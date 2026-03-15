@@ -1,0 +1,258 @@
+/* src/pages/billing/BillingDashboard.css */
+
+.bd {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-6);
+  max-width: 1100px;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+
+.bd__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.bd__title {
+  font-size: var(--font-size-24);
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0 0 4px;
+}
+
+.bd__subtitle {
+  font-size: var(--font-size-13);
+  color: var(--color-text-3);
+  margin: 0;
+}
+
+/* ── Date range controls ─────────────────────────────────────────────────── */
+
+.bd__controls {
+  padding: var(--space-4);
+}
+
+.bd__range {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.bd__range .ui-field {
+  flex: 1;
+  min-width: 140px;
+  max-width: 200px;
+}
+
+.bd__range-sep {
+  font-size: var(--font-size-13);
+  color: var(--color-text-3);
+  padding-bottom: 10px;
+  white-space: nowrap;
+}
+
+.bd__load-btn {
+  flex-shrink: 0;
+  margin-bottom: 1px;
+}
+
+.bd__error {
+  margin: var(--space-3) 0 0;
+  font-size: var(--font-size-13);
+  color: var(--color-danger);
+}
+
+/* ── Metric cards ────────────────────────────────────────────────────────── */
+
+.bd__metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-4);
+}
+
+.bd-metric {
+  padding: var(--space-5);
+  border-radius: var(--radius-lg);
+}
+
+.bd-metric--accent {
+  border-left: 3px solid var(--color-brand);
+}
+
+.bd-metric__label {
+  font-size: var(--font-size-12);
+  font-weight: 600;
+  color: var(--color-text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0 0 var(--space-2);
+}
+
+.bd-metric__value {
+  font-size: var(--font-size-24);
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.bd-metric__sub {
+  font-size: var(--font-size-12);
+  color: var(--color-text-3);
+  margin: var(--space-1) 0 0;
+}
+
+/* ── Section titles ──────────────────────────────────────────────────────── */
+
+.bd__section-title {
+  font-size: var(--font-size-16);
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0 0 var(--space-4);
+}
+
+/* ── Aging report ────────────────────────────────────────────────────────── */
+
+.bd__aging {
+  padding: var(--space-5);
+}
+
+.bd__aging-table-wrap {
+  overflow-x: auto;
+}
+
+.bd__aging-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-13);
+}
+
+.bd__aging-table thead th {
+  padding: 6px var(--space-3);
+  font-size: var(--font-size-11);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-3);
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+}
+
+.bd__aging-table tbody td,
+.bd__aging-table tfoot td {
+  padding: 9px var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+  vertical-align: middle;
+}
+
+.bd__aging-table tfoot td {
+  border-bottom: none;
+  border-top: 2px solid var(--color-border);
+  padding-top: 10px;
+}
+
+.bd__aging-row--zero td {
+  color: var(--color-text-3);
+}
+
+.bd__col-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  width: 120px;
+}
+
+.bd__col-bar {
+  width: 160px;
+  padding-left: var(--space-4) !important;
+}
+
+.bd__aging-bar {
+  height: 8px;
+  background: var(--color-brand);
+  border-radius: 4px;
+  min-width: 2px;
+  opacity: 0.7;
+  transition: width var(--transition);
+}
+
+/* Skeleton loading rows */
+.bd__skeleton-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.bd__skeleton-row {
+  height: 28px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, var(--color-bg-2) 25%, var(--color-bg-3) 50%, var(--color-bg-2) 75%);
+  background-size: 400% 100%;
+  animation: bd-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes bd-shimmer {
+  0%   { background-position: 100% 50% }
+  100% { background-position: 0%   50% }
+}
+
+/* ── Export controls ─────────────────────────────────────────────────────── */
+
+.bd__export {
+  padding: var(--space-5);
+}
+
+.bd__export-hint {
+  font-size: var(--font-size-13);
+  color: var(--color-text-3);
+  margin: -var(--space-2) 0 var(--space-4);
+}
+
+.bd__export-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.bd__checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-14);
+  color: var(--color-text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.bd__checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-brand);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.bd__count {
+  color: var(--color-text-3);
+  font-size: var(--font-size-13);
+}
+
+.bd__export-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.bd__export-summary {
+  font-size: var(--font-size-13);
+  color: var(--color-text-2);
+  margin: 0;
+}

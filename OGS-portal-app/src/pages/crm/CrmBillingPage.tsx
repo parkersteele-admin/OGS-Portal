@@ -1,2 +1,1 @@
-import placeholder from '../_placeholder'
-export default placeholder('CRM Billing')
+export { BillingDashboard as default } from '../billing/BillingDashboard'

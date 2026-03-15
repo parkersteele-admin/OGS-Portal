@@ -40,6 +40,7 @@ import LeadsPage from './pages/crm/LeadsPage'
 import QuotesPage from './pages/crm/QuotesPage'
 import CrmBillingPage from './pages/crm/CrmBillingPage'
 import AgingPage from './pages/crm/AgingPage'
+import BillingDashboard from './pages/billing/BillingDashboard'
 
 // ── Root redirect: auth-aware, sends each role to their home ─────────────────
 const RootRedirect: React.FC = () => {
@@ -97,6 +98,7 @@ export const Router: React.FC = () => (
         <Route path="dispatch" element={<DispatchPage />} />
         <Route path="tanks" element={<OpsTanksPage />} />
         <Route path="inventory" element={<InventoryPage />} />
+        <Route path="billing" element={<BillingDashboard />} />
       </Route>
 
       {/* Driver Portal */}
