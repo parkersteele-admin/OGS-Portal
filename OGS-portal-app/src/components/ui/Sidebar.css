@@ -1,0 +1,105 @@
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  width: 224px;
+  min-height: 100dvh;
+  background: var(--color-bg);
+  border-right: 1px solid var(--color-border);
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  overflow-y: auto;
+}
+
+.sidebar__logo-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  height: 56px;
+  flex-shrink: 0;
+}
+
+.sidebar__logo-mark {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.sidebar__logo-text {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-14);
+  font-weight: 700;
+  color: var(--color-brand);
+  letter-spacing: -0.01em;
+}
+
+.sidebar__portal-label {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-10);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-3);
+  padding: var(--space-4) var(--space-4) var(--space-2);
+  margin: 0;
+}
+
+.sidebar__nav {
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--space-2);
+  flex: 1;
+}
+
+.sidebar__link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-13);
+  font-weight: 500;
+  color: var(--color-text-2);
+  text-decoration: none;
+  transition: background var(--transition), color var(--transition);
+  margin-bottom: 2px;
+}
+
+.sidebar__link:hover {
+  background: var(--color-bg-2);
+  color: var(--color-text);
+}
+
+.sidebar__link--active {
+  background: var(--color-brand-light);
+  color: var(--color-brand-dark);
+}
+
+.sidebar__link--active .sidebar__icon {
+  color: var(--color-brand);
+}
+
+.sidebar__icon {
+  font-size: 16px;
+  line-height: 1;
+  flex-shrink: 0;
+  color: var(--color-text-3);
+  transition: color var(--transition);
+}
+
+.sidebar__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Hide on mobile */
+@media (max-width: 767px) {
+  .sidebar {
+    display: none;
+  }
+}

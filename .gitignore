@@ -1,8 +1,17 @@
-node_modules
+# Node.js
+node_modules/
 .env
 .env.local
 .env.*.local
+
+# Firebase
 firebase-debug.log
 .firebase/
+
+# Firebase service account keys — NEVER commit these
+*firebase-adminsdk*.json
+*service-account*.json
+
+# React/Vite
 dist/
 build/

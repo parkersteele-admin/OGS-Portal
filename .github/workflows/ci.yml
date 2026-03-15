@@ -1,29 +1,52 @@
-name: CI/CD
+name: CI
 
 on:
-  push:
-    branches:
-      - main
-      - staging
-      - develop
   pull_request:
     branches:
-      - main
+      - develop
       - staging
+      - main
+  push:
+    branches:
       - develop
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Set up Node.js
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
       - name: Install dependencies
-        run: npm install
-      - name: Build
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: TypeScript type check
+        run: npm run typecheck || true
+
+      - name: Run Vitest unit tests
+        run: npm run test
+
+      - name: Build Vite app
         run: npm run build
-      - name: Run tests
-        run: npm test || true
+
+    env:
+      NODE_ENV: production
+      # Add environment variables here, using GitHub secrets
+      # Example: FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}

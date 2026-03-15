@@ -1,24 +1,35 @@
-## Project: OGS Portal
+[![CI](https://github.com/parkersteele-admin/ogs-portal/actions/workflows/ci.yml/badge.svg)](https://github.com/parkersteele-admin/ogs-portal/actions/workflows/ci.yml)
 
-### Stack
-React + Vite
-Firebase (Auth, Firestore, Hosting, Functions, Storage)
+# OGS Portal
 
-### Setup Instructions
-_Coming soon_
+**Stack:** React + Vite, Firebase (Auth, Firestore, Hosting, Functions, Storage)
 
-### Branch Strategy
+## Setup Instructions
 
-```mermaid
-graph TD
-	develop((develop))
-	staging((staging))
-	main((main))
-	develop --> staging
-	staging --> main
+*To be added: step-by-step setup for local, GitHub, and Firebase workflows.*
+
+## Branch Strategy
+
+```
+main      ← production only (protected, PR + review required)
+  ↑
+staging   ← pre-production (merges from develop)
+  ↑
+develop   ← active development branch
 ```
 
-**Branch details:**
-- **main**: production only, protected, requires PR + review
-- **staging**: pre-production, merges from develop
-- **develop**: active development branch
+## Branch Strategy Diagram
+
+```
+          ┌─────────────┐
+          │   main      │
+          └─────▲───────┘
+                │
+          ┌─────┴───────┐
+          │  staging    │
+          └─────▲───────┘
+                │
+          ┌─────┴───────┐
+          │  develop    │
+          └─────────────┘
+```

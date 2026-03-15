@@ -1,0 +1,175 @@
+import {
+  doc,
+  getDoc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  onSnapshot,
+  query,
+  where,
+  orderBy,
+  serverTimestamp,
+  type QueryConstraint,
+  type Unsubscribe,
+} from 'firebase/firestore'
+import { db } from '../lib/firebase'
+import { ordersCol } from '../lib/firestore'
+import type { Order, OrderStatus, DeliveryTier } from '../types/order'
+import { serviceCall, fromSnap, paginate, type Page, type PageOptions, OgsValidationError } from './base'
+
+export interface OrderFilters {
+  customerId?: string
+  status?: OrderStatus
+  deliveryTier?: DeliveryTier
+  scheduledAfter?: Date
+  scheduledBefore?: Date
+}
+
+export interface CreateOrderInput {
+  customerId: string
+  productId: string
+  tankId?: string
+  quantity: number
+  deliveryTier: DeliveryTier
+  notes?: string
+}
+
+// Upcharge percentages by tier
+const TIER_UPCHARGE: Record<DeliveryTier, number> = {
+  standard: 0,
+  'next-day': 0.1,
+  'same-day': 0.25,
+}
+
+// ── Pricing ───────────────────────────────────────────────────────────────────
+
+export interface OrderPricing {
+  unitPrice: number
+  upchargePercent: number
+  subtotal: number
+  deliveryFee: number
+  total: number
+}
+
+export function calculateOrderPricing(
+  quantity: number,
+  unitPrice: number,
+  tier: DeliveryTier,
+  deliveryFee = 35,
+): OrderPricing {
+  const upchargePercent = TIER_UPCHARGE[tier]
+  const effectiveUnit = unitPrice * (1 + upchargePercent)
+  const subtotal = parseFloat((effectiveUnit * quantity).toFixed(2))
+  const total = parseFloat((subtotal + deliveryFee).toFixed(2))
+  return { unitPrice, upchargePercent, subtotal, deliveryFee, total }
+}
+
+// ── Valid status transitions ──────────────────────────────────────────────────
+
+const VALID_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  pending:    ['scheduled', 'cancelled'],
+  scheduled:  ['assigned',  'pending', 'cancelled'],
+  assigned:   ['in-transit','scheduled'],
+  'in-transit': ['delivered'],
+  delivered:  ['invoiced'],
+  invoiced:   ['paid'],
+  paid:       [],
+  cancelled:  [],
+}
+
+export function canTransition(from: OrderStatus, to: OrderStatus): boolean {
+  return VALID_TRANSITIONS[from]?.includes(to) ?? false
+}
+
+// ── Read ──────────────────────────────────────────────────────────────────────
+
+export async function getOrder(id: string): Promise<Order> {
+  return serviceCall(async () => {
+    const snap = await getDoc(doc(db, 'orders', id))
+    return fromSnap<Order>(snap, 'orders')
+  })
+}
+
+export async function getOrders(
+  filters: OrderFilters = {},
+  options: PageOptions = {},
+): Promise<Page<Order>> {
+  return serviceCall(async () => {
+    const constraints: QueryConstraint[] = [orderBy('requestedAt', 'desc')]
+    if (filters.customerId) constraints.push(where('customerId', '==', filters.customerId))
+    if (filters.status)     constraints.push(where('status', '==', filters.status))
+    if (filters.deliveryTier) constraints.push(where('deliveryTier', '==', filters.deliveryTier))
+    if (filters.scheduledAfter)  constraints.push(where('scheduledAt', '>=', filters.scheduledAfter))
+    if (filters.scheduledBefore) constraints.push(where('scheduledAt', '<=', filters.scheduledBefore))
+    return paginate<Order>(ordersCol, constraints, options)
+  })
+}
+
+export function subscribeToOrder(id: string, callback: (order: Order | null) => void): Unsubscribe {
+  return onSnapshot(doc(db, 'orders', id), (snap) => {
+    callback(snap.exists() ? ({ id: snap.id, ...snap.data() } as Order) : null)
+  })
+}
+
+export function subscribeToOrders(
+  filters: OrderFilters = {},
+  callback: (orders: Order[]) => void,
+): Unsubscribe {
+  const constraints: QueryConstraint[] = [orderBy('requestedAt', 'desc')]
+  if (filters.customerId) constraints.push(where('customerId', '==', filters.customerId))
+  if (filters.status)     constraints.push(where('status', '==', filters.status))
+  return onSnapshot(query(ordersCol, ...constraints), (snap) => {
+    callback(snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Order))
+  })
+}
+
+// ── Write ─────────────────────────────────────────────────────────────────────
+
+export async function createOrder(
+  data: CreateOrderInput,
+  unitPrice: number,
+): Promise<string> {
+  return serviceCall(async () => {
+    const pricing = calculateOrderPricing(data.quantity, unitPrice, data.deliveryTier)
+    const ref = await addDoc(ordersCol, {
+      ...data,
+      ...pricing,
+      status: 'pending' as OrderStatus,
+      requestedAt: serverTimestamp(),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    } as unknown as Omit<Order, 'id'>)
+    return ref.id
+  })
+}
+
+export async function updateOrder(
+  id: string,
+  data: Partial<Omit<Order, 'id' | 'createdAt' | 'requestedAt'>>,
+): Promise<void> {
+  return serviceCall(() =>
+    updateDoc(doc(db, 'orders', id), { ...data, updatedAt: serverTimestamp() }),
+  )
+}
+
+export async function transitionOrderStatus(
+  id: string,
+  nextStatus: OrderStatus,
+): Promise<void> {
+  return serviceCall(async () => {
+    const order = await getOrder(id)
+    if (!canTransition(order.status, nextStatus)) {
+      throw new OgsValidationError(
+        `Cannot transition order from '${order.status}' to '${nextStatus}'`,
+      )
+    }
+    await updateDoc(doc(db, 'orders', id), {
+      status: nextStatus,
+      updatedAt: serverTimestamp(),
+    })
+  })
+}
+
+export async function deleteOrder(id: string): Promise<void> {
+  return serviceCall(() => deleteDoc(doc(db, 'orders', id)))
+}

@@ -1,0 +1,62 @@
+.notif {
+  position: relative;
+}
+
+.notif__btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--color-text-2);
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+
+.notif__btn:hover {
+  background: var(--color-bg-3);
+  color: var(--color-text);
+}
+
+.notif__badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: 8px;
+  background: var(--color-danger);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  font-family: var(--font-sans);
+  letter-spacing: 0;
+}
+
+.notif__popover {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  width: 280px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 200;
+  overflow: hidden;
+}
+
+.notif__empty {
+  padding: var(--space-6);
+  text-align: center;
+  font-size: var(--font-size-13);
+  color: var(--color-text-3);
+  margin: 0;
+}
