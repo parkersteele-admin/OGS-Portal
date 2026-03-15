@@ -17,6 +17,7 @@ import DashboardPage from './pages/customer/DashboardPage'
 import OrderPage from './pages/customer/OrderPage'
 import OrdersPage from './pages/customer/OrdersPage'
 import InvoicesPage from './pages/customer/InvoicesPage'
+import PayInvoicePage from './pages/customer/PayInvoicePage'
 import AutopayPage from './pages/customer/AutopayPage'
 import TanksPage from './pages/customer/TanksPage'
 
@@ -75,6 +76,7 @@ export const Router: React.FC = () => (
         <Route path="order" element={<OrderPage />} />
         <Route path="orders" element={<OrdersPage />} />
         <Route path="invoices" element={<InvoicesPage />} />
+        <Route path="invoices/:invoiceId/pay" element={<PayInvoicePage />} />
         <Route path="autopay" element={<AutopayPage />} />
         <Route path="tanks" element={<TanksPage />} />
       </Route>

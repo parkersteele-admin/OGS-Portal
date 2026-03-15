@@ -1,9 +1,20 @@
-import { loadStripe } from '@stripe/stripe-js'
+/**
+ * src/lib/stripe.ts
+ *
+ * Lazy-initialises the Stripe.js client.  loadStripe() is deferred until the
+ * promise is first awaited — it does NOT execute on module import.
+ *
+ * Usage:
+ *   import { stripePromise } from '../lib/stripe'
+ *   <Elements stripe={stripePromise} ...>
+ */
 
-const publishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
+import { loadStripe, type Stripe } from '@stripe/stripe-js'
+import { STRIPE_PUBLISHABLE_KEY } from './env'
 
-if (!publishableKey) {
-  console.warn('VITE_STRIPE_PUBLISHABLE_KEY is not set')
-}
-
-export const stripe = loadStripe(publishableKey ?? '')
+// loadStripe caches the result internally so this is safe to reference anywhere.
+// Resolves to null when the key is absent (dev without Stripe configured) —
+// the Elements provider mounts cleanly but payments won't process.
+export const stripePromise: Promise<Stripe | null> = STRIPE_PUBLISHABLE_KEY
+  ? loadStripe(STRIPE_PUBLISHABLE_KEY)
+  : Promise.resolve(null)

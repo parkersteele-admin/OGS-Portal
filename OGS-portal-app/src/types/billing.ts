@@ -27,6 +27,12 @@ export interface Invoice {
   dueAt: Timestamp
   paidAt?: Timestamp
   stripeInvoiceId?: string
+  /** Active Stripe PaymentIntent ID for the current payment attempt. */
+  stripePaymentIntentId?: string
+  /** Cached clientSecret — reused on retry if the PI is still open. */
+  stripeClientSecret?: string
+  /** Signed Storage URL to the generated PDF invoice. */
+  pdfUrl?: string
   createdAt: Timestamp
   updatedAt: Timestamp
 }

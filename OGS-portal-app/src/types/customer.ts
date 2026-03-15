@@ -26,6 +26,12 @@ export interface Customer {
   status: CustomerStatus
   creditLimit: number
   notes?: string
+  /** Stripe Customer ID — set by createSetupIntent on first payment method save. */
+  stripeCustomerId?: string
+  /** Whether autopay is active for this customer. */
+  autopayEnabled?: boolean
+  /** Stripe PM ID currently used for autopay charges. */
+  autopayStripePaymentMethodId?: string
   createdAt: Timestamp
   updatedAt: Timestamp
 }
