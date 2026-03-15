@@ -26,6 +26,7 @@ import { db, FieldValue } from '../admin'
 import { STRIPE_SECRET_KEY, SENDGRID_API_KEY, requireSecret } from '../config'
 import { sendEmail } from '../mail'
 import { createNotification } from '../notifications/createNotification'
+import { generateInvoicePdf } from '../pdf/generateInvoicePdf'
 
 // ── Business-rule constants ───────────────────────────────────────────────────
 // Adjust these without touching logic.
@@ -251,6 +252,16 @@ export const onDeliveryComplete = onDocumentUpdated(
       }
     } catch (err) {
       console.error(`onDeliveryComplete [${orderId}]: invoice generation failed —`, err)
+    }
+
+    // ── Step 3b: Generate PDF ───────────────────────────────────────────────────
+    if (invoiceId) {
+      try {
+        await generateInvoicePdf(invoiceId)
+        console.log(`onDeliveryComplete [${orderId}]: PDF generated for invoice ${invoiceId}`)
+      } catch (err) {
+        console.error(`onDeliveryComplete [${orderId}]: PDF generation failed —`, err)
+      }
     }
 
     // ── Step 4: Autopay or invoice email ──────────────────────────────────────
