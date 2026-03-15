@@ -11,6 +11,7 @@
     "test": "vitest run",
     "prepare": "husky",
     "emulators": "firebase emulators:start",
+    "emulate": "firebase emulators:start --import=./emulator-data --export-on-exit=./emulator-data",
     "emulators:import": "firebase emulators:start --import=./emulator-data",
     "emulators:export": "firebase emulators:export ./emulator-data",
     "emulators:seed": "tsx scripts/seed-emulator.ts",
