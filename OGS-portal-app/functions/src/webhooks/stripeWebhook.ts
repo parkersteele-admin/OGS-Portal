@@ -27,6 +27,7 @@ import Stripe from 'stripe'
 import { db, FieldValue } from '../admin'
 import { STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, requireSecret } from '../config'
 import { sendEmail } from '../mail'
+import { createNotification } from '../notifications/createNotification'
 
 // Firebase Functions injects req.rawBody as a Buffer — typed here for clarity.
 type RawRequest = Request & { rawBody: Buffer }
@@ -214,36 +215,25 @@ async function handlePaymentIntentSucceeded(pi: Stripe.PaymentIntent): Promise<v
 
   // In-app notification: customer
   if (resolvedCustomerId) {
-    try {
-      await db.collection('notifications').add({
-        userId:    resolvedCustomerId,
-        type:      'payment_received',
-        title:     'Payment Received',
-        body:      `Your payment of $${amount.toFixed(2)} for invoice #${invoiceNumber ?? invoiceId} was successful.`,
-        entityId:  invoiceId,
-        read:      false,
-        createdAt: FieldValue.serverTimestamp(),
-      })
-    } catch (err) {
-      console.error(`payment_intent.succeeded [${pi.id}]: customer notification failed —`, err)
-    }
+    await createNotification({
+      userId:   resolvedCustomerId,
+      type:     'payment_received',
+      title:    'Payment Received',
+      body:     `Your payment of $${amount.toFixed(2)} for invoice #${invoiceNumber ?? invoiceId} was successful.`,
+      entityId: invoiceId,
+      link:     `/portal/invoices/${invoiceId}`,
+    })
   }
 
   // In-app notification: dispatch
-  try {
-    await db.collection('notifications').add({
-      userId:    null,
-      role:      'dispatch',
-      type:      'payment_received',
-      title:     'Payment Received',
-      body:      `Invoice #${invoiceNumber ?? invoiceId} paid — $${amount.toFixed(2)}.`,
-      entityId:  invoiceId,
-      read:      false,
-      createdAt: FieldValue.serverTimestamp(),
-    })
-  } catch (err) {
-    console.error(`payment_intent.succeeded [${pi.id}]: dispatch notification failed —`, err)
-  }
+  await createNotification({
+    userId:   null,
+    role:     'dispatch',
+    type:     'payment_received',
+    title:    'Payment Received',
+    body:     `Invoice #${invoiceNumber ?? invoiceId} paid — $${amount.toFixed(2)}.`,
+    entityId: invoiceId,
+  })
 
   // Receipt email
   if (customerData?.email) {
@@ -326,21 +316,15 @@ async function handlePaymentIntentFailed(pi: Stripe.PaymentIntent): Promise<void
   }
 
   // ── Staff alert notification ──────────────────────────────────────────────
-  try {
-    await db.collection('notifications').add({
-      userId:    null,
-      role:      'dispatch',
-      type:      'payment_failed',
-      title:     'Payment Failed',
-      body:      `Invoice #${invoiceNumber ?? invoiceId} payment failed: ${failReason}`,
-      entityId:  invoiceId,
-      priority:  'high',
-      read:      false,
-      createdAt: FieldValue.serverTimestamp(),
-    })
-  } catch (err) {
-    console.error(`payment_intent.payment_failed [${pi.id}]: staff alert failed —`, err)
-  }
+  await createNotification({
+    userId:   null,
+    role:     'dispatch',
+    type:     'payment_failed',
+    title:    'Payment Failed',
+    body:     `Invoice #${invoiceNumber ?? invoiceId} payment failed: ${failReason}`,
+    entityId: invoiceId,
+    priority: 'high',
+  })
 
   // ── Customer failure email ────────────────────────────────────────────────
   if (customerData?.email) {

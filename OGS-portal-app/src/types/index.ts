@@ -19,11 +19,31 @@ export type {
 export type { Lead, LeadStatus, Quote, QuoteItem, QuoteStatus, ContactLog } from './crm'
 export type { AppFile } from './file'
 
+export type NotificationType =
+  | 'rush_order'
+  | 'delivery_complete'
+  | 'payment_received'
+  | 'payment_failed'
+  | 'low_tank'
+  | 'overdue_invoice'
+  | 'cert_expiry'
+  | string  // allow extension without a breaking change
+
 export interface Notification {
   id: string
-  userId: string
+  /** Target user ID, or null for role-broadcast notifications. */
+  userId: string | null
+  /** Target role for broadcast notifications (e.g. 'dispatch'). */
+  role?: string
+  type: NotificationType
   title: string
   body: string
+  /** Optional deep link to navigate to on click. */
+  link?: string
+  /** Related Firestore document ID (orderId, invoiceId, etc.). */
+  entityId?: string
+  /** 'high' notifications may be visually emphasised. */
+  priority?: 'normal' | 'high' | 'urgent'
   read: boolean
-  createdAt: Date
+  createdAt: import('firebase/firestore').Timestamp
 }

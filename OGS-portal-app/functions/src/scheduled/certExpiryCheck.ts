@@ -19,6 +19,7 @@ import { onSchedule } from 'firebase-functions/v2/scheduler'
 import { db, FieldValue, Timestamp } from '../admin'
 import { SENDGRID_API_KEY, requireSecret } from '../config'
 import { sendEmail } from '../mail'
+import { createNotification } from '../notifications/createNotification'
 
 const WARN_DAYS   = 30
 const URGENT_DAYS = 7
@@ -89,16 +90,14 @@ export const certExpiryCheck = onSchedule(
           const expiryStr = expiresAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
 
           // Firestore notification for dispatch
-          await db.collection('notifications').add({
-            userId:    null,
-            role:      'dispatch',
-            type:      'cert_expiry',
-            title:     isUrgent ? '⚠️ Cert Expiring in Days' : 'Cert Expiry Notice',
-            body:      `${fileType} "${fileName}" expires ${expiryStr} (${daysLeft} day${daysLeft !== 1 ? 's' : ''}).`,
-            entityId:  fileId,
-            priority:  isUrgent ? 'urgent' : 'normal',
-            read:      false,
-            createdAt: FieldValue.serverTimestamp(),
+          await createNotification({
+            userId:   null,
+            role:     'dispatch',
+            type:     'cert_expiry',
+            title:    isUrgent ? '⚠️ Cert Expiring in Days' : 'Cert Expiry Notice',
+            body:     `${fileType} "${fileName}" expires ${expiryStr} (${daysLeft} day${daysLeft !== 1 ? 's' : ''}).`,
+            entityId: fileId,
+            priority: isUrgent ? 'urgent' : 'normal',
           })
           stats.notifs++
 

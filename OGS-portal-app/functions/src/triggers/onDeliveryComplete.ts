@@ -25,6 +25,7 @@ import Stripe from 'stripe'
 import { db, FieldValue } from '../admin'
 import { STRIPE_SECRET_KEY, SENDGRID_API_KEY, requireSecret } from '../config'
 import { sendEmail } from '../mail'
+import { createNotification } from '../notifications/createNotification'
 
 // ── Business-rule constants ───────────────────────────────────────────────────
 // Adjust these without touching logic.
@@ -362,22 +363,16 @@ export const onDeliveryComplete = onDocumentUpdated(
     }
 
     // ── Step 6: In-app notification for dispatch ──────────────────────────────
-    try {
-      const orderNum = (orderData!.orderNumber as string | undefined) ?? orderId
-      await db.collection('notifications').add({
-        userId:    null,
-        role:      'dispatch',
-        type:      'delivery_complete',
-        title:     'Delivery Complete',
-        body:      `Order ${orderNum} delivered — ${quantityDelivered.toFixed(1)} gal.`,
-        entityId:  orderId,
-        read:      false,
-        createdAt: FieldValue.serverTimestamp(),
-      })
-      console.log(`onDeliveryComplete [${orderId}]: dispatch notification created`)
-    } catch (err) {
-      console.error(`onDeliveryComplete [${orderId}]: dispatch notification failed —`, err)
-    }
+    const orderNum = (orderData!.orderNumber as string | undefined) ?? orderId
+    await createNotification({
+      userId:   null,
+      role:     'dispatch',
+      type:     'delivery_complete',
+      title:    'Delivery Complete',
+      body:     `Order ${orderNum} delivered — ${quantityDelivered.toFixed(1)} gal.`,
+      entityId: orderId,
+    })
+    console.log(`onDeliveryComplete [${orderId}]: dispatch notification created`)
 
     // ── Run completion check ──────────────────────────────────────────────────
     // Mark run complete when every stop is in a terminal state.

@@ -22,6 +22,7 @@ import { onSchedule } from 'firebase-functions/v2/scheduler'
 import { db, FieldValue, Timestamp } from '../admin'
 import { SENDGRID_API_KEY, requireSecret } from '../config'
 import { sendEmail } from '../mail'
+import { createNotification } from '../notifications/createNotification'
 
 // Thresholds (days overdue)
 const THRESHOLD_7D  = 7
@@ -122,16 +123,13 @@ export const overdueInvoiceCheck = onSchedule(
           await sendReminderEmail(customer, invoiceNumber, totalAmount, daysOverdue, '30-day')
           await sendReminderNotification(customerId, invoiceId, invoiceNumber, daysOverdue, false)
           // Staff notification: accounts > 30 days need follow-up
-          await db.collection('notifications').add({
-            userId:    null,
-            role:      'dispatch',
-            type:      'invoice_overdue_30d',
-            title:     '30-Day Overdue Invoice',
-            body:      `Invoice #${invoiceNumber} ($${totalAmount.toFixed(2)}) is ${daysOverdue} days overdue. Customer follow-up required.`,
-            entityId:  invoiceId,
-            priority:  'normal',
-            read:      false,
-            createdAt: FieldValue.serverTimestamp(),
+          await createNotification({
+            userId:   null,
+            role:     'dispatch',
+            type:     'invoice_overdue_30d',
+            title:    '30-Day Overdue Invoice',
+            body:     `Invoice #${invoiceNumber} ($${totalAmount.toFixed(2)}) is ${daysOverdue} days overdue. Customer follow-up required.`,
+            entityId: invoiceId,
           })
           await invoiceDoc.ref.update({
             'reminders.sent30d': true,
@@ -145,16 +143,14 @@ export const overdueInvoiceCheck = onSchedule(
         if (daysOverdue >= THRESHOLD_60D && !reminders.sent60d) {
           await sendReminderEmail(customer, invoiceNumber, totalAmount, daysOverdue, '60-day')
           await sendReminderNotification(customerId, invoiceId, invoiceNumber, daysOverdue, false)
-          await db.collection('notifications').add({
-            userId:    null,
-            role:      'dispatch',
-            type:      'invoice_overdue_60d',
-            title:     '60-Day Overdue Invoice — Final Warning Sent',
-            body:      `Invoice #${invoiceNumber} ($${totalAmount.toFixed(2)}) is ${daysOverdue} days overdue. Final warning sent to customer.`,
-            entityId:  invoiceId,
-            priority:  'high',
-            read:      false,
-            createdAt: FieldValue.serverTimestamp(),
+          await createNotification({
+            userId:   null,
+            role:     'dispatch',
+            type:     'invoice_overdue_60d',
+            title:    '60-Day Overdue Invoice — Final Warning Sent',
+            body:     `Invoice #${invoiceNumber} ($${totalAmount.toFixed(2)}) is ${daysOverdue} days overdue. Final warning sent to customer.`,
+            entityId: invoiceId,
+            priority: 'high',
           })
           await invoiceDoc.ref.update({
             'reminders.sent60d': true,
@@ -178,16 +174,14 @@ export const overdueInvoiceCheck = onSchedule(
           }
 
           // Urgent staff alert
-          await db.collection('notifications').add({
-            userId:    null,
-            role:      'dispatch',
-            type:      'invoice_overdue_90d',
-            title:     'Credit Hold Review Required',
-            body:      `Invoice #${invoiceNumber} ($${totalAmount.toFixed(2)}) is ${daysOverdue} days overdue. Account flagged for credit hold review.`,
-            entityId:  invoiceId,
-            priority:  'urgent',
-            read:      false,
-            createdAt: FieldValue.serverTimestamp(),
+          await createNotification({
+            userId:   null,
+            role:     'dispatch',
+            type:     'invoice_overdue_90d',
+            title:    'Credit Hold Review Required',
+            body:     `Invoice #${invoiceNumber} ($${totalAmount.toFixed(2)}) is ${daysOverdue} days overdue. Account flagged for credit hold review.`,
+            entityId: invoiceId,
+            priority: 'urgent',
           })
 
           await invoiceDoc.ref.update({
@@ -273,16 +267,13 @@ async function sendReminderNotification(
 ): Promise<void> {
   if (!customerId) return
 
-  await db.collection('notifications').add({
-    userId:    customerId,
-    type:      'invoice_overdue',
-    title:     'Invoice Overdue',
-    body:      `Invoice #${invoiceNumber} is ${daysOverdue} days past due. Please pay to avoid service interruption.`,
-    entityId:  invoiceId,
-    priority:  urgent ? 'high' : 'normal',
-    read:      false,
-    createdAt: FieldValue.serverTimestamp(),
-  }).catch((err) =>
-    console.error(`overdueInvoiceCheck [${invoiceId}]: customer notification failed —`, err)
-  )
+  await createNotification({
+    userId:   customerId,
+    type:     'invoice_overdue',
+    title:    'Invoice Overdue',
+    body:     `Invoice #${invoiceNumber} is ${daysOverdue} days past due. Please pay to avoid service interruption.`,
+    entityId: invoiceId,
+    link:     `/portal/invoices/${invoiceId}`,
+    priority: urgent ? 'high' : 'normal',
+  })
 }

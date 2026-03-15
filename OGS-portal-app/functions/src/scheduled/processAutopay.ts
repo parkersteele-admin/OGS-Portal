@@ -21,6 +21,7 @@ import Stripe from 'stripe'
 import { db, FieldValue } from '../admin'
 import { STRIPE_SECRET_KEY, SENDGRID_API_KEY, requireSecret } from '../config'
 import { sendEmail } from '../mail'
+import { createNotification } from '../notifications/createNotification'
 
 export const processAutopay = onSchedule(
   {
@@ -228,16 +229,14 @@ async function handleAutopayFailure(
     }),
 
     // Staff notification
-    db.collection('notifications').add({
-      userId:    null,
-      role:      'dispatch',
-      type:      'autopay_failed',
-      title:     'Autopay Failed',
-      body:      `Invoice #${invoiceNumber} autopay failed: ${reason}`,
-      entityId:  invoiceId,
-      priority:  'high',
-      read:      false,
-      createdAt: FieldValue.serverTimestamp(),
+    createNotification({
+      userId:   null,
+      role:     'dispatch',
+      type:     'autopay_failed',
+      title:    'Autopay Failed',
+      body:     `Invoice #${invoiceNumber} autopay failed: ${reason}`,
+      entityId: invoiceId,
+      priority: 'high',
     }),
 
     // Customer email
