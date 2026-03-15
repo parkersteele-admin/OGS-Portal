@@ -99,46 +99,5 @@ export const onOrderComplete = onDocumentUpdated(
   },
 )
 
-// ── onDeliveryComplete ────────────────────────────────────────────────────────
-
-/**
- * Triggered when a RunStop document transitions to status = 'completed'.
- *
- * Actions:
- *  1. Mark the linked order as 'completed'.
- *  2. If all stops in the run are now complete, mark the run 'completed'.
- */
-export const onDeliveryComplete = onDocumentUpdated(
-  'runs/{runId}/stops/{stopId}',
-  async (event) => {
-    const before = event.data?.before.data()
-    const after  = event.data?.after.data()
-
-    if (!after || before?.status === 'completed' || after.status !== 'completed') {
-      return
-    }
-
-    const { runId } = event.params
-
-    // ── 1. Complete the linked order ────────────────────────────────────────
-    if (after.orderId) {
-      await db.collection('orders').doc(after.orderId as string).update({
-        status:      'completed',
-        completedAt: FieldValue.serverTimestamp(),
-        updatedAt:   FieldValue.serverTimestamp(),
-      })
-    }
-
-    // ── 2. Check if all run stops are now complete ──────────────────────────
-    const stopsSnap = await db.collection(`runs/${runId}/stops`).get()
-    const allDone   = stopsSnap.docs.every((d) => d.data().status === 'completed')
-
-    if (allDone) {
-      await db.collection('runs').doc(runId).update({
-        status:      'completed',
-        completedAt: FieldValue.serverTimestamp(),
-        updatedAt:   FieldValue.serverTimestamp(),
-      })
-    }
-  },
-)
+// onDeliveryComplete has been promoted to functions/src/triggers/onDeliveryComplete.ts
+// with the full business-logic implementation (tank level, invoice, autopay, emails, notifications).

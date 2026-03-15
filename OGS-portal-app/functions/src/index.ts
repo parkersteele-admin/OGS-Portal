@@ -38,9 +38,14 @@ import './admin'
 import { onRequest } from 'firebase-functions/v2/https'
 
 export { onUserCreated, onUserRoleUpdated, setUserRole }          from './auth'
-export { stripeWebhook, createStripePaymentIntent }               from './stripe'
-export { onOrderComplete, onDeliveryComplete }                    from './orders'
-export { processAutopay, lowLevelAlertCheck, certExpiryCheck }    from './scheduled'
+export { stripeWebhook }                                          from './webhooks/stripeWebhook'
+export { createStripePaymentIntent }                              from './stripe'
+export { onOrderComplete }                                        from './orders'
+export { onDeliveryComplete }                                     from './triggers/onDeliveryComplete'
+export { processAutopay }         from './scheduled/processAutopay'
+export { lowLevelAlertCheck }     from './scheduled/lowLevelAlertCheck'
+export { overdueInvoiceCheck }    from './scheduled/overdueInvoiceCheck'
+export { certExpiryCheck }        from './scheduled/certExpiryCheck'
 export { generateInvoicePdf, optimizeRoute }                      from './callables'
 
 export const healthCheck = onRequest((_req, res) => {
