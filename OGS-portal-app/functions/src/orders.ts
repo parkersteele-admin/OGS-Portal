@@ -8,7 +8,8 @@
 import { onDocumentUpdated } from 'firebase-functions/v2/firestore'
 import { db, FieldValue } from './admin'
 import { SENDGRID_API_KEY } from './config'
-import { sendEmail, orderConfirmationHtml } from './mail'
+import { sendTemplateEmail } from './email/sendEmail'
+import { TEMPLATE_ORDER_CONFIRMATION } from './email/templates'
 
 // ── onOrderComplete ───────────────────────────────────────────────────────────
 
@@ -84,17 +85,16 @@ export const onOrderComplete = onDocumentUpdated(
     const customer = customerSnap.data()!
     if (!customer.email) return
 
-    await sendEmail({
-      to:      customer.email as string,
-      subject: `Order Confirmed – ${after.orderNumber as string}`,
-      html:    orderConfirmationHtml({
-        customerName: customer.name  as string,
-        orderNumber:  after.orderNumber as string,
-        gallons:      after.gallons   as number,
-        scheduledAt:  after.scheduledAt
-          ? new Date((after.scheduledAt as { toDate(): Date }).toDate()).toLocaleDateString()
-          : 'TBD',
-      }),
+    await sendTemplateEmail(customer.email as string, TEMPLATE_ORDER_CONFIRMATION, {
+      customerName:  customer.name    as string,
+      orderNumber:   after.orderNumber as string,
+      product:       'Gas delivery',
+      quantity:      after.gallons    as number,
+      deliveryTier:  after.deliveryTier as string ?? 'standard',
+      estimatedDate: after.scheduledAt
+        ? new Date((after.scheduledAt as { toDate(): Date }).toDate()).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+        : 'TBD',
+      total: `$${((after.gallons as number) * (after.unitPrice as number) * 1.08).toFixed(2)}`,
     })
   },
 )
