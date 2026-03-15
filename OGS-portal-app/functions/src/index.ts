@@ -49,6 +49,7 @@ export { lowLevelAlertCheck }     from './scheduled/lowLevelAlertCheck'
 export { overdueInvoiceCheck }    from './scheduled/overdueInvoiceCheck'
 export { certExpiryCheck }        from './scheduled/certExpiryCheck'
 export { generateInvoicePdf, optimizeRoute }                      from './callables'
+export { optimizeOrderRoute }                                     from './maps/optimizeRoute'
 
 export const healthCheck = onRequest((_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
