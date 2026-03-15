@@ -16,6 +16,7 @@ import {
 import { db } from '../lib/firebase'
 import { customersCol } from '../lib/firestore'
 import type { Customer, CustomerStatus } from '../types/customer'
+import { formatAddress } from '../utils/addressUtils'
 import { serviceCall, fromSnap, paginate, type Page, type PageOptions } from './base'
 
 export interface CustomerFilters {
@@ -88,6 +89,9 @@ export async function createCustomer(data: CreateCustomerInput): Promise<string>
       ...data,
       status: 'active' as CustomerStatus,
       creditLimit: data.creditLimit ?? 5000,
+      // geocodeCustomer Cloud Function handles geocoding server-side.
+      // Mark pending here so the UI can show a spinner immediately.
+      geocodeStatus: 'pending',
       ...(coords ?? {}),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -121,7 +125,11 @@ export async function deleteCustomer(id: string): Promise<void> {
   return serviceCall(() => deleteDoc(doc(db, 'customers', id)))
 }
 
-// ── Geocode helper (stub — swap for Google Maps Geocoding API call) ────────────
+// ── Geocode helper ────────────────────────────────────────────────────────────
+// Client-side geocoding is a best-effort fallback used only when the server-
+// side geocodeCustomer trigger has not yet run (e.g. during development with
+// emulators disabled).
+// The definitive geocoding path is the Cloud Function (server-side key).
 
 interface GeocodableAddress {
   address?: string
@@ -134,9 +142,12 @@ async function geocodeAddress(addr: GeocodableAddress): Promise<{ lat: number; l
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined
   if (!apiKey) throw new Error('VITE_GOOGLE_MAPS_API_KEY not set')
 
-  const addressString = [addr.address, addr.city, addr.state, addr.zip]
-    .filter(Boolean)
-    .join(', ')
+  const addressString = formatAddress({
+    address: addr.address ?? '',
+    city:    addr.city    ?? '',
+    state:   addr.state   ?? 'OH',
+    zip:     addr.zip     ?? '',
+  })
 
   const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(addressString)}&key=${apiKey}`
   const res = await fetch(url)

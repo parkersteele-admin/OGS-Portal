@@ -43,6 +43,7 @@ export { createStripePaymentIntent }                              from './stripe
 export { createSetupIntent, savePaymentMethod, removePaymentMethod } from './stripe/index'
 export { onOrderComplete }                                        from './orders'
 export { onDeliveryComplete }                                     from './triggers/onDeliveryComplete'
+export { geocodeCustomerOnCreate, geocodeCustomerOnUpdate }       from './triggers/geocodeCustomer'
 export { processAutopay }         from './scheduled/processAutopay'
 export { lowLevelAlertCheck }     from './scheduled/lowLevelAlertCheck'
 export { overdueInvoiceCheck }    from './scheduled/overdueInvoiceCheck'

@@ -23,6 +23,14 @@ export interface Customer {
   zip: string
   lat?: number
   lng?: number
+  /** Formatted address string returned by the Geocoding API. */
+  formattedAddress?: string
+  /** Google Maps place ID for the geocoded location. */
+  placeId?: string
+  /** Geocoding pipeline status. Set by the geocodeCustomer Cloud Function. */
+  geocodeStatus?: 'pending' | 'ok' | 'failed'
+  /** ISO timestamp of the last successful geocode. */
+  geocodedAt?: string
   status: CustomerStatus
   creditLimit: number
   notes?: string
