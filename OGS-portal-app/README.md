@@ -34,7 +34,7 @@ App Check (reCAPTCHA v3) blocks unauthorized clients from hitting Firebase servi
 
 1. Register a reCAPTCHA v3 site key at <https://www.google.com/recaptcha/admin>
    - Type: **Score-based (v3)**
-   - Domain: `ohiogashub.com`
+   - Domain: `ohiogassupply.com`
 2. Add the site key to the production environment secret `VITE_RECAPTCHA_SITE_KEY`.
 3. Register the app in **Firebase console → App Check → Apps** using the same reCAPTCHA v3 site key.
 

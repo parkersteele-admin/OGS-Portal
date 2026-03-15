@@ -80,7 +80,7 @@ export const createStripePaymentIntent = onCall(
         invoiceId:     data.invoiceId as string,
         customerId:    invoice.customerId as string,
         invoiceNumber: invoice.invoiceNumber as string,
-        ohioGasHub:    'true',
+        OhioGasSupply: 'true',
       },
     }
     if (stripeCustomerId) piParams.customer = stripeCustomerId
