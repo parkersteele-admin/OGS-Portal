@@ -1,0 +1,64 @@
+/* ── View As Banner ───────────────────────────────────────────────────────────
+   Shown at the very top of the layout when admin is impersonating a customer.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.va-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: 7px var(--space-6);
+  background: var(--color-brand);
+  color: #fff;
+  font-size: var(--font-size-13);
+  position: sticky;
+  top: 0;
+  z-index: 150;
+  /* Sits above TopBar (z-index 100) but below modals (z-index 200+) */
+}
+
+.va-banner__inner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  flex: 1;
+}
+
+.va-banner__icon {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.va-banner__text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.va-banner__email {
+  opacity: 0.75;
+  font-weight: 400;
+}
+
+.va-banner__exit {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  padding: 4px var(--space-3);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: #fff;
+  font-size: var(--font-size-12);
+  font-weight: 600;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  white-space: nowrap;
+}
+
+.va-banner__exit:hover {
+  background: rgba(255, 255, 255, 0.18);
+}

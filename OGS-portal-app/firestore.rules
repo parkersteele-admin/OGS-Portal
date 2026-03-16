@@ -1,0 +1,207 @@
+rules_version = '2';
+// ── App Check enforcement ─────────────────────────────────────────────────────
+// Token validation is enforced in the Firebase console, not in rules.
+// To enable: Firebase console → App Check → Firestore → Enforce.
+// Rules below assume an authenticated user; App Check adds a second layer that
+// blocks unauthenticated SDK calls entirely before rules are even evaluated.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Fetches the current user's Firestore document.
+    // Firestore deduplicates get() calls within a single rule evaluation, so
+    // calling getRole() multiple times incurs only one read per request.
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function getRole() {
+      return getUserData().role;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && getRole() == 'admin';
+    }
+
+    // admin + dispatch
+    function isDispatch() {
+      return isAuthenticated() && getRole() in ['admin', 'dispatch'];
+    }
+
+    function isDriver() {
+      return isAuthenticated() && getRole() == 'driver';
+    }
+
+    // admin + sales
+    function isSales() {
+      return isAuthenticated() && getRole() in ['admin', 'sales'];
+    }
+
+    function isCustomer() {
+      return isAuthenticated() && getRole() == 'customer';
+    }
+
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    // Returns the customerId field from the current user's document.
+    // For customer-role users this links to the /customers collection.
+    function linkedCustomerId() {
+      return getUserData().customerId;
+    }
+
+    // True when the write only touches the listed field names.
+    function onlyUpdatesFields(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
+    }
+
+
+    // ── Users ─────────────────────────────────────────────────────────────────
+    match /users/{userId} {
+      allow read:   if isOwner(userId) || isAdmin();
+      allow create: if isAdmin();
+      // Users may update their own non-sensitive profile fields only.
+      allow update: if isAdmin()
+        || (isOwner(userId)
+            && onlyUpdatesFields(['name', 'phone', 'avatarUrl', 'updatedAt']));
+      allow delete: if isAdmin();
+    }
+
+
+    // ── Customers ─────────────────────────────────────────────────────────────
+    match /customers/{customerId} {
+      allow read:   if isDispatch()
+        || isSales()
+        || (isCustomer() && linkedCustomerId() == customerId);
+      allow create: if isDispatch() || isSales();
+      allow update: if isDispatch() || isSales();
+      allow delete: if isAdmin();
+
+      // Customer-scoped tanks (mirrors the top-level /tanks collection).
+      match /tanks/{tankId} {
+        allow read:  if isDispatch()
+          || (isCustomer() && linkedCustomerId() == customerId);
+        allow write: if isDispatch();
+      }
+
+      // Payment methods are managed exclusively via Stripe + Cloud Functions.
+      match /paymentMethods/{pmId} {
+        allow read:  if isDispatch()
+          || (isCustomer() && linkedCustomerId() == customerId);
+        allow write: if false;
+      }
+    }
+
+
+    // ── Tanks (top-level) ─────────────────────────────────────────────────────
+    match /tanks/{tankId} {
+      allow read:  if isDispatch()
+        || (isCustomer() && resource.data.customerId == linkedCustomerId());
+      allow write: if isDispatch();
+    }
+
+
+    // ── Orders ────────────────────────────────────────────────────────────────
+    match /orders/{orderId} {
+      allow read: if isDispatch()
+        || isSales()
+        || (isCustomer() && resource.data.customerId == linkedCustomerId());
+      allow create: if isDispatch() || isSales() || isCustomer();
+      // Dispatch may change any field.
+      // Drivers may only record delivery outcome — no financial fields.
+      allow update: if isDispatch()
+        || (isDriver()
+            && onlyUpdatesFields(['status', 'gallonsDelivered', 'deliveredAt', 'notes', 'updatedAt']));
+      allow delete: if isAdmin();
+    }
+
+
+    // ── Runs ──────────────────────────────────────────────────────────────────
+    match /runs/{runId} {
+      allow read:              if isDispatch() || isDriver();
+      allow create, update, delete: if isDispatch();
+
+      // Run stops (subcollection)
+      match /stops/{stopId} {
+        allow read:          if isDispatch() || isDriver();
+        allow create, delete: if isDispatch();
+        // Drivers may update stops only on runs assigned to them.
+        allow update: if isDispatch()
+          || (isDriver()
+              && get(/databases/$(database)/documents/runs/$(runId)).data.driverId
+                 == request.auth.uid);
+      }
+    }
+
+
+    // ── Invoices ──────────────────────────────────────────────────────────────
+    match /invoices/{invoiceId} {
+      allow read: if isDispatch()
+        || isSales()
+        || (isCustomer() && resource.data.customerId == linkedCustomerId());
+      allow write: if isAdmin() || isDispatch();
+    }
+
+
+    // ── Payments ──────────────────────────────────────────────────────────────
+    // All payment writes go through Firebase Functions with the Admin SDK.
+    // Client-side writes are never permitted.
+    match /payments/{paymentId} {
+      allow read: if isDispatch()
+        || (isCustomer() && resource.data.customerId == linkedCustomerId());
+      allow write: if false;
+    }
+
+
+    // ── Notifications ─────────────────────────────────────────────────────────
+    match /notifications/{notifId} {
+      allow read: if isAuthenticated() && isOwner(resource.data.userId);
+      // Users may only mark their own notifications as read.
+      allow update: if isAuthenticated()
+        && isOwner(resource.data.userId)
+        && onlyUpdatesFields(['read']);
+      allow create, delete: if false; // Functions only
+    }
+
+
+    // ── Products (price catalog) ──────────────────────────────────────────────
+    match /products/{productId} {
+      allow read:  if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+
+    // ── Leads ─────────────────────────────────────────────────────────────────
+    match /leads/{leadId} {
+      allow read, write: if isSales();
+    }
+
+
+    // ── Quotes ────────────────────────────────────────────────────────────────
+    match /quotes/{quoteId} {
+      allow read: if isSales()
+        || (isCustomer() && resource.data.customerId == linkedCustomerId());
+      allow write: if isSales();
+    }
+
+
+    // ── Contact logs ──────────────────────────────────────────────────────────
+    match /contactLogs/{logId} {
+      allow read, write: if isSales();
+    }
+
+
+    // ── Deny everything else ──────────────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+

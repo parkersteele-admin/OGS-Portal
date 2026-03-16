@@ -1,0 +1,126 @@
+name: Deploy — Staging
+
+on:
+  push:
+    branches: [staging]
+
+jobs:
+  # ─── Hosting ───────────────────────────────────────────────────────────────
+  deploy_hosting:
+    name: Build & Deploy Hosting
+    runs-on: ubuntu-latest
+    environment: staging
+    outputs:
+      preview_url: ${{ steps.hosting.outputs.details_url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_FIREBASE_API_KEY: ${{ fromJson(secrets.VITE_FIREBASE_CONFIG).apiKey }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ fromJson(secrets.VITE_FIREBASE_CONFIG).authDomain }}
+          VITE_FIREBASE_PROJECT_ID: ${{ fromJson(secrets.VITE_FIREBASE_CONFIG).projectId }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ fromJson(secrets.VITE_FIREBASE_CONFIG).storageBucket }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ fromJson(secrets.VITE_FIREBASE_CONFIG).messagingSenderId }}
+          VITE_FIREBASE_APP_ID: ${{ fromJson(secrets.VITE_FIREBASE_CONFIG).appId }}
+          VITE_STRIPE_PUBLISHABLE_KEY: ${{ secrets.VITE_STRIPE_PUBLISHABLE_KEY }}
+          VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_KEY }}
+          VITE_APP_ENV: staging
+
+      - name: Deploy to Firebase Hosting (staging channel)
+        id: hosting
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_STAGING }}
+          projectId: ${{ fromJson(secrets.VITE_FIREBASE_CONFIG).projectId }}
+          channelId: staging
+
+      - name: Comment preview URL on related PR
+        if: steps.hosting.outputs.details_url != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${context.repo.owner}:staging`,
+            });
+            if (prs.length === 0) {
+              core.info('No open PR found for staging branch — skipping comment.');
+              return;
+            }
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = [
+              '## 🔥 Firebase Hosting — Staging Preview',
+              '',
+              '| | |',
+              '|---|---|',
+              `| **Preview URL** | ${{ steps.hosting.outputs.details_url }} |`,
+              `| **Commit** | \`${context.sha.slice(0, 7)}\` |`,
+              `| **Workflow run** | [View](${runUrl}) |`,
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prs[0].number,
+              body,
+            });
+
+  # ─── Functions ─────────────────────────────────────────────────────────────
+  deploy_functions:
+    name: Deploy Functions (if changed)
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check for functions changes
+        id: changes
+        run: |
+          if git diff --name-only HEAD~1 HEAD | grep -q '^functions/'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No changes in functions/ — skipping deploy."
+          fi
+
+      - name: Setup Node.js 20
+        if: steps.changes.outputs.changed == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+
+      - name: Install functions dependencies
+        if: steps.changes.outputs.changed == 'true'
+        run: npm ci
+        working-directory: functions
+
+      - name: Authenticate to Google Cloud
+        if: steps.changes.outputs.changed == 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_STAGING }}
+
+      - name: Deploy Firebase Functions
+        if: steps.changes.outputs.changed == 'true'
+        run: npx firebase-tools deploy --only functions --project staging --non-interactive

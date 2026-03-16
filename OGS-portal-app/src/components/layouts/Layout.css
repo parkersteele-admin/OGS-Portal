@@ -1,0 +1,48 @@
+.layout {
+  display: flex;
+  min-height: 100dvh;
+}
+
+.layout__main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.layout__content {
+  flex: 1;
+  padding: var(--space-6);
+}
+
+/* Mobile padding to clear bottom nav */
+@media (max-width: 767px) {
+  .layout__content {
+    padding-bottom: calc(60px + var(--space-4));
+  }
+}
+
+/* Loading state */
+.layout-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+}
+
+.layout-loading__spinner {
+  display: block;
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-brand);
+  border-radius: 50%;
+  animation: layout-spin 0.7s linear infinite;
+}
+
+@keyframes layout-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

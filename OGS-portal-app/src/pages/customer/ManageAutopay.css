@@ -1,0 +1,616 @@
+/* ── Customer Manage Payment Methods & Autopay ────────────────────────────────
+   BEM prefix: pm-
+   Mobile: ≤ 767px
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* ── Page wrapper ─────────────────────────────────────────────────────────── */
+
+.pm-page {
+  max-width: 680px;
+  padding-bottom: var(--space-8);
+  position: relative;
+}
+
+/* ── Page header ──────────────────────────────────────────────────────────── */
+
+.pm-header {
+  margin-bottom: var(--space-6);
+}
+
+.pm-header__title {
+  font-size: var(--font-size-20);
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0 0 var(--space-1);
+}
+
+.pm-header__sub {
+  font-size: var(--font-size-13);
+  color: var(--color-text-3);
+  margin: 0;
+}
+
+/* ── Section ──────────────────────────────────────────────────────────────── */
+
+.pm-section {
+  margin-top: var(--space-7);
+}
+
+.pm-section__title {
+  font-size: var(--font-size-11);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--color-text-3);
+  margin: 0 0 var(--space-4);
+}
+
+/* ── Global error banner ──────────────────────────────────────────────────── */
+
+.pm-global-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius);
+  font-size: var(--font-size-13);
+  color: var(--color-danger);
+  margin-bottom: var(--space-5);
+}
+
+.pm-global-error__dismiss {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  font-size: var(--font-size-16);
+  line-height: 1;
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+
+/* ── Autopay status card ──────────────────────────────────────────────────── */
+
+.pm-autopay-card {
+  padding: var(--space-5) var(--space-6);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-2);
+  transition: border-color var(--transition), background var(--transition);
+}
+
+.pm-autopay-card--on {
+  border-color: var(--color-success);
+  background: #f0fdf8;
+}
+
+.pm-autopay-card__status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.pm-autopay-card__indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.pm-autopay-card__dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-border-2);
+  flex-shrink: 0;
+  transition: background var(--transition), box-shadow var(--transition);
+}
+
+.pm-autopay-card__dot--on {
+  background: var(--color-success);
+  box-shadow: 0 0 0 4px rgba(29, 158, 117, 0.2);
+}
+
+.pm-autopay-card__status-label {
+  font-size: var(--font-size-12);
+  color: var(--color-text-3);
+  margin: 0;
+  line-height: 1.2;
+}
+
+.pm-autopay-card__status-value {
+  font-size: var(--font-size-24);
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0;
+  line-height: 1.2;
+}
+
+.pm-autopay-card--on .pm-autopay-card__status-value {
+  color: var(--color-success);
+}
+
+.pm-autopay-card__next {
+  font-size: var(--font-size-13);
+  color: var(--color-text-2);
+  margin: var(--space-3) 0 0;
+}
+
+.pm-autopay-card__next--warn {
+  color: var(--color-warning);
+}
+
+/* ── Toggle switch (iOS-style) ────────────────────────────────────────────── */
+
+.pm-toggle {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* Visually hidden checkbox (still keyboard/screen-reader accessible) */
+.pm-toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.pm-toggle__track {
+  position: relative;
+  width: 46px;
+  height: 26px;
+  background: var(--color-border-2);
+  border-radius: 13px;
+  transition: background var(--transition);
+}
+
+.pm-toggle input:checked + .pm-toggle__track {
+  background: var(--color-success);
+}
+
+.pm-toggle__thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.22);
+  transition: left var(--transition);
+}
+
+.pm-toggle input:checked + .pm-toggle__track .pm-toggle__thumb {
+  left: 23px;
+}
+
+.pm-toggle--busy .pm-toggle__track {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Focus ring for keyboard accessibility */
+.pm-toggle input:focus-visible + .pm-toggle__track {
+  box-shadow: 0 0 0 3px rgba(232, 119, 34, 0.35);
+}
+
+/* ── Payment method cards ─────────────────────────────────────────────────── */
+
+.pm-cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.pm-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  transition: border-color var(--transition-fast);
+}
+
+.pm-card--default {
+  border-color: var(--color-brand);
+}
+
+.pm-card__icon {
+  flex-shrink: 0;
+}
+
+.pm-card__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.pm-card__label-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.pm-card__label {
+  font-size: var(--font-size-14);
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.pm-card__badges {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.pm-card__exp {
+  font-size: var(--font-size-12);
+  color: var(--color-text-3);
+  display: block;
+  margin-top: var(--space-1);
+}
+
+.pm-card__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.pm-card__confirm {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.pm-card__confirm-text {
+  font-size: var(--font-size-13);
+  color: var(--color-danger);
+  white-space: nowrap;
+}
+
+@media (max-width: 767px) {
+  .pm-card {
+    flex-wrap: wrap;
+  }
+
+  .pm-card__actions {
+    width: 100%;
+    border-top: 1px solid var(--color-bg-3);
+    padding-top: var(--space-3);
+    margin-top: var(--space-2);
+  }
+}
+
+/* ── Brand chips ──────────────────────────────────────────────────────────── */
+
+.pm-brand {
+  width: 42px;
+  height: 27px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 9px;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+/* Visa — navy italic */
+.pm-brand--visa {
+  background: #1434CB;
+  color: #fff;
+  font-style: italic;
+  font-size: 11px;
+}
+
+/* Mastercard — overlapping circles */
+.pm-brand--mc {
+  background: #fff;
+  border: 1px solid var(--color-border);
+  position: relative;
+}
+
+.pm-brand__mc-l,
+.pm-brand__mc-r {
+  position: absolute;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+}
+
+.pm-brand__mc-l {
+  background: #EB001B;
+  left: 5px;
+}
+
+.pm-brand__mc-r {
+  background: #F79E1B;
+  right: 5px;
+  mix-blend-mode: multiply;
+}
+
+/* Amex — blue */
+.pm-brand--amex {
+  background: #016FD0;
+  color: #fff;
+  font-size: 8px;
+  letter-spacing: 0.05em;
+}
+
+/* Discover — orange */
+.pm-brand--discover {
+  background: #FF6600;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+/* Bank / generic */
+.pm-brand--bank,
+.pm-brand--generic {
+  background: transparent;
+  width: 42px;
+  height: 28px;
+}
+
+/* ── Add payment method buttons ───────────────────────────────────────────── */
+
+.pm-add-btns {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-5);
+}
+
+.pm-add-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  border: 1.5px dashed var(--color-border-2);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  color: var(--color-brand);
+  font-size: var(--font-size-14);
+  font-weight: 500;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.pm-add-btn:hover {
+  border-color: var(--color-brand);
+  background: var(--color-brand-light);
+}
+
+.pm-add-btn:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+.pm-add-btn__icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+@media (max-width: 600px) {
+  .pm-add-btn {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
+/* ── Security note ────────────────────────────────────────────────────────── */
+
+.pm-security-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--font-size-12);
+  color: var(--color-text-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-2);
+  border-radius: var(--radius-sm);
+  line-height: 1.5;
+}
+
+.pm-security-note__icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--color-success);
+}
+
+/* ── Loading skeleton ─────────────────────────────────────────────────────── */
+
+.pm-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.pm-skeleton__row {
+  height: 70px;
+  border-radius: var(--radius);
+  background: linear-gradient(
+    90deg,
+    var(--color-bg-2) 25%,
+    var(--color-bg-3) 50%,
+    var(--color-bg-2) 75%
+  );
+  background-size: 400% 100%;
+  animation: pm-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes pm-shimmer {
+  0%   { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+/* ── Empty state ──────────────────────────────────────────────────────────── */
+
+.pm-empty {
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+}
+
+.pm-empty p {
+  font-size: var(--font-size-14);
+  color: var(--color-text-3);
+  margin: 0 0 var(--space-1);
+}
+
+.pm-empty p:last-child {
+  margin: 0;
+  font-size: var(--font-size-13);
+}
+
+.pm-error-text {
+  font-size: var(--font-size-14);
+  color: var(--color-danger);
+  margin: 0;
+}
+
+/* ── Modal loading / error ────────────────────────────────────────────────── */
+
+.pm-add-modal__loading {
+  padding: var(--space-8) var(--space-5);
+  text-align: center;
+  font-size: var(--font-size-14);
+  color: var(--color-text-3);
+}
+
+.pm-add-modal__error {
+  padding: var(--space-3) var(--space-4);
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-13);
+  color: var(--color-danger);
+  margin-bottom: var(--space-4);
+}
+
+/* ── Add method form (inside modal) ──────────────────────────────────────── */
+
+.pm-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.pm-add-form__ach-note {
+  font-size: var(--font-size-13);
+  color: var(--color-info);
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-4);
+  margin: 0;
+}
+
+.pm-add-form__checks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.pm-add-form__check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-14);
+  color: var(--color-text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.pm-add-form__check input[type='checkbox'] {
+  accent-color: var(--color-brand);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.pm-add-form__error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-13);
+  color: var(--color-danger);
+}
+
+.pm-add-form__dismiss {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  font-size: var(--font-size-16);
+  line-height: 1;
+  padding: 0 2px;
+}
+
+.pm-add-form__actions {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: flex-end;
+}
+
+/* ── Toast notification ───────────────────────────────────────────────────── */
+
+.pm-toast {
+  position: fixed;
+  bottom: var(--space-7);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-14);
+  font-weight: 500;
+  z-index: 9999;
+  box-shadow: var(--shadow-lg);
+  white-space: nowrap;
+  pointer-events: none;
+  animation: pm-toast-in var(--transition-slow) ease;
+}
+
+.pm-toast--success {
+  background: #1D9E75;
+  color: #fff;
+}
+
+.pm-toast--error {
+  background: var(--color-danger);
+  color: #fff;
+}
+
+.pm-toast__icon {
+  font-weight: 700;
+  font-size: var(--font-size-16);
+}
+
+@keyframes pm-toast-in {
+  from { transform: translateX(-50%) translateY(16px); opacity: 0; }
+  to   { transform: translateX(-50%) translateY(0);    opacity: 1; }
+}

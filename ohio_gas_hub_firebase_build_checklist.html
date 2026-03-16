@@ -1,0 +1,3523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ohio Gas Hub — Firebase Build Checklist</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap');
+
+  :root {
+    --bg: #F7F6F2;
+    --bg2: #EEECEA;
+    --bg3: #E2E0DA;
+    --border: rgba(0,0,0,0.08);
+    --border2: rgba(0,0,0,0.13);
+    --text: #1A1A18;
+    --text2: #6B6A65;
+    --text3: #9B9A95;
+    --orange: #E87722;
+    --orange-light: #FEF4EC;
+    --orange-text: #7A3A08;
+    --orange-border: rgba(232,119,34,0.25);
+    --green: #1D9E75;
+    --green-light: #E8F5F0;
+    --green-text: #0A4A33;
+    --green-border: rgba(29,158,117,0.2);
+    --blue: #378ADD;
+    --blue-light: #E6F1FB;
+    --blue-text: #0C447C;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+    --radius: 8px;
+    --radius-lg: 12px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 32px 24px 64px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  /* HEADER */
+  .header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .header-left { display: flex; align-items: center; gap: 14px; }
+  .logo-bar { width: 5px; height: 44px; background: var(--orange); border-radius: 3px; flex-shrink: 0; }
+  .header-text h1 { font-size: 20px; font-weight: 500; letter-spacing: -0.02em; }
+  .header-text p { font-size: 11px; color: var(--text3); margin-top: 3px; font-family: var(--mono); }
+  .header-meta { font-size: 11px; color: var(--text3); font-family: var(--mono); text-align: right; line-height: 1.8; }
+
+  /* PROGRESS */
+  .progress-wrap {
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius-lg);
+    padding: 16px 20px;
+    margin-bottom: 28px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .progress-label { font-size: 11px; color: var(--text2); font-family: var(--mono); white-space: nowrap; }
+  .progress-bar-wrap { flex: 1; min-width: 120px; height: 8px; background: var(--bg3); border-radius: 4px; overflow: hidden; }
+  .progress-bar { height: 100%; background: var(--orange); border-radius: 4px; transition: width 0.4s ease; width: 0%; }
+  .progress-count { font-size: 14px; font-weight: 500; color: var(--text); font-family: var(--mono); white-space: nowrap; }
+
+  /* LEGEND */
+  .legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+    padding: 12px 16px;
+    background: var(--bg2);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--text2);
+    align-items: center;
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  /* PHASE */
+  .phase { margin-bottom: 32px; }
+  .phase-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border2);
+  }
+  .phase-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .phase-title { font-size: 12px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text2); font-family: var(--mono); flex: 1; }
+  .phase-stats { font-size: 11px; font-family: var(--mono); color: var(--text3); }
+  .phase-stats.complete { color: var(--green); }
+
+  /* GRIDS */
+  .grid-1 { display: grid; grid-template-columns: 1fr; gap: 10px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  @media (max-width: 860px) { .grid-3 { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 600px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+
+  /* SECTION CARD */
+  .section {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+  .section-header {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .section-name { font-size: 12px; font-weight: 500; color: var(--text); }
+  .section-count { font-size: 10px; font-family: var(--mono); color: var(--text3); white-space: nowrap; }
+  .section-count.complete { color: var(--green); }
+  .items { padding: 6px; }
+
+  /* ITEM */
+  .item {
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    margin-bottom: 3px;
+    overflow: hidden;
+  }
+  .item:last-child { margin-bottom: 0; }
+
+  .item-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 10px;
+    cursor: pointer;
+    transition: background 0.12s;
+    user-select: none;
+  }
+  .item-row:hover { background: var(--bg3); }
+
+  .item.in-progress { border-color: var(--orange-border); background: var(--orange-light); }
+  .item.in-progress .item-row:hover { background: rgba(232,119,34,0.08); }
+  .item.done { opacity: 0.5; }
+  .item.done:hover { opacity: 0.7; }
+
+  .check {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    border: 1.5px solid var(--bg3);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-top: 1px;
+    transition: all 0.15s;
+    background: var(--bg);
+  }
+  .item.in-progress .check { border-color: var(--orange); }
+  .item.done .check { background: var(--green); border-color: var(--green); }
+  .check svg { display: none; }
+  .item.done .check svg { display: block; }
+
+  .item-body { flex: 1; min-width: 0; }
+  .item-label { font-size: 12px; color: var(--text); line-height: 1.4; font-weight: 500; }
+  .item.in-progress .item-label { color: var(--orange-text); }
+  .item-sub { font-size: 10px; color: var(--text3); margin-top: 1px; font-family: var(--mono); line-height: 1.4; }
+
+  .item-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-top: 1px; }
+
+  .badge {
+    font-size: 9px; padding: 2px 7px;
+    border-radius: 20px; font-weight: 500;
+    font-family: var(--mono); white-space: nowrap;
+  }
+  .badge-active { background: var(--orange-light); color: var(--orange-text); border: 1px solid var(--orange-border); }
+  .badge-done   { background: var(--green-light); color: var(--green-text); border: 1px solid var(--green-border); }
+  .badge-firebase { background: #FFF3E0; color: #E65100; border: 1px solid rgba(230,81,0,0.2); }
+  .badge-github   { background: #F0F0F0; color: #1A1A18; border: 1px solid rgba(0,0,0,0.12); }
+  .badge-stripe   { background: #EEF0FB; color: #3D4EAC; border: 1px solid rgba(61,78,172,0.2); }
+  .badge-maps     { background: #E8F5E9; color: #1B5E20; border: 1px solid rgba(27,94,32,0.2); }
+  .badge-aws      { background: #FFF8E1; color: #F57F17; border: 1px solid rgba(245,127,23,0.2); }
+
+  /* EXPAND TOGGLE */
+  .expand-btn {
+    width: 20px; height: 20px;
+    border-radius: 4px;
+    border: 1px solid var(--border2);
+    background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.12s, transform 0.2s;
+    margin-top: 0px;
+  }
+  .expand-btn:hover { background: var(--bg3); }
+  .expand-btn svg { transition: transform 0.2s; }
+  .item.open .expand-btn svg { transform: rotate(90deg); }
+
+  /* PROMPT PANEL */
+  .prompt-panel {
+    display: none;
+    border-top: 1px solid var(--border);
+    background: #1E1E1E;
+    padding: 0;
+  }
+  .item.open .prompt-panel { display: block; }
+
+  .prompt-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .prompt-header-label {
+    font-size: 10px;
+    font-family: var(--mono);
+    color: #858585;
+    letter-spacing: 0.04em;
+  }
+  .copy-btn {
+    font-size: 10px;
+    font-family: var(--mono);
+    color: #858585;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 4px;
+    padding: 3px 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .copy-btn:hover { background: rgba(255,255,255,0.1); color: #ccc; }
+  .copy-btn.copied { color: #4EC9B0; border-color: rgba(78,201,176,0.3); }
+
+  .prompt-body {
+    padding: 12px 14px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: #D4D4D4;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  /* syntax hints */
+  .prompt-body .kw  { color: #569CD6; }
+  .prompt-body .str { color: #CE9178; }
+  .prompt-body .cmt { color: #6A9955; }
+  .prompt-body .fn  { color: #DCDCAA; }
+  .prompt-body .hl  { color: #4EC9B0; }
+
+  /* FOOTER */
+  .footer {
+    margin-top: 40px;
+    text-align: center;
+    font-size: 11px;
+    color: var(--text3);
+    font-family: var(--mono);
+    line-height: 2;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="logo-bar"></div>
+    <div class="header-text">
+      <h1>Ohio Gas Hub</h1>
+      <p>firebase build checklist · github · copilot prompts</p>
+    </div>
+  </div>
+  <div class="header-meta">
+    Ohio Gas Supply Co.<br>
+    Reliable Gas. Local Service. Built for Ohio.<br>
+    <span id="date-stamp"></span>
+  </div>
+</div>
+
+<div class="progress-wrap">
+  <span class="progress-label">overall progress</span>
+  <div class="progress-bar-wrap"><div class="progress-bar" id="progress-bar"></div></div>
+  <span class="progress-count" id="progress-count">0 / 0</span>
+</div>
+
+<div class="legend">
+  <span style="font-size:11px;color:var(--text2);margin-right:4px;">tags:</span>
+  <div class="legend-item"><div class="legend-dot" style="background:#E65100;"></div><span class="badge badge-firebase">Firebase</span></div>
+  <div class="legend-item"><div class="legend-dot" style="background:#1A1A18;"></div><span class="badge badge-github">GitHub</span></div>
+  <div class="legend-item"><div class="legend-dot" style="background:#3D4EAC;"></div><span class="badge badge-stripe">Stripe</span></div>
+  <div class="legend-item"><div class="legend-dot" style="background:#1B5E20;"></div><span class="badge badge-maps">Maps</span></div>
+  <div class="legend-item"><div class="legend-dot" style="background:#F57F17;"></div><span class="badge badge-aws">AWS S3</span></div>
+  <span style="margin-left:8px;font-size:11px;">· click any item row to check off · click <b>›</b> to expand copilot prompt</span>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════
+     PHASE 1 — GITHUB REPOSITORY SETUP
+════════════════════════════════════════════════════ -->
+<div class="phase">
+  <div class="phase-header">
+    <div class="phase-dot" style="background:#1A1A18;"></div>
+    <span class="phase-title">Phase 1 — GitHub repository setup</span>
+    <span class="phase-stats" id="ph1">0 / 0</span>
+  </div>
+  <div class="grid-2">
+
+    <div class="section" data-phase="1">
+      <div class="section-header"><span class="section-name">Repository &amp; branch strategy</span><span class="section-count">0 / 5</span></div>
+      <div class="items">
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Create GitHub repository</div><div class="item-sub">ohio-gas-hub · private · initialize with README</div></div>
+            <div class="item-right"><span class="badge badge-github">GitHub</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Create a new GitHub repository called <span class="hl">ohio-gas-hub</span> for a React + Firebase web app.
+
+Set up the following <span class="kw">branch strategy</span>:
+- <span class="hl">main</span> — production only, protected, requires PR + review
+- <span class="hl">staging</span> — pre-production, merges from develop
+- <span class="hl">develop</span> — active development branch
+
+Add a <span class="str">.gitignore</span> for Node.js, React, and Firebase:
+- node_modules, .env, .env.local, .env.*.local
+- firebase-debug.log, .firebase/, dist/, build/
+
+Create a root <span class="str">README.md</span> with:
+- Project: Ohio Gas Hub
+- Stack: React + Vite, Firebase (Auth, Firestore, Hosting, Functions, Storage)
+- Setup instructions placeholder
+- Branch strategy diagram</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Branch protection rules</div><div class="item-sub">Protect main + staging · require PR reviews</div></div>
+            <div class="item-right"><span class="badge badge-github">GitHub</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Set up GitHub branch protection rules for the <span class="hl">ohio-gas-hub</span> repository.
+
+For <span class="hl">main</span> branch:
+- Require pull request before merging
+- Require at least 1 approving review
+- Dismiss stale reviews on new commits
+- Require status checks to pass (CI/CD)
+- Restrict direct pushes
+
+For <span class="hl">staging</span> branch:
+- Require pull request before merging
+- Require CI checks to pass
+
+Write a <span class="str">CONTRIBUTING.md</span> documenting:
+- Feature branch naming: feature/description
+- Bug fix naming: fix/description
+- Commit message format: type(scope): message
+- PR template with checklist</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">PR template + issue templates</div><div class="item-sub">.github folder · PR checklist · bug + feature templates</div></div>
+            <div class="item-right"><span class="badge badge-github">GitHub</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Create a <span class="str">.github/</span> folder with the following templates for the ohio-gas-hub project:
+
+<span class="kw">1. Pull Request Template</span> (.github/pull_request_template.md):
+- Description of changes
+- Type of change: bug fix / new feature / refactor
+- Testing checklist
+- Firebase deployment checklist
+- Screenshots (if UI changes)
+
+<span class="kw">2. Bug Report Template</span> (.github/ISSUE_TEMPLATE/bug_report.md):
+- Steps to reproduce
+- Expected vs actual behavior
+- Firebase environment (dev/staging/prod)
+- Browser/device info
+
+<span class="kw">3. Feature Request Template</span> (.github/ISSUE_TEMPLATE/feature_request.md):
+- Related module (orders, tanks, dispatch, CRM, billing, portal)
+- User role affected
+- Acceptance criteria</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">GitHub Actions — CI pipeline</div><div class="item-sub">Lint + test on every PR to develop/staging/main</div></div>
+            <div class="item-right"><span class="badge badge-github">GitHub</span><span class="badge badge-firebase">Firebase</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Create a GitHub Actions CI workflow at <span class="str">.github/workflows/ci.yml</span> for the ohio-gas-hub React + Firebase project.
+
+The workflow should trigger on:
+- Pull requests to <span class="hl">develop</span>, <span class="hl">staging</span>, and <span class="hl">main</span>
+- Pushes to <span class="hl">develop</span>
+
+Steps to include:
+<span class="kw">1.</span> Checkout code
+<span class="kw">2.</span> Setup Node.js 20
+<span class="kw">3.</span> Install dependencies (npm ci)
+<span class="kw">4.</span> Run ESLint
+<span class="kw">5.</span> Run TypeScript type check
+<span class="kw">6.</span> Run Vitest unit tests
+<span class="kw">7.</span> Build the Vite app (npm run build)
+<span class="kw">8.</span> Cache node_modules between runs
+
+Use GitHub secrets for any environment variables.
+Add a status badge to README.md.</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">GitHub Actions — Firebase deploy</div><div class="item-sub">Auto-deploy to Firebase on merge to staging + main</div></div>
+            <div class="item-right"><span class="badge badge-github">GitHub</span><span class="badge badge-firebase">Firebase</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Create two GitHub Actions deploy workflows for the ohio-gas-hub Firebase project:
+
+<span class="kw">1. Staging deploy</span> (.github/workflows/deploy-staging.yml):
+- Trigger: push to <span class="hl">staging</span> branch
+- Build Vite app with staging env vars
+- Deploy to Firebase Hosting preview channel
+- Deploy Firebase Functions (if changed)
+- Comment preview URL on related PR
+
+<span class="kw">2. Production deploy</span> (.github/workflows/deploy-production.yml):
+- Trigger: push to <span class="hl">main</span> branch
+- Build Vite app with production env vars
+- Deploy to Firebase Hosting live channel
+- Deploy Firebase Functions
+- Deploy Firestore security rules
+- Notify on success/failure
+
+Required GitHub Secrets to document:
+- FIREBASE_SERVICE_ACCOUNT_STAGING
+- FIREBASE_SERVICE_ACCOUNT_PRODUCTION
+- VITE_FIREBASE_CONFIG (JSON)
+- VITE_STRIPE_PUBLISHABLE_KEY
+- VITE_GOOGLE_MAPS_KEY</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="section" data-phase="1">
+      <div class="section-header"><span class="section-name">Project initialization</span><span class="section-count">0 / 5</span></div>
+      <div class="items">
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Initialize Vite + React + TypeScript</div><div class="item-sub">npm create vite · folder structure · aliases</div></div>
+            <div class="item-right"><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Initialize the ohio-gas-hub frontend project with Vite + React + TypeScript.
+
+Run: <span class="hl">npm create vite@latest ohio-gas-hub -- --template react-ts</span>
+
+Then set up this folder structure:
+<span class="str">src/
+  components/     # shared UI components
+  pages/          # route-level page components
+    customer/     # customer portal pages
+    dispatch/     # dispatch + ops pages
+    driver/       # driver view pages
+    crm/          # CRM + sales pages
+    billing/      # billing pages
+    auth/         # login, reset password
+  hooks/          # custom React hooks
+  lib/            # firebase.ts, stripe.ts, maps.ts
+  services/       # API service functions
+  store/          # Zustand global state
+  types/          # TypeScript interfaces
+  utils/          # helpers, formatters
+  assets/         # static assets</span>
+
+Configure path aliases in vite.config.ts:
+- <span class="hl">@/</span> → src/
+- <span class="hl">@components/</span> → src/components/
+- <span class="hl">@pages/</span> → src/pages/
+
+Install core dependencies:
+- react-router-dom
+- zustand
+- @tanstack/react-query
+- date-fns</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">ESLint + Prettier + Husky</div><div class="item-sub">Code quality · pre-commit hooks · formatting</div></div>
+            <div class="item-right"><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Set up code quality tooling for the ohio-gas-hub project:
+
+<span class="kw">ESLint</span> (.eslintrc.cjs):
+- Extends: react-app, typescript, prettier
+- Rules: no unused vars, no console (warn), prefer-const
+- Ignore: dist/, node_modules/
+
+<span class="kw">Prettier</span> (.prettierrc):
+- Single quotes, semi: true
+- Print width: 100, tab width: 2
+- Trailing comma: es5
+
+<span class="kw">Husky + lint-staged</span>:
+- Pre-commit: run ESLint + Prettier on staged files
+- Pre-push: run TypeScript check
+
+<span class="kw">VS Code settings</span> (.vscode/settings.json):
+- Format on save: true
+- Default formatter: Prettier
+- TypeScript SDK path
+
+<span class="kw">VS Code extensions</span> (.vscode/extensions.json):
+- ESLint, Prettier, Firebase, GitLens,
+  Tailwind CSS IntelliSense, GitHub Copilot</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Environment variables setup</div><div class="item-sub">.env files · dev / staging / prod · secrets docs</div></div>
+            <div class="item-right"><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Set up environment variable management for the ohio-gas-hub project.
+
+Create these files (never commit .env.local or .env.production):
+
+<span class="str">.env.example</span> (committed — no real values):
+<span class="cmt"># Firebase</span>
+VITE_FIREBASE_API_KEY=
+VITE_FIREBASE_AUTH_DOMAIN=
+VITE_FIREBASE_PROJECT_ID=
+VITE_FIREBASE_STORAGE_BUCKET=
+VITE_FIREBASE_MESSAGING_SENDER_ID=
+VITE_FIREBASE_APP_ID=
+<span class="cmt"># Stripe</span>
+VITE_STRIPE_PUBLISHABLE_KEY=
+<span class="cmt"># Google Maps</span>
+VITE_GOOGLE_MAPS_API_KEY=
+<span class="cmt"># App</span>
+VITE_APP_ENV=development
+VITE_APP_URL=
+
+Create <span class="str">src/lib/env.ts</span> that:
+- Imports and validates all env vars at startup
+- Throws descriptive errors for missing required vars
+- Exports typed constants for use throughout the app
+- Differentiates dev/staging/prod behavior</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Design system tokens</div><div class="item-sub">Ohio Gas Hub brand colors · typography · spacing</div></div>
+            <div class="item-right"><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Create the Ohio Gas Hub design system in <span class="str">src/styles/tokens.css</span> and <span class="str">src/styles/global.css</span>.
+
+<span class="kw">Brand colors (CSS variables):</span>
+--color-brand: #E87722;        <span class="cmt">/* Ohio Gas orange */</span>
+--color-brand-light: #FEF4EC;
+--color-brand-dark: #7A3A08;
+--color-brand-border: rgba(232,119,34,0.25);
+
+<span class="kw">Semantic colors:</span>
+--color-success, --color-warning, --color-danger, --color-info
+(use green #1D9E75, amber #BA7517, red #E24B4A, blue #378ADD)
+
+<span class="kw">Neutrals:</span>
+--color-bg, --color-bg-2, --color-bg-3
+--color-text, --color-text-2, --color-text-3
+--color-border, --color-border-2
+
+<span class="kw">Typography:</span>
+Font stack: 'IBM Plex Sans', system-ui, sans-serif
+Mono stack: 'IBM Plex Mono', monospace
+Scale: 10px, 11px, 12px, 13px, 14px, 16px, 18px, 20px, 24px
+
+<span class="kw">Spacing:</span> 4px base unit, scale to 8, 12, 16, 20, 24, 32, 48
+
+<span class="kw">Border radius:</span> --radius-sm: 4px, --radius: 8px, --radius-lg: 12px
+
+Also create <span class="str">src/components/ui/</span> base components:
+Button, Input, Badge, Card, Modal, Alert using these tokens.</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">React Router setup + layout shells</div><div class="item-sub">Route tree · role-based layouts · nav shells</div></div>
+            <div class="item-right"><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Set up React Router v6 with role-based routing for the ohio-gas-hub app.
+
+<span class="kw">Route structure in src/router.tsx:</span>
+
+/ → redirect based on auth + role
+/login → LoginPage (public)
+/reset-password → ResetPasswordPage (public)
+
+/portal/* → CustomerLayout (role: customer)
+  /portal/dashboard
+  /portal/order
+  /portal/orders
+  /portal/invoices
+  /portal/autopay
+  /portal/tanks
+
+/ops/* → OpsLayout (role: admin, dispatch)
+  /ops/dashboard
+  /ops/orders
+  /ops/runs
+  /ops/dispatch
+  /ops/tanks
+  /ops/inventory
+
+/driver/* → DriverLayout (role: driver)
+  /driver/schedule
+  /driver/stop/:id
+  /driver/capture/:id
+
+/crm/* → CrmLayout (role: admin, sales)
+  /crm/customers
+  /crm/leads
+  /crm/quotes
+  /crm/billing
+  /crm/aging
+
+Create a <span class="fn">ProtectedRoute</span> component that:
+- Checks Firebase auth state
+- Checks user role from Firestore
+- Redirects to /login if not authenticated
+- Redirects to correct portal if wrong role
+
+Create layout shells for each role with:
+- Sidebar nav (desktop) with Ohio Gas Hub logo bar
+- Top bar with page title + user avatar
+- Mobile bottom nav (customer + driver)
+- Notification bell with unread count</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════
+     PHASE 2 — FIREBASE PROJECT SETUP
+════════════════════════════════════════════════════ -->
+<div class="phase">
+  <div class="phase-header">
+    <div class="phase-dot" style="background:#E65100;"></div>
+    <span class="phase-title">Phase 2 — Firebase project setup</span>
+    <span class="phase-stats" id="ph2">0 / 0</span>
+  </div>
+  <div class="grid-3">
+
+    <div class="section" data-phase="2">
+      <div class="section-header"><span class="section-name">Firebase console + CLI</span><span class="section-count">0 / 5</span></div>
+      <div class="items">
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Create Firebase projects</div><div class="item-sub">ohio-gas-hub-dev · ohio-gas-hub-prod</div></div>
+            <div class="item-right"><span class="badge badge-firebase">Firebase</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Set up Firebase for the ohio-gas-hub project with two separate Firebase projects.
+
+<span class="kw">In Firebase Console, create:</span>
+1. <span class="hl">ohio-gas-hub-dev</span> — development + staging environment
+2. <span class="hl">ohio-gas-hub-prod</span> — production environment only
+
+<span class="kw">For each project, enable these services:</span>
+- Authentication (Email/Password provider)
+- Firestore Database (production mode)
+- Firebase Storage
+- Firebase Hosting
+- Firebase Functions (Blaze plan required)
+- Firebase App Check (optional, for production)
+
+<span class="kw">Install Firebase CLI and initialize:</span>
+npm install -g firebase-tools
+firebase login
+firebase use --add  <span class="cmt"># add both projects</span>
+
+<span class="kw">Create .firebaserc:</span>
+{
+  "projects": {
+    "default": "ohio-gas-hub-dev",
+    "staging": "ohio-gas-hub-dev",
+    "production": "ohio-gas-hub-prod"
+  }
+}
+
+<span class="kw">Run firebase init and select:</span>
+Firestore, Functions, Hosting, Storage, Emulators</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Firebase SDK initialization</div><div class="item-sub">src/lib/firebase.ts · auth · firestore · storage</div></div>
+            <div class="item-right"><span class="badge badge-firebase">Firebase</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Create <span class="str">src/lib/firebase.ts</span> to initialize all Firebase services for ohio-gas-hub.
+
+<span class="kw">Install dependencies:</span>
+npm install firebase
+
+<span class="kw">Initialize in src/lib/firebase.ts:</span>
+- Import initializeApp, getAuth, getFirestore,
+  getStorage, getFunctions, connectAuthEmulator,
+  connectFirestoreEmulator, connectStorageEmulator,
+  connectFunctionsEmulator
+- Read config from VITE_ env vars
+- Initialize app, auth, db, storage, functions
+- In development mode, connect to Firebase Emulators
+- Export: app, auth, db, storage, functions
+
+<span class="kw">Create src/lib/firestore.ts with typed collection refs:</span>
+- customers, orders, runs, runStops, tanks
+- invoices, payments, paymentMethods
+- users, leads, quotes, products
+
+Each collection ref should use <span class="fn">collection(db, 'collectionName')</span>
+with TypeScript generics for type safety.
+
+<span class="kw">Create src/lib/storage.ts:</span>
+- Typed ref builders for each storage path
+- ohio-gas-hub/customers/{id}/contracts/
+- ohio-gas-hub/deliveries/{runId}/{stopId}/
+- ohio-gas-hub/employees/{id}/
+- ohio-gas-hub/compliance/</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Firebase Emulator Suite</div><div class="item-sub">Local dev · auth · firestore · functions · storage</div></div>
+            <div class="item-right"><span class="badge badge-firebase">Firebase</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Configure Firebase Emulator Suite for local development of ohio-gas-hub.
+
+<span class="kw">Configure firebase.json emulators section:</span>
+- auth: port 9099
+- firestore: port 8080
+- functions: port 5001
+- storage: port 9199
+- hosting: port 5000
+- ui: port 4000
+
+<span class="kw">Create npm scripts in package.json:</span>
+"dev": "vite"
+"emulators": "firebase emulators:start"
+"dev:full": "concurrently 'npm run emulators' 'npm run dev'"
+"emulators:export": "firebase emulators:export ./emulator-data"
+"emulators:import": "firebase emulators:start --import=./emulator-data"
+
+<span class="kw">Create scripts/seed-emulator.ts:</span>
+A seed script that populates the Firestore emulator with:
+- 3 test customers (including one with low tank level)
+- 2 products (CO2 50lb, Nitrogen 100cf)
+- 3 cylinders (2 deployed, 1 available)
+- 2 pending orders
+- 1 active run with 3 stops
+- 2 invoices (1 paid, 1 outstanding)
+- Test users for each role (admin, driver, customer, sales)
+
+Add to .gitignore: emulator-data/</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Firebase Hosting config</div><div class="item-sub">firebase.json · SPA rewrites · cache headers</div></div>
+            <div class="item-right"><span class="badge badge-firebase">Firebase</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Configure Firebase Hosting in firebase.json for the ohio-gas-hub React SPA.
+
+<span class="kw">Hosting config:</span>
+- public: "dist" (Vite build output)
+- ignore: ["firebase.json", "**/.*", "**/node_modules/**"]
+- rewrites: all routes → /index.html (SPA routing)
+- cleanUrls: true
+- trailingSlash: false
+
+<span class="kw">Cache control headers:</span>
+- /assets/**: cache-control: max-age=31536000, immutable
+  (Vite hashes asset filenames — safe to cache forever)
+- /index.html: cache-control: no-cache
+  (always fetch fresh HTML for SPA updates)
+- /**: cache-control: max-age=3600
+
+<span class="kw">Security headers:</span>
+- X-Frame-Options: SAMEORIGIN
+- X-Content-Type-Options: nosniff
+- Referrer-Policy: strict-origin-when-cross-origin
+- Permissions-Policy: camera=(), microphone=()
+  (Note: camera/mic may be needed for delivery photo capture — adjust accordingly)
+
+<span class="kw">Custom domain setup instructions:</span>
+Document steps to connect ohiogashub.com in Firebase console.</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Firebase App Check</div><div class="item-sub">reCAPTCHA v3 · protect Firestore + Functions</div></div>
+            <div class="item-right"><span class="badge badge-firebase">Firebase</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Set up Firebase App Check with reCAPTCHA v3 for ohio-gas-hub production security.
+
+<span class="kw">In src/lib/firebase.ts, add App Check init:</span>
+- Import initializeAppCheck, ReCaptchaV3Provider
+- Only initialize in production (VITE_APP_ENV === 'production')
+- Use VITE_RECAPTCHA_SITE_KEY env var
+- isTokenAutoRefreshEnabled: true
+
+<span class="kw">Firestore security rules update:</span>
+Add App Check enforcement comment to rules
+(actual enforcement done in Firebase console)
+
+<span class="kw">Debug token for development:</span>
+- Set FIREBASE_APPCHECK_DEBUG_TOKEN in .env.local
+- Add debug provider initialization for dev environment
+- Never commit the debug token
+
+<span class="kw">Document in README:</span>
+- App Check setup steps for new developers
+- How to generate debug token
+- Production enforcement checklist</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="section" data-phase="2">
+      <div class="section-header"><span class="section-name">Firestore data model</span><span class="section-count">0 / 6</span></div>
+      <div class="items">
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">TypeScript interfaces — all entities</div><div class="item-sub">src/types/ · Customer · Order · Tank · Run · Invoice</div></div>
+            <div class="item-right"><span class="badge badge-firebase">Firebase</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Create all TypeScript interfaces for the ohio-gas-hub Firestore data model in <span class="str">src/types/</span>.
+
+<span class="kw">src/types/user.ts:</span>
+- UserRole: 'admin' | 'dispatch' | 'driver' | 'sales' | 'customer'
+- AppUser: id, email, name, role, active, createdAt, customerId?
+
+<span class="kw">src/types/customer.ts:</span>
+- Customer: id, name, email, phone, address, city, state, zip,
+  lat, lng, status ('active'|'inactive'|'hold'), creditLimit,
+  notes, createdAt, updatedAt
+
+<span class="kw">src/types/product.ts:</span>
+- Product: id, name, type, unit, pricePerUnit, active
+
+<span class="kw">src/types/tank.ts:</span>
+- TankStatus: 'available' | 'deployed' | 'returned' | 'inspection'
+- Tank: id, customerId, serialNumber, gasType, sizeLabel,
+  capacityValue, capacityUnit, status, currentLevelPct,
+  rentalStartDate, monthlyRate, lastInspectionDate,
+  nextInspectionDate, notes
+
+<span class="kw">src/types/order.ts:</span>
+- DeliveryTier: 'standard' | 'next-day' | 'same-day'
+- OrderStatus: 'pending'|'scheduled'|'assigned'|'in-transit'|'delivered'|'invoiced'|'paid'
+- Order: id, customerId, productId, tankId?, quantity,
+  deliveryTier, upchargePercent, unitPrice, subtotal,
+  deliveryFee, total, status, notes, requestedAt, scheduledAt
+
+<span class="kw">src/types/run.ts:</span>
+- Run, RunStop, RunStatus types with all fields
+
+<span class="kw">src/types/billing.ts:</span>
+- Invoice, Payment, PaymentMethod with all fields
+
+<span class="kw">src/types/crm.ts:</span>
+- Lead, Quote, ContactLog types
+
+<span class="kw">src/types/file.ts:</span>
+- AppFile: id, entityType, entityId, fileType, url,
+  uploadedBy, signedAt?, expiresAt?, metadata</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Firestore security rules</div><div class="item-sub">firestore.rules · role-based read/write · per collection</div></div>
+            <div class="item-right"><span class="badge badge-firebase">Firebase</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Write comprehensive Firestore security rules in <span class="str">firestore.rules</span> for ohio-gas-hub.
+
+<span class="kw">Helper functions to define:</span>
+- isAuthenticated(): request.auth != null
+- getRole(): get user doc and return role field
+- isAdmin(): role == 'admin'
+- isDispatch(): role in ['admin', 'dispatch']
+- isDriver(): role == 'driver'
+- isSales(): role in ['admin', 'sales']
+- isCustomer(): role == 'customer'
+- isOwner(uid): request.auth.uid == uid
+
+<span class="kw">Rules per collection:</span>
+
+users: read if isAdmin() or own doc; write if isAdmin()
+
+customers:
+- read: isDispatch() or isSales() or (isCustomer() and own record)
+- create: isDispatch() or isSales()
+- update: isDispatch() or isSales()
+- delete: isAdmin() only
+
+orders:
+- read: isDispatch() or isSales() or (isCustomer() and owns order)
+- create: isDispatch() or isSales() or isCustomer()
+- update: isDispatch() — status transitions only for drivers
+- delete: isAdmin() only
+
+tanks: read: isDispatch() or isCustomer()(own tanks); write: isDispatch()
+
+runs: read: isDispatch() or isDriver(); write: isDispatch()
+runStops: read: isDispatch() or isDriver(); update: isDriver() (own stop)
+
+invoices: read: isDispatch() or isSales() or isCustomer()(own); write: isAdmin() or isDispatch()
+payments: read: isDispatch() or isCustomer()(own); write: Firebase Functions only
+
+Also write <span class="str">firestore.rules.test.ts</span> with unit tests for critical rules.</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Firestore indexes</div><div class="item-sub">firestore.indexes.json · composite indexes for queries</div></div>
+            <div class="item-right"><span class="badge badge-firebase">Firebase</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Create <span class="str">firestore.indexes.json</span> with all composite indexes needed for ohio-gas-hub queries.
+
+<span class="kw">Required composite indexes:</span>
+
+orders collection:
+- customerId ASC + requestedAt DESC (customer order history)
+- status ASC + requestedAt ASC (pending orders pool)
+- deliveryTier ASC + status ASC (rush order filter)
+- scheduledAt ASC + status ASC (dispatch weekly view)
+
+runStops collection:
+- runId ASC + stopNumber ASC (ordered stop list)
+- runId ASC + status ASC (completion tracking)
+
+tanks collection:
+- customerId ASC + status ASC (customer tank list)
+- status ASC + gasType ASC (warehouse inventory)
+- nextInspectionDate ASC + status ASC (compliance alerts)
+
+invoices collection:
+- customerId ASC + issuedAt DESC (customer invoice history)
+- status ASC + dueAt ASC (aging report)
+- status ASC + issuedAt DESC (billing dashboard)
+
+payments collection:
+- invoiceId ASC + processedAt DESC
+
+leads collection:
+- stage ASC + createdAt DESC (pipeline view)
+- assignedTo ASC + stage ASC (sales dashboard)</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Firestore service layer</div><div class="item-sub">src/services/ · typed CRUD for every collection</div></div>
+            <div class="item-right"><span class="badge badge-firebase">Firebase</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Create typed Firestore service files in <span class="str">src/services/</span> for ohio-gas-hub.
+
+<span class="kw">Pattern for each service (example: customerService.ts):</span>
+- getCustomer(id: string): Promise&lt;Customer&gt;
+- getCustomers(filters?): Promise&lt;Customer[]&gt;
+- createCustomer(data: CreateCustomerInput): Promise&lt;string&gt;
+- updateCustomer(id: string, data: Partial&lt;Customer&gt;): Promise&lt;void&gt;
+- deleteCustomer(id: string): Promise&lt;void&gt;
+- subscribeToCustomer(id, callback): unsubscribe function
+
+<span class="kw">Create these service files:</span>
+- customerService.ts — CRUD + geocode on create/update
+- orderService.ts — CRUD + status transitions + pricing calc
+- tankService.ts — CRUD + level updates + lifecycle transitions
+- runService.ts — CRUD + stop management + route optimization call
+- invoiceService.ts — CRUD + PDF generation trigger
+- paymentService.ts — read only (writes via Functions)
+- userService.ts — role management + profile updates
+- leadService.ts — pipeline CRUD + convert to customer
+- quoteService.ts — CRUD + PDF generation + convert to order
+- fileService.ts — upload/download with signed URLs
+
+<span class="kw">Shared utilities in src/services/base.ts:</span>
+- Converter factory for Firestore timestamps
+- Error handler wrapper
+- Pagination helper (cursor-based)</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Real-time subscriptions with hooks</div><div class="item-sub">src/hooks/ · onSnapshot listeners · live dispatch sync</div></div>
+            <div class="item-right"><span class="badge badge-firebase">Firebase</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Create custom React hooks in <span class="str">src/hooks/</span> for Firestore real-time subscriptions in ohio-gas-hub.
+
+<span class="kw">Real-time hooks using onSnapshot:</span>
+
+useActiveRun(runId):
+- Subscribes to run document
+- Subscribes to all runStops in order
+- Returns: { run, stops, loading, error }
+- Used by: dispatch live map + driver schedule
+
+useRunStopLive(stopId):
+- Subscribes to single stop
+- Returns: { stop, loading, error }
+- Used by: driver stop detail view
+
+usePendingOrders():
+- Subscribes to orders where status == 'pending'
+- Ordered by requestedAt ASC
+- Returns: { orders, loading, error }
+- Used by: dispatch run builder
+
+useCustomerTanks(customerId):
+- Subscribes to customer's deployed tanks
+- Returns: { tanks, hasLowLevel, loading }
+- Used by: customer portal dashboard
+
+useUnreadNotifications(userId):
+- Subscribes to notifications collection
+- Filters unread for current user
+- Returns: { notifications, unreadCount, markRead }
+
+<span class="kw">Also create TanStack Query hooks for non-realtime data:</span>
+useCustomers, useOrders, useInvoices, useTanks, useLeads
+Each with proper queryKey, staleTime, and error handling.</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Firebase Storage rules</div><div class="item-sub">storage.rules · role-based file access</div></div>
+            <div class="item-right"><span class="badge badge-firebase">Firebase</span><span class="badge badge-aws">AWS S3</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Write Firebase Storage security rules in <span class="str">storage.rules</span> for ohio-gas-hub file storage.
+
+<span class="kw">Storage structure and rules:</span>
+
+ohio-gas-hub/customers/{customerId}/contracts/{fileId}:
+- read: isAuthenticated() and (isDispatch() or isOwnCustomer(customerId))
+- write: isDispatch() or isOwnCustomer(customerId)
+
+ohio-gas-hub/customers/{customerId}/invoices/{fileId}:
+- read: isAuthenticated() and (isDispatch() or isOwnCustomer(customerId))
+- write: Firebase Functions only (admin SDK)
+
+ohio-gas-hub/deliveries/{runId}/{stopId}/{fileId}:
+- read: isDispatch() or isDriver()
+- write: isDriver() — max file size 10MB
+- Allow: image/jpeg, image/png, application/pdf
+
+ohio-gas-hub/employees/{userId}/{fileId}:
+- read: isAdmin() or isOwnUser(userId)
+- write: isAdmin()
+
+ohio-gas-hub/compliance/{fileId}:
+- read: isDispatch()
+- write: isAdmin() or isDispatch()
+
+<span class="kw">Note:</span> For large file storage (contracts, high-res photos),
+evaluate moving to AWS S3 with signed URLs for better
+cost control and CDN performance. Document the tradeoff.
+
+<span class="kw">File validation rules:</span>
+- Max size: images 10MB, documents 25MB
+- Allowed types per path documented above</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="section" data-phase="2">
+      <div class="section-header"><span class="section-name">Firebase Auth &amp; Functions</span><span class="section-count">0 / 5</span></div>
+      <div class="items">
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Firebase Auth setup</div><div class="item-sub">Email/password · custom claims · role in Firestore</div></div>
+            <div class="item-right"><span class="badge badge-firebase">Firebase</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Set up Firebase Authentication for ohio-gas-hub with role-based access.
+
+<span class="kw">Auth strategy:</span>
+- Email + password only (no social login)
+- Custom claims for role: { role: UserRole }
+- User document in Firestore users/ collection mirrors auth
+
+<span class="kw">Create src/lib/auth.ts with functions:</span>
+- signIn(email, password): Promise&lt;AppUser&gt;
+- signOut(): Promise&lt;void&gt;
+- sendPasswordReset(email): Promise&lt;void&gt;
+- getCurrentUser(): AppUser | null
+- onAuthStateChange(callback): unsubscribe
+
+<span class="kw">Create src/store/authStore.ts with Zustand:</span>
+- user: AppUser | null
+- loading: boolean
+- error: string | null
+- Actions: setUser, setLoading, setError, signOut
+
+<span class="kw">Create src/hooks/useAuth.ts:</span>
+- Subscribes to onAuthStateChanged
+- Fetches user doc from Firestore on login
+- Sets role in store
+- Returns: { user, loading, isAdmin, isDispatch, isDriver, isCustomer, isSales }
+
+<span class="kw">Create Firebase Function — setUserRole:</span>
+- Admin-only callable function
+- Sets custom claim on auth token
+- Updates role in Firestore user doc
+- Requires re-login to refresh token
+
+<span class="kw">Create Auth context + AuthProvider component</span>
+<span class="kw">Create useRequireAuth hook</span> that redirects if not authenticated.</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Firebase Functions — project setup</div><div class="item-sub">functions/ · TypeScript · 2nd gen · secrets</div></div>
+            <div class="item-right"><span class="badge badge-firebase">Firebase</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Set up Firebase Functions v2 (2nd generation) with TypeScript for ohio-gas-hub.
+
+<span class="kw">Initialize functions directory:</span>
+cd functions
+npm install typescript @types/node firebase-admin firebase-functions
+npm install stripe @google-cloud/storage nodemailer
+
+<span class="kw">functions/tsconfig.json:</span>
+- target: ES2020, module: commonjs
+- outDir: lib, rootDir: src
+- strict: true
+
+<span class="kw">functions/src/index.ts — export all functions:</span>
+- stripeWebhook (HTTPS trigger)
+- onOrderComplete (Firestore trigger)
+- onDeliveryComplete (Firestore trigger)
+- processAutopay (scheduled, daily)
+- lowLevelAlertCheck (scheduled, daily)
+- certExpiryCheck (scheduled, weekly)
+- setUserRole (callable)
+- generateInvoicePdf (callable)
+- optimizeRoute (callable)
+- createStripePaymentIntent (callable)
+
+<span class="kw">Set up Firebase Secrets (not env vars) for:</span>
+firebase functions:secrets:set STRIPE_SECRET_KEY
+firebase functions:secrets:set STRIPE_WEBHOOK_SECRET
+firebase functions:secrets:set SENDGRID_API_KEY
+firebase functions:secrets:set GOOGLE_MAPS_SERVER_KEY
+
+<span class="kw">functions/src/config.ts:</span>
+Import and validate all secrets at function startup.</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Function — onDeliveryComplete</div><div class="item-sub">Firestore trigger · invoice · notify · tank update</div></div>
+            <div class="item-right"><span class="badge badge-firebase">Firebase</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Create the <span class="fn">onDeliveryComplete</span> Firebase Function in <span class="str">functions/src/triggers/onDeliveryComplete.ts</span>.
+
+<span class="kw">Trigger:</span> Firestore onUpdate — runStops/{stopId}
+<span class="kw">Condition:</span> status changed to 'delivered'
+
+<span class="kw">On trigger, execute in sequence:</span>
+
+<span class="kw">1. Update order status:</span>
+- Set order.status = 'delivered'
+- Set order.deliveredAt = timestamp
+- Set order.quantityDelivered from stop data
+
+<span class="kw">2. Update tank level:</span>
+- Fetch tank record for this order
+- Recalculate currentLevelPct based on quantity added
+- Update tank.currentLevelPct and tank.lastFilledAt
+- If new level > 25%, clear any pending low-level alerts
+
+<span class="kw">3. Generate invoice:</span>
+- Calculate line items: product price × qty delivered
+- Add delivery tier upcharge (0/15/30%)
+- Add tank rental fee (prorated if first delivery)
+- Add flat delivery fee
+- Create invoice document in Firestore
+- Set invoice.status = 'pending'
+
+<span class="kw">4. Handle autopay:</span>
+- Check if customer has autopay payment method
+- If yes: create Stripe PaymentIntent, charge immediately
+- If no: send invoice email with pay link via SendGrid
+
+<span class="kw">5. Send delivery confirmation email</span> to customer
+
+<span class="kw">6. Create in-app notification</span> for dispatch (delivery complete)
+
+Wrap all steps in try/catch with detailed error logging.
+Use Firestore transactions where data consistency matters.</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Function — Stripe webhook handler</div><div class="item-sub">Payment success/failure · invoice updates · retry</div></div>
+            <div class="item-right"><span class="badge badge-firebase">Firebase</span><span class="badge badge-stripe">Stripe</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Create the Stripe webhook handler in <span class="str">functions/src/webhooks/stripeWebhook.ts</span> for ohio-gas-hub.
+
+<span class="kw">HTTPS endpoint: POST /stripeWebhook</span>
+
+<span class="kw">Security:</span>
+- Verify Stripe signature using STRIPE_WEBHOOK_SECRET
+- Return 400 for invalid signatures immediately
+- Use raw body (not parsed JSON) for signature verification
+
+<span class="kw">Handle these Stripe events:</span>
+
+payment_intent.succeeded:
+- Find invoice by stripePaymentIntentId
+- Update invoice.status = 'paid', invoice.paidAt = now
+- Create payment record in Firestore
+- Send payment receipt email to customer
+- Send in-app notification to customer + dispatch
+
+payment_intent.payment_failed:
+- Update invoice.status = 'payment_failed'
+- Log failure reason
+- Send payment failure email to customer
+- Create staff alert notification
+- If autopay: flag customer account for follow-up
+
+customer.subscription.deleted: (future — tank rentals)
+- Placeholder for subscription handling
+
+<span class="kw">Idempotency:</span>
+- Check if event already processed (store event IDs)
+- Return 200 immediately for duplicate events
+
+<span class="kw">Error handling:</span>
+- Log all errors to Firebase
+- Return 500 only for unrecoverable errors
+- Return 200 for handled business logic failures</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Scheduled functions — alerts + billing</div><div class="item-sub">Daily/weekly cron · low tank · overdue · cert expiry</div></div>
+            <div class="item-right"><span class="badge badge-firebase">Firebase</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Create scheduled Firebase Functions in <span class="str">functions/src/scheduled/</span> for ohio-gas-hub.
+
+<span class="kw">1. lowLevelAlertCheck</span> — runs daily at 8am EST:
+- Query all deployed tanks where currentLevelPct &lt; 25
+- For each: check if alert already sent in last 7 days
+- If not: send email to customer with refill CTA link
+- Create draft order if customer has autopay + no pending order
+- Send staff notification for each flagged tank
+- Log alert in Firestore notifications collection
+
+<span class="kw">2. processAutopay</span> — runs daily at 6am EST:
+- Query invoices where status = 'pending' and dueAt &lt;= today
+- For each customer with autopay enabled:
+  - Fetch their Stripe payment method
+  - Create PaymentIntent and charge
+  - Update invoice status (handled by webhook)
+- Log processing results
+
+<span class="kw">3. overdueInvoiceCheck</span> — runs daily at 9am EST:
+- Query invoices where status = 'pending' and dueAt &lt; today
+- Bucket by days overdue: 1-30, 31-60, 61-90, 90+
+- Send overdue reminder emails to customers at 7, 30, 60 days
+- Create staff notifications for 30+ day overdue accounts
+- Flag accounts at 90+ days for credit hold review
+
+<span class="kw">4. certExpiryCheck</span> — runs every Monday at 7am EST:
+- Query files where expiresAt is within 30 days
+- Send staff alert for each expiring cert/license
+- Create notification in Firestore
+
+All functions use: region('us-central1'), timeoutSeconds: 540, memory: '256MiB'</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════
+     PHASE 3 — INTEGRATIONS
+════════════════════════════════════════════════════ -->
+<div class="phase">
+  <div class="phase-header">
+    <div class="phase-dot" style="background:#378ADD;"></div>
+    <span class="phase-title">Phase 3 — Third-party integrations</span>
+    <span class="phase-stats" id="ph3">0 / 0</span>
+  </div>
+  <div class="grid-3">
+
+    <div class="section" data-phase="3">
+      <div class="section-header"><span class="section-name">Stripe payments</span><span class="section-count">0 / 5</span></div>
+      <div class="items">
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Stripe SDK initialization</div><div class="item-sub">src/lib/stripe.ts · loadStripe · Elements provider</div></div>
+            <div class="item-right"><span class="badge badge-stripe">Stripe</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Set up Stripe in the ohio-gas-hub React frontend.
+
+npm install @stripe/stripe-js @stripe/react-stripe-js
+
+<span class="kw">Create src/lib/stripe.ts:</span>
+- Import loadStripe from @stripe/stripe-js
+- Initialize with VITE_STRIPE_PUBLISHABLE_KEY
+- Lazy load (only instantiate when needed)
+- Export stripePromise
+
+<span class="kw">Create src/components/payments/StripeProvider.tsx:</span>
+- Wraps children with Elements provider
+- Passes stripePromise
+- Configures appearance to match Ohio Gas Hub brand:
+  - theme: 'stripe'
+  - variables: { colorPrimary: '#E87722', borderRadius: '8px' }
+
+<span class="kw">Create src/components/payments/PaymentForm.tsx:</span>
+- Uses PaymentElement (handles card + ACH automatically)
+- Shows loading state during payment processing
+- Handles PaymentIntent confirmation
+- Success: redirect to confirmation page
+- Error: show inline error message
+
+<span class="kw">Create src/components/payments/SavedPaymentMethod.tsx:</span>
+- Displays saved card/bank last 4 digits
+- Shows autopay status badge
+- Remove payment method button
+- Set as default button</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Stripe customer + payment method</div><div class="item-sub">Create Stripe customer · save card/ACH · autopay</div></div>
+            <div class="item-right"><span class="badge badge-stripe">Stripe</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Create Firebase Functions for Stripe customer and payment method management in ohio-gas-hub.
+
+<span class="kw">functions/src/stripe/createSetupIntent.ts (callable):</span>
+- Verify caller is authenticated
+- Check if customer already has stripeCustomerId in Firestore
+- If not: create Stripe customer with email + name
+- Save stripeCustomerId to customer Firestore doc
+- Create SetupIntent for saving payment method
+- Return: { clientSecret }
+
+<span class="kw">functions/src/stripe/savePaymentMethod.ts (callable):</span>
+- Called after SetupIntent confirmed on frontend
+- Retrieve PaymentMethod from Stripe
+- Determine type: card or us_bank_account (ACH)
+- Store in Firestore paymentMethods collection:
+  - stripePaymentMethodId, type, last4, brand/bankName
+  - isAutopay flag, isDefault flag
+- If isAutopay: attach to Stripe customer as default
+
+<span class="kw">functions/src/stripe/removePaymentMethod.ts (callable):</span>
+- Detach from Stripe customer
+- Delete from Firestore paymentMethods
+- If was default autopay: clear autopay flag on customer
+
+<span class="kw">Frontend flow in src/pages/customer/ManageAutopay.tsx:</span>
+1. Call createSetupIntent Function → get clientSecret
+2. Show Stripe PaymentElement with clientSecret
+3. On submit: stripe.confirmSetup()
+4. On success: call savePaymentMethod Function
+5. Refresh payment methods list</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Pay invoice flow</div><div class="item-sub">One-time payment · PaymentIntent · confirmation</div></div>
+            <div class="item-right"><span class="badge badge-stripe">Stripe</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Build the manual invoice payment flow for ohio-gas-hub customer portal.
+
+<span class="kw">Firebase Function — createPaymentIntent (callable):</span>
+- Verify caller owns this invoice
+- Check invoice.status === 'pending'
+- Create Stripe PaymentIntent with:
+  - amount: invoice.total (in cents)
+  - currency: 'usd'
+  - customer: customer.stripeCustomerId
+  - metadata: { invoiceId, customerId, ohioGasHub: true }
+  - payment_method_types: ['card', 'us_bank_account']
+- Return: { clientSecret, paymentIntentId }
+
+<span class="kw">Frontend page — src/pages/customer/PayInvoice.tsx:</span>
+- Shows invoice summary (items, total, due date)
+- Option A: Pay with saved payment method (one click)
+- Option B: Pay with new card/bank account
+- Stripe PaymentElement for Option B
+- Loading + processing states
+- Success state: show confirmation + receipt link
+- Failure state: clear error message + retry option
+
+<span class="kw">After successful payment:</span>
+- Stripe webhook handles invoice status update
+- Frontend polls invoice status or subscribes via Firestore
+- Show success screen with:
+  - Amount paid
+  - Invoice number
+  - Download receipt button (link to PDF in Firebase Storage)</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Stripe test suite</div><div class="item-sub">Test cards · ACH test · webhook local testing</div></div>
+            <div class="item-right"><span class="badge badge-stripe">Stripe</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Create a Stripe testing guide and test utilities for ohio-gas-hub.
+
+<span class="kw">Create docs/stripe-testing.md with:</span>
+
+Test card numbers:
+- 4242 4242 4242 4242 → payment succeeds
+- 4000 0000 0000 9995 → payment fails (insufficient funds)
+- 4000 0025 0000 3155 → requires 3D Secure authentication
+- 4000 0000 0000 0002 → card declined
+
+ACH test accounts:
+- routing: 110000000, account: 000123456789 → succeeds
+- routing: 110000000, account: 000111111116 → fails
+
+<span class="kw">Webhook local testing setup:</span>
+- Install Stripe CLI: brew install stripe/stripe-cli/stripe
+- stripe login
+- stripe listen --forward-to localhost:5001/ohio-gas-hub-dev/us-central1/stripeWebhook
+- stripe trigger payment_intent.succeeded
+
+<span class="kw">Create src/utils/stripe-test-helpers.ts (dev only):</span>
+- createTestInvoice(customerId, amount)
+- simulateAutopayCharge(invoiceId)
+- simulatePaymentFailure(invoiceId)
+- Only export in development environment
+
+<span class="kw">Write Vitest tests in functions/src/__tests__/stripe.test.ts:</span>
+- Test webhook signature verification
+- Test payment success handler
+- Test payment failure handler
+- Mock Stripe SDK responses</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Stripe go-live checklist</div><div class="item-sub">Production keys · webhook endpoint · test real charge</div></div>
+            <div class="item-right"><span class="badge badge-stripe">Stripe</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Create the Stripe production go-live checklist for ohio-gas-hub in <span class="str">docs/stripe-go-live.md</span>.
+
+<span class="kw">Pre-launch checklist:</span>
+
+Account setup:
+- [ ] Stripe account activated and verified (Ohio Gas Supply Co.)
+- [ ] Business details complete (EIN, bank account, address)
+- [ ] Stripe Radar fraud rules configured
+- [ ] ACH/bank transfer enabled in Stripe dashboard
+
+Keys + secrets:
+- [ ] Production publishable key added to GitHub secret VITE_STRIPE_PUBLISHABLE_KEY_PROD
+- [ ] Production secret key added to Firebase Secret STRIPE_SECRET_KEY (production project)
+- [ ] Production webhook endpoint created in Stripe dashboard
+  URL: https://us-central1-ohio-gas-hub-prod.cloudfunctions.net/stripeWebhook
+- [ ] Webhook secret added to Firebase Secret STRIPE_WEBHOOK_SECRET
+
+Webhook events to subscribe:
+- [ ] payment_intent.succeeded
+- [ ] payment_intent.payment_failed
+- [ ] setup_intent.succeeded
+- [ ] customer.updated
+
+Testing in production:
+- [ ] Run one real $0.50 charge and refund
+- [ ] Verify webhook events appear in Stripe dashboard
+- [ ] Verify invoice updates in Firestore
+- [ ] Verify receipt email delivered
+
+Monitoring:
+- [ ] Set up Stripe email alerts for failed payments
+- [ ] Review Stripe Radar fraud rules monthly</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="section" data-phase="3">
+      <div class="section-header"><span class="section-name">Google Maps integration</span><span class="section-count">0 / 4</span></div>
+      <div class="items">
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Maps JS API embed</div><div class="item-sub">Dispatch live map · truck pin · stop markers</div></div>
+            <div class="item-right"><span class="badge badge-maps">Maps</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Set up Google Maps JavaScript API for the ohio-gas-hub dispatch map.
+
+npm install @vis.gl/react-google-maps
+
+<span class="kw">Create src/components/maps/DispatchMap.tsx:</span>
+- Uses @vis.gl/react-google-maps APIProvider
+- Centered on central Ohio (lat: 40.0, lng: -82.9)
+- Map style: clean light theme, hide POI clutter
+- Map ID from Google Cloud (for Advanced Markers)
+
+<span class="kw">Markers to display:</span>
+- Truck pin: animated, orange (#E87722), shows driver name tooltip
+- Completed stops: green checkmark pin
+- Pending stops: gray numbered circle pin
+- Current stop: orange pulsing pin
+- Click any stop pin: show stop detail popover
+
+<span class="kw">Create src/components/maps/RoutePolyline.tsx:</span>
+- Draws route line between stops in order
+- Completed segments: solid green line
+- Remaining segments: dashed gray line
+- Updates in real-time as stops complete
+
+<span class="kw">Create src/hooks/useDriverLocation.ts:</span>
+- For future GPS tracking (placeholder)
+- Currently uses stop completion as position proxy
+- Architecture is ready for navigator.geolocation
+
+<span class="kw">API key restrictions in Google Cloud:</span>
+- HTTP referrer restriction: ohiogashub.com/*
+- Only enable: Maps JS API, Geocoding API, Routes API, Distance Matrix API</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Geocoding on customer create</div><div class="item-sub">Address → lat/lng · Firebase Function · stored on doc</div></div>
+            <div class="item-right"><span class="badge badge-maps">Maps</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Create geocoding logic for ohio-gas-hub customer records.
+
+<span class="kw">Firebase Function — geocodeCustomer (Firestore trigger):</span>
+- Trigger: onCreate and onUpdate of customers/{customerId}
+- Only run if address fields changed
+- Call Google Maps Geocoding API (server-side key):
+  https://maps.googleapis.com/maps/api/geocode/json
+  ?address={full address}&key={GOOGLE_MAPS_SERVER_KEY}
+- Extract: lat, lng, formatted_address, placeId
+- Update customer doc with geocoded data
+- Handle errors: log + set geocodeStatus: 'failed'
+
+<span class="kw">Address fields to geocode:</span>
+Combine: address + city + state + zip + 'OH' (default state)
+
+<span class="kw">Create src/utils/addressUtils.ts:</span>
+- formatAddress(customer: Customer): string
+- isOhioAddress(customer: Customer): boolean (validate OH zip ranges)
+- getGoogleMapsUrl(lat: number, lng: number): string
+  (used by driver "navigate" button → opens Google Maps app)
+
+<span class="kw">Address validation in customer form:</span>
+- Required: street, city, zip
+- State defaults to Ohio
+- Show geocode status indicator on customer record
+- Allow manual lat/lng override if geocode fails</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Route optimization function</div><div class="item-sub">Routes API · stop clustering · max stops per mile</div></div>
+            <div class="item-right"><span class="badge badge-maps">Maps</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Create the route optimization Firebase Function in <span class="str">functions/src/maps/optimizeRoute.ts</span> for ohio-gas-hub.
+
+<span class="kw">Callable function — optimizeRoute:</span>
+Input: { orderIds: string[], startLocation: LatLng, date: string }
+
+<span class="kw">Step 1 — Fetch order + customer data:</span>
+- Get all orders by IDs
+- Get customer lat/lng for each order
+- Filter out orders without geocoded addresses
+
+<span class="kw">Step 2 — Call Google Maps Routes API:</span>
+POST https://routes.googleapis.com/directions/v2:computeRoutes
+- origin: truck depot / start location
+- destination: origin (return to depot)
+- intermediates: all customer locations
+- travelMode: DRIVE
+- optimizeWaypointOrder: true
+- routingPreference: TRAFFIC_AWARE
+- Header: X-Goog-FieldMask for minimal response
+
+<span class="kw">Step 3 — Process response:</span>
+- Extract optimizedIntermediateWaypointIndex (reordered stops)
+- Map back to orderId order
+- Extract estimated duration and distance per leg
+- Calculate total route distance and estimated time
+
+<span class="kw">Step 4 — Return to frontend:</span>
+{
+  optimizedOrderIds: string[],  <span class="cmt">// reordered</span>
+  totalDistanceMiles: number,
+  estimatedDurationMinutes: number,
+  legs: { orderId, distanceMiles, durationMinutes }[]
+}
+
+<span class="kw">Dispatch then creates the run with this ordered stop list.</span></div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Driver navigation link</div><div class="item-sub">One-tap Google Maps · pre-loaded address · mobile</div></div>
+            <div class="item-right"><span class="badge badge-maps">Maps</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Build the driver navigation feature for ohio-gas-hub stop detail view.
+
+<span class="kw">Create src/utils/navigation.ts:</span>
+
+openGoogleMapsNavigation(lat: number, lng: number, label?: string):
+- On mobile: opens Google Maps app with turn-by-turn
+  URL: https://maps.google.com/?q={lat},{lng}&label={label}
+- Fallback: https://www.google.com/maps/dir/?api=1&destination={lat},{lng}
+- Detects iOS/Android for native app deep link
+
+openAppleMapsNavigation(lat: number, lng: number):
+- iOS fallback: maps://maps.apple.com/?daddr={lat},{lng}
+
+<span class="kw">Create src/components/driver/NavigateButton.tsx:</span>
+- Large prominent button: "Navigate to stop"
+- Orange (#E87722) background, white text
+- Shows customer name and address below button
+- On click: calls openGoogleMapsNavigation
+- Shows small map preview thumbnail above button
+  (static Google Maps image API)
+- Disable if lat/lng not available, show address only
+
+<span class="kw">Static map thumbnail:</span>
+https://maps.googleapis.com/maps/api/staticmap
+?center={lat},{lng}&zoom=15&size=320x160
+&markers=color:orange|{lat},{lng}
+&key={VITE_GOOGLE_MAPS_API_KEY}
+Restrict: HTTP referrer for client-side key
+Cache thumbnail URL in component state.</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="section" data-phase="3">
+      <div class="section-header"><span class="section-name">Email + notifications</span><span class="section-count">0 / 4</span></div>
+      <div class="items">
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">SendGrid email setup</div><div class="item-sub">Templates · transactional email · sender domain</div></div>
+            <div class="item-right"><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Set up SendGrid transactional email for ohio-gas-hub Firebase Functions.
+
+npm install @sendgrid/mail (in functions/)
+
+<span class="kw">Create functions/src/email/sendEmail.ts:</span>
+- Initialize SendGrid with SENDGRID_API_KEY secret
+- sendEmail(to, templateId, dynamicData): Promise&lt;void&gt;
+- From: noreply@ohiogassupply.com
+- Reply-to: info@ohiogassupply.com
+- Log all email sends to Firestore emailLogs collection
+
+<span class="kw">Create email templates (in SendGrid dashboard + docs):</span>
+
+1. TEMPLATE_ORDER_CONFIRMATION:
+   - Subject: "Order confirmed — Ohio Gas Hub"
+   - Variables: customerName, orderNumber, product, quantity, deliveryTier, estimatedDate, total
+
+2. TEMPLATE_DELIVERY_CONFIRMATION:
+   - Subject: "Your gas was delivered — Ohio Gas Hub"
+   - Variables: customerName, product, quantityDelivered, deliveredAt, invoiceLink
+
+3. TEMPLATE_INVOICE_ISSUED:
+   - Subject: "Invoice #{invoiceNumber} from Ohio Gas Supply"
+   - Variables: customerName, invoiceNumber, total, dueDate, payLink, lineItems[]
+
+4. TEMPLATE_PAYMENT_RECEIVED:
+   - Subject: "Payment received — Ohio Gas Hub"
+   - Variables: customerName, amount, invoiceNumber, receiptLink
+
+5. TEMPLATE_PAYMENT_FAILED:
+   - Subject: "Payment issue — action required"
+   - Variables: customerName, amount, reason, retryLink
+
+6. TEMPLATE_LOW_TANK_ALERT:
+   - Subject: "Your {{gasType}} cylinder is running low"
+   - Variables: customerName, gasType, levelPct, orderLink
+
+<span class="kw">Create functions/src/email/templates.ts:</span>
+- Export all template IDs as constants
+- Document each template's dynamic variables</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">In-app notification system</div><div class="item-sub">Firestore notifications · bell icon · unread count</div></div>
+            <div class="item-right"><span class="badge badge-firebase">Firebase</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Build the in-app notification system for ohio-gas-hub.
+
+<span class="kw">Firestore structure — notifications/{notificationId}:</span>
+- userId: string (target user)
+- type: 'rush_order' | 'delivery_complete' | 'payment_failed' | 'low_tank' | 'overdue_invoice' | 'cert_expiry'
+- title: string
+- body: string
+- read: boolean
+- link?: string (deep link to related record)
+- entityId?: string (orderId, invoiceId, etc.)
+- createdAt: Timestamp
+
+<span class="kw">Create src/hooks/useNotifications.ts:</span>
+- Subscribes to notifications where userId == currentUser.id
+- Returns: { notifications, unreadCount, markRead, markAllRead }
+- Real-time via onSnapshot
+
+<span class="kw">Create src/components/layout/NotificationBell.tsx:</span>
+- Bell SVG icon in top nav
+- Orange badge with unread count (hidden if 0)
+- Click: open notification dropdown panel
+- Panel shows last 20 notifications
+- Each row: icon by type, title, relative time (2h ago)
+- Click row: navigate to link + mark as read
+- "Mark all read" button at top
+- "No notifications" empty state
+
+<span class="kw">Notification creation helper in Functions:</span>
+createNotification(userId, type, title, body, link?, entityId?)
+Used by all Function triggers that need to alert users.</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">PDF invoice generation</div><div class="item-sub">Firebase Function · PDFKit · store to Firebase Storage</div></div>
+            <div class="item-right"><span class="badge badge-firebase">Firebase</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Build PDF invoice generation for ohio-gas-hub using Firebase Functions.
+
+npm install pdfkit (in functions/)
+
+<span class="kw">Create functions/src/pdf/generateInvoicePdf.ts:</span>
+
+Function signature: generateInvoicePdf(invoiceId: string): Promise&lt;string&gt;
+Returns: download URL of generated PDF
+
+<span class="kw">PDF layout (Ohio Gas Hub branded):</span>
+
+Header:
+- Ohio Gas Supply Co. logo placeholder (text-based)
+- Orange (#E87722) accent bar left side
+- "Invoice" title, invoice number, date issued
+
+Bill To section:
+- Customer name, company, address
+
+Invoice details table:
+- Columns: Description | Qty | Unit Price | Amount
+- Rows: product line, delivery fee, tier upcharge, tank rental
+- Subtotal, tax if applicable, Total Due (bold)
+
+Payment info:
+- Due date
+- "Pay online at: ohiogashub.com/portal/invoices"
+- Ohio Gas Supply contact info
+
+Footer:
+- "Thank you for your business."
+- ohiogassupply.com
+
+<span class="kw">Storage:</span>
+- Save to: ohio-gas-hub/invoices/{customerId}/{invoiceId}.pdf
+- Update invoice.pdfUrl in Firestore
+- Return signed download URL (expires 7 days)
+
+<span class="kw">Trigger:</span> Called by onDeliveryComplete after invoice created
+Also: callable for re-generation by staff</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">QuickBooks CSV export</div><div class="item-sub">Billing export · invoices + payments · download</div></div>
+            <div class="item-right"><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Build QuickBooks-compatible CSV export for ohio-gas-hub billing module.
+
+<span class="kw">Create src/utils/exportUtils.ts:</span>
+
+exportInvoicesToCsv(invoices: Invoice[], customers: Customer[]): void
+- Generates CSV with QuickBooks IIF-compatible columns:
+  Customer, Invoice#, Date, Due Date, Item, Quantity,
+  Rate, Amount, Memo, Terms, Status
+- Uses browser download (Blob + URL.createObjectURL)
+- Filename: ohio-gas-hub-invoices-{YYYY-MM-DD}.csv
+
+exportPaymentsToCsv(payments: Payment[]): void
+- Columns: Date, Customer, Invoice#, Amount, Method, Reference (Stripe ID)
+- Filename: ohio-gas-hub-payments-{YYYY-MM-DD}.csv
+
+<span class="kw">Create src/pages/billing/BillingDashboard.tsx export UI:</span>
+- Date range picker (start + end date)
+- Checkboxes: Export invoices / Export payments
+- "Export to CSV" button
+- Shows row count before download
+- Loading state while generating
+
+<span class="kw">Create src/utils/reportUtils.ts:</span>
+- generateAgingReport(invoices): AgingBucket[]
+  Returns: { current, days30, days60, days90plus } totals
+- calculateRevenueMetrics(invoices, payments): Metrics
+  Returns: totalRevenue, collected, outstanding, averageInvoice
+
+Both used by BillingDashboard for summary cards.</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════
+     PHASE 4 — SCREEN BUILDS
+════════════════════════════════════════════════════ -->
+<div class="phase">
+  <div class="phase-header">
+    <div class="phase-dot" style="background:#D85A30;"></div>
+    <span class="phase-title">Phase 4 — Screen builds (all 20 screens)</span>
+    <span class="phase-stats" id="ph4">0 / 0</span>
+  </div>
+  <div class="grid-3">
+
+    <div class="section" data-phase="4">
+      <div class="section-header"><span class="section-name">Customer portal</span><span class="section-count">0 / 6</span></div>
+      <div class="items">
+        <div class="item in-progress">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Account dashboard</div><div class="item-sub">Stats · tanks · invoices · orders · alert bar</div></div>
+            <div class="item-right"><span class="badge badge-active">In progress</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Build <span class="str">src/pages/customer/Dashboard.tsx</span> for the ohio-gas-hub customer portal.
+
+<span class="kw">Data hooks to use:</span>
+- useAuth() → current customer user
+- useCustomerTanks(customerId) → real-time tanks + low level flag
+- TanStack Query: useCustomerInvoices(customerId, limit: 4)
+- TanStack Query: useCustomerOrders(customerId, limit: 3)
+
+<span class="kw">Layout — desktop (sidebar nav):</span>
+Top bar: "Account dashboard" + "Report tank level" btn + "+ Place order" btn (orange)
+
+Alert bar (conditional — only when hasLowLevel):
+- Orange background, warning dot
+- "CO₂ cylinder at {level}% — getting low. Order a refill or update level."
+
+Stat cards row (3 columns):
+- Outstanding balance: sum of pending invoices | "X invoice(s) due {date}"
+- Orders this year: count | "Last: {date}"
+- Autopay: method last4 | status badge (Active/Inactive)
+
+Two-column grid:
+Left — Active tanks card:
+  For each tank: name, serial, level bar, status badge
+  "Report levels →" link
+
+Right — Recent invoices card:
+  Invoice number (mono), date, amount, status badge
+  "View all →" link
+
+Full-width — Recent orders:
+  Product, date, tier badge (+15% if next-day), status badge, amount
+  "View all →" link
+
+<span class="kw">Mobile layout:</span>
+- Remove sidebar, add bottom tab nav (5 tabs)
+- Stack all sections vertically
+- Two-column stat grid (balance + orders), autopay full-width below
+- Condensed tank bars, condensed invoice list (3 rows)
+- Sticky bottom: "Report level" + "+ Place order" buttons
+
+<span class="kw">Navigation links:</span>
+All "→" links use react-router navigate() to portal sub-pages</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Place an order</div><div class="item-sub">Product · qty · delivery tier · upcharge · confirm</div></div>
+            <div class="item-right"><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Build <span class="str">src/pages/customer/PlaceOrder.tsx</span> for ohio-gas-hub.
+
+<span class="kw">Multi-step form (3 steps, progress indicator):</span>
+
+<span class="kw">Step 1 — Select product:</span>
+- Load active products from Firestore
+- Card-style selector for each product (CO₂, Nitrogen, etc.)
+- Show unit (lb / cf), base price per unit
+- Show customer's deployed tanks of that type
+- Selected card gets orange border
+
+<span class="kw">Step 2 — Quantity + delivery:</span>
+- Quantity input with +/- stepper (min 1)
+- Delivery tier selector (3 cards):
+  Standard (week ahead) — no badge
+  Next day — orange "+15% upcharge" badge
+  Same day — red "+30% upcharge" badge + "subject to availability"
+- Date picker (standard: next 7 days; next-day: tomorrow; same-day: today)
+- Order notes textarea (optional)
+- Live price calculator updates as user selects:
+  Product subtotal + upcharge + delivery fee = Total
+
+<span class="kw">Step 3 — Review + confirm:</span>
+- Summary card: product, qty, tier, date, address, total
+- Delivery tier upcharge shown as line item if applicable
+- "Place order" button (orange, full-width)
+- Back button to edit
+
+<span class="kw">On submit:</span>
+- Call orderService.createOrder()
+- Show success screen: order number, estimated delivery
+- "Back to dashboard" + "View order" buttons
+
+<span class="kw">Mobile:</span> Same steps, full-screen each step, back/next navigation at bottom</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Order history</div><div class="item-sub">Filter · status · reorder · order detail</div></div>
+            <div class="item-right"><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Build <span class="str">src/pages/customer/OrderHistory.tsx</span> for ohio-gas-hub.
+
+<span class="kw">Filter bar:</span>
+- Status filter pills: All | Pending | Scheduled | Delivered | Invoiced
+- Date range picker (optional)
+- Search by order number
+
+<span class="kw">Order list (sorted newest first):</span>
+Each row shows:
+- Order number (mono font)
+- Product + quantity
+- Delivery tier badge (standard / next-day +15% / same-day +30%)
+- Scheduled/delivered date
+- Status badge with color coding
+- Total amount
+- "Reorder" button (copies order to new PlaceOrder form)
+
+<span class="kw">Empty state:</span> "No orders yet. Place your first order."
+
+<span class="kw">Order detail panel (slide-in on row click):</span>
+- Full order details
+- Status timeline (pending → scheduled → delivered)
+- Delivery photo thumbnail if available
+- Linked invoice with pay button if unpaid
+- "Reorder" button
+
+<span class="kw">Pagination:</span> Load 20 at a time, "Load more" button
+
+<span class="kw">Mobile:</span> Card list instead of table rows, full-screen detail on tap</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Invoices &amp; payments</div><div class="item-sub">Invoice list · pay now · download PDF · history</div></div>
+            <div class="item-right"><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Build <span class="str">src/pages/customer/Invoices.tsx</span> for ohio-gas-hub.
+
+<span class="kw">Summary bar at top:</span>
+- Outstanding total (red if overdue)
+- "Pay all outstanding" button if multiple unpaid
+
+<span class="kw">Invoice list:</span>
+Filter tabs: All | Outstanding | Paid
+Each row:
+- Invoice number (mono)
+- Issue date + due date
+- Status badge: Due {date} (amber) / Overdue (red) / Paid (green)
+- Total amount
+- "Pay now" button (shows for outstanding)
+- Download PDF icon button
+
+<span class="kw">Invoice detail (expand on click):</span>
+Line items table:
+- Product, qty, unit price, amount
+- Delivery fee
+- Upcharge (if rush)
+- Tank rental
+- Total due
+
+Payment history section:
+- Date paid, method (Visa ···· 4242), amount
+
+Action buttons:
+- "Pay now" → PayInvoice page with invoiceId
+- "Download PDF" → getDownloadURL from Firebase Storage
+
+<span class="kw">Empty state:</span> "No invoices yet."
+
+<span class="kw">Mobile:</span> Card list, "Pay now" prominent orange button on each card</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Manage autopay</div><div class="item-sub">Add card/ACH · set default · Stripe Elements</div></div>
+            <div class="item-right"><span class="badge badge-stripe">Stripe</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Build <span class="str">src/pages/customer/ManageAutopay.tsx</span> for ohio-gas-hub.
+
+<span class="kw">Current payment methods section:</span>
+- List saved payment methods from Firestore paymentMethods
+- Each card shows:
+  Card icon (Visa/MC/Amex) or bank icon
+  Last 4 digits + brand or bank name
+  "Autopay" badge if is_autopay = true
+  "Default" badge if is_default = true
+  "Remove" button (confirm dialog before removing)
+  "Set as autopay" button if not current autopay method
+
+<span class="kw">Autopay status card:</span>
+- Large status indicator: Autopay On / Off
+- Next charge estimate: "Your next invoice will be charged automatically to {method}"
+- Toggle autopay on/off (updates customer.autopayEnabled)
+
+<span class="kw">Add payment method section:</span>
+- "+ Add credit or debit card" button
+- "+ Add bank account (ACH)" button
+- Both open StripeProvider + PaymentElement modal
+- ACH note: "Bank transfers take 3–5 business days to settle"
+
+<span class="kw">Add method modal flow:</span>
+1. Call createSetupIntent Firebase Function
+2. Mount Stripe PaymentElement with clientSecret
+3. On submit: stripe.confirmSetup()
+4. On success: call savePaymentMethod Function
+5. Close modal, refresh methods list
+6. Toast: "Payment method added successfully"
+
+<span class="kw">Security note displayed:</span>
+"Your card details are securely stored by Stripe. Ohio Gas Hub never stores card numbers."</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Tank level report</div><div class="item-sub">Update level · request refill · tank history</div></div>
+            <div class="item-right"><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Build <span class="str">src/pages/customer/TankLevels.tsx</span> for ohio-gas-hub.
+
+<span class="kw">For each deployed tank, show a tank card:</span>
+- Tank name: CO₂ 50 lb cylinder
+- Serial number (mono, muted)
+- Visual level bar (color: green 50%+, amber 25-50%, red &lt;25%)
+- Current level percentage (large number)
+- Last updated timestamp
+
+<span class="kw">Update level section (inline form):</span>
+- Slider OR number input (0–100%)
+- "Update level" button → calls tankService.updateLevel()
+- Optimistic UI update (show immediately, confirm from Firestore)
+- Success: "Level updated" toast
+- If updated level &lt; 25%: show "Would you like to place a refill order?" prompt
+
+<span class="kw">Request refill CTA (shown when level &lt; 30%):</span>
+- Orange alert card
+- "Order a refill" button → navigate to PlaceOrder with tank pre-selected
+
+<span class="kw">Empty state:</span>
+"No tanks currently on rental. Contact Ohio Gas Supply to get started."
+
+<span class="kw">Level history (accordion, collapsed by default):</span>
+- List of level updates with date, level, updated by (Customer / Driver / Staff)
+
+<span class="kw">Mobile:</span>
+- Full-width tank cards, large slider for easy touch input
+- Refill CTA card is prominent orange full-width block</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section" data-phase="4">
+      <div class="section-header"><span class="section-name">Dispatch / ops screens</span><span class="section-count">0 / 6</span></div>
+      <div class="items">
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Ops dashboard</div><div class="item-sub">KPIs · run status · pending orders · alerts</div></div>
+            <div class="item-right"><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Build <span class="str">src/pages/dispatch/OpsDashboard.tsx</span> for ohio-gas-hub.
+
+<span class="kw">Top stat cards (4 columns):</span>
+- Pending orders: count + "X rush" sub-label
+- Active runs today: count + driver names
+- Tanks low level: count + "needs attention" link
+- Outstanding invoices: total $ amount
+
+<span class="kw">Active runs section (real-time via useActiveRun):</span>
+For each active run:
+- Run name, driver, truck
+- Progress bar: X of Y stops complete
+- Last stop completed timestamp
+- "View on map" button → DispatchMap page
+- Status badge: Active / Delayed / Complete
+
+<span class="kw">Pending orders pool:</span>
+- Table: Customer, Product, Qty, Tier (badge), Requested
+- Rush orders (same-day/next-day) sorted to top with colored border
+- "Build run" button → RunBuilder with orders pre-selected
+- Bulk select checkbox
+
+<span class="kw">Alerts panel (right sidebar or bottom section):</span>
+- Low tank alerts (tank name, customer, level)
+- Failed payments (customer, amount, action link)
+- Expiring certs (item, days until expiry)
+
+<span class="kw">Quick actions:</span>
+"+ New order", "+ New run", "+ New customer" buttons in top bar
+
+<span class="kw">All data real-time via Firestore subscriptions</span></div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Run builder</div><div class="item-sub">Select orders · optimize route · assign driver</div></div>
+            <div class="item-right"><span class="badge badge-maps">Maps</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Build <span class="str">src/pages/dispatch/RunBuilder.tsx</span> for ohio-gas-hub.
+
+<span class="kw">Step 1 — Run setup:</span>
+- Run name (auto: "Run {date} #{n}", editable)
+- Date picker
+- Driver selector (dropdown of active driver users)
+- Truck selector (text input or dropdown)
+
+<span class="kw">Step 2 — Select orders:</span>
+- List of all pending orders with checkboxes
+- Columns: Customer, Address, Product, Qty, Tier (badge)
+- Rush orders highlighted (amber/red border)
+- Filter: by product type, by area (zip prefix)
+- Selected order count + estimated total load shown
+
+<span class="kw">Step 3 — Optimize route:</span>
+- "Optimize Route" button → calls optimizeRoute Firebase Function
+- Loading state: "Calculating best route..."
+- Shows result:
+  - Reordered stop list (numbered)
+  - Total estimated distance + time
+  - Small preview map with route polyline
+- Dispatch can drag-reorder stops to override
+- "Looks good" → proceed
+
+<span class="kw">Step 4 — Review + create:</span>
+- Final ordered stop list
+- Driver + truck confirmation
+- "Create run" button → runService.createRun()
+- Creates run doc + all runStop docs in Firestore
+- Navigate to DispatchMap for this run
+
+<span class="kw">On create:</span> Send notification to driver's user account</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Live dispatch map</div><div class="item-sub">Real-time stops · truck position · status feed</div></div>
+            <div class="item-right"><span class="badge badge-maps">Maps</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Build <span class="str">src/pages/dispatch/DispatchMap.tsx</span> for ohio-gas-hub.
+
+<span class="kw">Layout: split view</span>
+Left panel (320px): Stop list + status feed
+Right panel (flex): Google Map
+
+<span class="kw">Left panel — Stop list:</span>
+- Run info header: driver name, truck, X of Y stops
+- Ordered list of stops:
+  Green check = completed (show time)
+  Orange pulsing = current stop (show "En route" or "At stop")
+  Gray number = pending
+- Click stop → map flies to that location
+- Completed stop shows delivery time
+- Failed stop shows red X + reason
+
+<span class="kw">Left panel — Event feed:</span>
+- Live log of events (newest first):
+  "09:42 — Stop 3 marked complete (Brennan Welding)"
+  "09:15 — Arrived at Stop 3"
+- Auto-scrolls as events come in
+
+<span class="kw">Right panel — Map:</span>
+- DispatchMap component (see maps setup)
+- All stop markers visible
+- Route polyline
+- Clicking a marker shows customer name + stop status popover
+
+<span class="kw">Top bar:</span>
+- Rush order alert badge (if new rush order came in)
+- "Add stop" button → opens order search modal
+- "End run" button (confirm dialog)
+
+<span class="kw">Real-time data:</span> useActiveRun(runId) hook drives all updates</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Order management</div><div class="item-sub">All orders · filters · create · edit · status</div></div>
+            <div class="item-right"><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Build <span class="str">src/pages/dispatch/OrderManagement.tsx</span> for ohio-gas-hub internal staff.
+
+<span class="kw">Filter + search bar:</span>
+- Search by customer name or order number
+- Status filter: All | Pending | Scheduled | Delivered | Invoiced | Paid
+- Delivery tier filter: All | Standard | Next Day | Same Day
+- Date range filter
+- "Rush only" toggle (highlights same-day + next-day)
+
+<span class="kw">Orders table:</span>
+Columns: Order# | Customer | Product + Qty | Tier | Scheduled | Status | Total | Actions
+
+Actions column:
+- View detail icon
+- Edit icon (if pending/scheduled)
+- Cancel icon (if pending)
+
+<span class="kw">Rush orders:</span> Amber/red left border, sorted to top automatically
+
+<span class="kw">Create order button:</span> Opens full staff order creation form
+- Customer search (typeahead)
+- Product selector
+- Quantity with load check (compare to warehouse stock)
+- Delivery tier (dispatched can set same-day)
+- Notes field
+- Scheduled date
+- Price preview
+
+<span class="kw">Order detail slide-in panel:</span>
+- Full timeline of status changes
+- Assigned run + stop number
+- Delivery photo + signature (if delivered)
+- Linked invoice
+- Edit, cancel, reschedule actions
+
+<span class="kw">Bulk actions:</span> Select multiple pending orders → "Add to run"</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Tank &amp; inventory screen</div><div class="item-sub">All cylinders · warehouse stock · lifecycle · alerts</div></div>
+            <div class="item-right"><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Build <span class="str">src/pages/dispatch/TankInventory.tsx</span> for ohio-gas-hub.
+
+<span class="kw">Warehouse stock summary (top):</span>
+Cards showing available count per product:
+- CO₂ 50lb: X available | Y deployed | Z at inspection
+- Nitrogen 100cf: X available | Y deployed
+- Warning badge if available count below minimum threshold
+
+<span class="kw">Cylinder list tabs:</span>
+All | Available | Deployed | Returned | Inspection
+
+<span class="kw">Cylinder table:</span>
+Serial# | Gas Type | Size | Status | Customer | Level | Last Inspection | Next Due | Actions
+
+Inspection due badge: green (60+ days) / amber (30 days) / red (overdue)
+
+<span class="kw">Actions per row:</span>
+- View detail
+- Update level (quick inline edit)
+- Change status (lifecycle transition)
+- View documents (inspection reports)
+
+<span class="kw">Add cylinder modal:</span>
+- Serial number, gas type, size, rental rate
+- Initial status: available
+
+<span class="kw">Cylinder detail slide-in:</span>
+- Full record
+- Level history chart (simple bar chart)
+- Rental history (which customers, when)
+- Inspection documents list + upload button
+- Edit rental rate
+
+<span class="kw">Low level alert list:</span>
+Separate section showing all deployed tanks below 25%
+Each with: customer, level bar, "Create refill order" button</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">End of day run summary</div><div class="item-sub">Stops · miles · skipped · close run</div></div>
+            <div class="item-right"><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Build <span class="str">src/pages/dispatch/RunSummary.tsx</span> for ohio-gas-hub.
+
+<span class="kw">Triggered when:</span> All stops complete or dispatch manually closes run
+
+<span class="kw">Summary header:</span>
+- Run name, date, driver name
+- Status: Complete ✓
+
+<span class="kw">KPI cards row:</span>
+- Stops completed: X / Y
+- Stops skipped: Z (if any)
+- Total deliveries: X units delivered
+- Estimated miles: from route optimization
+- Start time → End time → Total duration
+
+<span class="kw">Stop-by-stop summary table:</span>
+Stop# | Customer | Product | Qty Delivered | Status | Arrived | Completed | Notes
+
+Skipped stops in red with skip reason.
+
+<span class="kw">Skipped stop actions:</span>
+For each skipped stop: "Reschedule" button → creates new pending order
+
+<span class="kw">Financial summary:</span>
+- Total invoices generated: count + $ total
+- Autopay charged: count + $ total
+- Manual invoices sent: count + $ total
+
+<span class="kw">Actions:</span>
+- "Download run report" → CSV export
+- "Close run" button → sets run.status = 'complete'
+- "Back to ops dashboard" link
+
+<span class="kw">This page also accessible from run history list</span> (past completed runs)</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="section" data-phase="4">
+      <div class="section-header"><span class="section-name">Driver + CRM + Billing</span><span class="section-count">0 / 8</span></div>
+      <div class="items">
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Driver — day schedule</div><div class="item-sub">Ordered stop list · tap to navigate · progress</div></div>
+            <div class="item-right"><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Build <span class="str">src/pages/driver/DaySchedule.tsx</span> for ohio-gas-hub.
+
+<span class="kw">Designed for tablet browser in the truck cab.</span>
+
+<span class="kw">Header:</span>
+- "Good morning, {driverName}"
+- Today's date
+- Run name + total stops
+
+<span class="kw">Progress bar:</span> X of Y stops complete (orange fill)
+
+<span class="kw">Stop list (large touch targets):</span>
+Each stop card shows:
+- Stop number (large, bold)
+- Customer name (large)
+- Address (one line)
+- Product + quantity to deliver
+- Status indicator: pending (gray) / current (orange) / done (green check)
+
+Current stop card:
+- Highlighted with orange border
+- Larger card size
+- "Navigate" button (large, orange) → openGoogleMapsNavigation()
+- "View stop details" button
+
+Completed stop cards:
+- Muted appearance
+- Show delivery time
+
+<span class="kw">When all stops complete:</span>
+- "All stops complete!" message
+- "Submit end of day" button → navigate to DriverSummary
+
+<span class="kw">Real-time via:</span> useActiveRun(runId) — updates as driver completes stops
+
+<span class="kw">Mobile/tablet optimization:</span>
+- Minimum touch target 48px
+- Large readable fonts (16px minimum)
+- High contrast for outdoor visibility</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Driver — delivery capture</div><div class="item-sub">Check-in · qty · photo · signature · complete</div></div>
+            <div class="item-right"><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Build <span class="str">src/pages/driver/DeliveryCapture.tsx</span> for ohio-gas-hub.
+
+<span class="kw">Step 1 — Arrive:</span>
+- Shows customer name, address, product, quantity ordered
+- Large "I've arrived" button → logs arrivedAt timestamp to runStop
+- Updates stop status to 'at-stop'
+- Dispatch sees status update instantly
+
+<span class="kw">Step 2 — Confirm delivery:</span>
+- Quantity delivered input (pre-filled from order, editable)
+- Note if different from ordered quantity
+- Large number stepper for easy touch input
+
+<span class="kw">Step 3 — Photo capture:</span>
+- "Take photo" button → opens device camera via &lt;input type="file" accept="image/*" capture="environment"&gt;
+- Shows photo thumbnail after capture
+- "Retake" option
+- Upload to Firebase Storage: ohio-gas-hub/deliveries/{runId}/{stopId}/photo.jpg
+- Required before marking complete
+
+<span class="kw">Step 4 — Signature:</span>
+- Canvas-based signature pad (use react-signature-canvas or signature_pad library)
+- "Clear" button to redo
+- "Skip" option with reason (no one present, drop-off permission)
+- On capture: upload PNG to Firebase Storage
+
+<span class="kw">Step 5 — Mark complete:</span>
+- Summary: qty, photo thumbnail, signature captured
+- Large "Mark as delivered" button (green)
+- Confirmation dialog
+- On confirm: update runStop.status = 'delivered'
+  → triggers onDeliveryComplete Firebase Function
+
+<span class="kw">Skip stop flow:</span>
+- "Can't complete stop" button (always visible)
+- Reason select: Not home / Wrong address / Product unavailable / Other
+- Notes field
+- Sets stop.status = 'skipped'</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">CRM — customer record</div><div class="item-sub">Full profile · tanks · orders · notes · flags</div></div>
+            <div class="item-right"><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Build <span class="str">src/pages/crm/CustomerRecord.tsx</span> for ohio-gas-hub.
+
+<span class="kw">Header:</span>
+- Customer name (large) + company
+- Status badge: Active / Inactive / On Hold
+- Account flags: Priority ⭐ / Credit Hold 🚫
+- Edit button
+
+<span class="kw">Contact info card:</span>
+Email, phone, address with Google Maps link
+
+<span class="kw">Tabs layout:</span>
+
+Tab 1 — Overview:
+- Active tanks with level bars
+- Outstanding balance + autopay status
+- Recent orders (last 5)
+- Recent invoices (last 5)
+- Quick actions: "New order", "New invoice"
+
+Tab 2 — Contact history:
+- Timeline of logged interactions (calls, emails, visits)
+- "Log interaction" button → modal with type, date, notes, next follow-up date
+- Sorted newest first
+
+Tab 3 — Account notes:
+- Free-form notes text area (auto-saved)
+- Internal flags: credit limit input, delivery notes, access instructions
+- Account hold toggle with reason
+
+Tab 4 — Documents:
+- Contracts (with DocuSeal eSign status)
+- Signed agreements
+- Upload button
+
+<span class="kw">All data loaded from Firestore with TanStack Query</span>
+<span class="kw">Real-time subscription on tanks for live level updates</span></div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">CRM — leads pipeline</div><div class="item-sub">Kanban stages · owner · convert to customer</div></div>
+            <div class="item-right"><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Build <span class="str">src/pages/crm/LeadsPipeline.tsx</span> for ohio-gas-hub.
+
+<span class="kw">Pipeline stages (Kanban columns):</span>
+New Lead → Contacted → Qualified → Quote Sent → Won → Lost
+
+<span class="kw">Kanban board layout:</span>
+- Horizontal scroll on desktop
+- Each column shows count + total estimated value
+- Lead cards show: company name, contact, assigned to, last activity date
+
+<span class="kw">Lead card actions:</span>
+- Drag to move stage (or use stage dropdown on card)
+- Click to open lead detail panel
+- "Send quote" shortcut button
+
+<span class="kw">Lead detail panel (slide-in):</span>
+- Company, contact name, email, phone
+- Source (referral, website, cold call, etc.)
+- Assigned sales rep
+- Products of interest, estimated value
+- Notes + activity log
+- "Convert to customer" button (shows when stage = Won)
+
+<span class="kw">Convert to customer flow:</span>
+- Pre-fills new customer form from lead data
+- Creates customer doc in Firestore
+- Archives lead as Won
+- Navigates to new customer record
+
+<span class="kw">Add lead button:</span> Quick form modal (name, company, contact, source)
+
+<span class="kw">Also build list view toggle</span> (table format, sortable columns)</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">CRM — quote builder</div><div class="item-sub">Products · pricing · PDF email · convert to order</div></div>
+            <div class="item-right"><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Build <span class="str">src/pages/crm/QuoteBuilder.tsx</span> for ohio-gas-hub.
+
+<span class="kw">Quote form:</span>
+- Customer or lead selector (typeahead search)
+- Quote name / reference
+- Valid until date
+
+<span class="kw">Line items builder (add multiple rows):</span>
+Each row: Product selector | Qty | Unit price (editable) | Amount
+"+ Add line item" button
+Remove row button
+
+Special items: Delivery fee, Tank rental (optional checkboxes)
+
+<span class="kw">Pricing summary:</span>
+Subtotal, delivery fee, rental, Total
+All update live as user edits
+
+<span class="kw">Notes / terms field:</span> Free text, shown on PDF
+
+<span class="kw">Actions:</span>
+- "Save draft" → saves to quotes collection
+- "Preview PDF" → generates PDF preview in modal
+- "Send to customer" → generates PDF + sends email with quote
+  Update quote.status = 'sent', sentAt = now
+- "Convert to order" → creates order from quote data
+  Update quote.status = 'accepted'
+
+<span class="kw">Quote list page:</span>
+Table: Quote# | Customer | Total | Status | Sent | Valid Until | Actions
+Status: Draft / Sent / Accepted / Expired
+
+<span class="kw">PDF generation:</span> Call generateQuotePdf Firebase Function (similar to invoice PDF)</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Billing dashboard</div><div class="item-sub">Revenue · outstanding · aging · export</div></div>
+            <div class="item-right"><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Build <span class="str">src/pages/billing/BillingDashboard.tsx</span> for ohio-gas-hub.
+
+<span class="kw">Summary stat cards (4):</span>
+- Revenue this month: $ collected
+- Outstanding: $ total pending
+- Overdue: $ total overdue (red)
+- Avg days to pay: number
+
+<span class="kw">Invoice list (full-width table):</span>
+Filter bar: Status | Date range | Customer search | Tier filter
+Columns: Invoice# | Customer | Order | Issued | Due | Total | Status | Actions
+
+Status badges:
+- Paid (green)
+- Due in X days (amber if &lt;7 days)
+- Overdue X days (red)
+- Draft (gray)
+
+Actions: View | Download PDF | Mark paid manually | Void
+
+<span class="kw">Aging report section:</span>
+Four colored cards:
+- Current (due in future): $ amount + count
+- 1–30 days overdue: $ amount (amber)
+- 31–60 days: $ amount (orange)
+- 61–90+ days: $ amount (red)
+Click each card to filter invoice list to that bucket
+
+<span class="kw">Export section:</span>
+- Date range pickers
+- "Export invoices CSV" button
+- "Export payments CSV" button
+
+<span class="kw">Credit holds section:</span>
+List of accounts on hold with reason and outstanding balance</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Auth — login screen</div><div class="item-sub">Email + password · forgot password · role redirect</div></div>
+            <div class="item-right"><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Build <span class="str">src/pages/auth/Login.tsx</span> for ohio-gas-hub.
+
+<span class="kw">Layout:</span>
+- Centered card on neutral background
+- Ohio Gas Hub logo: orange vertical bar + "Ohio Gas Hub" text
+- Tagline: "Reliable Gas. Local Service. Built for Ohio."
+
+<span class="kw">Form:</span>
+- Email input (type="email", autocomplete="email")
+- Password input (type="password", show/hide toggle)
+- "Sign in" button (orange, full-width)
+- "Forgot password?" link below button
+
+<span class="kw">On submit:</span>
+1. Validate inputs client-side
+2. Show loading spinner on button
+3. Call auth.signIn(email, password)
+4. On success: fetch user role from Firestore
+5. Redirect based on role:
+   - admin / dispatch → /ops/dashboard
+   - driver → /driver/schedule
+   - sales → /crm/customers
+   - customer → /portal/dashboard
+6. On error: show inline error message
+   "Invalid email or password" (generic, don't specify which)
+
+<span class="kw">Forgot password page (src/pages/auth/ResetPassword.tsx):</span>
+- Email input
+- "Send reset link" button
+- Success state: "Check your email for a reset link"
+- Calls Firebase sendPasswordResetEmail()
+
+<span class="kw">Both pages:</span> Redirect to home if already authenticated</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Admin — user management</div><div class="item-sub">Create users · assign roles · activate/deactivate</div></div>
+            <div class="item-right"><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Build <span class="str">src/pages/admin/UserManagement.tsx</span> for ohio-gas-hub (admin only).
+
+<span class="kw">User list table:</span>
+Name | Email | Role | Status | Last login | Actions
+
+Role badge colors:
+- Admin: red
+- Dispatch: purple
+- Driver: blue
+- Sales: amber
+- Customer: gray
+
+<span class="kw">Create user modal:</span>
+- Full name, email
+- Role selector (dropdown)
+- For customer role: link to existing customer record
+- System sends Firebase password reset email (they set their own password)
+- Creates Firestore user doc
+- Calls setUserRole Firebase Function to set custom claim
+
+<span class="kw">Edit user:</span>
+- Change role → calls setUserRole Function
+- Activate / Deactivate → sets user.active flag
+- Deactivated users cannot log in (check in auth flow)
+
+<span class="kw">User stats:</span>
+Total users count by role (small cards at top)
+
+<span class="kw">Security:</span>
+- This entire page only accessible to admin role
+- ProtectedRoute wraps with isAdmin check
+- All mutations go through Firebase Functions (not direct Firestore writes)</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════
+     PHASE 5 — TESTING
+════════════════════════════════════════════════════ -->
+<div class="phase">
+  <div class="phase-header">
+    <div class="phase-dot" style="background:#888780;"></div>
+    <span class="phase-title">Phase 5 — Testing &amp; QA</span>
+    <span class="phase-stats" id="ph5">0 / 0</span>
+  </div>
+  <div class="grid-2">
+
+    <div class="section" data-phase="5">
+      <div class="section-header"><span class="section-name">Unit + integration tests</span><span class="section-count">0 / 5</span></div>
+      <div class="items">
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Vitest setup + pricing logic tests</div><div class="item-sub">Delivery tier calc · invoice totals · upcharge math</div></div>
+            <div class="item-right"><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Set up Vitest and write unit tests for ohio-gas-hub core business logic.
+
+npm install -D vitest @testing-library/react @testing-library/user-event jsdom
+
+<span class="kw">Configure vitest.config.ts:</span>
+- environment: jsdom
+- globals: true
+- setupFiles: src/test/setup.ts
+- coverage: v8, threshold 70%
+
+<span class="kw">Create src/utils/pricing.ts and test src/utils/pricing.test.ts:</span>
+
+calculateDeliveryUpcharge(tier: DeliveryTier, subtotal: number):
+- standard → 0% upcharge
+- next-day → 15% upcharge
+- same-day → 30% upcharge
+Test: all three tiers, edge cases (zero subtotal, large amounts)
+
+calculateOrderTotal(order: OrderInput):
+- subtotal = product.pricePerUnit × quantity
+- upcharge = calculateDeliveryUpcharge(tier, subtotal)
+- total = subtotal + upcharge + deliveryFee + tankRentalFee
+Test: standard order, next-day upcharge, with tank rental
+
+calculateTankRentalFee(monthlyRate, deployedDate, invoiceDate):
+- Prorated for partial months
+Test: full month, partial month (15 days), same-day deploy
+
+<span class="kw">Create src/utils/status.ts and test:</span>
+isValidStatusTransition(current: OrderStatus, next: OrderStatus): boolean
+Test: all valid and invalid transitions
+
+<span class="kw">Create src/utils/formatting.test.ts:</span>
+formatCurrency, formatDate, formatPhone, formatAddress</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Firestore rules tests</div><div class="item-sub">@firebase/rules-unit-testing · role access matrix</div></div>
+            <div class="item-right"><span class="badge badge-firebase">Firebase</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Write Firestore security rules tests for ohio-gas-hub using @firebase/rules-unit-testing.
+
+npm install -D @firebase/rules-unit-testing
+
+<span class="kw">Create tests/firestore-rules.test.ts:</span>
+
+<span class="kw">Test setup:</span>
+- initializeTestEnvironment with firestore.rules
+- Create test contexts for each role:
+  adminContext, dispatchContext, driverContext,
+  salesContext, customerContext(customerId), unauthContext
+
+<span class="kw">Test suite for customers collection:</span>
+- Admin can read any customer ✓
+- Dispatch can read any customer ✓
+- Customer can read only own record ✓
+- Customer cannot read another customer's record ✗
+- Unauthenticated cannot read ✗
+- Driver cannot create customers ✗
+- Sales can create customers ✓
+
+<span class="kw">Test suite for orders collection:</span>
+- Customer can create own order ✓
+- Customer cannot create order for another customer ✗
+- Driver can update stop status ✓
+- Driver cannot create orders ✗
+- Admin can delete orders ✓
+- Customer cannot delete orders ✗
+
+<span class="kw">Test suite for invoices collection:</span>
+- Customer can read own invoices ✓
+- Customer cannot read another's invoices ✗
+- Customer cannot write invoices ✗
+- Firebase Functions (admin SDK) can write ✓
+
+Run with: npx firebase emulators:exec --only firestore "npx vitest run tests/firestore-rules.test.ts"</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Firebase Functions tests</div><div class="item-sub">onDeliveryComplete · Stripe webhook · scheduled fns</div></div>
+            <div class="item-right"><span class="badge badge-firebase">Firebase</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Write unit tests for Firebase Functions in ohio-gas-hub using Vitest + mocks.
+
+<span class="kw">functions/src/__tests__/onDeliveryComplete.test.ts:</span>
+Mock: firebase-admin (Firestore, Storage)
+Mock: stripe SDK
+Mock: @sendgrid/mail
+
+Test: status = 'delivered' triggers all downstream actions
+- Order status updated to 'delivered' ✓
+- Tank level recalculated correctly ✓
+- Invoice created with correct line items ✓
+- Autopay customer: Stripe PaymentIntent created ✓
+- Non-autopay customer: invoice email sent ✓
+- Delivery confirmation email sent ✓
+- Staff notification created ✓
+
+Test: non-delivered status change does nothing ✓
+
+<span class="kw">functions/src/__tests__/stripeWebhook.test.ts:</span>
+Mock: stripe.webhooks.constructEvent
+
+Test: valid signature + payment_intent.succeeded:
+- Invoice updated to 'paid' ✓
+- Payment record created ✓
+- Receipt email sent ✓
+
+Test: invalid signature returns 400 ✓
+Test: payment_intent.payment_failed:
+- Invoice status = 'payment_failed' ✓
+- Staff alert created ✓
+
+Test: duplicate event ID returns 200 without processing ✓
+
+<span class="kw">functions/src/__tests__/scheduled.test.ts:</span>
+Test lowLevelAlertCheck with mock tanks below/above threshold
+Test overdueInvoiceCheck with mock invoices at various ages</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Component tests — critical flows</div><div class="item-sub">PlaceOrder · DeliveryCapture · PaymentForm</div></div>
+            <div class="item-right"><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Write React component tests for ohio-gas-hub critical user flows using Vitest + Testing Library.
+
+<span class="kw">src/pages/customer/__tests__/PlaceOrder.test.tsx:</span>
+Mock: orderService.createOrder, useCustomerTanks, product data
+
+Test: renders all 3 steps in sequence
+Test: product selection updates price preview
+Test: next-day tier shows "+15% upcharge" badge
+Test: same-day tier shows "+30% upcharge" badge
+Test: form submission calls createOrder with correct data
+Test: success state shown after submit
+Test: back button returns to previous step
+
+<span class="kw">src/pages/driver/__tests__/DeliveryCapture.test.tsx:</span>
+Mock: tankService, runStopService, Firebase Storage
+
+Test: "I've arrived" button logs arrivedAt timestamp
+Test: quantity input defaults to ordered quantity
+Test: photo capture input present (cannot test camera in jsdom)
+Test: skip stop flow shows reason selector
+Test: "Mark as delivered" updates stop status
+Test: confirmation dialog appears before marking complete
+
+<span class="kw">src/components/payments/__tests__/PaymentForm.test.tsx:</span>
+Mock: @stripe/react-stripe-js
+
+Test: renders Stripe PaymentElement
+Test: submit button disabled during loading
+Test: error message shown on payment failure
+Test: success callback called on payment success
+
+<span class="kw">Run all tests:</span> npm run test
+<span class="kw">Coverage report:</span> npm run test -- --coverage</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Mobile responsive QA</div><div class="item-sub">375px · 768px · all 20 screens · touch targets</div></div>
+            <div class="item-right"><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Create a responsive QA checklist and fix any issues in ohio-gas-hub for mobile breakpoints.
+
+<span class="kw">Test at these breakpoints:</span>
+- 375px (iPhone SE / smallest phone)
+- 390px (iPhone 14)
+- 768px (iPad / tablet — for driver view)
+- 1024px (laptop)
+- 1280px (desktop)
+
+<span class="kw">For each screen, verify:</span>
+
+Layout:
+- [ ] No horizontal overflow / scrollbars
+- [ ] Sidebar hidden, bottom nav visible on mobile
+- [ ] Grid columns collapse appropriately
+- [ ] Cards stack vertically on small screens
+- [ ] Tables scroll horizontally or collapse to cards
+
+Touch targets:
+- [ ] All buttons minimum 44px height
+- [ ] Tap targets not overlapping
+- [ ] Form inputs minimum 48px height on mobile
+- [ ] Driver screens: minimum 56px for primary actions
+
+Typography:
+- [ ] Minimum 14px font size on mobile
+- [ ] No text overflow / ellipsis where unexpected
+- [ ] Mono font (invoice numbers) readable at small sizes
+
+Forms:
+- [ ] Input zoom prevention (font-size: 16px on iOS)
+- [ ] Keyboard doesn't hide submit button
+- [ ] Date pickers work on mobile
+
+<span class="kw">Create responsive utility classes:</span>
+In src/styles/responsive.css:
+- .hide-mobile, .show-mobile
+- .hide-desktop, .show-desktop
+- Grid utilities with mobile-first breakpoints</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="section" data-phase="5">
+      <div class="section-header"><span class="section-name">End-to-end + launch</span><span class="section-count">0 / 5</span></div>
+      <div class="items">
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Full order-to-payment E2E test</div><div class="item-sub">Place order → delivery → invoice → payment flow</div></div>
+            <div class="item-right"><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Document and execute the full end-to-end test flow for ohio-gas-hub using Firebase Emulators.
+
+<span class="kw">Create docs/e2e-test-checklist.md with these test scenarios:</span>
+
+<span class="kw">Scenario 1 — Standard order full cycle:</span>
+1. Login as customer (test-customer@ohiogassupply.com)
+2. Place standard delivery order for CO₂ 50lb
+3. Verify order confirmation email (check SendGrid sandbox)
+4. Login as dispatch → verify order in pending pool
+5. Build run with this order → optimize route → create run
+6. Login as driver → verify stop appears in day schedule
+7. Driver: arrive at stop → confirm qty → capture photo → sign → mark delivered
+8. Verify: invoice auto-generated in Firestore
+9. Verify: delivery confirmation email sent to customer
+10. Verify: tank level updated in Firestore
+11. Customer: login → pay invoice with test card 4242...
+12. Verify: invoice.status = 'paid' in Firestore
+13. Verify: payment receipt email sent
+
+<span class="kw">Scenario 2 — Autopay flow:</span>
+1. Customer saves card as autopay
+2. Driver marks delivery complete
+3. Verify: Stripe PaymentIntent created automatically
+4. Simulate webhook: payment_intent.succeeded
+5. Verify: invoice auto-marked paid
+
+<span class="kw">Scenario 3 — Rush order:</span>
+1. Customer places same-day order
+2. Verify: 30% upcharge applied to total
+3. Verify: dispatch receives rush notification immediately
+4. Dispatch: manually slot into active run
+
+<span class="kw">Scenario 4 — Low tank alert:</span>
+1. Manually set tank level to 20% in Firestore
+2. Run lowLevelAlertCheck function manually
+3. Verify: alert email sent to customer
+4. Verify: staff notification created</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Performance + security audit</div><div class="item-sub">Lighthouse · bundle size · auth edge cases</div></div>
+            <div class="item-right"><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Run performance and security audit for ohio-gas-hub before launch.
+
+<span class="kw">Performance — Vite bundle optimization:</span>
+- Run: npm run build -- --report
+- Check bundle size: target &lt; 200kb initial JS (gzipped)
+- Code split by route using React.lazy + Suspense
+- Lazy load: @vis.gl/react-google-maps, @stripe/react-stripe-js
+- Check: no large libraries in main bundle
+
+vite.config.ts optimizations:
+- manualChunks: separate vendor chunks
+- rollupOptions for tree-shaking
+
+<span class="kw">Performance — Firestore query audit:</span>
+- Check all queries use indexes (no collection scans)
+- Ensure real-time listeners are properly unsubscribed on unmount
+- Paginate any query returning 20+ documents
+- Review onSnapshot usage — ensure no duplicate listeners
+
+<span class="kw">Security audit checklist:</span>
+- [ ] No API keys in source code (check git history)
+- [ ] All routes protected by ProtectedRoute
+- [ ] Role checks on every sensitive page
+- [ ] Firestore rules tested for all role scenarios
+- [ ] Storage rules: no public read access
+- [ ] No sensitive data in URL params
+- [ ] All form inputs sanitized before Firestore write
+- [ ] Stripe webhook signature always verified
+- [ ] Error messages don't expose internal details to users
+
+<span class="kw">Run Lighthouse audit on:</span>
+/portal/dashboard, /ops/dashboard, /driver/schedule
+Target scores: Performance 80+, Accessibility 90+</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Seed production data</div><div class="item-sub">Products · trucks · staff users · initial cylinders</div></div>
+            <div class="item-right"><span class="badge badge-firebase">Firebase</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Create a production data seed script for ohio-gas-hub in <span class="str">scripts/seed-production.ts</span>.
+
+<span class="kw">This script uses Firebase Admin SDK (run with service account key locally — NEVER commit):</span>
+
+<span class="kw">Seed: Products collection</span>
+- { name: 'CO₂ — 50 lb cylinder', type: 'co2', unit: 'cylinder', pricePerUnit: XX.XX, active: true }
+- { name: 'CO₂ — 20 lb cylinder', type: 'co2', unit: 'cylinder', pricePerUnit: XX.XX, active: true }
+- { name: 'Nitrogen — 100 cf cylinder', type: 'nitrogen', unit: 'cylinder', pricePerUnit: XX.XX, active: true }
+- { name: 'Nitrogen — 200 cf cylinder', type: 'nitrogen', unit: 'cylinder', pricePerUnit: XX.XX, active: true }
+(Parker: fill in actual prices before running)
+
+<span class="kw">Seed: Users collection + Firebase Auth accounts</span>
+- Admin: Parker's email, role: admin
+- Dispatch user account
+- Driver account(s)
+- Sales account
+
+<span class="kw">Seed: Delivery fee config</span>
+- { id: 'delivery-fees', standardFee: XX, nextDayFee: XX, sameDayFee: XX }
+  (Or use upcharge percentages — standardize this)
+
+<span class="kw">Add npm script:</span>
+"seed:prod": "GOOGLE_APPLICATION_CREDENTIALS=./service-account.json ts-node scripts/seed-production.ts"
+
+<span class="kw">Safety checks in script:</span>
+- Confirm running against correct Firebase project
+- Print project ID and ask for 'yes' confirmation
+- Never overwrite existing data (use createIfNotExists)</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Production deploy + custom domain</div><div class="item-sub">Firebase go-live · ohiogashub.com · SSL</div></div>
+            <div class="item-right"><span class="badge badge-firebase">Firebase</span><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Execute production deployment of ohio-gas-hub to Firebase Hosting.
+
+<span class="kw">Pre-deploy checklist:</span>
+- [ ] All GitHub Actions CI checks passing on main
+- [ ] .env.production has all correct production values
+- [ ] Firebase production project secrets set (firebase functions:secrets commands)
+- [ ] Stripe live keys configured (not test keys)
+- [ ] SendGrid sender domain verified
+- [ ] Google Maps API key restricted to production domain
+
+<span class="kw">Deploy steps:</span>
+
+1. Build production bundle:
+   VITE_APP_ENV=production npm run build
+   Verify dist/ folder size and contents
+
+2. Deploy Firestore rules:
+   firebase deploy --only firestore:rules --project production
+
+3. Deploy Firestore indexes:
+   firebase deploy --only firestore:indexes --project production
+
+4. Deploy Storage rules:
+   firebase deploy --only storage --project production
+
+5. Deploy Firebase Functions:
+   firebase deploy --only functions --project production
+
+6. Deploy Firebase Hosting:
+   firebase deploy --only hosting --project production
+
+<span class="kw">Custom domain setup (Firebase console):</span>
+- Hosting → Add custom domain → ohiogashub.com
+- Add DNS records as instructed (A records or CNAME)
+- Wait for SSL provisioning (up to 24h)
+- Verify both ohiogashub.com and www.ohiogashub.com
+
+<span class="kw">Post-deploy verification:</span>
+- Login as each role → verify redirect works
+- Place test order → verify full flow
+- Check Firebase console for any function errors
+- Run Lighthouse on production URL</div>
+          </div>
+        </div>
+
+        <div class="item">
+          <div class="item-row">
+            <div class="check" onclick="toggleDone(this.closest('.item'))"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="item-body"><div class="item-label">Go live — Ohio Gas Hub ✦</div><div class="item-sub">Onboard staff · notify first customers · monitor</div></div>
+            <div class="item-right"><div class="expand-btn" onclick="togglePrompt(this.closest('.item'))"><svg width="8" height="12" viewBox="0 0 8 12" fill="none"><path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>
+          </div>
+          <div class="prompt-panel">
+            <div class="prompt-header"><span class="prompt-header-label">copilot prompt — paste into VS Code chat</span><button class="copy-btn" onclick="copyPrompt(this)">copy</button></div>
+            <div class="prompt-body">Create launch day runbook for ohio-gas-hub in <span class="str">docs/launch-runbook.md</span>.
+
+<span class="kw">Day 1 — Soft launch (internal only):</span>
+1. Create accounts for all Ohio Gas Supply staff
+2. Walk dispatch through OpsDashboard + RunBuilder
+3. Walk driver(s) through DaySchedule + DeliveryCapture on tablet
+4. Walk Parker through admin panel + billing dashboard
+5. Create 2–3 test customers (friends/family) and run full order cycle
+6. Monitor Firebase console for errors for 48h
+
+<span class="kw">Day 3 — Customer onboarding:</span>
+1. For each existing customer:
+   - Create customer record in Firestore (with geocoded address)
+   - Create Firebase Auth account
+   - System sends password setup email
+   - Add their deployed tanks
+2. Send welcome email from Parker with portal login link
+3. Have Parker available to help first customers log in
+
+<span class="kw">Week 1 monitoring checklist (daily):</span>
+- [ ] Firebase console → Functions → check error logs
+- [ ] Stripe dashboard → check for any failed payments
+- [ ] Firestore → check notification collection isn't growing unbounded
+- [ ] SendGrid → check email delivery rates
+- [ ] Check any skipped orders → reschedule if needed
+
+<span class="kw">Firebase monitoring setup:</span>
+- Enable Firebase Performance Monitoring
+- Set up Firebase Crashlytics (web)
+- Create alerts for function errors > 5 per hour
+- Create alerts for Firestore reads > 50k per day (cost control)
+
+<span class="kw">Congratulations — Ohio Gas Hub is live.</span>
+Reliable Gas. Local Service. Built for Ohio.</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="footer">
+  Ohio Gas Hub · Ohio Gas Supply Co.<br>
+  Reliable Gas. Local Service. Built for Ohio.<br>
+  <span id="footer-count"></span> build steps · click any item to mark complete · expand › for Copilot prompt
+</div>
+
+
+<script>
+document.getElementById('date-stamp').textContent = new Date().toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'});
+
+let TOTAL = 0;
+
+function updateSection(section) {
+  const items = section.querySelectorAll('.item');
+  const done = section.querySelectorAll('.item.done').length;
+  const total = items.length;
+  const countEl = section.querySelector('.section-count');
+  if (countEl) {
+    countEl.textContent = done + ' / ' + total;
+    countEl.className = 'section-count' + (done === total && total > 0 ? ' complete' : '');
+  }
+}
+
+function updatePhase(phaseNum) {
+  const sections = document.querySelectorAll('[data-phase="' + phaseNum + '"]');
+  let done = 0, total = 0;
+  sections.forEach(s => {
+    done += s.querySelectorAll('.item.done').length;
+    total += s.querySelectorAll('.item').length;
+  });
+  const el = document.getElementById('ph' + phaseNum);
+  if (el) {
+    el.textContent = done + ' / ' + total;
+    el.className = 'phase-stats' + (done === total && total > 0 ? ' complete' : '');
+  }
+}
+
+function updateTotal() {
+  const done = document.querySelectorAll('.item.done').length;
+  const pct = TOTAL > 0 ? Math.round((done / TOTAL) * 100) : 0;
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('progress-count').textContent = done + ' / ' + TOTAL;
+}
+
+function toggleDone(item) {
+  if (item.classList.contains('in-progress')) return;
+  const wasDone = item.classList.contains('done');
+  item.classList.toggle('done', !wasDone);
+  const badge = item.querySelector('.badge:not(.badge-firebase):not(.badge-github):not(.badge-stripe):not(.badge-maps):not(.badge-aws)');
+  if (badge && (badge.classList.contains('badge-active') || badge.classList.contains('badge-done'))) {
+    badge.textContent = wasDone ? 'In progress' : 'Done';
+    badge.className = 'badge ' + (wasDone ? 'badge-active' : 'badge-done');
+  }
+  const section = item.closest('.section');
+  if (section) {
+    updateSection(section);
+    const phase = section.getAttribute('data-phase');
+    if (phase) updatePhase(phase);
+  }
+  updateTotal();
+}
+
+function togglePrompt(item) {
+  const isOpen = item.classList.contains('open');
+  item.classList.toggle('open', !isOpen);
+}
+
+function copyPrompt(btn) {
+  const panel = btn.closest('.prompt-panel');
+  const body = panel.querySelector('.prompt-body');
+  const text = body.innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'copied ✓';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'copy';
+      btn.classList.remove('copied');
+    }, 2000);
+  });
+}
+
+// Init
+TOTAL = document.querySelectorAll('.item').length;
+document.querySelectorAll('.section').forEach(updateSection);
+[1,2,3,4,5].forEach(updatePhase);
+updateTotal();
+const fc = document.getElementById('footer-count');
+if (fc) fc.textContent = TOTAL;
+</script>
+</body>
+</html>

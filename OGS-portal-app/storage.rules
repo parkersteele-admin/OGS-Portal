@@ -1,0 +1,144 @@
+rules_version = '2';
+
+// ════════════════════════════════════════════════════════════════════════════
+// OGS Portal — Firebase Storage Security Rules
+//
+// Storage layout (all paths prefixed with ogs-portal/):
+//
+//   customers/{customerId}/contracts/{fileId}   — signed contracts
+//   customers/{customerId}/invoices/{fileId}    — invoice PDFs (write: Functions only)
+//   deliveries/{runId}/{stopId}/{fileId}        — driver photos / POD signatures
+//   employees/{userId}/{fileId}                 — employee HR documents
+//   compliance/{fileId}                         — compliance / regulatory docs
+//
+// ── AWS S3 note ──────────────────────────────────────────────────────────────
+// For large-file workloads (contracts > 25 MB, high-res delivery photos) consider
+// migrating to AWS S3 + CloudFront signed URLs:
+//   Pros: cheaper egress at scale, global CDN edge caching, lifecycle policies,
+//         presigned URL downloads without exposing Firebase service credentials.
+//   Cons: second cloud vendor to manage, requires a backend endpoint to mint
+//         presigned URLs, loses Firebase SDK convenience.
+// Recommendation: keep Firebase Storage for < 25 MB operational files; route
+// contract archives and bulk photo exports through S3 once monthly storage
+// exceeds ~50 GB or egress cost becomes significant.
+// ════════════════════════════════════════════════════════════════════════════
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ── Auth helpers ──────────────────────────────────────────────────────────
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function hasRole(role) {
+      return isAuthenticated() && request.auth.token.role == role;
+    }
+
+    function hasAnyRole(roles) {
+      return isAuthenticated() && request.auth.token.role in roles;
+    }
+
+    function isAdmin()    { return hasRole('admin');    }
+    function isDispatch() { return hasAnyRole(['admin', 'dispatch']); }
+    function isDriver()   { return hasAnyRole(['admin', 'dispatch', 'driver']); }
+
+    // Customer portal users have their customerId stored as a custom claim.
+    function isOwnCustomer(customerId) {
+      return isAuthenticated() && request.auth.token.customerId == customerId;
+    }
+
+    function isOwnUser(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // ── Content-type helpers ──────────────────────────────────────────────────
+
+    function isImageType() {
+      return request.resource.contentType in ['image/jpeg', 'image/png'];
+    }
+
+    function isDocumentType() {
+      return request.resource.contentType == 'application/pdf';
+    }
+
+    function isImageOrDocument() {
+      return isImageType() || isDocumentType();
+    }
+
+    // ── Size helpers ──────────────────────────────────────────────────────────
+
+    // 10 MB — delivery photos
+    function isUnder10MB() {
+      return request.resource.size <= 10 * 1024 * 1024;
+    }
+
+    // 25 MB — contracts and other documents
+    function isUnder25MB() {
+      return request.resource.size <= 25 * 1024 * 1024;
+    }
+
+    // ── ogs-portal/ subtree ───────────────────────────────────────────────────
+    match /ogs-portal/{restOfPath=**} {
+      // Deny by default; specific sub-matches below grant access.
+      allow read, write: if false;
+    }
+
+    // ── contracts ─────────────────────────────────────────────────────────────
+    // Signed service/supply contracts uploaded by dispatch or by the customer.
+    match /ogs-portal/customers/{customerId}/contracts/{fileId} {
+      allow read:   if isAuthenticated() && (isDispatch() || isOwnCustomer(customerId));
+      allow write:  if (isDispatch() || isOwnCustomer(customerId))
+                    && isDocumentType()
+                    && isUnder25MB();
+    }
+
+    // ── invoices ──────────────────────────────────────────────────────────────
+    // Invoice PDFs are generated and written exclusively by Cloud Functions
+    // using the Admin SDK (bypasses these rules). Client-side writes are denied.
+    // Reads are open to dispatch and the owning customer.
+    match /ogs-portal/customers/{customerId}/invoices/{fileId} {
+      allow read:  if isAuthenticated() && (isDispatch() || isOwnCustomer(customerId));
+      allow write: if false; // Admin SDK (Functions) only — bypasses rules
+    }
+
+    // ── deliveries ────────────────────────────────────────────────────────────
+    // Driver-captured proof-of-delivery photos and signatures.
+    // Allowed types: image/jpeg, image/png, application/pdf (signature PDFs).
+    // Max size: 10 MB per file.
+    match /ogs-portal/deliveries/{runId}/{stopId}/{fileId} {
+      allow read:   if isDriver(); // dispatch can review; driver can view own uploads
+      allow create: if hasRole('driver')
+                    && isImageOrDocument()
+                    && isUnder10MB();
+      allow update: if false; // POD files are immutable after upload
+      allow delete: if isAdmin();
+    }
+
+    // ── employees ─────────────────────────────────────────────────────────────
+    // HR / onboarding documents. Employees can read their own folder;
+    // only admins may upload or remove files.
+    match /ogs-portal/employees/{userId}/{fileId} {
+      allow read:   if isAdmin() || isOwnUser(userId);
+      allow write:  if isAdmin()
+                    && isDocumentType()
+                    && isUnder25MB();
+    }
+
+    // ── compliance ────────────────────────────────────────────────────────────
+    // Regulatory and safety compliance documents.
+    match /ogs-portal/compliance/{fileId} {
+      allow read:  if isDispatch();
+      allow write: if (isAdmin() || isDispatch())
+                   && isDocumentType()
+                   && isUnder25MB();
+    }
+
+    // ── Deny everything else ──────────────────────────────────────────────────
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
+

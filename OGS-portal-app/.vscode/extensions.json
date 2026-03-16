@@ -1,0 +1,10 @@
+{
+  "recommendations": [
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "firebase.firebase-vscode",
+    "eamodio.gitlens",
+    "bradlc.vscode-tailwindcss",
+    "github.copilot"
+  ]
+}

@@ -1,0 +1,1343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ohio Gas Supply — Master Build Checklist</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap');
+
+  :root {
+    --bg: #F7F6F2;
+    --bg2: #EEECEA;
+    --bg3: #E2E0DA;
+    --border: rgba(0,0,0,0.08);
+    --border2: rgba(0,0,0,0.12);
+    --text: #1A1A18;
+    --text2: #6B6A65;
+    --text3: #9B9A95;
+    --orange: #E87722;
+    --orange-light: #FEF4EC;
+    --orange-text: #7A3A08;
+    --orange-border: rgba(232,119,34,0.25);
+    --green: #1D9E75;
+    --green-light: #E8F5F0;
+    --green-text: #0A4A33;
+    --green-border: rgba(29,158,117,0.2);
+    --purple: #7F77DD;
+    --purple-light: #EEEDFE;
+    --purple-text: #3C3489;
+    --teal: #1D9E75;
+    --teal-light: #E1F5EE;
+    --teal-text: #085041;
+    --blue: #378ADD;
+    --blue-light: #E6F1FB;
+    --blue-text: #0C447C;
+    --amber: #BA7517;
+    --amber-light: #FAEEDA;
+    --amber-text: #633806;
+    --coral: #D85A30;
+    --coral-light: #FAECE7;
+    --coral-text: #712B13;
+    --radius: 8px;
+    --radius-lg: 12px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'IBM Plex Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 32px 24px 48px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  /* HEADER */
+  .header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    gap: 16px;
+  }
+
+  .header-left { display: flex; align-items: center; gap: 14px; }
+
+  .logo-bar {
+    width: 5px;
+    height: 42px;
+    background: var(--orange);
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+
+  .header-text h1 {
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--text);
+    letter-spacing: -0.02em;
+  }
+
+  .header-text p {
+    font-size: 11px;
+    color: var(--text3);
+    margin-top: 3px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .header-meta {
+    font-size: 11px;
+    color: var(--text3);
+    font-family: 'IBM Plex Mono', monospace;
+    text-align: right;
+    line-height: 1.6;
+  }
+
+  /* PROGRESS */
+  .progress-wrap {
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius-lg);
+    padding: 16px 20px;
+    margin-bottom: 28px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .progress-label {
+    font-size: 11px;
+    color: var(--text2);
+    white-space: nowrap;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .progress-bar-wrap {
+    flex: 1;
+    height: 8px;
+    background: var(--bg3);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .progress-bar {
+    height: 100%;
+    background: var(--orange);
+    border-radius: 4px;
+    transition: width 0.4s ease;
+    width: 0%;
+  }
+
+  .progress-count {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    white-space: nowrap;
+  }
+
+  /* PHASE SECTIONS */
+  .phase {
+    margin-bottom: 28px;
+  }
+
+  .phase-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .phase-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .phase-title {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text2);
+    font-family: 'IBM Plex Mono', monospace;
+    flex: 1;
+  }
+
+  .phase-stats {
+    font-size: 11px;
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--text3);
+  }
+
+  .phase-stats.complete { color: var(--green); }
+
+  /* GRID */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; }
+
+  @media (max-width: 900px) {
+    .grid-3 { grid-template-columns: 1fr 1fr; }
+    .grid-4 { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 600px) {
+    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  }
+
+  /* SECTION CARDS */
+  .section {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+
+  .section-header {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .section-name {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .section-tag {
+    display: inline-block;
+    font-size: 9px;
+    padding: 1px 6px;
+    border-radius: 20px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 500;
+  }
+
+  .section-count {
+    font-size: 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--text3);
+    white-space: nowrap;
+  }
+
+  .section-count.complete { color: var(--green); }
+
+  .items { padding: 6px; }
+
+  /* ITEMS */
+  .item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 7px 8px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: background 0.12s;
+    border: 1px solid transparent;
+    margin-bottom: 2px;
+    user-select: none;
+  }
+
+  .item:last-child { margin-bottom: 0; }
+  .item:hover { background: var(--bg3); }
+
+  .item.in-progress {
+    background: var(--orange-light);
+    border-color: var(--orange-border);
+  }
+
+  .item.done { opacity: 0.5; }
+  .item.done:hover { opacity: 0.7; }
+
+  .check {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 1.5px solid var(--bg3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+    transition: all 0.15s;
+    background: var(--bg);
+  }
+
+  .item.in-progress .check { border-color: var(--orange); }
+
+  .item.done .check {
+    background: var(--green);
+    border-color: var(--green);
+  }
+
+  .check svg { display: none; }
+  .item.done .check svg { display: block; }
+
+  .item-body { flex: 1; min-width: 0; }
+
+  .item-label {
+    font-size: 12px;
+    color: var(--text);
+    line-height: 1.4;
+  }
+
+  .item.in-progress .item-label {
+    color: var(--orange-text);
+    font-weight: 500;
+  }
+
+  .item-sub {
+    font-size: 10px;
+    color: var(--text3);
+    margin-top: 1px;
+    font-family: 'IBM Plex Mono', monospace;
+    line-height: 1.4;
+  }
+
+  .badge {
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 20px;
+    font-weight: 500;
+    font-family: 'IBM Plex Mono', monospace;
+    white-space: nowrap;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .badge-active { background: var(--orange-light); color: var(--orange-text); border: 1px solid var(--orange-border); }
+  .badge-done   { background: var(--green-light);  color: var(--green-text);  border: 1px solid var(--green-border); }
+
+  /* DIVIDER */
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 20px 0;
+  }
+
+  /* FOOTER */
+  .footer {
+    margin-top: 32px;
+    text-align: center;
+    font-size: 11px;
+    color: var(--text3);
+    font-family: 'IBM Plex Mono', monospace;
+    line-height: 2;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="logo-bar"></div>
+    <div class="header-text">
+      <h1>Ohio Gas Supply Co.</h1>
+      <p>master build checklist · web app</p>
+    </div>
+  </div>
+  <div class="header-meta">
+    Reliable Gas. Local Service. Built for Ohio.<br>
+    <span id="date-stamp"></span>
+  </div>
+</div>
+
+<div class="progress-wrap">
+  <span class="progress-label">overall progress</span>
+  <div class="progress-bar-wrap">
+    <div class="progress-bar" id="progress-bar"></div>
+  </div>
+  <span class="progress-count" id="progress-count">0 / 0</span>
+</div>
+
+
+<!-- ══════════════════════════════════════════
+     PHASE 1 — FOUNDATION
+════════════════════════════════════════════ -->
+<div class="phase">
+  <div class="phase-header">
+    <div class="phase-dot" style="background:#888780;"></div>
+    <span class="phase-title">Phase 1 — Foundation &amp; infrastructure</span>
+    <span class="phase-stats" id="phase-1-stats">0 / 0</span>
+  </div>
+  <div class="grid-2">
+
+    <div class="section" data-phase="1">
+      <div class="section-header">
+        <span class="section-name">Project setup</span>
+        <span class="section-count">0 / 6</span>
+      </div>
+      <div class="items">
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Initialize React project</div><div class="item-sub">Vite · TypeScript · folder structure</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Design system / tokens</div><div class="item-sub">Colors · typography · spacing · Ohio Gas brand orange</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Component library setup</div><div class="item-sub">Button · input · badge · card · modal base components</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Routing setup</div><div class="item-sub">React Router · protected routes · role-based guards</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Sidebar + top nav shell</div><div class="item-sub">Layout wrapper · responsive breakpoints</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Environment config</div><div class="item-sub">.env setup · dev / staging / production</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section" data-phase="1">
+      <div class="section-header">
+        <span class="section-name">Auth &amp; roles</span>
+        <span class="section-count">0 / 6</span>
+      </div>
+      <div class="items">
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Login screen</div><div class="item-sub">Email + password · forgot password</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Role-based access control</div><div class="item-sub">Admin · dispatch · driver · sales · customer roles</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">JWT token management</div><div class="item-sub">Access + refresh tokens · secure storage</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Password reset flow</div><div class="item-sub">Email link · token expiry · confirmation</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Role-based nav rendering</div><div class="item-sub">Each role sees only their nav items</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Session timeout + logout</div><div class="item-sub">Auto-logout · clear tokens on sign out</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════
+     PHASE 2 — DATABASE & API
+════════════════════════════════════════════ -->
+<div class="phase">
+  <div class="phase-header">
+    <div class="phase-dot" style="background:#378ADD;"></div>
+    <span class="phase-title">Phase 2 — Database &amp; API layer</span>
+    <span class="phase-stats" id="phase-2-stats">0 / 0</span>
+  </div>
+  <div class="grid-3">
+
+    <div class="section" data-phase="2">
+      <div class="section-header">
+        <span class="section-name">Database schema</span>
+        <span class="section-count">0 / 10</span>
+      </div>
+      <div class="items">
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Customers table</div><div class="item-sub">name · contact · address · lat/lng · status</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Payment methods table</div><div class="item-sub">Stripe token · type · autopay flag</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Products table</div><div class="item-sub">Gas type · unit · price per unit · active</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Tanks table</div><div class="item-sub">Serial · capacity · level · rental · status</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Orders table</div><div class="item-sub">Customer · product · quantity · tier · status</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Runs table</div><div class="item-sub">Date · truck · driver · status · summary</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Run stops table</div><div class="item-sub">Stop order · timestamps · photo/sig URLs</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Invoices table</div><div class="item-sub">Line items · totals · status · due date</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Payments table</div><div class="item-sub">Stripe charge ID · amount · status</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Users table</div><div class="item-sub">Name · email · role · active</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section" data-phase="2">
+      <div class="section-header">
+        <span class="section-name">API gateway &amp; backend</span>
+        <span class="section-count">0 / 7</span>
+      </div>
+      <div class="items">
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">API gateway setup</div><div class="item-sub">Node/Express or FastAPI · base routing</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Auth middleware</div><div class="item-sub">JWT validation · role enforcement</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Rate limiting</div><div class="item-sub">Per-route limits · abuse protection</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">CRUD endpoints — customers</div><div class="item-sub">GET · POST · PATCH · DELETE</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">CRUD endpoints — orders</div><div class="item-sub">Status machine · tier upcharge logic</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">CRUD endpoints — tanks / runs / invoices</div><div class="item-sub">All remaining entities</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">WebSocket server</div><div class="item-sub">Real-time dispatch/driver sync</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section" data-phase="2">
+      <div class="section-header">
+        <span class="section-name">Integrations</span>
+        <span class="section-count">0 / 8</span>
+      </div>
+      <div class="items">
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Stripe — payments setup</div><div class="item-sub">API keys · webhook endpoint · test mode</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Stripe — card &amp; ACH tokenization</div><div class="item-sub">Stripe Elements · autopay charge logic</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Google Maps — Geocoding API</div><div class="item-sub">Address → lat/lng on customer create</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Google Maps — Routes API</div><div class="item-sub">Stop clustering · route optimization</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Google Maps — JS embed</div><div class="item-sub">Live dispatch map display</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">AWS S3 — bucket setup</div><div class="item-sub">Private buckets · folder structure · versioning</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">AWS S3 — signed URL service</div><div class="item-sub">Upload · download · expiring links</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">DocuSeal — eSign setup</div><div class="item-sub">Self-hosted · template config · webhook</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════
+     PHASE 3 — CUSTOMER PORTAL SCREENS
+════════════════════════════════════════════ -->
+<div class="phase">
+  <div class="phase-header">
+    <div class="phase-dot" style="background:#D85A30;"></div>
+    <span class="phase-title">Phase 3 — Customer portal screens</span>
+    <span class="phase-stats" id="phase-3-stats">0 / 0</span>
+  </div>
+  <div class="grid-3">
+
+    <div class="section" data-phase="3">
+      <div class="section-header">
+        <span class="section-name">Account &amp; dashboard</span>
+        <span class="section-count">0 / 4</span>
+      </div>
+      <div class="items">
+        <div class="item in-progress" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Account dashboard</div><div class="item-sub">Stats · tanks · invoices · orders · alert bar</div></div>
+          <span class="badge badge-active">In progress</span>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Place an order</div><div class="item-sub">Product · qty · delivery tier · pricing</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Order history</div><div class="item-sub">Filter · status · reorder</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Tank level report</div><div class="item-sub">Update level · request refill</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section" data-phase="3">
+      <div class="section-header">
+        <span class="section-name">Billing &amp; payments</span>
+        <span class="section-count">0 / 4</span>
+      </div>
+      <div class="items">
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Invoices &amp; payments</div><div class="item-sub">List · status · pay now · download PDF</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Manage autopay</div><div class="item-sub">Add card · ACH · set default · remove</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Payment confirmation</div><div class="item-sub">Success state · receipt display</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Payment failed state</div><div class="item-sub">Error handling · retry flow</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section" data-phase="3">
+      <div class="section-header">
+        <span class="section-name">Portal UX &amp; notifications</span>
+        <span class="section-count">0 / 4</span>
+      </div>
+      <div class="items">
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Mobile bottom nav</div><div class="item-sub">Home · order · invoices · tanks · account</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Low tank alert banner</div><div class="item-sub">Threshold trigger · inline CTA</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Email — invoice issued</div><div class="item-sub">Template · pay link · PDF attachment</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Email — delivery confirmation</div><div class="item-sub">Template · order summary · receipt</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════
+     PHASE 4 — ORDERS & DELIVERY MODULE
+════════════════════════════════════════════ -->
+<div class="phase">
+  <div class="phase-header">
+    <div class="phase-dot" style="background:#1D9E75;"></div>
+    <span class="phase-title">Phase 4 — Orders &amp; delivery module</span>
+    <span class="phase-stats" id="phase-4-stats">0 / 0</span>
+  </div>
+  <div class="grid-2">
+
+    <div class="section" data-phase="4">
+      <div class="section-header">
+        <span class="section-name">Order management screens</span>
+        <span class="section-count">0 / 6</span>
+      </div>
+      <div class="items">
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Order list view</div><div class="item-sub">All orders · filter by status / tier / date</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Create order — staff form</div><div class="item-sub">Customer lookup · product · qty · tier</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Order detail view</div><div class="item-sub">Full order · status · linked invoice</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Delivery tier pricing logic</div><div class="item-sub">Standard · next-day +15% · same-day +30%</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Rush order alert system</div><div class="item-sub">Dispatch notification on same/next day</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Order status machine</div><div class="item-sub">Pending → scheduled → assigned → delivered → invoiced → paid</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section" data-phase="4">
+      <div class="section-header">
+        <span class="section-name">Post-delivery automation</span>
+        <span class="section-count">0 / 4</span>
+      </div>
+      <div class="items">
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Auto invoice generation</div><div class="item-sub">Fires on delivery complete · line item builder</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Auto customer notification</div><div class="item-sub">Email on delivery complete</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Auto tank level update</div><div class="item-sub">Recalculate level on delivery</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Skip / failed delivery flow</div><div class="item-sub">Reason capture · reschedule prompt</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════
+     PHASE 5 — TANK & INVENTORY MODULE
+════════════════════════════════════════════ -->
+<div class="phase">
+  <div class="phase-header">
+    <div class="phase-dot" style="background:#1D9E75;"></div>
+    <span class="phase-title">Phase 5 — Tank &amp; inventory module</span>
+    <span class="phase-stats" id="phase-5-stats">0 / 0</span>
+  </div>
+  <div class="grid-3">
+
+    <div class="section" data-phase="5">
+      <div class="section-header">
+        <span class="section-name">Cylinder management</span>
+        <span class="section-count">0 / 5</span>
+      </div>
+      <div class="items">
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Cylinder inventory list</div><div class="item-sub">All cylinders · status · customer · level</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Add / edit cylinder record</div><div class="item-sub">Serial · gas type · size · rental rate</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Cylinder detail view</div><div class="item-sub">History · inspections · rental · docs</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Lifecycle status transitions</div><div class="item-sub">Available → deployed → returned → refilled</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Warehouse stock view</div><div class="item-sub">Available count by type · restock alerts</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section" data-phase="5">
+      <div class="section-header">
+        <span class="section-name">Level tracking &amp; alerts</span>
+        <span class="section-count">0 / 4</span>
+      </div>
+      <div class="items">
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Manual level update — staff</div><div class="item-sub">Admin override on any cylinder</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Customer level self-report</div><div class="item-sub">Portal form → updates cylinder record</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Low level alert engine</div><div class="item-sub">Threshold check · notify customer + staff</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">IoT sensor API hook</div><div class="item-sub">Placeholder endpoint · future ready</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section" data-phase="5">
+      <div class="section-header">
+        <span class="section-name">Rental billing &amp; compliance</span>
+        <span class="section-count">0 / 4</span>
+      </div>
+      <div class="items">
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Monthly rental auto-billing</div><div class="item-sub">Prorated on deploy date · adds to invoice</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Inspection scheduling</div><div class="item-sub">Due date per cylinder · expiry alerts</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Inspection report upload</div><div class="item-sub">PDF to S3 · linked to cylinder record</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Bulk tank data model</div><div class="item-sub">Schema ready · capacity field · future UI</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════
+     PHASE 6 — FIELD OPS MODULE
+════════════════════════════════════════════ -->
+<div class="phase">
+  <div class="phase-header">
+    <div class="phase-dot" style="background:#7F77DD;"></div>
+    <span class="phase-title">Phase 6 — Field ops module</span>
+    <span class="phase-stats" id="phase-6-stats">0 / 0</span>
+  </div>
+  <div class="grid-2">
+
+    <div class="section" data-phase="6">
+      <div class="section-header">
+        <span class="section-name">Dispatch screens</span>
+        <span class="section-count">0 / 6</span>
+      </div>
+      <div class="items">
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Ops dashboard</div><div class="item-sub">KPIs · run status · alerts · quick actions</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Run builder</div><div class="item-sub">Select truck · date · orders · optimize route</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Live dispatch map</div><div class="item-sub">Truck pin · stops · route line · live status</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Stop list manager</div><div class="item-sub">Drag reorder · reassign · add stop</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Rush order dispatch alert</div><div class="item-sub">In-app notification · slot to run</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">End of day run summary</div><div class="item-sub">Stops · miles · time · skipped</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section" data-phase="6">
+      <div class="section-header">
+        <span class="section-name">Driver screens</span>
+        <span class="section-count">0 / 5</span>
+      </div>
+      <div class="items">
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Day schedule view</div><div class="item-sub">Ordered stop list · tap to navigate</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Stop detail view</div><div class="item-sub">Customer · product · qty · notes</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Delivery capture screen</div><div class="item-sub">Qty confirm · photo · signature · complete</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Skip stop flow</div><div class="item-sub">Reason select · reschedule prompt</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Driver end of day summary</div><div class="item-sub">Stops completed · wrap-up</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════
+     PHASE 7 — CRM & BILLING MODULE
+════════════════════════════════════════════ -->
+<div class="phase">
+  <div class="phase-header">
+    <div class="phase-dot" style="background:#BA7517;"></div>
+    <span class="phase-title">Phase 7 — CRM &amp; billing module</span>
+    <span class="phase-stats" id="phase-7-stats">0 / 0</span>
+  </div>
+  <div class="grid-4">
+
+    <div class="section" data-phase="7">
+      <div class="section-header">
+        <span class="section-name">Customer CRM</span>
+        <span class="section-count">0 / 5</span>
+      </div>
+      <div class="items">
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Customer list</div><div class="item-sub">Search · filter · status</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Customer record</div><div class="item-sub">Full profile · tanks · orders · notes</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Contact history log</div><div class="item-sub">Calls · emails · visits</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Account flags &amp; notes</div><div class="item-sub">Holds · warnings · priority tags</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Add / edit customer</div><div class="item-sub">Form · geocode on save</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section" data-phase="7">
+      <div class="section-header">
+        <span class="section-name">Sales pipeline</span>
+        <span class="section-count">0 / 4</span>
+      </div>
+      <div class="items">
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Leads pipeline</div><div class="item-sub">Kanban stages · owner · source</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Lead → customer convert</div><div class="item-sub">One-click convert on close</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Quote builder</div><div class="item-sub">Products · qty · tier · PDF email</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Sales dashboard</div><div class="item-sub">Pipeline value · open quotes · activity</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section" data-phase="7">
+      <div class="section-header">
+        <span class="section-name">Billing screens</span>
+        <span class="section-count">0 / 5</span>
+      </div>
+      <div class="items">
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Billing dashboard</div><div class="item-sub">Revenue · outstanding · collected</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Invoice list — staff</div><div class="item-sub">All invoices · status · filter</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Invoice detail view</div><div class="item-sub">Line items · payment history · PDF</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Aging report</div><div class="item-sub">Current · 30 · 60 · 90+ days</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">QuickBooks export</div><div class="item-sub">CSV / QBO · invoices · payments</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section" data-phase="7">
+      <div class="section-header">
+        <span class="section-name">Payment ops</span>
+        <span class="section-count">0 / 4</span>
+      </div>
+      <div class="items">
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Credit limits &amp; holds</div><div class="item-sub">Per-account limit · auto-block orders</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Payment failure handling</div><div class="item-sub">Retry · staff alert · account flag</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Overdue follow-up queue</div><div class="item-sub">30/60/90 day alerts to staff</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Billing notification emails</div><div class="item-sub">Issued · paid · failed · overdue · autopay</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════
+     PHASE 8 — FILE STORAGE
+════════════════════════════════════════════ -->
+<div class="phase">
+  <div class="phase-header">
+    <div class="phase-dot" style="background:#378ADD;"></div>
+    <span class="phase-title">Phase 8 — File storage &amp; documents</span>
+    <span class="phase-stats" id="phase-8-stats">0 / 0</span>
+  </div>
+  <div class="grid-2">
+
+    <div class="section" data-phase="8">
+      <div class="section-header">
+        <span class="section-name">Document management</span>
+        <span class="section-count">0 / 6</span>
+      </div>
+      <div class="items">
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">File upload service</div><div class="item-sub">S3 pre-signed upload · type validation</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">In-app PDF preview</div><div class="item-sub">Contracts · invoices · reports</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">DocuSeal eSign flow</div><div class="item-sub">Send · sign · store completed doc</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Delivery photo upload</div><div class="item-sub">Driver captures · attaches to stop record</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Signature capture</div><div class="item-sub">Canvas signature · save to S3</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Role-based file access</div><div class="item-sub">Permission check before every signed URL</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section" data-phase="8">
+      <div class="section-header">
+        <span class="section-name">Compliance &amp; expiry tracking</span>
+        <span class="section-count">0 / 4</span>
+      </div>
+      <div class="items">
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Safety cert expiry tracking</div><div class="item-sub">expires_at per doc · alert before lapse</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Driver license expiry alerts</div><div class="item-sub">Employee records · notify admin</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Auto-generated invoice PDFs</div><div class="item-sub">Built on delivery · stored to S3</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">File metadata in database</div><div class="item-sub">URL · type · entity · uploaded_by · expiry</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════
+     PHASE 9 — NOTIFICATIONS
+════════════════════════════════════════════ -->
+<div class="phase">
+  <div class="phase-header">
+    <div class="phase-dot" style="background:#BA7517;"></div>
+    <span class="phase-title">Phase 9 — Notifications &amp; alerts</span>
+    <span class="phase-stats" id="phase-9-stats">0 / 0</span>
+  </div>
+  <div class="grid-2">
+
+    <div class="section" data-phase="9">
+      <div class="section-header">
+        <span class="section-name">Customer notifications</span>
+        <span class="section-count">0 / 6</span>
+      </div>
+      <div class="items">
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Order confirmation email</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Delivery confirmation email</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Invoice issued email + pay link</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Payment received receipt</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Payment failed alert</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Low tank level alert + refill CTA</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section" data-phase="9">
+      <div class="section-header">
+        <span class="section-name">Internal staff notifications</span>
+        <span class="section-count">0 / 6</span>
+      </div>
+      <div class="items">
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Rush order alert to dispatch</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Payment failure alert to staff</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Overdue invoice follow-up queue</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Low warehouse stock alert</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Cert / license expiry alert</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">In-app notification center</div><div class="item-sub">Bell icon · unread count · mark all read</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════
+     PHASE 10 — LAUNCH
+════════════════════════════════════════════ -->
+<div class="phase">
+  <div class="phase-header">
+    <div class="phase-dot" style="background:#888780;"></div>
+    <span class="phase-title">Phase 10 — QA, testing &amp; launch</span>
+    <span class="phase-stats" id="phase-10-stats">0 / 0</span>
+  </div>
+  <div class="grid-2">
+
+    <div class="section" data-phase="10">
+      <div class="section-header">
+        <span class="section-name">Testing</span>
+        <span class="section-count">0 / 5</span>
+      </div>
+      <div class="items">
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Unit tests — core logic</div><div class="item-sub">Pricing · status machine · billing calc</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">End-to-end order flow test</div><div class="item-sub">Order → delivery → invoice → payment</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Stripe payment test suite</div><div class="item-sub">Success · failure · retry · refund</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Role access audit</div><div class="item-sub">Every route tested per role</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Mobile responsive QA</div><div class="item-sub">All screens at 375px and 768px</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section" data-phase="10">
+      <div class="section-header">
+        <span class="section-name">Launch</span>
+        <span class="section-count">0 / 5</span>
+      </div>
+      <div class="items">
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Production environment setup</div><div class="item-sub">Hosting · domain · SSL · env vars</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Stripe go-live</div><div class="item-sub">Switch to live keys · test real payment</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Seed initial data</div><div class="item-sub">Products · trucks · staff users · cylinders</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Staff onboarding walkthrough</div><div class="item-sub">Dispatch · driver · sales training</div></div>
+        </div>
+        <div class="item" onclick="toggle(this)">
+          <div class="check"><svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <div class="item-body"><div class="item-label">Go live ✦</div><div class="item-sub">Ohio Gas Supply app in production</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<div class="footer">
+  Ohio Gas Supply Co. · Reliable Gas. Local Service. Built for Ohio.<br>
+  click any item to toggle · progress tracked in this tab
+</div>
+
+<script>
+  document.getElementById('date-stamp').textContent = new Date().toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'});
+
+  const phases = [1,2,3,4,5,6,7,8,9,10];
+  let TOTAL = 0;
+
+  function countSection(section) {
+    return section.querySelectorAll('.item').length;
+  }
+
+  function updateSection(section) {
+    const items = section.querySelectorAll('.item');
+    const done = section.querySelectorAll('.item.done').length;
+    const total = items.length;
+    const countEl = section.querySelector('.section-count');
+    if (countEl) {
+      countEl.textContent = done + ' / ' + total;
+      countEl.className = 'section-count' + (done === total ? ' complete' : '');
+    }
+  }
+
+  function updatePhase(phaseNum) {
+    const sections = document.querySelectorAll('[data-phase="' + phaseNum + '"]');
+    let done = 0, total = 0;
+    sections.forEach(s => {
+      done += s.querySelectorAll('.item.done').length;
+      total += s.querySelectorAll('.item').length;
+    });
+    const el = document.getElementById('phase-' + phaseNum + '-stats');
+    if (el) {
+      el.textContent = done + ' / ' + total;
+      el.className = 'phase-stats' + (done === total && total > 0 ? ' complete' : '');
+    }
+  }
+
+  function updateTotal() {
+    const done = document.querySelectorAll('.item.done').length;
+    document.getElementById('progress-bar').style.width = Math.round((done / TOTAL) * 100) + '%';
+    document.getElementById('progress-count').textContent = done + ' / ' + TOTAL;
+  }
+
+  function toggle(el) {
+    const wasDone = el.classList.contains('done');
+    const wasActive = el.classList.contains('in-progress');
+    if (wasActive) return;
+    el.classList.toggle('done', !wasDone);
+    const badge = el.querySelector('.badge');
+    if (badge) {
+      badge.textContent = wasDone ? 'In progress' : 'Done';
+      badge.className = 'badge ' + (wasDone ? 'badge-active' : 'badge-done');
+    }
+    const section = el.closest('.section');
+    if (section) updateSection(section);
+    const phaseNum = section ? section.getAttribute('data-phase') : null;
+    if (phaseNum) updatePhase(phaseNum);
+    updateTotal();
+  }
+
+  // Init
+  TOTAL = document.querySelectorAll('.item').length;
+  document.querySelectorAll('.section').forEach(updateSection);
+  phases.forEach(updatePhase);
+  updateTotal();
+</script>
+</body>
+</html>
