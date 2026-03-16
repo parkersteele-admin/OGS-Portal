@@ -119,6 +119,7 @@ export const Router: React.FC = () => (
         <Route path="schedule" element={<SchedulePage />} />
         <Route path="stop/:id" element={<StopPage />} />
         <Route path="capture/:id" element={<CapturePage />} />
+        <Route path="summary/:runId" element={<StopPage />} />
       </Route>
 
       {/* CRM Portal */}
