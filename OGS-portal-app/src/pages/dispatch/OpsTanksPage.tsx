@@ -1,2 +1,1 @@
-import placeholder from '../_placeholder'
-export default placeholder('Ops Tanks')
+export { default } from './TankInventory'

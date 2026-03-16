@@ -84,3 +84,29 @@ export async function reactivateUser(id: string): Promise<void> {
 export async function deleteUser(id: string): Promise<void> {
   return serviceCall(() => deleteDoc(doc(db, 'users', id)))
 }
+
+// ── Admin: create user ────────────────────────────────────────────────────────
+// Calls the adminCreateUser Cloud Function which uses the Admin SDK to:
+//   1. Create the Firebase Auth user
+//   2. Create the Firestore user doc
+//   3. Set the custom role claim via setUserRole
+
+export interface CreateUserInput {
+  name:        string
+  email:       string
+  role:        UserRole
+  customerId?: string
+}
+
+export async function createAppUser(data: CreateUserInput): Promise<string> {
+  return serviceCall(async () => {
+    const { httpsCallable } = await import('firebase/functions')
+    const { functions }     = await import('../lib/firebase')
+    const fn = httpsCallable<CreateUserInput, { uid: string }>(
+      functions,
+      'adminCreateUser',
+    )
+    const result = await fn(data)
+    return result.data.uid
+  })
+}

@@ -7,6 +7,7 @@ import { CustomerLayout } from './components/layouts/CustomerLayout'
 import { OpsLayout } from './components/layouts/OpsLayout'
 import { DriverLayout } from './components/layouts/DriverLayout'
 import { CrmLayout } from './components/layouts/CrmLayout'
+import { AdminLayout } from './components/layouts/AdminLayout'
 
 // Auth
 import LoginPage from './pages/auth/Login'
@@ -26,6 +27,7 @@ import OpsDashboardPage from './pages/dispatch/OpsDashboard'
 import OpsOrdersPage from './pages/dispatch/OpsOrdersPage'
 import RunsPage from './pages/dispatch/RunsPage'
 import RunBuilder from './pages/dispatch/RunBuilder'
+import RunSummaryPage from './pages/dispatch/RunSummary'
 import DispatchPage from './pages/dispatch/DispatchPage'
 import OpsTanksPage from './pages/dispatch/OpsTanksPage'
 import InventoryPage from './pages/dispatch/InventoryPage'
@@ -37,11 +39,13 @@ import CapturePage from './pages/driver/CapturePage'
 
 // CRM
 import CustomersPage from './pages/crm/CustomersPage'
+import CustomerRecord from './pages/crm/CustomerRecord'
 import LeadsPage from './pages/crm/LeadsPage'
 import QuotesPage from './pages/crm/QuotesPage'
 import CrmBillingPage from './pages/crm/CrmBillingPage'
 import AgingPage from './pages/crm/AgingPage'
 import BillingDashboard from './pages/billing/BillingDashboard'
+import UserManagement from './pages/admin/UserManagement'
 
 // ── Root redirect: auth-aware, sends each role to their home ─────────────────
 const RootRedirect: React.FC = () => {
@@ -97,7 +101,9 @@ export const Router: React.FC = () => (
         <Route path="orders" element={<OpsOrdersPage />} />
         <Route path="runs" element={<RunsPage />} />
         <Route path="runs/new" element={<RunBuilder />} />
+        <Route path="runs/:runId/summary" element={<RunSummaryPage />} />
         <Route path="dispatch" element={<DispatchPage />} />
+        <Route path="dispatch/:runId" element={<DispatchPage />} />
         <Route path="tanks" element={<OpsTanksPage />} />
         <Route path="inventory" element={<InventoryPage />} />
         <Route path="billing" element={<BillingDashboard />} />
@@ -116,6 +122,7 @@ export const Router: React.FC = () => (
         <Route path="schedule" element={<SchedulePage />} />
         <Route path="stop/:id" element={<StopPage />} />
         <Route path="capture/:id" element={<CapturePage />} />
+        <Route path="summary/:runId" element={<StopPage />} />
       </Route>
 
       {/* CRM Portal */}
@@ -129,10 +136,24 @@ export const Router: React.FC = () => (
       >
         <Route index element={<Navigate to="customers" replace />} />
         <Route path="customers" element={<CustomersPage />} />
+        <Route path="customers/:customerId" element={<CustomerRecord />} />
         <Route path="leads" element={<LeadsPage />} />
         <Route path="quotes" element={<QuotesPage />} />
         <Route path="billing" element={<CrmBillingPage />} />
         <Route path="aging" element={<AgingPage />} />
+      </Route>
+
+      {/* Admin Portal */}
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute role="admin">
+            <AdminLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<Navigate to="users" replace />} />
+        <Route path="users" element={<UserManagement />} />
       </Route>
 
       {/* 404 fallback */}

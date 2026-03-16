@@ -1,2 +1,1 @@
-import placeholder from '../_placeholder'
-export default placeholder('Quotes')
+export { default } from './QuoteBuilder'

@@ -1,20 +1,18 @@
 /**
  * src/pages/billing/BillingDashboard.tsx
  *
- * Staff billing dashboard accessible at /ops/billing (admin/dispatch) and
- * /crm/billing (admin/sales).
+ * Staff billing dashboard accessible at /ops/billing and /crm/billing.
  *
- * Features:
- *  - Date-range filter (start + end date inputs)
- *  - Summary metric cards (total revenue, collected, outstanding, avg invoice)
- *  - Aging report (5-bucket table)
- *  - Export controls: checkboxes for invoices / payments + "Export to CSV"
- *  - Shows row counts before download
- *  - Loading state while data is being fetched
+ * Sections:
+ *  1. Summary stat cards  — revenue this month, outstanding, overdue, avg days to pay
+ *  2. Invoice list        — filter bar (status / date / customer) + table with actions
+ *  3. Aging report        — 4 colored clickable cards that filter the invoice list
+ *  4. Export              — date range + button for invoices CSV + payments CSV
+ *  5. Credit holds        — accounts on hold with outstandng balance
  */
 
 import React, { useState, useMemo, useCallback } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   getDocs,
   query,
@@ -24,38 +22,45 @@ import {
 } from 'firebase/firestore'
 import { invoicesCol, paymentsCol, customersCol } from '../../lib/firestore'
 import { Card } from '../../components/ui/Card'
+import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
-import { Input } from '../../components/ui/Input'
-import { formatCurrency } from '../../utils/format'
+import { Modal } from '../../components/ui/Modal'
+import {
+  markInvoicePaid,
+  voidInvoice,
+  generateInvoicePdf,
+} from '../../services/invoiceService'
 import { exportInvoicesToCsv, exportPaymentsToCsv } from '../../utils/exportUtils'
-import { generateAgingReport, calculateRevenueMetrics } from '../../utils/reportUtils'
-import type { Invoice, Payment } from '../../types/billing'
+import { generateAgingReport } from '../../utils/reportUtils'
+import { formatCurrency, formatDate } from '../../utils/format'
+import type { Invoice, InvoiceStatus, Payment } from '../../types/billing'
 import type { Customer } from '../../types/customer'
 import './BillingDashboard.css'
 
-// ── Default date range: first day of current month → today ───────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10)
 }
 
-function defaultRange(): { start: string; end: string } {
+function defaultExportRange() {
   const today = new Date()
   const first = new Date(today.getFullYear(), today.getMonth(), 1)
   return { start: isoDate(first), end: isoDate(today) }
 }
 
-// ── Fetch helpers (direct Firestore — we need all rows, not a paginated page) ─
+const DAY_MS = 86_400_000
 
-async function fetchInvoicesInRange(start: Date, end: Date): Promise<Invoice[]> {
-  const snap = await getDocs(
-    query(
-      invoicesCol,
-      where('issuedAt', '>=', Timestamp.fromDate(start)),
-      where('issuedAt', '<=', Timestamp.fromDate(end)),
-      orderBy('issuedAt', 'desc'),
-    ),
-  )
+// ── Firestore fetch helpers ───────────────────────────────────────────────────
+
+async function fetchAllInvoices(): Promise<Invoice[]> {
+  const snap = await getDocs(query(invoicesCol, orderBy('issuedAt', 'desc')))
   return snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Invoice)
+}
+
+async function fetchAllCustomers(): Promise<Customer[]> {
+  const snap = await getDocs(query(customersCol, orderBy('name')))
+  return snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Customer)
 }
 
 async function fetchPaymentsInRange(start: Date, end: Date): Promise<Payment[]> {
@@ -70,299 +75,697 @@ async function fetchPaymentsInRange(start: Date, end: Date): Promise<Payment[]> 
   return snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Payment)
 }
 
-async function fetchAllCustomers(): Promise<Customer[]> {
-  const snap = await getDocs(query(customersCol, orderBy('name')))
-  return snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Customer)
+// ── Status badge ──────────────────────────────────────────────────────────────
+
+const InvoiceStatusBadge: React.FC<{ invoice: Invoice }> = ({ invoice }) => {
+  // eslint-disable-next-line react-hooks/purity
+  const now     = Date.now()
+  const dueDate = invoice.dueAt?.toDate?.()
+
+  if (invoice.status === 'paid')  return <Badge variant="success">Paid</Badge>
+  if (invoice.status === 'void')  return <Badge variant="neutral">Void</Badge>
+  if (invoice.status === 'draft') return <Badge variant="neutral">Draft</Badge>
+
+  if (dueDate) {
+    const daysLeft = Math.floor((dueDate.getTime() - now) / DAY_MS)
+    if (daysLeft < 0)  return <Badge variant="danger">Overdue {Math.abs(daysLeft)}d</Badge>
+    if (daysLeft < 7)  return <Badge variant="warning">Due in {daysLeft}d</Badge>
+  }
+
+  return <Badge variant="info">Sent</Badge>
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
+// ── Stat card ─────────────────────────────────────────────────────────────────
 
-interface MetricCardProps {
-  label:    string
-  value:    string
-  sub?:     string
-  accent?:  boolean
+interface StatCardProps {
+  label:   string
+  value:   string
+  sub?:    string
+  danger?: boolean
 }
 
-const MetricCard: React.FC<MetricCardProps> = ({ label, value, sub, accent }) => (
-  <Card className={`bd-metric${accent ? ' bd-metric--accent' : ''}`}>
-    <p className="bd-metric__label">{label}</p>
-    <p className="bd-metric__value">{value}</p>
-    {sub && <p className="bd-metric__sub">{sub}</p>}
+const StatCard: React.FC<StatCardProps> = ({ label, value, sub, danger }) => (
+  <Card className={`bd-stat${danger ? ' bd-stat--danger' : ''}`}>
+    <p className="bd-stat__label">{label}</p>
+    <p className="bd-stat__value">{value}</p>
+    {sub && <p className="bd-stat__sub">{sub}</p>}
   </Card>
 )
+
+// ── Aging card ────────────────────────────────────────────────────────────────
+
+const AGING_ACCENTS = ['green', 'amber', 'orange', 'red'] as const
+
+interface AgingCardProps {
+  label:       string
+  total:       number
+  count:       number
+  accentIndex: number
+  active:      boolean
+  onClick:     () => void
+}
+
+const AgingCard: React.FC<AgingCardProps> = ({
+  label, total, count, accentIndex, active, onClick,
+}) => (
+  <button
+    type="button"
+    className={`bd-aging-card bd-aging-card--${AGING_ACCENTS[accentIndex]}${active ? ' bd-aging-card--active' : ''}`}
+    onClick={onClick}
+  >
+    <p className="bd-aging-card__label">{label}</p>
+    <p className="bd-aging-card__amount">{formatCurrency(total)}</p>
+    <p className="bd-aging-card__count">{count} invoice{count !== 1 ? 's' : ''}</p>
+  </button>
+)
+
+// ── Invoice detail modal ──────────────────────────────────────────────────────
+
+interface InvoiceDetailModalProps {
+  invoice:     Invoice | null
+  customerMap: Map<string, Customer>
+  onClose:     () => void
+}
+
+const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
+  invoice, customerMap, onClose,
+}) => {
+  if (!invoice) return null
+  const customer = customerMap.get(invoice.customerId)
+
+  return (
+    <Modal open={!!invoice} onClose={onClose} title={`Invoice ${invoice.invoiceNumber}`} size="lg">
+      <div className="bd-inv-detail">
+        <div className="bd-inv-detail__meta">
+          <div className="bd-inv-detail__meta-item">
+            <span className="bd-inv-detail__meta-label">Customer</span>
+            <span className="bd-inv-detail__meta-value">{customer?.name ?? invoice.customerId}</span>
+          </div>
+          <div className="bd-inv-detail__meta-item">
+            <span className="bd-inv-detail__meta-label">Issued</span>
+            <span className="bd-inv-detail__meta-value">{formatDate(invoice.issuedAt)}</span>
+          </div>
+          <div className="bd-inv-detail__meta-item">
+            <span className="bd-inv-detail__meta-label">Due</span>
+            <span className="bd-inv-detail__meta-value">{formatDate(invoice.dueAt)}</span>
+          </div>
+          <div className="bd-inv-detail__meta-item">
+            <span className="bd-inv-detail__meta-label">Status</span>
+            <span className="bd-inv-detail__meta-value">
+              <InvoiceStatusBadge invoice={invoice} />
+            </span>
+          </div>
+          {invoice.orderId && (
+            <div className="bd-inv-detail__meta-item">
+              <span className="bd-inv-detail__meta-label">Order</span>
+              <span className="bd-inv-detail__meta-value">{invoice.orderId}</span>
+            </div>
+          )}
+          {invoice.paidAt && (
+            <div className="bd-inv-detail__meta-item">
+              <span className="bd-inv-detail__meta-label">Paid</span>
+              <span className="bd-inv-detail__meta-value">{formatDate(invoice.paidAt)}</span>
+            </div>
+          )}
+        </div>
+
+        <table className="bd-inv-detail__table">
+          <thead>
+            <tr>
+              <th>Description</th>
+              <th className="bd-inv-detail__num">Qty</th>
+              <th className="bd-inv-detail__num">Unit Price</th>
+              <th className="bd-inv-detail__num">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {invoice.lineItems.map((item, i) => (
+              <tr key={i}>
+                <td>{item.description}</td>
+                <td className="bd-inv-detail__num">{item.quantity}</td>
+                <td className="bd-inv-detail__num">{formatCurrency(item.unitPrice)}</td>
+                <td className="bd-inv-detail__num">{formatCurrency(item.amount)}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colSpan={3}>Subtotal</td>
+              <td className="bd-inv-detail__num">{formatCurrency(invoice.subtotal)}</td>
+            </tr>
+            {invoice.tax > 0 && (
+              <tr>
+                <td colSpan={3}>Tax</td>
+                <td className="bd-inv-detail__num">{formatCurrency(invoice.tax)}</td>
+              </tr>
+            )}
+            <tr className="bd-inv-detail__total-row">
+              <td colSpan={3}><strong>Total</strong></td>
+              <td className="bd-inv-detail__num"><strong>{formatCurrency(invoice.total)}</strong></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </Modal>
+  )
+}
 
 // ── Main component ────────────────────────────────────────────────────────────
 
 export const BillingDashboard: React.FC = () => {
-  const def = defaultRange()
-  const [startDate, setStartDate] = useState(def.start)
-  const [endDate,   setEndDate]   = useState(def.end)
+  const queryClient = useQueryClient()
+  const exportDef   = defaultExportRange()
 
-  // Committed range — only updates when user clicks "Load Data"
-  const [committed, setCommitted] = useState({ start: def.start, end: def.end })
+  // ── Filter state ────────────────────────────────────────────────────────
+  const [filterStatus,    setFilterStatus]    = useState<InvoiceStatus | 'all'>('all')
+  const [filterDateStart, setFilterDateStart] = useState('')
+  const [filterDateEnd,   setFilterDateEnd]   = useState('')
+  const [filterCustomer,  setFilterCustomer]  = useState('')
+  const [agingFilter,     setAgingFilter]     = useState<number | null>(null)
 
-  const [exportInvoices, setExportInvoices] = useState(true)
-  const [exportPayments, setExportPayments] = useState(false)
-  const [exporting, setExporting] = useState(false)
+  // ── Modal / action state ─────────────────────────────────────────────────
+  const [viewInvoice, setViewInvoice] = useState<Invoice | null>(null)
+  const [voidTarget,  setVoidTarget]  = useState<Invoice | null>(null)
+  const [pdfLoading,  setPdfLoading]  = useState<string | null>(null)
 
-  // Derived Date objects for queries
-  const startDt = useMemo(() => {
-    const d = new Date(committed.start)
-    d.setHours(0, 0, 0, 0)
-    return d
-  }, [committed.start])
+  // ── Export state ─────────────────────────────────────────────────────────
+  const [exportStart,  setExportStart]  = useState(exportDef.start)
+  const [exportEnd,    setExportEnd]    = useState(exportDef.end)
+  const [exportingInv, setExportingInv] = useState(false)
+  const [exportingPay, setExportingPay] = useState(false)
 
-  const endDt = useMemo(() => {
-    const d = new Date(committed.end)
-    d.setHours(23, 59, 59, 999)
-    return d
-  }, [committed.end])
-
+  // ── Queries ──────────────────────────────────────────────────────────────
   const invoicesQuery = useQuery({
-    queryKey:  ['billing-dashboard', 'invoices', committed.start, committed.end],
-    queryFn:   () => fetchInvoicesInRange(startDt, endDt),
-    staleTime: 2 * 60 * 1000,
-  })
-
-  const paymentsQuery = useQuery({
-    queryKey:  ['billing-dashboard', 'payments', committed.start, committed.end],
-    queryFn:   () => fetchPaymentsInRange(startDt, endDt),
+    queryKey: ['billing', 'allInvoices'],
+    queryFn:  fetchAllInvoices,
     staleTime: 2 * 60 * 1000,
   })
 
   const customersQuery = useQuery({
-    queryKey:  ['billing-dashboard', 'customers'],
-    queryFn:   fetchAllCustomers,
+    queryKey: ['billing', 'allCustomers'],
+    queryFn:  fetchAllCustomers,
     staleTime: 5 * 60 * 1000,
   })
 
   const invoices  = invoicesQuery.data  ?? []
-  const payments  = paymentsQuery.data  ?? []
   const customers = customersQuery.data ?? []
+  const isLoading = invoicesQuery.isPending || customersQuery.isPending
 
-  const isLoading = invoicesQuery.isPending || paymentsQuery.isPending || customersQuery.isPending
-  const hasError  = invoicesQuery.isError  || paymentsQuery.isError
-
-  // Computed reports
-  const metrics = useMemo(
-    () => calculateRevenueMetrics(invoices, payments),
-    [invoices, payments],
+  const customerMap = useMemo(
+    () => new Map(customers.map((c) => [c.id, c])),
+    [customers],
   )
 
-  const agingBuckets = useMemo(
-    () => generateAgingReport(invoices),
-    [invoices],
-  )
+  // ── Mutations ────────────────────────────────────────────────────────────
+  const paidMutation = useMutation({
+    mutationFn: (id: string) => markInvoicePaid(id),
+    onSuccess:  () => queryClient.invalidateQueries({ queryKey: ['billing'] }),
+  })
 
-  const handleLoad = useCallback(() => {
-    if (!startDate || !endDate || startDate > endDate) return
-    setCommitted({ start: startDate, end: endDate })
-  }, [startDate, endDate])
+  const voidMutation = useMutation({
+    mutationFn: (id: string) => voidInvoice(id),
+    onSuccess:  () => {
+      queryClient.invalidateQueries({ queryKey: ['billing'] })
+      setVoidTarget(null)
+    },
+  })
 
-  const handleExport = useCallback(async () => {
-    setExporting(true)
-    try {
-      if (exportInvoices) exportInvoicesToCsv(invoices, customers)
-      if (exportPayments) exportPaymentsToCsv(payments, customers, invoices)
-    } finally {
-      setExporting(false)
+  // ── Summary stats (this month) ───────────────────────────────────────────
+  const stats = useMemo(() => {
+    const now        = Date.now()
+    const monthStart = new Date()
+    monthStart.setDate(1)
+    monthStart.setHours(0, 0, 0, 0)
+    const monthStartMs = monthStart.getTime()
+
+    let revenueThisMonth = 0
+    let outstanding      = 0
+    let overdue          = 0
+    let paidDaysTotal    = 0
+    let paidCount        = 0
+
+    for (const inv of invoices) {
+      if (inv.status === 'paid') {
+        const paidMs = inv.paidAt?.toDate?.().getTime() ?? 0
+        if (paidMs >= monthStartMs) revenueThisMonth += inv.total
+        if (inv.paidAt && inv.issuedAt) {
+          const days = (inv.paidAt.toDate().getTime() - inv.issuedAt.toDate().getTime()) / DAY_MS
+          if (days >= 0) { paidDaysTotal += days; paidCount++ }
+        }
+      } else if (inv.status !== 'void') {
+        outstanding += inv.total
+        const dueMs = inv.dueAt?.toDate?.().getTime() ?? Infinity
+        if (dueMs < now) overdue += inv.total
+      }
     }
-  }, [exportInvoices, exportPayments, invoices, payments, customers])
 
-  const exportCount =
-    (exportInvoices ? invoices.length : 0) +
-    (exportPayments ? payments.length : 0)
+    return {
+      revenueThisMonth: parseFloat(revenueThisMonth.toFixed(2)),
+      outstanding:      parseFloat(outstanding.toFixed(2)),
+      overdue:          parseFloat(overdue.toFixed(2)),
+      avgDaysToPay:     paidCount ? Math.round(paidDaysTotal / paidCount) : 0,
+    }
+  }, [invoices])
 
-  const canExport = (exportInvoices || exportPayments) && exportCount > 0 && !isLoading
+  // ── Aging buckets (4 cards) ──────────────────────────────────────────────
+  const agingBuckets = useMemo(() => {
+    const raw = generateAgingReport(invoices) // 5 buckets; merge 61-90 + 90+
+    return [
+      { label: 'Current',     count: raw[0].count,                 total: raw[0].total },
+      { label: '1–30 Days',   count: raw[1].count,                 total: raw[1].total },
+      { label: '31–60 Days',  count: raw[2].count,                 total: raw[2].total },
+      {
+        label: '61–90+ Days',
+        count: raw[3].count + raw[4].count,
+        total: parseFloat((raw[3].total + raw[4].total).toFixed(2)),
+      },
+    ]
+  }, [invoices])
 
+  // ── Filtered invoice list (client-side) ──────────────────────────────────
+  const filteredInvoices = useMemo(() => {
+    const now = Date.now()
+    return invoices.filter((inv) => {
+      if (filterStatus !== 'all' && inv.status !== filterStatus) return false
+
+      const issuedMs = inv.issuedAt?.toDate?.().getTime() ?? 0
+      if (filterDateStart) {
+        if (issuedMs < new Date(filterDateStart + 'T00:00:00').getTime()) return false
+      }
+      if (filterDateEnd) {
+        if (issuedMs > new Date(filterDateEnd + 'T23:59:59').getTime()) return false
+      }
+
+      if (filterCustomer) {
+        const cust = customerMap.get(inv.customerId)
+        if (!cust?.name.toLowerCase().includes(filterCustomer.toLowerCase())) return false
+      }
+
+      if (agingFilter !== null) {
+        if (inv.status === 'paid' || inv.status === 'void') return false
+        const dueMs = inv.dueAt?.toDate?.().getTime()
+        if (!dueMs) return false
+        const daysOverdue = Math.floor((now - dueMs) / DAY_MS)
+        if (agingFilter === 0 && daysOverdue > 0)                        return false // Current
+        if (agingFilter === 1 && (daysOverdue < 1  || daysOverdue > 30)) return false
+        if (agingFilter === 2 && (daysOverdue < 31 || daysOverdue > 60)) return false
+        if (agingFilter === 3 && daysOverdue < 61)                       return false // 61-90+
+      }
+
+      return true
+    })
+  }, [invoices, filterStatus, filterDateStart, filterDateEnd, filterCustomer, agingFilter, customerMap])
+
+  // ── Credit holds ─────────────────────────────────────────────────────────
+  const holdAccounts = useMemo(() =>
+    customers
+      .filter((c) => c.status === 'hold')
+      .map((c) => {
+        const balance = invoices
+          .filter((i) => i.customerId === c.id && i.status !== 'paid' && i.status !== 'void')
+          .reduce((sum, i) => sum + i.total, 0)
+        return { customer: c, balance: parseFloat(balance.toFixed(2)) }
+      }),
+    [customers, invoices],
+  )
+
+  // ── Actions ──────────────────────────────────────────────────────────────
+  const handleDownloadPdf = useCallback(async (invoiceId: string) => {
+    setPdfLoading(invoiceId)
+    try {
+      const url = await generateInvoicePdf(invoiceId)
+      window.open(url, '_blank', 'noopener,noreferrer')
+    } catch {
+      alert('Failed to generate PDF. Please try again.')
+    } finally {
+      setPdfLoading(null)
+    }
+  }, [])
+
+  const handleExportInvoices = useCallback(() => {
+    setExportingInv(true)
+    try {
+      const startMs = exportStart ? new Date(exportStart + 'T00:00:00').getTime() : 0
+      const endMs   = exportEnd   ? new Date(exportEnd   + 'T23:59:59').getTime() : Infinity
+      const ranged  = invoices.filter((inv) => {
+        const ms = inv.issuedAt?.toDate?.().getTime() ?? 0
+        return ms >= startMs && ms <= endMs
+      })
+      exportInvoicesToCsv(ranged, customers)
+    } finally {
+      setExportingInv(false)
+    }
+  }, [exportStart, exportEnd, invoices, customers])
+
+  const handleExportPayments = useCallback(async () => {
+    if (!exportStart || !exportEnd) return
+    setExportingPay(true)
+    try {
+      const startDt = new Date(exportStart + 'T00:00:00')
+      const endDt   = new Date(exportEnd   + 'T23:59:59')
+      const payments = await fetchPaymentsInRange(startDt, endDt)
+      exportPaymentsToCsv(payments, customers, invoices)
+    } finally {
+      setExportingPay(false)
+    }
+  }, [exportStart, exportEnd, customers, invoices])
+
+  const handleAgingClick = useCallback((idx: number) => {
+    setAgingFilter((prev) => (prev === idx ? null : idx))
+  }, [])
+
+  const clearFilters = useCallback(() => {
+    setFilterStatus('all')
+    setFilterDateStart('')
+    setFilterDateEnd('')
+    setFilterCustomer('')
+    setAgingFilter(null)
+  }, [])
+
+  const hasActiveFilters =
+    filterStatus !== 'all' || filterDateStart || filterDateEnd ||
+    filterCustomer || agingFilter !== null
+
+  // ── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="bd">
-      {/* ── Page heading ─────────────────────────────────────────────────── */}
+
+      {/* ── Header ──────────────────────────────────────────────────────── */}
       <div className="bd__header">
         <div>
           <h1 className="bd__title">Billing Dashboard</h1>
-          <p className="bd__subtitle">Financial summary and QuickBooks-compatible CSV export</p>
+          <p className="bd__subtitle">Invoices, aging, and exports</p>
         </div>
       </div>
 
-      {/* ── Date range + Load ────────────────────────────────────────────── */}
-      <Card className="bd__controls">
-        <div className="bd__range">
-          <Input
-            label="Start Date"
-            type="date"
-            value={startDate}
-            max={endDate}
-            onChange={(e) => setStartDate(e.target.value)}
-          />
-          <span className="bd__range-sep">to</span>
-          <Input
-            label="End Date"
-            type="date"
-            value={endDate}
-            min={startDate}
-            max={isoDate(new Date())}
-            onChange={(e) => setEndDate(e.target.value)}
-          />
-          <Button
-            variant="primary"
-            onClick={handleLoad}
-            disabled={!startDate || !endDate || startDate > endDate}
-            className="bd__load-btn"
-          >
-            Load Data
-          </Button>
-        </div>
-
-        {hasError && (
-          <p className="bd__error" role="alert">
-            Failed to load billing data. Please try again.
-          </p>
-        )}
-      </Card>
-
-      {/* ── Metric cards ────────────────────────────────────────────────── */}
-      <div className="bd__metrics">
-        <MetricCard
-          label="Total Revenue"
-          value={formatCurrency(metrics.totalRevenue)}
-          sub={`${metrics.invoiceCount} invoice${metrics.invoiceCount !== 1 ? 's' : ''}`}
-          accent
+      {/* ── 1. Summary stat cards ────────────────────────────────────────── */}
+      <div className="bd__stats">
+        <StatCard
+          label="Revenue This Month"
+          value={formatCurrency(stats.revenueThisMonth)}
+          sub="Collected (paid invoices)"
         />
-        <MetricCard
-          label="Collected"
-          value={formatCurrency(metrics.collected)}
-          sub={`${metrics.collectionRate}% collection rate`}
-        />
-        <MetricCard
+        <StatCard
           label="Outstanding"
-          value={formatCurrency(metrics.outstanding)}
+          value={formatCurrency(stats.outstanding)}
+          sub="All pending invoices"
         />
-        <MetricCard
-          label="Avg Invoice"
-          value={formatCurrency(metrics.averageInvoice)}
-          sub={`${metrics.paymentCount} payment${metrics.paymentCount !== 1 ? 's' : ''}`}
+        <StatCard
+          label="Overdue"
+          value={formatCurrency(stats.overdue)}
+          sub="Past due date"
+          danger
+        />
+        <StatCard
+          label="Avg Days to Pay"
+          value={`${stats.avgDaysToPay} days`}
+          sub="Issued → paid"
         />
       </div>
 
-      {/* ── Aging report ─────────────────────────────────────────────────── */}
-      <Card className="bd__aging">
-        <h2 className="bd__section-title">Accounts Receivable Aging</h2>
+      {/* ── 2. Invoice list ──────────────────────────────────────────────── */}
+      <Card className="bd__invoice-card">
+        <div className="bd__invoice-header">
+          <h2 className="bd__section-title">
+            Invoices
+            {agingFilter !== null && (
+              <span className="bd__aging-active-label">
+                — {agingBuckets[agingFilter].label}
+                <button type="button" className="bd__aging-clear" onClick={() => setAgingFilter(null)}>
+                  ✕
+                </button>
+              </span>
+            )}
+          </h2>
+          <span className="bd__invoice-count">
+            {filteredInvoices.length} invoice{filteredInvoices.length !== 1 ? 's' : ''}
+          </span>
+        </div>
 
+        {/* Filter bar */}
+        <div className="bd__filters">
+          <select
+            className="bd__filter-select"
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value as InvoiceStatus | 'all')}
+            aria-label="Filter by status"
+          >
+            <option value="all">All statuses</option>
+            <option value="draft">Draft</option>
+            <option value="sent">Sent</option>
+            <option value="paid">Paid</option>
+            <option value="overdue">Overdue</option>
+            <option value="void">Void</option>
+          </select>
+
+          <input
+            type="date"
+            className="bd__filter-date"
+            value={filterDateStart}
+            max={filterDateEnd || undefined}
+            onChange={(e) => setFilterDateStart(e.target.value)}
+            aria-label="Filter from date"
+          />
+          <span className="bd__filter-sep">–</span>
+          <input
+            type="date"
+            className="bd__filter-date"
+            value={filterDateEnd}
+            min={filterDateStart || undefined}
+            onChange={(e) => setFilterDateEnd(e.target.value)}
+            aria-label="Filter to date"
+          />
+
+          <input
+            type="search"
+            className="bd__filter-search"
+            placeholder="Search customer…"
+            value={filterCustomer}
+            onChange={(e) => setFilterCustomer(e.target.value)}
+            aria-label="Search by customer"
+          />
+
+          {hasActiveFilters && (
+            <button type="button" className="bd__filter-clear" onClick={clearFilters}>
+              Clear all
+            </button>
+          )}
+        </div>
+
+        {/* Table */}
         {isLoading ? (
           <div className="bd__skeleton-rows">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="bd__skeleton-row" />
-            ))}
+            {[...Array(5)].map((_, i) => <div key={i} className="bd__skeleton-row" />)}
           </div>
+        ) : filteredInvoices.length === 0 ? (
+          <p className="bd__empty">No invoices match the current filters.</p>
         ) : (
-          <div className="bd__aging-table-wrap">
-            <table className="bd__aging-table">
+          <div className="bd__table-wrap">
+            <table className="bd__table">
               <thead>
                 <tr>
-                  <th>Age</th>
-                  <th className="bd__col-num">Invoices</th>
-                  <th className="bd__col-num">Amount</th>
-                  <th className="bd__col-bar" aria-hidden="true"></th>
+                  <th>Invoice #</th>
+                  <th>Customer</th>
+                  <th>Order</th>
+                  <th>Issued</th>
+                  <th>Due</th>
+                  <th className="bd__col-r">Total</th>
+                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {agingBuckets.map((bucket) => {
-                  const maxTotal  = Math.max(...agingBuckets.map((b) => b.total), 1)
-                  const barWidth  = maxTotal > 0
-                    ? Math.max(2, Math.round((bucket.total / maxTotal) * 100))
-                    : 0
-
+                {filteredInvoices.map((inv) => {
+                  const cust = customerMap.get(inv.customerId)
                   return (
-                    <tr key={bucket.label} className={bucket.total > 0 ? '' : 'bd__aging-row--zero'}>
-                      <td>{bucket.label}</td>
-                      <td className="bd__col-num">{bucket.count}</td>
-                      <td className="bd__col-num">{formatCurrency(bucket.total)}</td>
-                      <td className="bd__col-bar">
-                        <div
-                          className="bd__aging-bar"
-                          style={{ width: `${barWidth}%` }}
-                          aria-hidden="true"
-                        />
+                    <tr key={inv.id}>
+                      <td className="bd__inv-num">{inv.invoiceNumber}</td>
+                      <td>{cust?.name ?? inv.customerId}</td>
+                      <td className="bd__order-id">{inv.orderId ?? '—'}</td>
+                      <td className="bd__date">{formatDate(inv.issuedAt)}</td>
+                      <td className="bd__date">{formatDate(inv.dueAt)}</td>
+                      <td className="bd__col-r">{formatCurrency(inv.total)}</td>
+                      <td><InvoiceStatusBadge invoice={inv} /></td>
+                      <td>
+                        <div className="bd__actions">
+                          <button
+                            type="button"
+                            className="bd__action-btn"
+                            onClick={() => setViewInvoice(inv)}
+                          >
+                            View
+                          </button>
+                          <button
+                            type="button"
+                            className="bd__action-btn"
+                            onClick={() => handleDownloadPdf(inv.id)}
+                            disabled={pdfLoading === inv.id}
+                          >
+                            {pdfLoading === inv.id ? '…' : 'PDF'}
+                          </button>
+                          {inv.status !== 'paid' && inv.status !== 'void' && (
+                            <button
+                              type="button"
+                              className="bd__action-btn bd__action-btn--success"
+                              onClick={() => paidMutation.mutate(inv.id)}
+                              disabled={paidMutation.isPending}
+                            >
+                              Paid
+                            </button>
+                          )}
+                          {inv.status !== 'void' && inv.status !== 'paid' && (
+                            <button
+                              type="button"
+                              className="bd__action-btn bd__action-btn--danger"
+                              onClick={() => setVoidTarget(inv)}
+                            >
+                              Void
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   )
                 })}
               </tbody>
-              <tfoot>
-                <tr>
-                  <td><strong>Total</strong></td>
-                  <td className="bd__col-num">
-                    <strong>{agingBuckets.reduce((s, b) => s + b.count, 0)}</strong>
-                  </td>
-                  <td className="bd__col-num">
-                    <strong>
-                      {formatCurrency(agingBuckets.reduce((s, b) => s + b.total, 0))}
-                    </strong>
-                  </td>
-                  <td />
-                </tr>
-              </tfoot>
             </table>
           </div>
         )}
       </Card>
 
-      {/* ── Export controls ──────────────────────────────────────────────── */}
-      <Card className="bd__export">
-        <h2 className="bd__section-title">Export to CSV</h2>
-        <p className="bd__export-hint">
-          Downloads QuickBooks-compatible CSV files directly to your browser.
-        </p>
-
-        <div className="bd__export-options">
-          <label className="bd__checkbox">
-            <input
-              type="checkbox"
-              checked={exportInvoices}
-              onChange={(e) => setExportInvoices(e.target.checked)}
+      {/* ── 3. Aging report ──────────────────────────────────────────────── */}
+      <div className="bd__aging-section">
+        <h2 className="bd__section-title">Accounts Receivable Aging</h2>
+        <p className="bd__aging-hint">Click a card to filter the invoice list above.</p>
+        <div className="bd__aging-cards">
+          {agingBuckets.map((bucket, i) => (
+            <AgingCard
+              key={bucket.label}
+              label={bucket.label}
+              total={bucket.total}
+              count={bucket.count}
+              accentIndex={i}
+              active={agingFilter === i}
+              onClick={() => handleAgingClick(i)}
             />
-            <span>
-              Export invoices
-              {!isLoading && (
-                <span className="bd__count"> ({invoices.length} row{invoices.length !== 1 ? 's' : ''})</span>
-              )}
-            </span>
-          </label>
-
-          <label className="bd__checkbox">
-            <input
-              type="checkbox"
-              checked={exportPayments}
-              onChange={(e) => setExportPayments(e.target.checked)}
-            />
-            <span>
-              Export payments
-              {!isLoading && (
-                <span className="bd__count"> ({payments.length} row{payments.length !== 1 ? 's' : ''})</span>
-              )}
-            </span>
-          </label>
+          ))}
         </div>
+      </div>
 
-        <div className="bd__export-footer">
-          {canExport && (
-            <p className="bd__export-summary">
-              Ready to export <strong>{exportCount}</strong> row{exportCount !== 1 ? 's' : ''}.
-            </p>
-          )}
-
+      {/* ── 4. Export section ────────────────────────────────────────────── */}
+      <Card className="bd__export-card">
+        <h2 className="bd__section-title">Export</h2>
+        <div className="bd__export-range">
+          <span className="bd__export-range-label">Date range</span>
+          <div className="bd__export-range-inputs">
+            <input
+              type="date"
+              className="bd__filter-date"
+              value={exportStart}
+              max={exportEnd || undefined}
+              onChange={(e) => setExportStart(e.target.value)}
+              aria-label="Export start date"
+            />
+            <span className="bd__filter-sep">–</span>
+            <input
+              type="date"
+              className="bd__filter-date"
+              value={exportEnd}
+              min={exportStart || undefined}
+              max={isoDate(new Date())}
+              onChange={(e) => setExportEnd(e.target.value)}
+              aria-label="Export end date"
+            />
+          </div>
+        </div>
+        <div className="bd__export-btns">
           <Button
-            variant="primary"
-            onClick={handleExport}
-            disabled={!canExport}
-            loading={exporting}
+            variant="secondary"
+            onClick={handleExportInvoices}
+            loading={exportingInv}
+            disabled={isLoading}
           >
-            Export to CSV
+            Export Invoices CSV
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={handleExportPayments}
+            loading={exportingPay}
+            disabled={!exportStart || !exportEnd}
+          >
+            Export Payments CSV
           </Button>
         </div>
       </Card>
+
+      {/* ── 5. Credit holds ──────────────────────────────────────────────── */}
+      <Card className="bd__holds-card">
+        <h2 className="bd__section-title">
+          Credit Holds
+          {holdAccounts.length > 0 && (
+            <span className="bd__holds-badge">{holdAccounts.length}</span>
+          )}
+        </h2>
+        {isLoading ? (
+          <div className="bd__skeleton-rows">
+            {[...Array(3)].map((_, i) => <div key={i} className="bd__skeleton-row" />)}
+          </div>
+        ) : holdAccounts.length === 0 ? (
+          <p className="bd__empty">No accounts currently on hold.</p>
+        ) : (
+          <ul className="bd__holds-list">
+            {holdAccounts.map(({ customer, balance }) => (
+              <li key={customer.id} className="bd__hold-row">
+                <div className="bd__hold-info">
+                  <span className="bd__hold-name">{customer.name}</span>
+                  <span className="bd__hold-reason">
+                    {(customer as unknown as Record<string, unknown>).holdReason as string | undefined
+                      ?? 'Account on hold'}
+                  </span>
+                </div>
+                <div className="bd__hold-right">
+                  <span className="bd__hold-balance">{formatCurrency(balance)}</span>
+                  <Badge variant="danger">Hold</Badge>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      {/* ── Invoice detail modal ─────────────────────────────────────────── */}
+      <InvoiceDetailModal
+        invoice={viewInvoice}
+        customerMap={customerMap}
+        onClose={() => setViewInvoice(null)}
+      />
+
+      {/* ── Void confirm modal ───────────────────────────────────────────── */}
+      <Modal
+        open={!!voidTarget}
+        onClose={() => setVoidTarget(null)}
+        title="Void Invoice"
+        size="sm"
+      >
+        <p className="bd__void-body">
+          Are you sure you want to void{' '}
+          <strong>{voidTarget?.invoiceNumber}</strong>?{' '}
+          This cannot be undone.
+        </p>
+        <div className="bd__void-actions">
+          <Button variant="ghost" onClick={() => setVoidTarget(null)}>
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            onClick={() => voidTarget && voidMutation.mutate(voidTarget.id)}
+            loading={voidMutation.isPending}
+          >
+            Void Invoice
+          </Button>
+        </div>
+      </Modal>
+
     </div>
   )
 }
