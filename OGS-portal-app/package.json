@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "apphosting:build": "npm run build",
-    "start": "vite preview --host 0.0.0.0 --port ${PORT:-8080}",
+    "start": "node scripts/serve-dist.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
