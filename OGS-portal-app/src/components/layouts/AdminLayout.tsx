@@ -4,7 +4,7 @@ import { Sidebar } from '../ui/Sidebar'
 import { TopBar } from '../ui/TopBar'
 import { ViewAsBanner } from '../ui/ViewAsBanner'
 import type { SidebarItem } from '../ui/Sidebar'
-import './layout.css'
+import './Layout.css'
 
 const NAV_ITEMS: SidebarItem[] = [
   { to: '/admin/users', label: 'Users', icon: '◎' },
