@@ -1,13 +1,7 @@
 type AppEnv = 'development' | 'staging' | 'production'
 
-// Collect ALL missing vars before throwing so developers see every gap at once.
-const missing: string[] = []
-
-function getEnv(key: string, required = true): string {
+function getEnv(key: string): string {
   const value = import.meta.env[key] as string | undefined
-  if (required && !value) {
-    missing.push(key)
-  }
   return value ?? ''
 }
 
@@ -21,23 +15,18 @@ export const firebase = {
   appId: getEnv('VITE_FIREBASE_APP_ID'),
 } as const
 
+export const hasFirebaseEnvConfig = Object.values(firebase).every(Boolean)
+
 // ── Third-party keys ──────────────────────────────────────────────────────────
 export const STRIPE_PUBLISHABLE_KEY = getEnv('VITE_STRIPE_PUBLISHABLE_KEY')
 export const GOOGLE_MAPS_API_KEY = getEnv('VITE_GOOGLE_MAPS_API_KEY')
 // Only required in production — firebase.ts reads this directly from import.meta.env
-export const RECAPTCHA_SITE_KEY = getEnv('VITE_RECAPTCHA_SITE_KEY', /* required */ false)
+export const RECAPTCHA_SITE_KEY = getEnv('VITE_RECAPTCHA_SITE_KEY')
 
 // ── App ───────────────────────────────────────────────────────────────────────
-const rawEnv = getEnv('VITE_APP_ENV')
+const rawEnv = (import.meta.env.VITE_APP_ENV as string | undefined) ?? 'production'
 export const APP_ENV = rawEnv as AppEnv
-export const APP_URL = getEnv('VITE_APP_URL', /* required */ false)
-
-if (missing.length > 0) {
-  throw new Error(
-    `Missing required environment variables:\n${missing.map((k) => `  • ${k}`).join('\n')}\n` +
-      'Copy .env.example to .env.local and fill in the values.',
-  )
-}
+export const APP_URL = getEnv('VITE_APP_URL')
 
 if (!['development', 'staging', 'production'].includes(rawEnv)) {
   throw new Error(

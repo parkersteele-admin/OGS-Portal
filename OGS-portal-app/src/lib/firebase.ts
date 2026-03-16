@@ -3,9 +3,11 @@ import { getAuth, connectAuthEmulator } from 'firebase/auth'
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore'
 import { getStorage, connectStorageEmulator } from 'firebase/storage'
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions'
-import { firebase as firebaseConfig, isDev } from './env'
+import { firebase as firebaseConfig, hasFirebaseEnvConfig, isDev } from './env'
 
-const app = initializeApp(firebaseConfig)
+// In Firebase App Hosting, FIREBASE_WEBAPP_CONFIG is injected during build and
+// the Firebase JS SDK can initialize with no explicit options.
+const app = hasFirebaseEnvConfig ? initializeApp(firebaseConfig) : initializeApp()
 
 export const auth = getAuth(app)
 export const db = getFirestore(app)
