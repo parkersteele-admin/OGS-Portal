@@ -38,6 +38,7 @@ import CapturePage from './pages/driver/CapturePage'
 
 // CRM
 import CustomersPage from './pages/crm/CustomersPage'
+import CustomerRecord from './pages/crm/CustomerRecord'
 import LeadsPage from './pages/crm/LeadsPage'
 import QuotesPage from './pages/crm/QuotesPage'
 import CrmBillingPage from './pages/crm/CrmBillingPage'
@@ -133,6 +134,7 @@ export const Router: React.FC = () => (
       >
         <Route index element={<Navigate to="customers" replace />} />
         <Route path="customers" element={<CustomersPage />} />
+        <Route path="customers/:customerId" element={<CustomerRecord />} />
         <Route path="leads" element={<LeadsPage />} />
         <Route path="quotes" element={<QuotesPage />} />
         <Route path="billing" element={<CrmBillingPage />} />
