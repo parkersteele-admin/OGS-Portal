@@ -67,7 +67,7 @@ export const Router: React.FC = () => (
       <Route
         path="/portal"
         element={
-          <ProtectedRoute role="customer">
+          <ProtectedRoute role={['customer', 'admin']}>
             <CustomerLayout />
           </ProtectedRoute>
         }
