@@ -98,6 +98,7 @@ export const Router: React.FC = () => (
         <Route path="runs" element={<RunsPage />} />
         <Route path="runs/new" element={<RunBuilder />} />
         <Route path="dispatch" element={<DispatchPage />} />
+        <Route path="dispatch/:runId" element={<DispatchPage />} />
         <Route path="tanks" element={<OpsTanksPage />} />
         <Route path="inventory" element={<InventoryPage />} />
         <Route path="billing" element={<BillingDashboard />} />

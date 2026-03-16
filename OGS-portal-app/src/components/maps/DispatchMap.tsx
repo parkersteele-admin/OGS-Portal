@@ -21,7 +21,7 @@
  *   Requires a Map ID (VITE_GOOGLE_MAPS_MAP_ID) for Advanced Markers support.
  */
 
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import {
   APIProvider,
   Map,
@@ -29,6 +29,7 @@ import {
   Pin,
   InfoWindow,
   useAdvancedMarkerRef,
+  useMap,
 } from '@vis.gl/react-google-maps'
 import { GOOGLE_MAPS_API_KEY } from '../../lib/env'
 import { useDriverLocation } from '../../hooks/useDriverLocation'
@@ -284,18 +285,30 @@ function injectStyles() {
   stylesInjected = true
 }
 
+// ── Camera controller ─────────────────────────────────────────────────────────
+// Renders nothing; pans the map whenever `target` changes.
+function CameraPan({ target }: { target: LatLngLiteral | null | undefined }) {
+  const map = useMap()
+  useEffect(() => {
+    if (map && target) map.panTo(target)
+  }, [map, target])
+  return null
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export interface DispatchMapProps {
-  stops:      RunStop[]
-  customers:  Record<string, Customer>
-  driverName: string
+  stops:        RunStop[]
+  customers:    Record<string, Customer>
+  driverName:   string
   /** Override map centre — defaults to central Ohio. */
-  center?:    LatLngLiteral
+  center?:      LatLngLiteral
   /** Override zoom level. */
-  zoom?:      number
+  zoom?:        number
   /** CSS height for the map container. Defaults to '100%'. */
-  height?:    string
+  height?:      string
+  /** If set, smoothly pans the map to this location. */
+  cameraTarget?: LatLngLiteral | null
 }
 
 export function DispatchMap({
@@ -305,6 +318,7 @@ export function DispatchMap({
   center = CENTRAL_OHIO,
   zoom   = DEFAULT_ZOOM,
   height = '100%',
+  cameraTarget,
 }: DispatchMapProps) {
   injectStyles()
 
@@ -334,6 +348,9 @@ export function DispatchMap({
           onClick={handleMapClick}
           reuseMaps
         >
+          {/* Camera controller — pans map when a stop is clicked in the sidebar */}
+          <CameraPan target={cameraTarget} />
+
           {/* Route line */}
           <RoutePolyline stops={stops} customers={customers} />
 
