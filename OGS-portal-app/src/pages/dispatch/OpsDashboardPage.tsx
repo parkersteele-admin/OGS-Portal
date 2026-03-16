@@ -1,2 +1,1 @@
-import placeholder from '../_placeholder'
-export default placeholder('Ops Dashboard')
+export { default } from './OpsDashboard'
