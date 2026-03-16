@@ -222,3 +222,31 @@ export function useLead(
     ...options,
   })
 }
+
+// ── Customer portal convenience hooks ─────────────────────────────────────────
+
+/** Most-recent invoices for one customer, used by the portal dashboard. */
+export function useCustomerInvoices(
+  customerId: string | null | undefined,
+  fetchLimit = 4,
+) {
+  return useQuery({
+    queryKey:  [...queryKeys.invoices.all({ customerId: customerId ?? undefined }), fetchLimit],
+    queryFn:   () => getInvoices({ customerId: customerId! }, { pageSize: fetchLimit }),
+    enabled:   !!customerId,
+    staleTime: STALE_TIME,
+  })
+}
+
+/** Most-recent orders for one customer, used by the portal dashboard. */
+export function useCustomerOrders(
+  customerId: string | null | undefined,
+  fetchLimit = 3,
+) {
+  return useQuery({
+    queryKey:  [...queryKeys.orders.all({ customerId: customerId ?? undefined }), fetchLimit],
+    queryFn:   () => getOrders({ customerId: customerId! }, { pageSize: fetchLimit }),
+    enabled:   !!customerId,
+    staleTime: STALE_TIME,
+  })
+}
