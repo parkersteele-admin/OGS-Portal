@@ -9,8 +9,8 @@
  * Success — Confirmation screen
  */
 
-import React, { useState, useMemo, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import React, { useState, useMemo, useCallback, useEffect } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getDocs, query, where } from 'firebase/firestore'
 import { productsCol, customerTanksCol } from '../../lib/firestore'
@@ -636,13 +636,37 @@ const SuccessScreen: React.FC<SuccessProps> = ({ orderId, state, products }) => 
 // ROOT — wizard controller
 // ══════════════════════════════════════════════════════════════════════════════
 
+interface ReorderState {
+  productId: string
+  quantity:  number
+  tier:      DeliveryTier
+  notes:     string
+}
+
 const OrderPage: React.FC = () => {
   const { user }   = useAuth()
+  const location   = useLocation()
   const customerId = user?.customerId ?? ''
 
-  const [step, setStep]         = useState(0)
-  const [wizState, setWizState] = useState<WizardState>(INITIAL)
+  // Check if navigated here via Reorder button from order history
+  const reorder = (location.state as { reorder?: ReorderState } | null)?.reorder
+
+  const [step, setStep]         = useState(reorder ? 1 : 0)
+  const [wizState, setWizState] = useState<WizardState>(
+    reorder
+      ? { ...INITIAL, productId: reorder.productId, quantity: reorder.quantity, tier: reorder.tier, notes: reorder.notes }
+      : INITIAL,
+  )
   const [orderId, setOrderId]   = useState<string | null>(null)
+
+  // Pre-fill scheduled date when reordering
+  useEffect(() => {
+    if (reorder && !wizState.scheduledDate) {
+      const { min } = dateConstraints(reorder.tier)
+      setWizState((prev) => ({ ...prev, scheduledDate: min }))
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Product list shared between step 1, 2, 3 to avoid duplicate fetches
   const { data: products = [] } = useQuery<Product[]>({
