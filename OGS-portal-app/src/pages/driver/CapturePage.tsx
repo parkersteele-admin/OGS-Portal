@@ -1,2 +1,1 @@
-import placeholder from '../_placeholder'
-export default placeholder('Capture')
+export { default } from './DeliveryCapture'
