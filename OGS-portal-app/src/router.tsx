@@ -7,6 +7,7 @@ import { CustomerLayout } from './components/layouts/CustomerLayout'
 import { OpsLayout } from './components/layouts/OpsLayout'
 import { DriverLayout } from './components/layouts/DriverLayout'
 import { CrmLayout } from './components/layouts/CrmLayout'
+import { AdminLayout } from './components/layouts/AdminLayout'
 
 // Auth
 import LoginPage from './pages/auth/Login'
@@ -44,6 +45,7 @@ import QuotesPage from './pages/crm/QuotesPage'
 import CrmBillingPage from './pages/crm/CrmBillingPage'
 import AgingPage from './pages/crm/AgingPage'
 import BillingDashboard from './pages/billing/BillingDashboard'
+import UserManagement from './pages/admin/UserManagement'
 
 // ── Root redirect: auth-aware, sends each role to their home ─────────────────
 const RootRedirect: React.FC = () => {
@@ -139,6 +141,19 @@ export const Router: React.FC = () => (
         <Route path="quotes" element={<QuotesPage />} />
         <Route path="billing" element={<CrmBillingPage />} />
         <Route path="aging" element={<AgingPage />} />
+      </Route>
+
+      {/* Admin Portal */}
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute role="admin">
+            <AdminLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<Navigate to="users" replace />} />
+        <Route path="users" element={<UserManagement />} />
       </Route>
 
       {/* 404 fallback */}
