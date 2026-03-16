@@ -10,20 +10,23 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ role, children }) => {
-  const { user, loading, role: userRole } = useAuth()
+  const { user, realUser, loading, role: userRole } = useAuth()
   const location = useLocation()
+
+  // Use realUser role for access control so role-preview doesn't lock admins out
+  const authRole = realUser?.role ?? userRole
 
   if (loading) {
     return <div className="layout-loading"><span className="layout-loading__spinner" /></div>
   }
 
-  if (!user || !userRole) {
+  if (!user || !authRole) {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
   const allowed = Array.isArray(role) ? role : [role]
-  if (!allowed.includes(userRole)) {
-    return <Navigate to={ROLE_HOME[userRole]} replace />
+  if (!allowed.includes(authRole)) {
+    return <Navigate to={ROLE_HOME[authRole]} replace />
   }
 
   return <>{children}</>

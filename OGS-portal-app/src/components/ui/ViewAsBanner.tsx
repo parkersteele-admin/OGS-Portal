@@ -12,19 +12,27 @@ import { useAuth } from '../../hooks/useAuth'
 import './ViewAsBanner.css'
 
 export const ViewAsBanner: React.FC = () => {
-  const { isViewingAs, user } = useAuth()
+  const { isViewingAs, user, realUser } = useAuth()
   const { exitViewAs } = useViewAsStore()
   const navigate = useNavigate()
 
+  // Role-preview: admin set viewAsUser to a synthetic copy of themselves with a different role
+  const isRolePreview = isViewingAs && user?.id === realUser?.id
+
   const handleExit = useCallback(() => {
     exitViewAs()
-    navigate('/portal/dashboard', { replace: true })
-  }, [exitViewAs, navigate])
+    // Role-preview → return to admin home; user-impersonation → return to customer portal
+    navigate(realUser ? (isRolePreview ? '/portal/dashboard' : '/portal/dashboard') : '/portal/dashboard', { replace: true })
+  }, [exitViewAs, navigate, realUser, isRolePreview])
 
   if (!isViewingAs || !user) return null
 
   return (
-    <div className="va-banner" role="status" aria-live="polite">
+    <div
+      className={`va-banner${isRolePreview ? ' va-banner--role' : ''}`}
+      role="status"
+      aria-live="polite"
+    >
       <div className="va-banner__inner">
         <svg
           className="va-banner__icon"
@@ -41,12 +49,18 @@ export const ViewAsBanner: React.FC = () => {
           <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
           <circle cx="12" cy="12" r="3" />
         </svg>
-        <span className="va-banner__text">
-          Viewing as <strong>{user.name}</strong>
-          {user.email && (
-            <span className="va-banner__email"> ({user.email})</span>
-          )}
-        </span>
+        {isRolePreview ? (
+          <span className="va-banner__text">
+            Previewing as <strong>{user.role}</strong> role
+          </span>
+        ) : (
+          <span className="va-banner__text">
+            Viewing as <strong>{user.name}</strong>
+            {user.email && (
+              <span className="va-banner__email"> ({user.email})</span>
+            )}
+          </span>
+        )}
       </div>
 
       <button className="va-banner__exit" onClick={handleExit}>

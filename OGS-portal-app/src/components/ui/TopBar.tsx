@@ -6,7 +6,8 @@ import { useViewAsStore } from '../../store/viewAsStore'
 import { signOut } from '../../lib/auth'
 import { usersCol } from '../../lib/firestore'
 import { NotificationBell } from './NotificationBell'
-import type { AppUser } from '../../types/user'
+import { ROLE_HOME } from '../../types/auth'
+import type { AppUser, UserRole } from '../../types/user'
 import './TopBar.css'
 
 interface TopBarProps {
@@ -132,8 +133,10 @@ export const TopBar: React.FC<TopBarProps> = ({ title }) => {
         .toUpperCase()
     : (displayUser?.email?.[0] ?? '?').toUpperCase()
 
-  const isAdmin    = realUser?.role === 'admin'
-  const isViewingAs = viewAsUser !== null
+  const isAdmin       = realUser?.role === 'admin'
+  const isViewingAs   = viewAsUser !== null
+  const isRolePreview = isViewingAs && viewAsUser?.id === realUser?.id
+  const activePreviewRole: UserRole = (isRolePreview ? viewAsUser?.role : realUser?.role) ?? 'admin'
 
   // Close dropdown on outside click
   const handleOutside = useCallback((e: MouseEvent) => {
@@ -161,6 +164,31 @@ export const TopBar: React.FC<TopBarProps> = ({ title }) => {
     // Navigate to customer portal so the view takes effect immediately
     navigate('/portal/dashboard', { replace: true })
   }, [setViewAsUser, navigate])
+
+  const handleSwitchRole = useCallback((role: UserRole) => {
+    if (!realUser) return
+    if (isRolePreview && viewAsUser?.role === role) {
+      // Clicking the active preview role → exit preview
+      exitViewAs()
+      setOpen(false)
+      return
+    }
+    if (!isViewingAs && role === realUser.role) {
+      // Already on own role, just close
+      setOpen(false)
+      return
+    }
+    if (role === realUser.role) {
+      // Exit preview back to own role
+      exitViewAs()
+      setOpen(false)
+      navigate(ROLE_HOME[role], { replace: true })
+      return
+    }
+    setViewAsUser({ ...realUser, role })
+    setOpen(false)
+    navigate(ROLE_HOME[role], { replace: true })
+  }, [realUser, isViewingAs, isRolePreview, viewAsUser, exitViewAs, setViewAsUser, navigate])
 
   return (
     <>
@@ -208,7 +236,7 @@ export const TopBar: React.FC<TopBarProps> = ({ title }) => {
                       View as customer…
                     </button>
 
-                    {isViewingAs && (
+                    {isViewingAs && !isRolePreview && (
                       <button
                         className="topbar__dropdown-item topbar__dropdown-item--exit-view-as"
                         role="menuitem"
@@ -220,6 +248,22 @@ export const TopBar: React.FC<TopBarProps> = ({ title }) => {
                         Exit view as {viewAsUser?.name}
                       </button>
                     )}
+                    <div className="topbar__dropdown-divider" />
+
+                    <div className="topbar__dropdown-section">
+                      <span className="topbar__dropdown-section-label">Preview role</span>
+                      <div className="topbar__roles">
+                        {(['admin', 'dispatch', 'driver', 'sales', 'customer'] as UserRole[]).map((r) => (
+                          <button
+                            key={r}
+                            className={`topbar__role-pill topbar__role-pill--${r}${activePreviewRole === r ? ' topbar__role-pill--active' : ''}`}
+                            onClick={() => handleSwitchRole(r)}
+                          >
+                            {r}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                     <div className="topbar__dropdown-divider" />
                   </>
                 )}

@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom'
 import { Sidebar } from '../ui/Sidebar'
 import { TopBar } from '../ui/TopBar'
 import { MobileNav } from '../ui/MobileNav'
+import { ViewAsBanner } from '../ui/ViewAsBanner'
 import type { SidebarItem } from '../ui/Sidebar'
 import type { MobileNavItem } from '../ui/MobileNav'
 import './Layout.css'
@@ -19,6 +20,7 @@ export const DriverLayout: React.FC = () => (
   <div className="layout">
     <Sidebar title="Driver" items={NAV_ITEMS} />
     <div className="layout__main">
+      <ViewAsBanner />
       <TopBar title="Driver Portal" />
       <main className="layout__content">
         <Outlet />
