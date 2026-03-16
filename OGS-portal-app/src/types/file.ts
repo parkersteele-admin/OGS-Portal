@@ -9,6 +9,7 @@ export type FileEntityType =
   | 'lead'
   | 'quote'
   | 'user'
+  | 'tank'
 
 /** Category of file content. */
 export type FileType =
