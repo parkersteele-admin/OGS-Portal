@@ -1,2 +1,2 @@
-import placeholder from '../_placeholder'
-export default placeholder('Ops Orders')
+export { default } from './OrderManagement'
+
