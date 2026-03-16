@@ -1,0 +1,244 @@
+/* ── Auth pages — shared layout + login ──────────────────────────────────────
+   BEM prefix: auth- (shared card/brand), lgn- (login), rp- (reset password)
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* ── Full-page centering wrapper ─────────────────────────────────────────── */
+
+.auth-wrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg-2);
+  padding: var(--space-6);
+}
+
+/* ── Card ────────────────────────────────────────────────────────────────── */
+
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-8) var(--space-7);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.07);
+}
+
+/* ── Brand lockup ────────────────────────────────────────────────────────── */
+
+.auth-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-7);
+}
+
+/* Orange vertical bar */
+.auth-brand__bar {
+  width: 5px;
+  height: 48px;
+  background: var(--color-brand);
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.auth-brand__lockup {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.auth-brand__name {
+  font-size: var(--font-size-24);
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1.1;
+  letter-spacing: -0.3px;
+}
+
+.auth-brand__tagline {
+  font-size: var(--font-size-12);
+  color: var(--color-text-3);
+  font-style: italic;
+  line-height: 1.4;
+}
+
+/* ── Login form ──────────────────────────────────────────────────────────── */
+
+.lgn-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.lgn-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ── Password field wrapper — input + eye button ─────────────────────────── */
+
+.lgn-pw-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.lgn-pw-input {
+  /* Extend right padding to leave room for the toggle button */
+  padding-right: 42px !important;
+  width: 100%;
+}
+
+.lgn-pw-toggle {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--color-text-3);
+  padding: 0;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.lgn-pw-toggle:hover {
+  color: var(--color-text);
+  background: var(--color-bg-3);
+}
+
+.lgn-pw-toggle:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 1px;
+}
+
+/* ── Error banner ────────────────────────────────────────────────────────── */
+
+.lgn-error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius);
+  font-size: var(--font-size-13);
+  color: var(--color-danger);
+  line-height: 1.4;
+}
+
+.lgn-error svg {
+  flex-shrink: 0;
+}
+
+/* ── Submit button — full width ──────────────────────────────────────────── */
+
+.lgn-submit-btn {
+  width: 100% !important;
+}
+
+/* ── Footer links ────────────────────────────────────────────────────────── */
+
+.lgn-footer {
+  text-align: center;
+  margin-top: var(--space-5);
+}
+
+.lgn-link {
+  font-size: var(--font-size-13);
+  color: var(--color-brand);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+.lgn-link:hover {
+  color: var(--color-brand-dark);
+  text-decoration: underline;
+}
+
+/* ── Reset password page ─────────────────────────────────────────────────── */
+
+.rp-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.rp-hint {
+  font-size: var(--font-size-13);
+  color: var(--color-text-2);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.rp-submit-btn {
+  width: 100% !important;
+}
+
+/* ── Success state ───────────────────────────────────────────────────────── */
+
+.rp-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  text-align: center;
+  padding: var(--space-4) 0 var(--space-2);
+}
+
+.rp-success__icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #d1fae5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-success);
+}
+
+.rp-success__title {
+  font-size: var(--font-size-16);
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.rp-success__body {
+  font-size: var(--font-size-13);
+  color: var(--color-text-2);
+  line-height: 1.5;
+  margin: 0;
+  max-width: 300px;
+}
+
+/* ── Back link row ───────────────────────────────────────────────────────── */
+
+.rp-back {
+  text-align: center;
+  margin-top: var(--space-5);
+}
+
+.rp-back-link {
+  font-size: var(--font-size-13);
+  color: var(--color-brand);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  transition: color var(--transition-fast);
+}
+
+.rp-back-link:hover {
+  color: var(--color-brand-dark);
+  text-decoration: underline;
+}
