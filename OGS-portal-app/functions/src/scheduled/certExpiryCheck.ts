@@ -32,7 +32,7 @@ export const certExpiryCheck = onSchedule(
     memory:         '256MiB',
     timeoutSeconds: 540,
   },
-  async (_event) => {
+  async () => {
     requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY')
 
     const now    = new Date()

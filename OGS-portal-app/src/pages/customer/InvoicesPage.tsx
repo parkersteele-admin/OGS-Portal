@@ -271,7 +271,6 @@ const InvoiceRow: React.FC<InvoiceRowProps> = ({
 
       <span className="inv-row__total">{formatCurrency(invoice.total)}</span>
 
-      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events */}
       <span className="inv-row__actions" onClick={(e) => e.stopPropagation()}>
         {outstanding && (
           <Button

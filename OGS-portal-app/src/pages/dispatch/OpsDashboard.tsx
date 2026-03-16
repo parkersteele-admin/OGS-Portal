@@ -343,7 +343,11 @@ const PendingOrdersTable: React.FC<PendingOrdersTableProps> = ({ orders, loading
   const toggle = (id: string) => {
     setSelected((prev) => {
       const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
       return next
     })
   }
@@ -668,7 +672,7 @@ const ActiveRunDriverNames: React.FC<{ runIds: string[]; driverNames: Record<str
   const [drivers, setDrivers] = useState<string[]>([])
 
   useEffect(() => {
-    if (runIds.length === 0) { setDrivers([]); return }
+    if (runIds.length === 0) return
     const unsub = onSnapshot(
       query(runsCol, where('status', 'in', ['scheduled', 'in-progress'])),
       (snap) => {

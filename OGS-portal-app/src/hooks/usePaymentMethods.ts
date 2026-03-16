@@ -23,12 +23,8 @@ export function usePaymentMethods(customerId: string | undefined): UsePaymentMet
 
   useEffect(() => {
     if (!customerId) {
-      setMethods([])
-      setLoading(false)
       return
     }
-
-    setLoading(true)
 
     const unsub = subscribePaymentMethods(customerId, (data, err) => {
       if (err) {
@@ -43,10 +39,12 @@ export function usePaymentMethods(customerId: string | undefined): UsePaymentMet
     return unsub
   }, [customerId])
 
+  const visibleMethods = customerId ? methods : []
+
   return {
-    methods,
-    defaultMethod: methods.find((m) => m.isDefault),
-    loading,
-    error,
+    methods: visibleMethods,
+    defaultMethod: visibleMethods.find((m) => m.isDefault),
+    loading: customerId ? loading : false,
+    error: customerId ? error : null,
   }
 }

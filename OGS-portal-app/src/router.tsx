@@ -9,8 +9,8 @@ import { DriverLayout } from './components/layouts/DriverLayout'
 import { CrmLayout } from './components/layouts/CrmLayout'
 
 // Auth
-import LoginPage from './pages/auth/LoginPage'
-import ResetPasswordPage from './pages/auth/ResetPasswordPage'
+import LoginPage from './pages/auth/Login'
+import ResetPasswordPage from './pages/auth/ResetPassword'
 
 // Customer
 import DashboardPage from './pages/customer/DashboardPage'
@@ -19,10 +19,10 @@ import OrdersPage from './pages/customer/OrdersPage'
 import InvoicesPage from './pages/customer/InvoicesPage'
 import PayInvoicePage from './pages/customer/PayInvoicePage'
 import ManageAutopay from './pages/customer/ManageAutopay'
-import TanksPage from './pages/customer/TankLevels'
+import TankLevelsPage from './pages/customer/TankLevels'
 
 // Ops / Dispatch
-import OpsDashboardPage from './pages/dispatch/OpsDashboardPage'
+import OpsDashboardPage from './pages/dispatch/OpsDashboard'
 import OpsOrdersPage from './pages/dispatch/OpsOrdersPage'
 import RunsPage from './pages/dispatch/RunsPage'
 import RunBuilder from './pages/dispatch/RunBuilder'
@@ -80,7 +80,7 @@ export const Router: React.FC = () => (
         <Route path="invoices" element={<InvoicesPage />} />
         <Route path="invoices/:invoiceId/pay" element={<PayInvoicePage />} />
         <Route path="autopay" element={<ManageAutopay />} />
-        <Route path="tanks" element={<TanksPage />} />
+        <Route path="tanks" element={<TankLevelsPage />} />
       </Route>
 
       {/* Ops Portal */}

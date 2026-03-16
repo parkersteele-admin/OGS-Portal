@@ -9,7 +9,7 @@
  * like useNavigate work if needed downstream).
  */
 
-import React, { createContext, useContext, useEffect } from 'react'
+import React, { createContext, useEffect } from 'react'
 import { onAuthStateChange } from '../lib/auth'
 import { useAuthStore } from '../store/authStore'
 import type { AppUser } from '../types/user'
@@ -49,11 +49,3 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   )
 }
 
-// ── Consumer hook ─────────────────────────────────────────────────────────────
-// Prefer useAuth() from src/hooks/useAuth.ts for components that need role helpers.
-
-export function useAuthContext(): AuthContextValue {
-  const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error('useAuthContext must be used within <AuthProvider>')
-  return ctx
-}

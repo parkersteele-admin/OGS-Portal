@@ -26,8 +26,6 @@ export function useCustomerTanks(
 
   useEffect(() => {
     if (!customerId) {
-      setTanks([])
-      setLoading(false)
       return
     }
 
@@ -46,12 +44,19 @@ export function useCustomerTanks(
     return unsubscribe
   }, [customerId])
 
-  const hasLowLevel = tanks.some(
+  const visibleTanks = customerId ? tanks : []
+
+  const hasLowLevel = visibleTanks.some(
     (t) =>
       t.status === 'deployed' &&
       t.currentLevelPct !== undefined &&
       t.currentLevelPct <= LOW_LEVEL_THRESHOLD,
   )
 
-  return { tanks, hasLowLevel, loading, error }
+  return {
+    tanks: visibleTanks,
+    hasLowLevel,
+    loading: customerId ? loading : false,
+    error: customerId ? error : null,
+  }
 }

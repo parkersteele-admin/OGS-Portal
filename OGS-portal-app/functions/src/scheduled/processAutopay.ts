@@ -31,7 +31,7 @@ export const processAutopay = onSchedule(
     memory:         '256MiB',
     timeoutSeconds: 540,
   },
-  async (_event) => {
+  async () => {
     const stripeKey = requireSecret(STRIPE_SECRET_KEY.value(), 'STRIPE_SECRET_KEY')
     requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY')
     const stripe = new Stripe(stripeKey)

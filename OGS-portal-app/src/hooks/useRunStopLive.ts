@@ -23,13 +23,8 @@ export function useRunStopLive(
 
   useEffect(() => {
     if (!runId || !stopId) {
-      setStop(null)
-      setLoading(false)
       return
     }
-
-    setLoading(true)
-    setError(null)
 
     const unsubscribe = onSnapshot(
       doc(db, 'runs', runId, 'stops', stopId),
@@ -46,5 +41,11 @@ export function useRunStopLive(
     return unsubscribe
   }, [runId, stopId])
 
-  return { stop, loading, error }
+  const enabled = Boolean(runId && stopId)
+
+  return {
+    stop: enabled ? stop : null,
+    loading: enabled ? loading : false,
+    error: enabled ? error : null,
+  }
 }

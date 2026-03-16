@@ -297,20 +297,13 @@ function AddMethodModal({
   const [clientSecret,  setClientSecret]  = useState<string | null>(null)
   const [setupIntentId, setSetupIntentId] = useState('')
   const [initError,     setInitError]     = useState<string | null>(null)
-  const [initLoading,   setInitLoading]   = useState(false)
+  const initLoading = mode !== null && !clientSecret && !initError
 
   // Fetch a fresh SetupIntent every time the modal opens
   useEffect(() => {
     if (!mode) {
-      // Reset when modal closes
-      setClientSecret(null)
-      setInitError(null)
       return
     }
-
-    setInitLoading(true)
-    setInitError(null)
-    setClientSecret(null)
 
     createSetupIntent(customerId)
       .then(({ clientSecret: cs }) => {
@@ -322,7 +315,6 @@ function AddMethodModal({
           err instanceof Error ? err.message : 'Could not initialise payment setup.',
         )
       })
-      .finally(() => setInitLoading(false))
   }, [mode, customerId])
 
   const title =

@@ -207,12 +207,11 @@ export default function PayInvoicePage() {
   const [invoice, setInvoice]           = useState<Invoice | null>(null)
   const [invoiceLoading, setInvoiceLoading] = useState(true)
   const [clientSecret, setClientSecret] = useState<string | null>(null)
-  const [piLoading, setPiLoading]       = useState(false)
   const [error, setError]               = useState<string | null>(null)
   const [tab, setTab]                   = useState<PayTab>('saved')
   const [paid, setPaid]                 = useState(false)
 
-  const { methods, defaultMethod, loading: pmLoading } = usePaymentMethods(customerId)
+  const { methods, defaultMethod } = usePaymentMethods(customerId)
 
   // ── Load invoice + subscribe for status changes ───────────────────────────
   useEffect(() => {
@@ -231,31 +230,23 @@ export default function PayInvoicePage() {
     if (!invoiceId || !invoice || invoice.status === 'paid') return
 
     // Use cached secret if available
-    if (invoice.stripeClientSecret) {
-      setClientSecret(invoice.stripeClientSecret)
-      return
-    }
+    if (invoice.stripeClientSecret) return
 
-    setPiLoading(true)
     const fn = httpsCallable<{ invoiceId: string }, { clientSecret: string }>(
       functions, 'createStripePaymentIntent',
     )
     fn({ invoiceId })
       .then(r => setClientSecret(r.data.clientSecret))
       .catch(e => setError(e instanceof Error ? e.message : 'Could not initialise payment.'))
-      .finally(() => setPiLoading(false))
   }, [invoiceId, invoice])
-
-  // Default tab: show saved if there are saved methods, otherwise new
-  useEffect(() => {
-    if (!pmLoading) setTab(methods.length > 0 ? 'saved' : 'new')
-  }, [pmLoading, methods.length])
 
   function handleConfirmed() { /* status update comes via Firestore subscription */ }
   function handleError(msg: string) { setError(msg) }
 
+  const activeClientSecret = invoice?.stripeClientSecret ?? clientSecret
+
   // ── Guards ────────────────────────────────────────────────────────────────
-  if (invoiceLoading || piLoading) {
+  if (invoiceLoading) {
     return <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-3)' }}>Loading…</div>
   }
   if (!invoice) {
@@ -340,8 +331,8 @@ export default function PayInvoicePage() {
       </div>
 
       {/* Payment section */}
-      {clientSecret ? (
-        <StripeProvider clientSecret={clientSecret}>
+      {activeClientSecret ? (
+        <StripeProvider clientSecret={activeClientSecret}>
           <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, padding: '20px 24px' }}>
             <h2 style={{ fontSize: 'var(--font-size-16)', fontWeight: 600, marginBottom: 20, color: 'var(--color-text)' }}>
               Pay {formatCurrency(invoice.total)}
@@ -380,7 +371,7 @@ export default function PayInvoicePage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <SavedPaymentMethod method={savedDefault} />
                 <SavedMethodPay
-                  clientSecret={clientSecret}
+                  clientSecret={activeClientSecret}
                   stripePaymentMethodId={savedDefault.stripePaymentMethodId}
                   label={`${savedDefault.brand ?? savedDefault.type} ···· ${savedDefault.last4}`}
                   onSuccess={handleConfirmed}

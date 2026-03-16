@@ -29,14 +29,9 @@ export function useActiveRun(runId: string | null | undefined): UseActiveRunResu
 
   useEffect(() => {
     if (!runId) {
-      setRun(null)
-      setStops([])
-      setLoading(false)
       return
     }
 
-    setLoading(true)
-    setError(null)
     runReady.current = false
     stopsReady.current = false
 
@@ -76,5 +71,10 @@ export function useActiveRun(runId: string | null | undefined): UseActiveRunResu
     }
   }, [runId])
 
-  return { run, stops, loading, error }
+  return {
+    run: runId ? run : null,
+    stops: runId ? stops : [],
+    loading: runId ? loading : false,
+    error: runId ? error : null,
+  }
 }

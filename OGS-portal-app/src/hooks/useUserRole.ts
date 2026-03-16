@@ -14,8 +14,6 @@ export function useUserRole(uid: string | undefined): UseUserRoleResult {
 
   useEffect(() => {
     if (!uid) {
-      setUserRole(null)
-      setRoleLoading(false)
       return
     }
 
@@ -40,5 +38,8 @@ export function useUserRole(uid: string | undefined): UseUserRoleResult {
     }
   }, [uid])
 
-  return { userRole, roleLoading }
+  return {
+    userRole: uid ? userRole : null,
+    roleLoading: uid ? roleLoading : false,
+  }
 }

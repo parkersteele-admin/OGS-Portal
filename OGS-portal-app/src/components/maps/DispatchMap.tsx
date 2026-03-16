@@ -191,7 +191,7 @@ function StopMarker({ stop, customer, isCurrent }: StopMarkerProps) {
   const isCompleted = stop.status === 'completed'
 
   let bgColor    = COLOR_PENDING
-  let glyphColor = COLOR_WHITE
+  const glyphColor = COLOR_WHITE
   let glyphNode: React.ReactNode = (
     <span style={{ fontWeight: 700, fontSize: 11 }}>{stop.order}</span>
   )

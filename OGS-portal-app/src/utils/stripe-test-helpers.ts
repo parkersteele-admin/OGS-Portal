@@ -172,10 +172,8 @@ export async function simulateAutopayCharge(invoiceId: string): Promise<void> {
 export async function simulatePaymentFailure(invoiceId: string): Promise<void> {
   console.info(`[stripe-test-helpers] simulatePaymentFailure → invoice ${invoiceId}`)
 
-  const [_stripe, clientSecret] = await Promise.all([
-    getStripe(),
-    getClientSecret(invoiceId),
-  ])
+  await getStripe()
+  const clientSecret = await getClientSecret(invoiceId)
 
   // Stripe rejects the confirmation client-side; the failure is also surfaced
   // server-side via the payment_intent.payment_failed webhook.

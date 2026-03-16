@@ -37,8 +37,6 @@ export function useUnreadNotifications(
 
   useEffect(() => {
     if (!userId) {
-      setNotifications([])
-      setLoading(false)
       return
     }
 
@@ -78,12 +76,12 @@ export function useUnreadNotifications(
   }, [notifications])
 
   return {
-    notifications,
-    unreadCount: notifications.length,
+    notifications: userId ? notifications : [],
+    unreadCount: userId ? notifications.length : 0,
     markRead,
     markAllRead,
-    loading,
-    error,
+    loading: userId ? loading : false,
+    error: userId ? error : null,
   }
 }
 
@@ -110,8 +108,6 @@ export function useNotifications(
 
   useEffect(() => {
     if (!userId) {
-      setNotifications([])
-      setLoading(false)
       return
     }
 
@@ -147,11 +143,11 @@ export function useNotifications(
   }, [notifications])
 
   return {
-    notifications,
-    unreadCount: notifications.filter((n) => !n.read).length,
+    notifications: userId ? notifications : [],
+    unreadCount: userId ? notifications.filter((n) => !n.read).length : 0,
     markRead,
     markAllRead,
-    loading,
+    loading: userId ? loading : false,
   }
 }
 

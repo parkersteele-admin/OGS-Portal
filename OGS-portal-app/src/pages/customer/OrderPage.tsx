@@ -466,7 +466,7 @@ const Step3: React.FC<Step3Props> = ({ products, state, customerId, onBack, onCo
 
   const tierInfo = TIER_INFO[state.tier]
 
-  const handleSubmit = useCallback(async () => {
+  const handleSubmit = async () => {
     if (!product || !customerId) return
     setSubmitting(true)
     setError(null)
@@ -487,7 +487,7 @@ const Step3: React.FC<Step3Props> = ({ products, state, customerId, onBack, onCo
       setError(err instanceof Error ? err.message : 'Failed to place order. Please try again.')
       setSubmitting(false)
     }
-  }, [product, customerId, state, onConfirm])
+  }
 
   if (!product || !pricing) return null
 
