@@ -25,6 +25,7 @@ import TanksPage from './pages/customer/TankLevels'
 import OpsDashboardPage from './pages/dispatch/OpsDashboardPage'
 import OpsOrdersPage from './pages/dispatch/OpsOrdersPage'
 import RunsPage from './pages/dispatch/RunsPage'
+import RunBuilder from './pages/dispatch/RunBuilder'
 import DispatchPage from './pages/dispatch/DispatchPage'
 import OpsTanksPage from './pages/dispatch/OpsTanksPage'
 import InventoryPage from './pages/dispatch/InventoryPage'
@@ -95,6 +96,7 @@ export const Router: React.FC = () => (
         <Route path="dashboard" element={<OpsDashboardPage />} />
         <Route path="orders" element={<OpsOrdersPage />} />
         <Route path="runs" element={<RunsPage />} />
+        <Route path="runs/new" element={<RunBuilder />} />
         <Route path="dispatch" element={<DispatchPage />} />
         <Route path="tanks" element={<OpsTanksPage />} />
         <Route path="inventory" element={<InventoryPage />} />

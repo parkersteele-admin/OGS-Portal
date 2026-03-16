@@ -350,7 +350,7 @@ const PendingOrdersTable: React.FC<PendingOrdersTableProps> = ({ orders, loading
 
   const buildRun = () => {
     const ids = Array.from(selected)
-    navigate('/ops/runs', { state: { selectedOrderIds: ids } })
+    navigate('/ops/runs/new', { state: { selectedOrderIds: ids } })
   }
 
   if (loading) {
@@ -417,7 +417,7 @@ const PendingOrdersTable: React.FC<PendingOrdersTableProps> = ({ orders, loading
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => navigate('/ops/runs', { state: { selectedOrderIds: [order.id] } })}
+                    onClick={() => navigate('/ops/runs/new', { state: { selectedOrderIds: [order.id] } })}
                   >
                     Build run
                   </Button>
@@ -463,7 +463,7 @@ const OpsDashboard: React.FC = () => {
           <Button size="sm" onClick={() => navigate('/ops/orders', { state: { openNew: true } })}>
             + New order
           </Button>
-          <Button size="sm" variant="secondary" onClick={() => navigate('/ops/runs', { state: { openNew: true } })}>
+          <Button size="sm" variant="secondary" onClick={() => navigate('/ops/runs/new')}>
             + New run
           </Button>
           <Button size="sm" variant="secondary" onClick={() => navigate('/crm/customers', { state: { openNew: true } })}>
