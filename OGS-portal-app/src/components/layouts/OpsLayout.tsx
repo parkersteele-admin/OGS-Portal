@@ -3,7 +3,7 @@ import { Outlet } from 'react-router-dom'
 import { Sidebar } from '../ui/Sidebar'
 import { TopBar } from '../ui/TopBar'
 import type { SidebarItem } from '../ui/Sidebar'
-import './layout.css'
+import './Layout.css'
 
 const NAV_ITEMS: SidebarItem[] = [
   { to: '/ops/dashboard', label: 'Dashboard', icon: '⊞' },

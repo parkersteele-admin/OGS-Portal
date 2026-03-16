@@ -6,7 +6,7 @@ import { MobileNav } from '../ui/MobileNav'
 import { ViewAsBanner } from '../ui/ViewAsBanner'
 import type { SidebarItem } from '../ui/Sidebar'
 import type { MobileNavItem } from '../ui/MobileNav'
-import './layout.css'
+import './Layout.css'
 
 const NAV_ITEMS: SidebarItem[] = [
   { to: '/portal/dashboard', label: 'Dashboard', icon: '⊞' },

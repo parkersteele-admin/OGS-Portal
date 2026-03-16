@@ -5,7 +5,7 @@ import { TopBar } from '../ui/TopBar'
 import { MobileNav } from '../ui/MobileNav'
 import type { SidebarItem } from '../ui/Sidebar'
 import type { MobileNavItem } from '../ui/MobileNav'
-import './layout.css'
+import './Layout.css'
 
 const NAV_ITEMS: SidebarItem[] = [
   { to: '/driver/schedule', label: 'My Schedule', icon: '∷' },
