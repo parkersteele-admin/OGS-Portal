@@ -10,35 +10,47 @@
  */
 
 import { useAuthStore } from '../store/authStore'
+import { useViewAsStore } from '../store/viewAsStore'
 import type { AppUser } from '../types/user'
 import type { UserRole } from '../types/user'
 
 export interface UseAuthResult {
-  user:       AppUser | null
-  loading:    boolean
-  error:      string | null
-  role:       UserRole | null
-  isAdmin:    boolean
+  user:         AppUser | null
+  /** The real signed-in admin — unchanged even in View As mode. */
+  realUser:     AppUser | null
+  loading:      boolean
+  error:        string | null
+  role:         UserRole | null
+  isAdmin:      boolean
   /** isDispatch is true for both 'admin' and 'dispatch' roles. */
-  isDispatch: boolean
-  isDriver:   boolean
-  isCustomer: boolean
-  isSales:    boolean
+  isDispatch:   boolean
+  isDriver:     boolean
+  isCustomer:   boolean
+  isSales:      boolean
+  /** True when an admin is currently impersonating another user. */
+  isViewingAs:  boolean
 }
 
 export function useAuth(): UseAuthResult {
-  const { user, loading, error } = useAuthStore()
+  const { user: realUser, loading, error } = useAuthStore()
+  const { viewAsUser } = useViewAsStore()
+
+  // When an admin has activated "View as", surface the impersonated user to
+  // every page/component — but keep the real user accessible as `realUser`.
+  const user = viewAsUser ?? realUser
   const role = (user?.role ?? null) as UserRole | null
 
   return {
     user,
+    realUser,
     loading,
     error,
     role,
-    isAdmin:    role === 'admin',
-    isDispatch: role === 'admin' || role === 'dispatch',
-    isDriver:   role === 'driver',
-    isCustomer: role === 'customer',
-    isSales:    role === 'sales',
+    isAdmin:     role === 'admin',
+    isDispatch:  role === 'admin' || role === 'dispatch',
+    isDriver:    role === 'driver',
+    isCustomer:  role === 'customer',
+    isSales:     role === 'sales',
+    isViewingAs: viewAsUser !== null,
   }
 }

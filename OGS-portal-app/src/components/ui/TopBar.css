@@ -150,3 +150,218 @@
   background: #fef2f2;
   color: var(--color-danger);
 }
+
+/* ── View-as styles ──────────────────────────────────────────────────────── */
+
+.topbar__dropdown-item--view-as {
+  color: var(--color-brand);
+}
+
+.topbar__dropdown-item--view-as:hover:not(:disabled) {
+  background: var(--color-brand-light);
+  color: var(--color-brand-dark);
+}
+
+.topbar__dropdown-item--exit-view-as {
+  color: var(--color-info);
+}
+
+.topbar__dropdown-item--exit-view-as:hover:not(:disabled) {
+  background: #eff6ff;
+  color: var(--color-info);
+}
+
+/* Orange ring + dot indicator when viewing as another user */
+.topbar__avatar--viewing-as {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+  position: relative;
+}
+
+.topbar__avatar-va-dot {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  background: var(--color-brand);
+  border-radius: 50%;
+  border: 2px solid var(--color-bg);
+}
+
+/* ── View-as modal overlay ───────────────────────────────────────────────── */
+
+.va-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.40);
+  z-index: 500;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 80px;
+  animation: va-overlay-in 120ms ease;
+}
+
+@keyframes va-overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.va-modal {
+  width: 480px;
+  max-width: calc(100vw - 32px);
+  background: var(--color-bg);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  max-height: 70vh;
+  overflow: hidden;
+  animation: va-modal-in 150ms ease;
+}
+
+@keyframes va-modal-in {
+  from { opacity: 0; transform: translateY(-12px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.va-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.va-modal__title {
+  font-size: var(--font-size-14);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.va-modal__close {
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: var(--font-size-13);
+  color: var(--color-text-3);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.va-modal__close:hover {
+  background: var(--color-bg-3);
+  color: var(--color-text);
+}
+
+.va-modal__search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.va-modal__search-icon {
+  color: var(--color-text-3);
+  flex-shrink: 0;
+}
+
+.va-modal__input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: var(--font-size-14);
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  background: transparent;
+}
+
+.va-modal__input::placeholder {
+  color: var(--color-text-3);
+}
+
+/* Cancel the browser's search-input × button */
+.va-modal__input::-webkit-search-cancel-button { display: none; }
+
+.va-modal__list {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.va-modal__empty {
+  padding: var(--space-7) var(--space-5);
+  text-align: center;
+  font-size: var(--font-size-13);
+  color: var(--color-text-3);
+}
+
+.va-modal__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-3) var(--space-5);
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-sans);
+  transition: background var(--transition-fast);
+}
+
+.va-modal__item:hover {
+  background: var(--color-bg-2);
+}
+
+.va-modal__item-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--color-brand-light);
+  color: var(--color-brand-dark);
+  font-size: var(--font-size-13);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.va-modal__item-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.va-modal__item-name {
+  font-size: var(--font-size-14);
+  font-weight: 500;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.va-modal__item-email {
+  font-size: var(--font-size-12);
+  color: var(--color-text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.va-modal__item-arrow {
+  color: var(--color-text-3);
+  flex-shrink: 0;
+}
