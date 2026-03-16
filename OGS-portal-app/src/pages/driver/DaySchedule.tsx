@@ -186,8 +186,6 @@ export default function DaySchedule() {
 
   useEffect(() => {
     if (!user) return
-    setFindingRun(true)
-    setFindError(null)
 
     const todayStart = new Date()
     todayStart.setHours(0, 0, 0, 0)
@@ -199,7 +197,7 @@ export default function DaySchedule() {
       { pageSize: 10 },
     )
       .then(({ data }) => {
-        // Prefer in-progress → scheduled → first available
+        setFindError(null)
         const active =
           data.find((r: Run) => r.status === 'in-progress') ??
           data.find((r: Run) => r.status === 'scheduled')   ??

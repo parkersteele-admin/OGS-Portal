@@ -792,7 +792,6 @@ const LeadsPipeline: React.FC = () => {
 
   // Real-time leads subscription
   useEffect(() => {
-    setLeadsLoading(true)
     const unsub = subscribeToLeads({}, (data) => {
       setLeads(data)
       setLeadsLoading(false)

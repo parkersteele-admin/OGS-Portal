@@ -78,6 +78,7 @@ async function fetchPaymentsInRange(start: Date, end: Date): Promise<Payment[]> 
 // ── Status badge ──────────────────────────────────────────────────────────────
 
 const InvoiceStatusBadge: React.FC<{ invoice: Invoice }> = ({ invoice }) => {
+  // eslint-disable-next-line react-hooks/purity
   const now     = Date.now()
   const dueDate = invoice.dueAt?.toDate?.()
 

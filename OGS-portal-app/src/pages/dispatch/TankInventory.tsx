@@ -911,7 +911,6 @@ export default function TankInventory() {
 
   // Subscribe to all tanks
   useEffect(() => {
-    setLoading(true)
     const unsub = onSnapshot(
       query(tanksCol, orderBy('serialNumber')),
       (snap) => {

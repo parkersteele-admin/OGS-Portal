@@ -512,7 +512,7 @@ const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
       if (!firstRow) throw new Error('No line item with a unit price.')
       return convertQuoteToOrder(savedId, recipient.id, firstRow.unitPrice)
     },
-    onSuccess: (_orderId) => {
+    onSuccess: () => {
       setStatus('accepted')
       queryClient.invalidateQueries({ queryKey: ['quotes'] })
       // Navigate to ops orders
@@ -878,15 +878,10 @@ const QuoteBuilder: React.FC = () => {
   const [searchParams]    = useSearchParams()
   const queryClient       = useQueryClient()
 
-  const [panelOpen,   setPanelOpen]   = useState(false)
+  const [panelOpen,   setPanelOpen]   = useState(() => searchParams.get('new') === '1')
   const [editQuote,   setEditQuote]   = useState<Quote | null>(null)
   const [statusFilter,setStatusFilter]= useState<QuoteStatus | 'all'>('all')
   const [deletingId,  setDeletingId]  = useState<string | null>(null)
-
-  // Open builder if ?new=1 is in URL
-  useEffect(() => {
-    if (searchParams.get('new') === '1') setPanelOpen(true)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const prefillLeadId = searchParams.get('leadId') ?? undefined
 
@@ -927,7 +922,7 @@ const QuoteBuilder: React.FC = () => {
     setEditQuote(null)
   }
 
-  const handleSaved = (_id: string) => {
+  const handleSaved = () => {
     queryClient.invalidateQueries({ queryKey: ['quotes'] })
   }
 

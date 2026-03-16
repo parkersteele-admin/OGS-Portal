@@ -811,7 +811,6 @@ export default function OrderManagement() {
 
   // ── Subscribe to all orders ───────────────────────────────────────────────────
   useEffect(() => {
-    setOrdersLoading(true)
     const unsub = onSnapshot(
       query(ordersCol, orderBy('requestedAt', 'desc')),
       (snap) => {
@@ -948,7 +947,7 @@ export default function OrderManagement() {
     if (status !== 'pending') return
     setSelected((prev) => {
       const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
+      if (next.has(id)) { next.delete(id) } else { next.add(id) }
       return next
     })
   }
