@@ -142,6 +142,10 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ salesReps, onClose, onSave,
     company:        '',
     email:          '',
     phone:          '',
+    address:        '',
+    city:           '',
+    state:          '',
+    zip:            '',
     source:         '',
     assignedTo:     user?.id ?? '',
     estimatedValue: undefined,
@@ -172,6 +176,14 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ salesReps, onClose, onSave,
         <div className="lp-form-row">
           <Input label="Email" type="email" value={form.email} onChange={set('email')} required />
           <Input label="Phone" type="tel"   value={form.phone} onChange={set('phone')} />
+        </div>
+        <div className="lp-form-row">
+          <Input label="Address" value={form.address ?? ''} onChange={set('address')} />
+          <Input label="City"    value={form.city    ?? ''} onChange={set('city')}    />
+        </div>
+        <div className="lp-form-row">
+          <Input label="State"   value={form.state   ?? ''} onChange={set('state')}   />
+          <Input label="ZIP"     value={form.zip     ?? ''} onChange={set('zip')}     />
         </div>
         <div className="lp-form-row">
           <div className="ui-field">
@@ -372,6 +384,10 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
   const [estValue,  setEstValue]  = useState(String(lead.estimatedValue ?? ''))
   const [assigned,  setAssigned]  = useState(lead.assignedTo ?? '')
   const [source,    setSource]    = useState(lead.source ?? '')
+  const [address,   setAddress]   = useState(lead.address ?? '')
+  const [city,      setCity]      = useState(lead.city    ?? '')
+  const [stateVal,  setStateVal]  = useState(lead.state   ?? '')
+  const [zip,       setZip]       = useState(lead.zip     ?? '')
   const [saved,     setSaved]     = useState(false)
   const [saving,    setSaving]    = useState(false)
 
@@ -381,6 +397,10 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
     setEstValue(String(lead.estimatedValue ?? ''))
     setAssigned(lead.assignedTo ?? '')
     setSource(lead.source ?? '')
+    setAddress(lead.address ?? '')
+    setCity(lead.city    ?? '')
+    setStateVal(lead.state   ?? '')
+    setZip(lead.zip     ?? '')
   }, [lead.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSave = async () => {
@@ -391,6 +411,10 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
         estimatedValue: estValue ? Number(estValue) : undefined,
         assignedTo:     assigned || undefined,
         source:         source || undefined,
+        address:        address.trim() || undefined,
+        city:           city.trim()    || undefined,
+        state:          stateVal.trim() || undefined,
+        zip:            zip.trim()     || undefined,
       })
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
@@ -442,6 +466,15 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
                 <a href={`tel:${lead.phone}`} className="lp-panel__info-value lp-link">{lead.phone}</a>
               </>
             )}
+            {(lead.address || lead.city) && (
+              <>
+                <span className="lp-panel__info-label">Address</span>
+                <span className="lp-panel__info-value">
+                  {lead.address && <>{lead.address}<br /></>}
+                  {[lead.city, lead.state, lead.zip].filter(Boolean).join(', ')}
+                </span>
+              </>
+            )}
             {lead.source && (
               <>
                 <span className="lp-panel__info-label">Source</span>
@@ -471,6 +504,12 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
         <section className="lp-panel__section">
           <h4 className="lp-panel__section-title">Details</h4>
           <div className="lp-panel__fields">
+            <Input label="Address" value={address} onChange={e => setAddress(e.target.value)} />
+            <div className="lp-form-row">
+              <Input label="City"  value={city}     onChange={e => setCity(e.target.value)}     />
+              <Input label="State" value={stateVal} onChange={e => setStateVal(e.target.value)} />
+              <Input label="ZIP"   value={zip}      onChange={e => setZip(e.target.value)}      />
+            </div>
             <div className="ui-field">
               <label className="ui-field__label">Source</label>
               <select className="ui-input" value={source} onChange={e => setSource(e.target.value)}>
