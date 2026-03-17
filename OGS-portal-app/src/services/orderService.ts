@@ -131,8 +131,12 @@ export async function createOrder(
 ): Promise<string> {
   return serviceCall(async () => {
     const pricing = calculateOrderPricing(data.quantity, unitPrice, data.deliveryTier)
+    // Strip undefined fields — Firestore rejects them
+    const payload = Object.fromEntries(
+      Object.entries(data).filter(([, v]) => v !== undefined),
+    )
     const ref = await addDoc(ordersCol, {
-      ...data,
+      ...payload,
       ...pricing,
       status: 'pending' as OrderStatus,
       requestedAt: serverTimestamp(),
