@@ -37,6 +37,8 @@ import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { Modal } from '../../components/ui/Modal'
+import { ProductCombobox } from '../../components/ui/ProductCombobox'
+import type { ProductDropdownItem } from '../../services/productService'
 import type { Quote, QuoteItem, QuoteStatus } from '../../types/crm'
 import type { Customer } from '../../types/customer'
 import type { Lead } from '../../types/crm'
@@ -48,6 +50,7 @@ import './QuoteBuilder.css'
 interface DraftLineItem {
   _id:         string     // local key for list reconciliation
   productId:   string
+  skuLabel:    string     // e.g. "CO2-20LB" shown as badge when product picked
   description: string
   quantity:    number
   unitPrice:   number
@@ -74,6 +77,7 @@ const STATUS_BADGE: Record<QuoteStatus, { label: string; variant: 'success' | 'w
 const EMPTY_ROW = (): DraftLineItem => ({
   _id:         crypto.randomUUID(),
   productId:   '',
+  skuLabel:    '',
   description: '',
   quantity:    1,
   unitPrice:   0,
@@ -217,13 +221,15 @@ const RecipientSearch: React.FC<RecipientSearchProps> = ({ value, onChange, disa
 // ── LineItemRow ───────────────────────────────────────────────────────────────
 
 interface LineItemRowProps {
-  row:      DraftLineItem
-  index:    number
-  onChange: (id: string, field: keyof DraftLineItem, value: string | number) => void
-  onRemove: (id: string) => void
+  row:             DraftLineItem
+  index:           number
+  onChange:        (id: string, field: keyof DraftLineItem, value: string | number) => void
+  onProductSelect: (id: string, product: ProductDropdownItem | null) => void
+  onRemove:        (id: string) => void
+  disabled?:       boolean
 }
 
-const LineItemRow: React.FC<LineItemRowProps> = ({ row, index, onChange, onRemove }) => {
+const LineItemRow: React.FC<LineItemRowProps> = ({ row, index, onChange, onProductSelect, onRemove, disabled }) => {
   const handleNum = (field: 'quantity' | 'unitPrice') =>
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const v = parseFloat(e.target.value) || 0
@@ -234,12 +240,22 @@ const LineItemRow: React.FC<LineItemRowProps> = ({ row, index, onChange, onRemov
     <div className="qb-row">
       <span className="qb-row__num">{index + 1}</span>
 
-      <input
-        className="ui-input qb-row__desc"
-        placeholder="Description / product"
-        value={row.description}
-        onChange={e => onChange(row._id, 'description', e.target.value)}
-      />
+      <div className="qb-row__product">
+        <ProductCombobox
+          value={row.productId}
+          onSelect={(p) => onProductSelect(row._id, p)}
+          label=""
+          placeholder="Select product…"
+          disabled={disabled}
+        />
+        <input
+          className="ui-input qb-row__desc"
+          placeholder="Description (auto-filled or custom)"
+          value={row.description}
+          onChange={e => onChange(row._id, 'description', e.target.value)}
+          disabled={disabled}
+        />
+      </div>
 
       <input
         className="ui-input qb-row__qty"
@@ -249,6 +265,7 @@ const LineItemRow: React.FC<LineItemRowProps> = ({ row, index, onChange, onRemov
         placeholder="Qty"
         value={row.quantity || ''}
         onChange={handleNum('quantity')}
+        disabled={disabled}
       />
 
       <input
@@ -259,6 +276,7 @@ const LineItemRow: React.FC<LineItemRowProps> = ({ row, index, onChange, onRemov
         placeholder="Unit price"
         value={row.unitPrice || ''}
         onChange={handleNum('unitPrice')}
+        disabled={disabled}
       />
 
       <span className="qb-row__amount">{formatCurrency(row.amount)}</span>
@@ -268,6 +286,7 @@ const LineItemRow: React.FC<LineItemRowProps> = ({ row, index, onChange, onRemov
         onClick={() => onRemove(row._id)}
         aria-label="Remove line item"
         title="Remove"
+        disabled={disabled}
       >
         ✕
       </button>
@@ -349,6 +368,7 @@ const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
       editQuote.lineItems.map(item => ({
         _id:         crypto.randomUUID(),
         productId:   item.productId,
+        skuLabel:    '',
         description: item.description,
         quantity:    item.quantity,
         unitPrice:   item.unitPrice,
@@ -389,6 +409,26 @@ const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
       setRows(prev => prev.map(r => {
         if (r._id !== id) return r
         const updated = { ...r, [field]: value }
+        updated.amount = rowAmount(updated)
+        return updated
+      }))
+    },
+    [],
+  )
+
+  // Auto-fill description + unitPrice when a product is chosen from the catalog
+  const handleProductSelect = useCallback(
+    (id: string, product: ProductDropdownItem | null) => {
+      setRows(prev => prev.map(r => {
+        if (r._id !== id) return r
+        if (!product) return { ...r, productId: '', skuLabel: '' }
+        const updated: DraftLineItem = {
+          ...r,
+          productId:   product.id,
+          skuLabel:    product.sku,
+          description: `${product.name}${product.unit ? ` (${product.unit})` : ''}`,
+          unitPrice:   product.basePrice,
+        }
         updated.amount = rowAmount(updated)
         return updated
       }))
@@ -598,7 +638,7 @@ const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
 
           <div className="qb-rows-header">
             <span className="qb-rows-header__num" />
-            <span className="qb-rows-header__desc">Description</span>
+            <span className="qb-rows-header__desc">Product / Description</span>
             <span className="qb-rows-header__qty">Qty</span>
             <span className="qb-rows-header__price">Unit price</span>
             <span className="qb-rows-header__amount">Amount</span>
@@ -612,7 +652,9 @@ const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
                 row={row}
                 index={i}
                 onChange={handleRowChange}
+                onProductSelect={handleProductSelect}
                 onRemove={removeRow}
+                disabled={isReadOnly}
               />
             ))}
           </div>

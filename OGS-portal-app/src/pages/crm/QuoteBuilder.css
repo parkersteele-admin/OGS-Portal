@@ -451,6 +451,17 @@
 .qb-row__qty   { min-width: 0; }
 .qb-row__price { min-width: 0; }
 
+/* Product combobox + description stacked in the 1fr column */
+.qb-row__product {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+/* Make the ProductCombobox inner wrapper full-width */
+.qb-row__product .pcb-field { width: 100%; }
+.qb-row__product .qb-row__desc { width: 100%; font-size: 0.8rem; }
+
 .qb-row__amount {
   text-align: right;
   font-size: 0.88rem;
