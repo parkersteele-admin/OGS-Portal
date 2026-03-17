@@ -411,9 +411,13 @@ function CreateOrderModal({ onClose, onCreated }: CreateOrderModalProps) {
 
   // Load products on mount
   useEffect(() => {
-    getDocs(query(productsCol, where('active', '==', true), orderBy('name')))
+    getDocs(query(productsCol, where('active', '==', true)))
       .then((snap) =>
-        setProducts(snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Product)),
+        setProducts(
+          snap.docs
+            .map((d) => ({ ...d.data(), id: d.id }) as Product)
+            .sort((a, b) => a.name.localeCompare(b.name)),
+        ),
       )
   }, [])
 
