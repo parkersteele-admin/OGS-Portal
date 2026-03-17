@@ -29,7 +29,7 @@ import {
   convertQuoteToOrder,
   deleteQuote,
 } from '../../services/quoteService'
-import { searchCustomers } from '../../services/customerService'
+import { subscribeToCustomers, searchCustomers } from '../../services/customerService'
 import { getLeads } from '../../services/leadService'
 import { useAuth } from '../../hooks/useAuth'
 import { formatCurrency, formatDate, formatRelative } from '../../utils/format'
@@ -835,13 +835,14 @@ export const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
 interface QuoteTableProps {
   quotes:      Quote[]
   loading:     boolean
+  nameMap:     Record<string, string>
   onEdit:      (quote: Quote) => void
   onDelete:    (id: string) => void
   deletingId:  string | null
 }
 
 const QuoteTable: React.FC<QuoteTableProps> = ({
-  quotes, loading, onEdit, onDelete, deletingId,
+  quotes, loading, nameMap, onEdit, onDelete, deletingId,
 }) => {
   if (loading) {
     return (
@@ -881,7 +882,7 @@ const QuoteTable: React.FC<QuoteTableProps> = ({
             return (
               <tr key={q.id} className="qb-tr" onClick={() => onEdit(q)}>
                 <td className="qb-td qb-td--mono">{q.quoteNumber}</td>
-                <td className="qb-td">{q.customerId ?? q.leadId ?? '—'}</td>
+                <td className="qb-td">{nameMap[q.customerId ?? q.leadId ?? ''] ?? q.customerId ?? q.leadId ?? '—'}</td>
                 <td className="qb-td qb-td--right qb-td--bold">{formatCurrency(q.total)}</td>
                 <td className="qb-td">
                   <Badge variant={cfg.variant}>{cfg.label}</Badge>
@@ -922,6 +923,23 @@ const QuoteBuilder: React.FC = () => {
 
   const [statusFilter,setStatusFilter]= useState<QuoteStatus | 'all'>('all')
   const [deletingId,  setDeletingId]  = useState<string | null>(null)
+  const [nameMap,     setNameMap]     = useState<Record<string, string>>({})
+
+  // Build ID → display name map from customers + leads
+  useEffect(() => {
+    let mounted = true
+    const unsub = subscribeToCustomers({ status: 'active' }, (customers) => {
+      if (!mounted) return
+      const map: Record<string, string> = {}
+      customers.forEach((c: Customer) => { map[c.id] = c.name })
+      getLeads({}, { pageSize: 200 }).then((page) => {
+        if (!mounted) return
+        page.data.forEach((l: Lead) => { map[l.id] = l.company ?? l.name })
+        setNameMap(map)
+      })
+    })
+    return () => { mounted = false; unsub() }
+  }, [])
 
   const { data: quotesPage, isLoading } = useQuery({
     queryKey: ['quotes', statusFilter],
@@ -976,6 +994,7 @@ const QuoteBuilder: React.FC = () => {
         <QuoteTable
           quotes={quotes}
           loading={isLoading}
+          nameMap={nameMap}
           onEdit={handleEdit}
           onDelete={id => deleteMutation.mutate(id)}
           deletingId={deletingId}
