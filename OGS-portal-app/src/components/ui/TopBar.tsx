@@ -4,11 +4,12 @@ import { getDocs, query, orderBy } from 'firebase/firestore'
 import { useAuth } from '../../hooks/useAuth'
 import { useViewAsStore } from '../../store/viewAsStore'
 import { signOut } from '../../lib/auth'
-import { usersCol } from '../../lib/firestore'
+import { customersCol, usersCol } from '../../lib/firestore'
 import { NotificationBell } from './NotificationBell'
 import { CreateUserModal } from './CreateUserModal'
 import { ROLE_HOME } from '../../types/auth'
 import type { AppUser, UserRole } from '../../types/user'
+import type { Customer } from '../../types/customer'
 import './TopBar.css'
 import './CreateUserModal.css'
 
@@ -32,13 +33,47 @@ function ViewAsModal({
 
   useEffect(() => {
     inputRef.current?.focus()
-    getDocs(query(usersCol, orderBy('name')))
-      .then((snap) => {
-        const all = snap.docs.map((d) => ({ ...d.data(), id: d.id } as AppUser))
-        // Only show active customer-role accounts (admins can already see everything natively)
-        setUsers(all.filter((u) => u.active && u.role === 'customer'))
-      })
-      .finally(() => setLoading(false))
+
+    // Load all customers from the customers collection, then overlay real
+    // portal user accounts where they exist (so customerId is preserved).
+    Promise.all([
+      getDocs(query(customersCol, orderBy('name'))),
+      getDocs(query(usersCol, orderBy('name'))),
+    ]).then(([custSnap, userSnap]) => {
+      // Build a map of customerId → portal AppUser
+      const portalByCustomerId = new Map<string, AppUser>()
+      for (const d of userSnap.docs) {
+        const u = { ...d.data(), id: d.id } as AppUser
+        if (u.role === 'customer' && u.customerId) {
+          portalByCustomerId.set(u.customerId, u)
+        }
+      }
+
+      // For every customer record, use their real portal account if one exists,
+      // otherwise synthesise an AppUser so the view-as store still gets the
+      // right shape (name, email, role, customerId).
+      const list: AppUser[] = custSnap.docs
+        .map((d) => {
+          const c = { ...d.data(), id: d.id } as Customer
+          if (c.status !== 'active') return null
+          const real = portalByCustomerId.get(c.id)
+          if (real) return real
+          // Synthetic — no portal login yet, but still previewable
+          return {
+            id:         c.id,
+            name:       c.name,
+            email:      c.email,
+            role:       'customer' as UserRole,
+            active:     true,
+            customerId: c.id,
+            createdAt:  c.createdAt,
+            updatedAt:  c.updatedAt,
+          } as AppUser
+        })
+        .filter((u): u is AppUser => u !== null)
+
+      setUsers(list)
+    }).finally(() => setLoading(false))
   }, [])
 
   const filtered = search.trim()
