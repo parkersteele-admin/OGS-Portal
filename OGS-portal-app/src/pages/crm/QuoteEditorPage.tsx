@@ -375,7 +375,8 @@ const QuoteEditorPage: React.FC = () => {
     mutationFn: async () => {
       setError(null)
       let id = savedId; if (!id) id = await saveMutation.mutateAsync()
-      await generateQuotePdf(id!)
+      // PDF generation is best-effort — don't block send if the function isn't available
+      await generateQuotePdf(id!).catch(() => null)
       await sendQuote(id!)
       setStatus('sent')
       queryClient.invalidateQueries({ queryKey: ['quotes'] })

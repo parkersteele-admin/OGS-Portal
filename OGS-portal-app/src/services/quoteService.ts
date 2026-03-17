@@ -94,9 +94,11 @@ export async function createQuote(data: CreateQuoteInput, taxRate = 0): Promise<
     }
     const totals = calculateQuoteTotals(data.lineItems, taxRate)
     const quoteNumber = `QT-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`
+    // Strip undefined fields — Firestore rejects them
+    const cleanData = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined))
     const ref = await addDoc(quotesCol, {
       quoteNumber,
-      ...data,
+      ...cleanData,
       ...totals,
       lineItems: data.lineItems,
       status: 'draft' as QuoteStatus,
@@ -111,8 +113,10 @@ export async function updateQuote(
   id: string,
   data: Partial<Omit<Quote, 'id' | 'createdAt'>>,
 ): Promise<void> {
+  // Strip undefined fields — Firestore rejects them
+  const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined))
   return serviceCall(() =>
-    updateDoc(doc(db, 'quotes', id), { ...data, updatedAt: serverTimestamp() }),
+    updateDoc(doc(db, 'quotes', id), { ...clean, updatedAt: serverTimestamp() }),
   )
 }
 
