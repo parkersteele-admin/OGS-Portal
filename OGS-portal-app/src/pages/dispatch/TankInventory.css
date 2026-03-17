@@ -37,6 +37,49 @@
   color: var(--color-text-3);
 }
 
+.ti-page-header__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+/* ── Import feedback ───────────────────────────────────────────────────────── */
+
+.ti-import-msg {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius);
+  font-size: var(--font-size-13);
+  font-weight: 500;
+}
+
+.ti-import-msg--success {
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #6ee7b7;
+}
+
+.ti-import-msg--error {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+
+.ti-import-msg__dismiss {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: var(--font-size-13);
+  color: inherit;
+  opacity: 0.7;
+  padding: 0 2px;
+}
+.ti-import-msg__dismiss:hover { opacity: 1; }
+
 /* ── Stock summary cards ───────────────────────────────────────────────────── */
 
 .ti-stock-grid {

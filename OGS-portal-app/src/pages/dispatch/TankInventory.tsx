@@ -51,6 +51,7 @@ import type { Product } from '../../types/product'
 import type { AppFile } from '../../types/file'
 import type { DeliveryTier } from '../../types/order'
 import './TankInventory.css'
+import * as XLSX from 'xlsx'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -279,9 +280,10 @@ interface CylinderRowProps {
   customer?: Customer
   onViewDetail: () => void
   onRefill: () => void
+  onEdit: () => void
 }
 
-function CylinderRow({ tank, customer, onViewDetail, onRefill }: CylinderRowProps) {
+function CylinderRow({ tank, customer, onViewDetail, onRefill, onEdit }: CylinderRowProps) {
   const [editingLevel, setEditingLevel] = useState(false)
   const [showStatus, setShowStatus] = useState(false)
 
@@ -340,6 +342,13 @@ function CylinderRow({ tank, customer, onViewDetail, onRefill }: CylinderRowProp
             <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
           </svg>
         </button>
+        {/* Edit */}
+        <button className="ti-action-btn" title="Edit cylinder" onClick={(e) => { e.stopPropagation(); onEdit() }} aria-label="Edit cylinder">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+          </svg>
+        </button>
         {/* Update level */}
         {tank.status === 'deployed' && (
           <button
@@ -378,9 +387,10 @@ interface CylinderDetailPanelProps {
   customer?: Customer
   onClose: () => void
   onRefill: () => void
+  onEdit: () => void
 }
 
-function CylinderDetailPanel({ tank, customer, onClose, onRefill }: CylinderDetailPanelProps) {
+function CylinderDetailPanel({ tank, customer, onClose, onRefill, onEdit }: CylinderDetailPanelProps) {
   const [docs, setDocs] = useState<AppFile[]>([])
   const [uploading, setUploading] = useState(false)
   const [uploadPct, setUploadPct] = useState(0)
@@ -601,6 +611,9 @@ function CylinderDetailPanel({ tank, customer, onClose, onRefill }: CylinderDeta
 
         {/* Footer */}
         <div className="ti-panel__footer">
+          <Button variant="secondary" size="sm" onClick={onEdit}>
+            ✏️ Edit
+          </Button>
           {tank.status === 'deployed' && (
             <Button variant="secondary" size="sm" onClick={onRefill}>
               Create Refill Order
@@ -795,6 +808,140 @@ function AddCylinderModal({ onClose, onCreated }: AddCylinderModalProps) {
   )
 }
 
+// ── Edit cylinder modal ────────────────────────────────────────────────────────
+
+interface EditCylinderModalProps {
+  tank: Tank
+  onClose: () => void
+  onSaved: () => void
+}
+
+function EditCylinderModal({ tank, onClose, onSaved }: EditCylinderModalProps) {
+  function tsToDateStr(ts: unknown): string {
+    if (!ts || typeof (ts as { toDate?: unknown }).toDate !== 'function') return ''
+    return (ts as { toDate: () => Date }).toDate().toISOString().slice(0, 10)
+  }
+
+  const GAS_TYPES = ['CO2', 'Nitrogen', 'Propane', 'Oxygen', 'Argon', 'Helium']
+  const CAPACITY_UNITS = ['gal', 'lb', 'cf', 'L']
+
+  const [serial,         setSerial]         = useState(tank.serialNumber)
+  const [gasType,        setGasType]        = useState(tank.gasType)
+  const [sizeLabel,      setSizeLabel]      = useState(tank.sizeLabel)
+  const [capacityValue,  setCapacityValue]  = useState(String(tank.capacityValue))
+  const [capacityUnit,   setCapacityUnit]   = useState(tank.capacityUnit)
+  const [ownership,      setOwnership]      = useState<'company' | 'customer'>(tank.ownership ?? 'company')
+  const [monthlyRate,    setMonthlyRate]    = useState(String(tank.monthlyRate ?? ''))
+  const [currentLevel,   setCurrentLevel]   = useState(String(tank.currentLevelPct ?? ''))
+  const [lastInspection, setLastInspection] = useState(tsToDateStr(tank.lastInspectionDate))
+  const [nextInspection, setNextInspection] = useState(tsToDateStr(tank.nextInspectionDate))
+  const [notes,          setNotes]          = useState(tank.notes ?? '')
+  const [busy,           setBusy]           = useState(false)
+  const [error,          setError]          = useState('')
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!serial.trim()) return setError('Serial number is required.')
+    if (!gasType.trim()) return setError('Gas type is required.')
+    if (!sizeLabel.trim()) return setError('Size label is required.')
+    if (!capacityValue || isNaN(Number(capacityValue))) return setError('Capacity must be a number.')
+    setBusy(true)
+    setError('')
+    try {
+      const updates: Partial<Omit<Tank, 'id'>> = {
+        serialNumber:   serial.trim(),
+        gasType:        gasType.trim(),
+        sizeLabel:      sizeLabel.trim(),
+        capacityValue:  Number(capacityValue),
+        capacityUnit,
+        ownership,
+        monthlyRate:    monthlyRate !== '' ? Number(monthlyRate) : undefined,
+        currentLevelPct: currentLevel !== '' ? Number(currentLevel) : undefined,
+        notes:          notes.trim() || undefined,
+      }
+      if (lastInspection) updates.lastInspectionDate = new Date(lastInspection + 'T12:00:00') as unknown as Tank['lastInspectionDate']
+      if (nextInspection) updates.nextInspectionDate = new Date(nextInspection + 'T12:00:00') as unknown as Tank['nextInspectionDate']
+      await updateTank(tank.id, updates)
+      onSaved()
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update cylinder.')
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="ti-overlay" onClick={onClose}>
+      <div className="ti-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Edit cylinder">
+        <div className="ti-modal__header">
+          <h2 className="ti-modal__title">Edit — {tank.serialNumber}</h2>
+          <button className="ti-modal__close" onClick={onClose} aria-label="Close">✕</button>
+        </div>
+        <form className="ti-modal__body" onSubmit={handleSubmit} noValidate>
+          {error && <div className="ti-form-error">{error}</div>}
+
+          <div className="ti-form-grid">
+            <Input label="Serial Number *" value={serial} onChange={(e) => setSerial(e.target.value)} required />
+
+            <div className="ti-field">
+              <label className="ti-field__label" htmlFor="edit-gastype">Gas Type *</label>
+              <div className="ti-combo">
+                <select
+                  id="edit-gastype"
+                  className="ti-select"
+                  value={GAS_TYPES.includes(gasType) ? gasType : '__custom'}
+                  onChange={(e) => { if (e.target.value !== '__custom') setGasType(e.target.value) }}
+                >
+                  {GAS_TYPES.map((g) => <option key={g} value={g}>{g}</option>)}
+                  <option value="__custom">Custom…</option>
+                </select>
+                {!GAS_TYPES.includes(gasType) && (
+                  <input className="ti-combo__custom" placeholder="Enter gas type…" value={gasType} onChange={(e) => setGasType(e.target.value)} />
+                )}
+              </div>
+            </div>
+
+            <Input label="Size Label *" value={sizeLabel} onChange={(e) => setSizeLabel(e.target.value)} required />
+
+            <div className="ti-field">
+              <label className="ti-field__label">Capacity *</label>
+              <div className="ti-capacity-row">
+                <input className="ti-input" type="number" min={0.1} step={0.1} value={capacityValue} onChange={(e) => setCapacityValue(e.target.value)} required />
+                <select className="ti-select ti-select--unit" value={capacityUnit} onChange={(e) => setCapacityUnit(e.target.value)}>
+                  {CAPACITY_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="ti-field">
+              <label className="ti-field__label" htmlFor="edit-ownership">Ownership</label>
+              <select id="edit-ownership" className="ti-select" value={ownership} onChange={(e) => setOwnership(e.target.value as 'company' | 'customer')}>
+                <option value="company">Company-owned</option>
+                <option value="customer">Customer-owned</option>
+              </select>
+            </div>
+
+            <Input label="Monthly Rental Rate ($)" type="number" min={0} step={5} value={monthlyRate} onChange={(e) => setMonthlyRate(e.target.value)} placeholder="0" />
+            <Input label="Current Level (%)" type="number" min={0} max={100} step={1} value={currentLevel} onChange={(e) => setCurrentLevel(e.target.value)} placeholder="—" />
+            <Input label="Last Inspection Date" type="date" value={lastInspection} onChange={(e) => setLastInspection(e.target.value)} />
+            <Input label="Next Inspection Due" type="date" value={nextInspection} onChange={(e) => setNextInspection(e.target.value)} />
+          </div>
+
+          <div className="ti-field ti-field--full">
+            <label className="ti-field__label" htmlFor="edit-notes">Notes</label>
+            <textarea id="edit-notes" className="ti-textarea" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Any additional notes…" />
+          </div>
+
+          <div className="ti-modal__footer">
+            <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>Cancel</Button>
+            <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save Changes'}</Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 // ── Create refill order modal ──────────────────────────────────────────────────
 
 interface CreateRefillModalProps {
@@ -930,9 +1077,14 @@ export default function TankInventory() {
   const [search, setSearch] = useState('')
 
   // ── UI state ─────────────────────────────────────────────────────────────────
-  const [detailTank, setDetailTank] = useState<Tank | null>(null)
-  const [showAdd, setShowAdd] = useState(false)
-  const [refillTank, setRefillTank] = useState<Tank | null>(null)
+  const [detailTank,   setDetailTank]   = useState<Tank | null>(null)
+  const [showAdd,      setShowAdd]      = useState(false)
+  const [editTank,     setEditTank]     = useState<Tank | null>(null)
+  const [refillTank,   setRefillTank]   = useState<Tank | null>(null)
+  const [importing,    setImporting]    = useState(false)
+  const [importError,  setImportError]  = useState('')
+  const [importResult, setImportResult] = useState<{ created: number; updated: number; errors: number } | null>(null)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   // Subscribe to all tanks
   useEffect(() => {
@@ -1035,6 +1187,113 @@ export default function TankInventory() {
     { key: 'inspection', label: 'Inspection' },
   ]
 
+  // ── Export ────────────────────────────────────────────────────────────────────
+
+  function handleExport() {
+    const rows = allTanks.map((t) => ({
+      'Serial #':       t.serialNumber,
+      'Gas Type':       t.gasType,
+      'Size':           t.sizeLabel,
+      'Capacity Value': t.capacityValue,
+      'Capacity Unit':  t.capacityUnit,
+      'Status':         t.status,
+      'Customer':       customerMap[t.customerId]?.name ?? '',
+      'Level %':        t.currentLevelPct ?? '',
+      'Last Inspection':t.lastInspectionDate ? fmtDate(t.lastInspectionDate) : '',
+      'Next Due':       t.nextInspectionDate ? fmtDate(t.nextInspectionDate) : '',
+      'Ownership':      t.ownership ?? 'company',
+      'Monthly Rate':   t.monthlyRate ?? '',
+      'Notes':          t.notes ?? '',
+    }))
+    const ws = XLSX.utils.json_to_sheet(rows)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Tank Inventory')
+    XLSX.writeFile(wb, 'tank-inventory.xlsx')
+  }
+
+  // ── Import ────────────────────────────────────────────────────────────────────
+
+  async function handleImport(file: File) {
+    setImporting(true)
+    setImportError('')
+    setImportResult(null)
+    try {
+      const buf = await file.arrayBuffer()
+      const wb  = XLSX.read(buf, { type: 'array', cellDates: true })
+      const ws  = wb.Sheets[wb.SheetNames[0]]
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws)
+
+      let created = 0, updated = 0, errors = 0
+
+      for (const row of rows) {
+        const serial = String(row['Serial #'] ?? '').trim()
+        if (!serial) continue
+
+        const gasType      = String(row['Gas Type']      ?? '').trim()
+        const sizeLabel    = String(row['Size']          ?? '').trim()
+        const capValue     = Number(row['Capacity Value'] ?? 0)
+        const capUnit      = String(row['Capacity Unit'] ?? 'gal').trim()
+        const ownership    = (String(row['Ownership']   ?? 'company').trim()) as 'company' | 'customer'
+        const levelPct     = row['Level %'] !== '' && row['Level %'] !== undefined ? Number(row['Level %']) : undefined
+        const monthlyRate  = row['Monthly Rate'] !== '' && row['Monthly Rate'] !== undefined ? Number(row['Monthly Rate']) : undefined
+        const notes        = String(row['Notes'] ?? '').trim() || undefined
+
+        function parseDate(v: unknown): Date | undefined {
+          if (!v) return undefined
+          if (v instanceof Date) return v
+          const d = new Date(String(v))
+          return isNaN(d.getTime()) ? undefined : d
+        }
+
+        const lastInsp = parseDate(row['Last Inspection'])
+        const nextInsp = parseDate(row['Next Due'])
+
+        const existing = allTanks.find((t) => t.serialNumber === serial)
+        try {
+          if (existing) {
+            const updates: Partial<Omit<Tank, 'id'>> = {
+              ...(gasType   ? { gasType }    : {}),
+              ...(sizeLabel ? { sizeLabel }  : {}),
+              ...(capValue  ? { capacityValue: capValue } : {}),
+              ...(capUnit   ? { capacityUnit: capUnit }   : {}),
+              ownership,
+              ...(monthlyRate !== undefined ? { monthlyRate } : {}),
+              ...(levelPct   !== undefined ? { currentLevelPct: levelPct } : {}),
+              ...(notes !== undefined      ? { notes }          : {}),
+              ...(lastInsp ? { lastInspectionDate: lastInsp as unknown as Tank['lastInspectionDate'] } : {}),
+              ...(nextInsp ? { nextInspectionDate: nextInsp as unknown as Tank['nextInspectionDate'] } : {}),
+            }
+            await updateTank(existing.id, updates)
+            updated++
+          } else {
+            if (!gasType || !sizeLabel || !capValue) { errors++; continue }
+            await createTank({
+              customerId: 'WAREHOUSE',
+              serialNumber: serial,
+              gasType,
+              sizeLabel,
+              capacityValue: capValue,
+              capacityUnit: capUnit,
+              ownership,
+              monthlyRate,
+              currentLevelPct: levelPct,
+              notes,
+            } as Parameters<typeof createTank>[0])
+            created++
+          }
+        } catch {
+          errors++
+        }
+      }
+
+      setImportResult({ created, updated, errors })
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : 'Failed to parse file.')
+    } finally {
+      setImporting(false)
+    }
+  }
+
   return (
     <div className="ti-page">
       {/* ── Page header ── */}
@@ -1045,8 +1304,39 @@ export default function TankInventory() {
             <span className="ti-page-header__count">{allTanks.length} cylinders</span>
           )}
         </div>
-        <Button size="sm" onClick={() => setShowAdd(true)}>+ Add Cylinder</Button>
+        <div className="ti-page-header__actions">
+          <Button variant="ghost" size="sm" onClick={handleExport} disabled={loading || allTanks.length === 0}>
+            ↓ Export Excel
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => importInputRef.current?.click()} disabled={importing}>
+            {importing ? 'Importing…' : '↑ Import Excel'}
+          </Button>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) handleImport(f)
+              e.target.value = ''
+            }}
+          />
+          <Button size="sm" onClick={() => setShowAdd(true)}>+ Add Cylinder</Button>
+        </div>
       </div>
+
+      {/* ── Import feedback ── */}
+      {importError && (
+        <div className="ti-import-msg ti-import-msg--error">{importError}</div>
+      )}
+      {importResult && (
+        <div className="ti-import-msg ti-import-msg--success">
+          Import complete — {importResult.created} created, {importResult.updated} updated
+          {importResult.errors > 0 ? `, ${importResult.errors} skipped` : ''}.
+          <button className="ti-import-msg__dismiss" onClick={() => setImportResult(null)}>✕</button>
+        </div>
+      )}
 
       {/* ── Stock summary cards ── */}
       {stockGroups.length > 0 && (
@@ -1140,6 +1430,7 @@ export default function TankInventory() {
                     customer={customerMap[tank.customerId]}
                     onViewDetail={() => setDetailTank(tank)}
                     onRefill={() => setRefillTank(tank)}
+                    onEdit={() => setEditTank(tank)}
                   />
                 ))}
               </tbody>
@@ -1155,6 +1446,7 @@ export default function TankInventory() {
           customer={customerMap[detailTank.customerId]}
           onClose={() => setDetailTank(null)}
           onRefill={() => { setRefillTank(detailTank); setDetailTank(null) }}
+          onEdit={() => { setEditTank(detailTank); setDetailTank(null) }}
         />
       )}
 
@@ -1163,6 +1455,15 @@ export default function TankInventory() {
         <AddCylinderModal
           onClose={() => setShowAdd(false)}
           onCreated={() => {}}
+        />
+      )}
+
+      {/* ── Edit cylinder modal ── */}
+      {editTank && (
+        <EditCylinderModal
+          tank={editTank}
+          onClose={() => setEditTank(null)}
+          onSaved={() => {}}
         />
       )}
 
