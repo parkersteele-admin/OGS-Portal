@@ -1,6 +1,49 @@
 {
   "indexes": [
 
+    // ── customers ─────────────────────────────────────────────────────────────
+
+    // getCustomers / subscribeToCustomers: where(status) + orderBy(name)
+    {
+      "collectionGroup": "customers",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "name",   "order": "ASCENDING" }
+      ]
+    },
+    // getCustomers: where(state) + orderBy(name)
+    {
+      "collectionGroup": "customers",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "state", "order": "ASCENDING" },
+        { "fieldPath": "name",  "order": "ASCENDING" }
+      ]
+    },
+    // getCustomers: where(status) + where(state) + orderBy(name)
+    {
+      "collectionGroup": "customers",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "state",  "order": "ASCENDING" },
+        { "fieldPath": "name",   "order": "ASCENDING" }
+      ]
+    },
+
+    // ── users ─────────────────────────────────────────────────────────────────
+
+    // getUsersByRole: where(role) + orderBy(name)
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "role", "order": "ASCENDING" },
+        { "fieldPath": "name", "order": "ASCENDING" }
+      ]
+    },
+
     // ── products ──────────────────────────────────────────────────────────────
 
     // getAllProducts + subscribeToProducts: where(active) + orderBy(sortOrder, name)
@@ -36,6 +79,7 @@
 
     // ── orders ────────────────────────────────────────────────────────────────
 
+    // getOrders: where(customerId) + orderBy(requestedAt DESC)
     {
       "collectionGroup": "orders",
       "queryScope": "COLLECTION",
@@ -44,12 +88,23 @@
         { "fieldPath": "requestedAt",  "order": "DESCENDING" }
       ]
     },
+    // getOrders: where(status) + orderBy(requestedAt DESC)
     {
       "collectionGroup": "orders",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "status",      "order": "ASCENDING" },
-        { "fieldPath": "requestedAt", "order": "ASCENDING" }
+        { "fieldPath": "requestedAt", "order": "DESCENDING" }
+      ]
+    },
+    // getOrders: where(customerId) + where(status) + orderBy(requestedAt DESC)
+    {
+      "collectionGroup": "orders",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "customerId",  "order": "ASCENDING" },
+        { "fieldPath": "status",      "order": "ASCENDING" },
+        { "fieldPath": "requestedAt", "order": "DESCENDING" }
       ]
     },
     {
@@ -90,12 +145,41 @@
 
     // ── tanks ─────────────────────────────────────────────────────────────────
 
+    // getTanks: where(customerId) + where(status) (existing)
     {
       "collectionGroup": "tanks",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "customerId", "order": "ASCENDING" },
         { "fieldPath": "status",     "order": "ASCENDING" }
+      ]
+    },
+    // getTanks: where(customerId) + orderBy(serialNumber)
+    {
+      "collectionGroup": "tanks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "customerId",   "order": "ASCENDING" },
+        { "fieldPath": "serialNumber", "order": "ASCENDING" }
+      ]
+    },
+    // getTanks: where(status) + orderBy(serialNumber)
+    {
+      "collectionGroup": "tanks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status",       "order": "ASCENDING" },
+        { "fieldPath": "serialNumber", "order": "ASCENDING" }
+      ]
+    },
+    // getTanks: where(customerId) + where(status) + orderBy(serialNumber)
+    {
+      "collectionGroup": "tanks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "customerId",   "order": "ASCENDING" },
+        { "fieldPath": "status",       "order": "ASCENDING" },
+        { "fieldPath": "serialNumber", "order": "ASCENDING" }
       ]
     },
     {
@@ -122,6 +206,16 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "customerId", "order": "ASCENDING" },
+        { "fieldPath": "issuedAt",   "order": "DESCENDING" }
+      ]
+    },
+    // getInvoices: where(customerId) + where(status) + orderBy(issuedAt DESC)
+    {
+      "collectionGroup": "invoices",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "customerId", "order": "ASCENDING" },
+        { "fieldPath": "status",     "order": "ASCENDING" },
         { "fieldPath": "issuedAt",   "order": "DESCENDING" }
       ]
     },
@@ -152,9 +246,118 @@
         { "fieldPath": "processedAt", "order": "DESCENDING" }
       ]
     },
+    // getPaymentsByCustomer: where(customerId) + orderBy(processedAt DESC)
+    {
+      "collectionGroup": "payments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "customerId",  "order": "ASCENDING" },
+        { "fieldPath": "processedAt", "order": "DESCENDING" }
+      ]
+    },
+
+    // ── runs ──────────────────────────────────────────────────────────────────
+
+    // getRuns: where(driverId) + orderBy(scheduledDate)
+    {
+      "collectionGroup": "runs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "driverId",      "order": "ASCENDING" },
+        { "fieldPath": "scheduledDate", "order": "ASCENDING" }
+      ]
+    },
+    // getRuns: where(status) + orderBy(scheduledDate)
+    {
+      "collectionGroup": "runs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status",        "order": "ASCENDING" },
+        { "fieldPath": "scheduledDate", "order": "ASCENDING" }
+      ]
+    },
+    // getRuns: where(driverId) + where(status) + orderBy(scheduledDate)
+    {
+      "collectionGroup": "runs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "driverId",      "order": "ASCENDING" },
+        { "fieldPath": "status",        "order": "ASCENDING" },
+        { "fieldPath": "scheduledDate", "order": "ASCENDING" }
+      ]
+    },
+
+    // ── quotes ────────────────────────────────────────────────────────────────
+
+    // getQuotes: where(customerId) + orderBy(createdAt DESC)
+    {
+      "collectionGroup": "quotes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "customerId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt",  "order": "DESCENDING" }
+      ]
+    },
+    // getQuotes: where(leadId) + orderBy(createdAt DESC)
+    {
+      "collectionGroup": "quotes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "leadId",    "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    // getQuotes: where(status) + orderBy(createdAt DESC)
+    {
+      "collectionGroup": "quotes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status",    "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    // getQuotes: where(customerId) + where(status) + orderBy(createdAt DESC)
+    {
+      "collectionGroup": "quotes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "customerId", "order": "ASCENDING" },
+        { "fieldPath": "status",     "order": "ASCENDING" },
+        { "fieldPath": "createdAt",  "order": "DESCENDING" }
+      ]
+    },
 
     // ── leads ─────────────────────────────────────────────────────────────────
 
+    // getLeads: where(status) + orderBy(createdAt DESC)
+    {
+      "collectionGroup": "leads",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status",    "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    // getLeads: where(assignedTo) + orderBy(createdAt DESC)
+    {
+      "collectionGroup": "leads",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "assignedTo", "order": "ASCENDING" },
+        { "fieldPath": "createdAt",  "order": "DESCENDING" }
+      ]
+    },
+    // getLeads: where(assignedTo) + where(status) + orderBy(createdAt DESC)
+    {
+      "collectionGroup": "leads",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "assignedTo", "order": "ASCENDING" },
+        { "fieldPath": "status",     "order": "ASCENDING" },
+        { "fieldPath": "createdAt",  "order": "DESCENDING" }
+      ]
+    },
+    // legacy stage-based indexes
     {
       "collectionGroup": "leads",
       "queryScope": "COLLECTION",
@@ -169,6 +372,30 @@
       "fields": [
         { "fieldPath": "assignedTo", "order": "ASCENDING" },
         { "fieldPath": "stage",      "order": "ASCENDING" }
+      ]
+    },
+
+    // ── files ─────────────────────────────────────────────────────────────────
+
+    // getFiles: where(entityType) + where(entityId) + orderBy(createdAt DESC)
+    {
+      "collectionGroup": "files",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "entityType", "order": "ASCENDING" },
+        { "fieldPath": "entityId",   "order": "ASCENDING" },
+        { "fieldPath": "createdAt",  "order": "DESCENDING" }
+      ]
+    },
+    // getFiles: where(entityType) + where(entityId) + where(fileType) + orderBy(createdAt DESC)
+    {
+      "collectionGroup": "files",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "entityType", "order": "ASCENDING" },
+        { "fieldPath": "entityId",   "order": "ASCENDING" },
+        { "fieldPath": "fileType",   "order": "ASCENDING" },
+        { "fieldPath": "createdAt",  "order": "DESCENDING" }
       ]
     }
 

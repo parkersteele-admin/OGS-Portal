@@ -180,6 +180,15 @@
   color: var(--color-success, #16a34a);
 }
 
+.topbar__dropdown-item--manage-users {
+  color: var(--color-info, #2563eb);
+}
+
+.topbar__dropdown-item--manage-users:hover:not(:disabled) {
+  background: #eff6ff;
+  color: var(--color-info, #2563eb);
+}
+
 /* Orange ring + dot indicator when viewing as another user */
 .topbar__avatar--viewing-as {
   outline: 2px solid var(--color-brand);

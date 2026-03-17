@@ -14,8 +14,8 @@ export interface AuthUser {
 /** Default landing path for each role after sign-in */
 export const ROLE_HOME: Record<UserRole, string> = {
   customer: '/portal/dashboard',
-  admin: '/portal/dashboard',
+  admin:    '/ops/dashboard',
   dispatch: '/ops/dashboard',
-  driver: '/driver/schedule',
-  sales: '/crm/customers',
+  driver:   '/driver/schedule',
+  sales:    '/crm/customers',
 }

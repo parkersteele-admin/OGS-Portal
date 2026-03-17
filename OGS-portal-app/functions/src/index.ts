@@ -39,6 +39,7 @@ import './admin'
 import { onRequest } from 'firebase-functions/v2/https'
 
 export { onUserCreated, onUserRoleUpdated, setUserRole }          from './auth'
+export { adminCreateUser }                                        from './adminCreateUser'
 export { stripeWebhook }                                          from './webhooks/stripeWebhook'
 export { createStripePaymentIntent }                              from './stripe'
 export { createSetupIntent, savePaymentMethod, removePaymentMethod } from './stripe/index'

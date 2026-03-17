@@ -12,7 +12,7 @@ import {
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   sendPasswordResetEmail,
-  onAuthStateChanged,
+  onIdTokenChanged,
   type Unsubscribe,
 } from 'firebase/auth'
 import { doc, getDoc } from 'firebase/firestore'
@@ -74,6 +74,19 @@ export function getCurrentUser(): AppUser | null {
 }
 
 /**
+ * Forces an ID-token refresh and re-fetches the Firestore user document.
+ * Call this after a role change to pick up the new role without signing out.
+ */
+export async function refreshCurrentUser(): Promise<AppUser | null> {
+  const firebaseUser = auth.currentUser
+  if (!firebaseUser) return null
+  await firebaseUser.getIdToken(/* forceRefresh = */ true)
+  const appUser = await fetchAppUser(firebaseUser.uid)
+  _currentUser = appUser
+  return appUser
+}
+
+/**
  * Subscribes to Firebase auth-state changes.
  * On each change the Firestore user document is fetched so the callback always
  * receives a fully-populated AppUser (or null when signed out).
@@ -83,7 +96,10 @@ export function getCurrentUser(): AppUser | null {
 export function onAuthStateChange(
   callback: (user: AppUser | null) => void,
 ): Unsubscribe {
-  return onAuthStateChanged(auth, async (firebaseUser) => {
+  // onIdTokenChanged fires on sign-in, sign-out, AND whenever the ID token
+  // is refreshed (e.g. after custom claims are updated via setCustomUserClaims).
+  // This ensures role changes propagate without requiring a full sign-out/sign-in.
+  return onIdTokenChanged(auth, async (firebaseUser) => {
     if (!firebaseUser) {
       _currentUser = null
       callback(null)
