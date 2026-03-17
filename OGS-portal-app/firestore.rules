@@ -14,15 +14,10 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Fetches the current user's Firestore document.
-    // Firestore deduplicates get() calls within a single rule evaluation, so
-    // calling getRole() multiple times incurs only one read per request.
-    function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-    }
-
+    // Role is read from custom claims (set by adminCreateUser / setUserRole CFs).
+    // This is faster than a Firestore get() and works even before the user doc exists.
     function getRole() {
-      return getUserData().role;
+      return request.auth.token.role;
     }
 
     function isAdmin() {
@@ -51,10 +46,12 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == uid;
     }
 
-    // Returns the customerId field from the current user's document.
-    // For customer-role users this links to the /customers collection.
+    // Returns the customerId from the custom claim (set by adminCreateUser CF).
+    // Falls back to a Firestore read only if the claim is absent (legacy accounts).
     function linkedCustomerId() {
-      return getUserData().customerId;
+      return request.auth.token.customerId != null
+        ? request.auth.token.customerId
+        : get(/databases/$(database)/documents/users/$(request.auth.uid)).data.customerId;
     }
 
     // True when the write only touches the listed field names.
