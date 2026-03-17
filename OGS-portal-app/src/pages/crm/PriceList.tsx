@@ -367,6 +367,7 @@ const PriceList: React.FC = () => {
 
   const [products,    setProducts]    = useState<Product[]>([])
   const [loading,     setLoading]     = useState(true)
+  const [loadErr,     setLoadErr]     = useState('')
   const [search,      setSearch]      = useState('')
   const [catFilter,   setCatFilter]   = useState<ProductCategory | 'All'>('All')
   const [slideOver,   setSlideOver]   = useState<Product | null | 'new'>(null)
@@ -375,10 +376,10 @@ const PriceList: React.FC = () => {
 
   useEffect(() => {
     setLoading(true)
-    const unsub = subscribeToProducts((ps) => {
-      setProducts(ps)
-      setLoading(false)
-    })
+    const unsub = subscribeToProducts(
+      (ps) => { setProducts(ps); setLoading(false) },
+      (err) => { setLoadErr(err.message); setLoading(false) },
+    )
     return unsub
   }, [])
 
@@ -482,6 +483,10 @@ const PriceList: React.FC = () => {
       {/* Table */}
       {loading ? (
         <div className="pl-loading">Loading products…</div>
+      ) : loadErr ? (
+        <div className="pl-empty" style={{ color: 'var(--color-error, #c0392b)' }}>
+          Failed to load products: {loadErr}
+        </div>
       ) : Object.keys(grouped).length === 0 ? (
         <div className="pl-empty">No products found. Use "Load Seed Data" to populate the Columbus market catalog, or add products manually.</div>
       ) : (

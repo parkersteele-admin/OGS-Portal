@@ -173,8 +173,10 @@ service cloud.firestore {
 
     // ── Products (price catalog) ──────────────────────────────────────────────
     match /products/{productId} {
-      allow read:  if isAuthenticated();
-      allow write: if isAdmin();
+      allow read:   if isAuthenticated();
+      allow create: if isAdmin();
+      allow update: if isSales();   // admin + sales can edit prices, visibility, etc.
+      allow delete: if isAdmin();
     }
 
 

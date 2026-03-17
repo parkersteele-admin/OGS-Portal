@@ -97,10 +97,15 @@ export async function getProductDropdown(): Promise<ProductDropdownItem[]> {
 /** Real-time listener for all active products. */
 export function subscribeToProducts(
   cb: (products: Product[]) => void,
+  onError?: (err: Error) => void,
 ): Unsubscribe {
   return onSnapshot(
     query(productsCol, where('active', '==', true), orderBy('sortOrder'), orderBy('name')),
     (snap) => cb(snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Product)),
+    (err) => {
+      console.error('[subscribeToProducts]', err)
+      onError?.(err)
+    },
   )
 }
 

@@ -193,10 +193,10 @@ const MerchandisingPanel: React.FC = () => {
 
   useEffect(() => {
     setLoading(true)
-    const unsub = subscribeToProducts((ps) => {
-      setRows(ps.filter((p) => p.isVisible || true)) // show all for merchandising, including hidden
-      setLoading(false)
-    })
+    const unsub = subscribeToProducts(
+      (ps) => { setRows(ps.filter((p) => p.isVisible || true)); setLoading(false) },
+      () => setLoading(false),
+    )
     return unsub
   }, [])
 

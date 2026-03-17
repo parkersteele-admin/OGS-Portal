@@ -1,6 +1,39 @@
 {
   "indexes": [
 
+    // ── products ──────────────────────────────────────────────────────────────
+
+    // getAllProducts + subscribeToProducts: where(active) + orderBy(sortOrder, name)
+    {
+      "collectionGroup": "products",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "active",    "order": "ASCENDING" },
+        { "fieldPath": "sortOrder", "order": "ASCENDING" },
+        { "fieldPath": "name",      "order": "ASCENDING" }
+      ]
+    },
+    // getVisibleProducts: where(active, isVisible) + orderBy(sortOrder)
+    {
+      "collectionGroup": "products",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "active",    "order": "ASCENDING" },
+        { "fieldPath": "isVisible", "order": "ASCENDING" },
+        { "fieldPath": "sortOrder", "order": "ASCENDING" }
+      ]
+    },
+    // getProductDropdown: where(active) + orderBy(category, name)
+    {
+      "collectionGroup": "products",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "active",   "order": "ASCENDING" },
+        { "fieldPath": "category", "order": "ASCENDING" },
+        { "fieldPath": "name",     "order": "ASCENDING" }
+      ]
+    },
+
     // ── orders ────────────────────────────────────────────────────────────────
 
     {
