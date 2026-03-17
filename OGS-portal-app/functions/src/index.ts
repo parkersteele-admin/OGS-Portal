@@ -25,6 +25,7 @@
  *
  *  Callables
  *    generateInvoicePdf — Build PDF invoice, upload to Storage, return signed URL
+ *    generateQuotePdf   — Build PDF quote, upload to Storage, email to recipient, return signed URL
  *    optimizeRoute      — Reorder run stops via Google Maps Routes API
  *
  *  Utility
@@ -48,7 +49,7 @@ export { processAutopay }         from './scheduled/processAutopay'
 export { lowLevelAlertCheck }     from './scheduled/lowLevelAlertCheck'
 export { overdueInvoiceCheck }    from './scheduled/overdueInvoiceCheck'
 export { certExpiryCheck }        from './scheduled/certExpiryCheck'
-export { generateInvoicePdf, optimizeRoute }                      from './callables'
+export { generateInvoicePdf, generateQuotePdf, optimizeRoute }    from './callables'
 export { optimizeOrderRoute }                                     from './maps/optimizeRoute'
 
 export const healthCheck = onRequest((_req, res) => {
