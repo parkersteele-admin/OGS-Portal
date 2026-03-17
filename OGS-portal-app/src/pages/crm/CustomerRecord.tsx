@@ -41,6 +41,7 @@ import { useCustomerTanks } from '../../hooks/useCustomerTanks'
 import { useAuth } from '../../hooks/useAuth'
 import { updateCustomer } from '../../services/customerService'
 import { getInvoices, createInvoice } from '../../services/invoiceService'
+import { getProductDropdown, type ProductDropdownItem } from '../../services/productService'
 import { getFilesForEntity, uploadFile, deleteFile } from '../../services/fileService'
 import { formatCurrency, formatDate, formatRelative } from '../../utils/format'
 import { formatAddress, getGoogleMapsUrl } from '../../utils/addressUtils'
@@ -228,7 +229,15 @@ const EditCustomerModal: React.FC<EditCustomerModalProps> = ({ customer, onClose
 
 // ── Create Invoice Modal ──────────────────────────────────────────────────────
 
-interface InvoiceLineRow { description: string; quantity: string; unitPrice: string }
+interface InvoiceLineRow {
+  productId:   string   // '' = custom / manual
+  description: string
+  quantity:    string
+  unitPrice:   string
+  unit:        string
+}
+
+const EMPTY_ROW: InvoiceLineRow = { productId: '', description: '', quantity: '1', unitPrice: '', unit: '' }
 
 interface CreateInvoiceModalProps {
   onClose:  () => void
@@ -242,22 +251,85 @@ interface CreateInvoiceModalProps {
 
 const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({ onClose, onSubmit, saving }) => {
   const dueDefault = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
-  const [rows, setRows]       = useState<InvoiceLineRow[]>([{ description: '', quantity: '1', unitPrice: '' }])
+  const [rows, setRows]       = useState<InvoiceLineRow[]>([{ ...EMPTY_ROW }])
   const [dueDate, setDueDate] = useState(dueDefault)
   const [notes, setNotes]     = useState('')
   const [formError, setFormError] = useState('')
+  const [products, setProducts]   = useState<ProductDropdownItem[]>([])
 
-  const setRow = (i: number, field: keyof InvoiceLineRow) =>
+  // Load product catalog once on mount
+  React.useEffect(() => {
+    getProductDropdown().then(setProducts).catch(() => {/* non-blocking */})
+  }, [])
+
+  // Group products by category for <optgroup>
+  const productsByCategory = React.useMemo(() => {
+    const map = new Map<string, ProductDropdownItem[]>()
+    for (const p of products) {
+      if (!map.has(p.category)) map.set(p.category, [])
+      map.get(p.category)!.push(p)
+    }
+    return map
+  }, [products])
+
+  // Add-ons: products from Fees / Rentals category
+  const addOns = React.useMemo(
+    () => products.filter(p => p.category === 'Fees' || p.category === 'Rentals'),
+    [products],
+  )
+
+  // Track which add-on IDs are already in the line items
+  const addedAddOnIds = new Set(rows.map(r => r.productId))
+
+  const handleProductSelect = (i: number, productId: string) => {
+    if (!productId) {
+      setRows(prev => prev.map((r, idx) => idx === i ? { ...EMPTY_ROW } : r))
+      return
+    }
+    const product = products.find(p => p.id === productId)
+    if (!product) return
+    setRows(prev => prev.map((r, idx) =>
+      idx === i
+        ? {
+            productId,
+            description: product.name,
+            quantity:    '1',
+            unitPrice:   String(product.basePrice),
+            unit:        product.unit,
+          }
+        : r,
+    ))
+  }
+
+  const setRowField = (i: number, field: keyof Omit<InvoiceLineRow, 'productId'>) =>
     (e: React.ChangeEvent<HTMLInputElement>) =>
       setRows(prev => prev.map((r, idx) => idx === i ? { ...r, [field]: e.target.value } : r))
 
-  const addRow    = () => setRows(prev => [...prev, { description: '', quantity: '1', unitPrice: '' }])
+  const addRow    = () => setRows(prev => [...prev, { ...EMPTY_ROW }])
   const removeRow = (i: number) => setRows(prev => prev.length > 1 ? prev.filter((_, idx) => idx !== i) : prev)
+
+  const addAddOn = (addOn: ProductDropdownItem) => {
+    setRows(prev => [
+      ...prev,
+      {
+        productId:   addOn.id,
+        description: addOn.name,
+        quantity:    '1',
+        unitPrice:   String(addOn.basePrice),
+        unit:        addOn.unit,
+      },
+    ])
+  }
 
   const lineItems = rows.map(r => {
     const qty   = parseFloat(r.quantity)  || 0
     const price = parseFloat(r.unitPrice) || 0
-    return { description: r.description.trim(), quantity: qty, unitPrice: price, amount: parseFloat((qty * price).toFixed(2)) }
+    return {
+      description: r.description.trim(),
+      quantity:    qty,
+      unitPrice:   price,
+      amount:      parseFloat((qty * price).toFixed(2)),
+    }
   })
   const total = lineItems.reduce((s, li) => s + li.amount, 0)
 
@@ -274,71 +346,124 @@ const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({ onClose, onSubm
       <form className="cr-modal-form" onSubmit={handleSubmit}>
         {formError && <p className="cr-form-error">{formError}</p>}
 
+        {/* ── Line items ── */}
         <div className="cr-inv-header-row">
-          <span style={{ flex: 3 }}>Description</span>
-          <span style={{ flex: 1 }}>Qty</span>
-          <span style={{ flex: 1 }}>Unit price</span>
-          <span style={{ flex: 1 }}>Amount</span>
+          <span className="cr-inv-col-product">Product</span>
+          <span className="cr-inv-col-desc">Description</span>
+          <span className="cr-inv-col-qty">Qty</span>
+          <span className="cr-inv-col-price">Unit price</span>
+          <span className="cr-inv-col-amount">Amount</span>
           <span style={{ width: 28 }} />
         </div>
 
-        {rows.map((row, i) => (
-          <div key={i} className="cr-inv-line-row">
-            <input
-              className="ui-input"
-              style={{ flex: 3 }}
-              placeholder="Description"
-              value={row.description}
-              onChange={setRow(i, 'description')}
-              required
-            />
-            <input
-              className="ui-input"
-              style={{ flex: 1 }}
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="Qty"
-              value={row.quantity}
-              onChange={setRow(i, 'quantity')}
-              required
-            />
-            <input
-              className="ui-input"
-              style={{ flex: 1 }}
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="$0.00"
-              value={row.unitPrice}
-              onChange={setRow(i, 'unitPrice')}
-              required
-            />
-            <span className="cr-inv-line-amount" style={{ flex: 1, textAlign: 'right', padding: '0 8px', lineHeight: '38px' }}>
-              ${((parseFloat(row.quantity) || 0) * (parseFloat(row.unitPrice) || 0)).toFixed(2)}
-            </span>
-            <button
-              type="button"
-              className="cr-inv-remove-btn"
-              onClick={() => removeRow(i)}
-              disabled={rows.length === 1}
-              title="Remove line"
-            >✕</button>
-          </div>
-        ))}
+        {rows.map((row, i) => {
+          const rowTotal = (parseFloat(row.quantity) || 0) * (parseFloat(row.unitPrice) || 0)
+          return (
+            <div key={i} className="cr-inv-line-row">
+              {/* Product picker */}
+              <select
+                className="ui-input cr-inv-col-product"
+                value={row.productId}
+                onChange={e => handleProductSelect(i, e.target.value)}
+              >
+                <option value="">— Custom —</option>
+                {Array.from(productsByCategory.entries()).map(([cat, prods]) => (
+                  <optgroup key={cat} label={cat}>
+                    {prods.map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.unit}) — ${p.basePrice.toFixed(2)}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+
+              {/* Description (editable even when product selected) */}
+              <input
+                className="ui-input cr-inv-col-desc"
+                placeholder="Description"
+                value={row.description}
+                onChange={setRowField(i, 'description')}
+                required
+              />
+
+              {/* Qty */}
+              <input
+                className="ui-input cr-inv-col-qty"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="1"
+                value={row.quantity}
+                onChange={setRowField(i, 'quantity')}
+                required
+              />
+
+              {/* Unit price */}
+              <input
+                className="ui-input cr-inv-col-price"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="$0.00"
+                value={row.unitPrice}
+                onChange={setRowField(i, 'unitPrice')}
+                required
+              />
+
+              {/* Amount */}
+              <span className="cr-inv-col-amount cr-inv-line-amount">
+                ${rowTotal.toFixed(2)}
+              </span>
+
+              <button
+                type="button"
+                className="cr-inv-remove-btn"
+                onClick={() => removeRow(i)}
+                disabled={rows.length === 1}
+                title="Remove line"
+              >✕</button>
+            </div>
+          )
+        })}
 
         <button type="button" className="cr-link cr-inv-add-line" onClick={addRow}>
           + Add line item
         </button>
 
+        {/* ── Add-ons (fees & rentals) ── */}
+        {addOns.length > 0 && (
+          <div className="cr-inv-addons">
+            <p className="cr-inv-addons__label">Quick add-ons:</p>
+            <div className="cr-inv-addons__chips">
+              {addOns.map(a => (
+                <button
+                  key={a.id}
+                  type="button"
+                  className={`cr-inv-addon-chip${addedAddOnIds.has(a.id) ? ' cr-inv-addon-chip--added' : ''}`}
+                  onClick={() => !addedAddOnIds.has(a.id) && addAddOn(a)}
+                  disabled={addedAddOnIds.has(a.id)}
+                  title={`$${a.basePrice.toFixed(2)} / ${a.unit}`}
+                >
+                  {addedAddOnIds.has(a.id) ? '✓ ' : '+ '}{a.name}
+                  <span className="cr-inv-addon-chip__price">${a.basePrice.toFixed(2)}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Totals ── */}
         <div className="cr-inv-total-row">
           <strong>Total: ${total.toFixed(2)}</strong>
         </div>
 
+        {/* ── Due date ── */}
         <div className="cr-form-row">
           <Input label="Due date" type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} required />
         </div>
 
+        {/* ── Notes ── */}
         <div className="ui-field">
           <label className="ui-field__label">Notes (optional)</label>
           <textarea

@@ -726,7 +726,15 @@
   padding: 0 0 var(--space-1);
   border-bottom: 1px solid var(--color-border);
   margin-bottom: var(--space-1);
+  align-items: center;
 }
+
+/* Column widths — shared between header row and data rows */
+.cr-inv-col-product { flex: 2; min-width: 0; }
+.cr-inv-col-desc    { flex: 2; min-width: 0; }
+.cr-inv-col-qty     { flex: 0 0 70px; }
+.cr-inv-col-price   { flex: 0 0 90px; }
+.cr-inv-col-amount  { flex: 0 0 80px; text-align: right; }
 
 .cr-inv-line-row {
   display: flex;
@@ -738,6 +746,8 @@
 .cr-inv-line-amount {
   font-variant-numeric: tabular-nums;
   font-size: 0.9rem;
+  padding: 0 4px;
+  white-space: nowrap;
 }
 
 .cr-inv-remove-btn {
@@ -763,12 +773,82 @@
   font-size: 0.875rem;
 }
 
+/* ── Add-on chips ── */
+.cr-inv-addons {
+  background: var(--color-surface-2, #f9fafb);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.cr-inv-addons__label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-2);
+}
+
+.cr-inv-addons__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.cr-inv-addon-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+.cr-inv-addon-chip:hover:not(:disabled) {
+  border-color: var(--color-brand, #E87722);
+  background: var(--color-brand-50, #fff7ed);
+}
+.cr-inv-addon-chip--added {
+  background: var(--color-success-bg, #f0fdf4);
+  border-color: var(--color-success, #16a34a);
+  color: var(--color-success, #16a34a);
+  cursor: default;
+}
+.cr-inv-addon-chip__price {
+  background: var(--color-surface-2, #f3f4f6);
+  border-radius: 10px;
+  padding: 1px 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+.cr-inv-addon-chip--added .cr-inv-addon-chip__price {
+  background: var(--color-success-bg, #f0fdf4);
+}
+
 .cr-inv-total-row {
   text-align: right;
   padding: var(--space-2) 0;
   border-top: 1px solid var(--color-border);
   margin-bottom: var(--space-3);
   font-size: 1rem;
+}
+
+/* ── Responsive: stack columns on small screens ── */
+@media (max-width: 680px) {
+  .cr-inv-header-row { display: none; }
+  .cr-inv-line-row   { flex-wrap: wrap; }
+  .cr-inv-col-product,
+  .cr-inv-col-desc   { flex: 1 1 100%; }
+  .cr-inv-col-qty,
+  .cr-inv-col-price,
+  .cr-inv-col-amount { flex: 1; }
 }
 
 /* ── CardHeader flex layout fix ────────────────────────────────────────────── */
