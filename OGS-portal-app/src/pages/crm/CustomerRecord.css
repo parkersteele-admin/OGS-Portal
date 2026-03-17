@@ -707,6 +707,70 @@
   margin-top: var(--space-1);
 }
 
+/* ── Create Invoice Modal ───────────────────────────────────────────────────── */
+
+.cr-form-error {
+  color: var(--color-danger, #dc2626);
+  font-size: 0.85rem;
+  margin: 0 0 var(--space-2);
+}
+
+.cr-inv-header-row {
+  display: flex;
+  gap: var(--space-2);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  padding: 0 0 var(--space-1);
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: var(--space-1);
+}
+
+.cr-inv-line-row {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  margin-bottom: var(--space-2);
+}
+
+.cr-inv-line-amount {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+}
+
+.cr-inv-remove-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.cr-inv-remove-btn:hover:not(:disabled) { background: var(--color-danger-bg, #fee2e2); color: var(--color-danger, #dc2626); }
+.cr-inv-remove-btn:disabled { opacity: 0.3; cursor: default; }
+
+.cr-inv-add-line {
+  display: inline-block;
+  margin-bottom: var(--space-3);
+  font-size: 0.875rem;
+}
+
+.cr-inv-total-row {
+  text-align: right;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--color-border);
+  margin-bottom: var(--space-3);
+  font-size: 1rem;
+}
+
 /* ── CardHeader flex layout fix ────────────────────────────────────────────── */
 
 /* Ensure CardHeader rows that contain section-title + action button lay out in a row */

@@ -40,7 +40,7 @@ import {
 import { useCustomerTanks } from '../../hooks/useCustomerTanks'
 import { useAuth } from '../../hooks/useAuth'
 import { updateCustomer } from '../../services/customerService'
-import { getInvoices } from '../../services/invoiceService'
+import { getInvoices, createInvoice } from '../../services/invoiceService'
 import { getFilesForEntity, uploadFile, deleteFile } from '../../services/fileService'
 import { formatCurrency, formatDate, formatRelative } from '../../utils/format'
 import { formatAddress, getGoogleMapsUrl } from '../../utils/addressUtils'
@@ -226,6 +226,139 @@ const EditCustomerModal: React.FC<EditCustomerModalProps> = ({ customer, onClose
   )
 }
 
+// ── Create Invoice Modal ──────────────────────────────────────────────────────
+
+interface InvoiceLineRow { description: string; quantity: string; unitPrice: string }
+
+interface CreateInvoiceModalProps {
+  onClose:  () => void
+  onSubmit: (
+    lineItems: { description: string; quantity: number; unitPrice: number; amount: number }[],
+    dueDate:   string,
+    notes:     string,
+  ) => Promise<void>
+  saving: boolean
+}
+
+const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({ onClose, onSubmit, saving }) => {
+  const dueDefault = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  const [rows, setRows]       = useState<InvoiceLineRow[]>([{ description: '', quantity: '1', unitPrice: '' }])
+  const [dueDate, setDueDate] = useState(dueDefault)
+  const [notes, setNotes]     = useState('')
+  const [formError, setFormError] = useState('')
+
+  const setRow = (i: number, field: keyof InvoiceLineRow) =>
+    (e: React.ChangeEvent<HTMLInputElement>) =>
+      setRows(prev => prev.map((r, idx) => idx === i ? { ...r, [field]: e.target.value } : r))
+
+  const addRow    = () => setRows(prev => [...prev, { description: '', quantity: '1', unitPrice: '' }])
+  const removeRow = (i: number) => setRows(prev => prev.length > 1 ? prev.filter((_, idx) => idx !== i) : prev)
+
+  const lineItems = rows.map(r => {
+    const qty   = parseFloat(r.quantity)  || 0
+    const price = parseFloat(r.unitPrice) || 0
+    return { description: r.description.trim(), quantity: qty, unitPrice: price, amount: parseFloat((qty * price).toFixed(2)) }
+  })
+  const total = lineItems.reduce((s, li) => s + li.amount, 0)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setFormError('')
+    if (lineItems.some(li => !li.description)) { setFormError('All line items need a description.'); return }
+    if (!dueDate) { setFormError('Due date is required.'); return }
+    await onSubmit(lineItems, dueDate, notes)
+  }
+
+  return (
+    <Modal open onClose={onClose} title="Create invoice" size="lg">
+      <form className="cr-modal-form" onSubmit={handleSubmit}>
+        {formError && <p className="cr-form-error">{formError}</p>}
+
+        <div className="cr-inv-header-row">
+          <span style={{ flex: 3 }}>Description</span>
+          <span style={{ flex: 1 }}>Qty</span>
+          <span style={{ flex: 1 }}>Unit price</span>
+          <span style={{ flex: 1 }}>Amount</span>
+          <span style={{ width: 28 }} />
+        </div>
+
+        {rows.map((row, i) => (
+          <div key={i} className="cr-inv-line-row">
+            <input
+              className="ui-input"
+              style={{ flex: 3 }}
+              placeholder="Description"
+              value={row.description}
+              onChange={setRow(i, 'description')}
+              required
+            />
+            <input
+              className="ui-input"
+              style={{ flex: 1 }}
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="Qty"
+              value={row.quantity}
+              onChange={setRow(i, 'quantity')}
+              required
+            />
+            <input
+              className="ui-input"
+              style={{ flex: 1 }}
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="$0.00"
+              value={row.unitPrice}
+              onChange={setRow(i, 'unitPrice')}
+              required
+            />
+            <span className="cr-inv-line-amount" style={{ flex: 1, textAlign: 'right', padding: '0 8px', lineHeight: '38px' }}>
+              ${((parseFloat(row.quantity) || 0) * (parseFloat(row.unitPrice) || 0)).toFixed(2)}
+            </span>
+            <button
+              type="button"
+              className="cr-inv-remove-btn"
+              onClick={() => removeRow(i)}
+              disabled={rows.length === 1}
+              title="Remove line"
+            >✕</button>
+          </div>
+        ))}
+
+        <button type="button" className="cr-link cr-inv-add-line" onClick={addRow}>
+          + Add line item
+        </button>
+
+        <div className="cr-inv-total-row">
+          <strong>Total: ${total.toFixed(2)}</strong>
+        </div>
+
+        <div className="cr-form-row">
+          <Input label="Due date" type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} required />
+        </div>
+
+        <div className="ui-field">
+          <label className="ui-field__label">Notes (optional)</label>
+          <textarea
+            className="ui-input cr-textarea"
+            rows={2}
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            placeholder="Payment terms, special instructions…"
+          />
+        </div>
+
+        <div className="cr-modal-actions">
+          <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button type="submit" variant="primary" loading={saving}>Create invoice</Button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
 // ── Log Interaction Modal ─────────────────────────────────────────────────────
 
 interface LogInteractionForm {
@@ -316,8 +449,10 @@ const CustomerRecord: React.FC = () => {
   const { user }       = useAuth()
 
   const [activeTab,     setActiveTab]     = useState<TabKey>('overview')
-  const [showEdit,      setShowEdit]      = useState(false)
-  const [showLogModal,  setShowLogModal]  = useState(false)
+  const [showEdit,          setShowEdit]          = useState(false)
+  const [showLogModal,      setShowLogModal]      = useState(false)
+  const [showCreateInvoice, setShowCreateInvoice] = useState(false)
+  const [invoiceError,      setInvoiceError]      = useState<string | null>(null)
 
   // Notes tab local state (mirrors customer doc, saved on blur)
   const [notes,             setNotes]             = useState('')
@@ -459,6 +594,30 @@ const CustomerRecord: React.FC = () => {
     mutationFn: deleteFile,
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ['files', 'customer', customerId] }),
+  })
+
+  const createInvoiceMutation = useMutation({
+    mutationFn: async ({
+      lineItems,
+      dueDate,
+      notes: invNotes,
+    }: {
+      lineItems: { description: string; quantity: number; unitPrice: number; amount: number }[]
+      dueDate:   string
+      notes:     string
+    }) => createInvoice({
+      customerId: customerId!,
+      lineItems,
+      dueAt: new Date(dueDate),
+      ...(invNotes ? { notes: invNotes } : {}),
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices', customerId] })
+      queryClient.invalidateQueries({ queryKey: ['invoices', 'outstanding', customerId] })
+      setShowCreateInvoice(false)
+      setInvoiceError(null)
+    },
+    onError: (e: Error) => setInvoiceError(e.message),
   })
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
@@ -807,11 +966,14 @@ const CustomerRecord: React.FC = () => {
             </Button>
             <Button
               variant="secondary"
-              onClick={() => navigate(`/ops/billing?new=1&customerId=${customerId}`)}
+              onClick={() => { setInvoiceError(null); setShowCreateInvoice(true) }}
             >
               + New invoice
             </Button>
           </div>
+          {invoiceError && (
+            <p className="cr-form-error" style={{ marginTop: 8 }}>{invoiceError}</p>
+          )}
         </div>
       )}
 
@@ -1049,6 +1211,16 @@ const CustomerRecord: React.FC = () => {
           onClose={() => setShowLogModal(false)}
           onSubmit={async (form) => { await logMutation.mutateAsync(form) }}
           saving={logMutation.isPending}
+        />
+      )}
+
+      {showCreateInvoice && (
+        <CreateInvoiceModal
+          onClose={() => setShowCreateInvoice(false)}
+          onSubmit={async (lineItems, dueDate, notes) => {
+            await createInvoiceMutation.mutateAsync({ lineItems, dueDate, notes })
+          }}
+          saving={createInvoiceMutation.isPending}
         />
       )}
     </div>

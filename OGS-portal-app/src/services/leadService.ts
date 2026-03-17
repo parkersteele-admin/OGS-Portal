@@ -143,6 +143,7 @@ export async function convertLeadToCustomer(leadId: string): Promise<string> {
       state: lead.state ?? '',
       zip: lead.zip ?? '',
       notes: lead.notes,
+      leadId: leadId,
     }
     const customerId = await createCustomer(customerInput)
 

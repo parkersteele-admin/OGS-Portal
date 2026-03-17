@@ -35,6 +35,7 @@ export interface CreateCustomerInput {
   zip: string
   creditLimit?: number
   notes?: string
+  leadId?: string
 }
 
 // ── Read ──────────────────────────────────────────────────────────────────────

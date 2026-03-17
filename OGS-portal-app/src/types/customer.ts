@@ -31,6 +31,8 @@ export interface Customer {
   geocodeStatus?: 'pending' | 'ok' | 'failed'
   /** ISO timestamp of the last successful geocode. */
   geocodedAt?: string
+  /** The lead this customer was converted from, if any. */
+  leadId?: string
   status: CustomerStatus
   creditLimit: number
   notes?: string
