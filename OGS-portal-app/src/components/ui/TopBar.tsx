@@ -6,9 +6,11 @@ import { useViewAsStore } from '../../store/viewAsStore'
 import { signOut } from '../../lib/auth'
 import { usersCol } from '../../lib/firestore'
 import { NotificationBell } from './NotificationBell'
+import { CreateUserModal } from './CreateUserModal'
 import { ROLE_HOME } from '../../types/auth'
 import type { AppUser, UserRole } from '../../types/user'
 import './TopBar.css'
+import './CreateUserModal.css'
 
 interface TopBarProps {
   title: string
@@ -117,9 +119,10 @@ export const TopBar: React.FC<TopBarProps> = ({ title }) => {
   const navigate  = useNavigate()
   const { viewAsUser, setViewAsUser, exitViewAs } = useViewAsStore()
 
-  const [open,         setOpen]       = useState(false)
-  const [pickerOpen,   setPickerOpen] = useState(false)
-  const [loggingOut,   setLoggingOut] = useState(false)
+  const [open,           setOpen]       = useState(false)
+  const [pickerOpen,     setPickerOpen] = useState(false)
+  const [createUserOpen, setCreateUserOpen] = useState(false)
+  const [loggingOut,     setLoggingOut] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
   // Use real admin identity for display in the avatar/dropdown header
@@ -265,6 +268,22 @@ export const TopBar: React.FC<TopBarProps> = ({ title }) => {
                       </div>
                     </div>
                     <div className="topbar__dropdown-divider" />
+
+                    {/* Create User shortcut */}
+                    <button
+                      className="topbar__dropdown-item topbar__dropdown-item--create-user"
+                      role="menuitem"
+                      onClick={() => { setOpen(false); setCreateUserOpen(true) }}
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                        <line x1="19" y1="8" x2="19" y2="14" />
+                        <line x1="16" y1="11" x2="22" y2="11" />
+                      </svg>
+                      Create user…
+                    </button>
+                    <div className="topbar__dropdown-divider" />
                   </>
                 )}
 
@@ -291,6 +310,13 @@ export const TopBar: React.FC<TopBarProps> = ({ title }) => {
         <ViewAsModal
           onClose={() => setPickerOpen(false)}
           onSelect={handleSelectUser}
+        />
+      )}
+
+      {createUserOpen && (
+        <CreateUserModal
+          onClose={() => setCreateUserOpen(false)}
+          onCreated={() => setCreateUserOpen(false)}
         />
       )}
     </>

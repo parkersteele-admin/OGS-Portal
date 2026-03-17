@@ -1,0 +1,188 @@
+/* src/components/ui/CreateUserModal.css */
+
+.cum-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.cum-select {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-14);
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  background: var(--color-bg);
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  cursor: pointer;
+  transition: border-color var(--transition-fast);
+}
+.cum-select:focus {
+  outline: none;
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 3px var(--color-brand-light);
+}
+
+.cum-role-descriptions {
+  margin-top: var(--space-1);
+  min-height: 20px;
+}
+
+.cum-role-desc {
+  font-size: 0.8rem;
+  color: var(--color-text-3);
+  margin: 0;
+}
+
+.cum-form__hint {
+  font-size: 0.8rem;
+  color: var(--color-text-3);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-2, #f9fafb);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--color-brand);
+}
+
+.cum-form__error {
+  color: var(--color-danger, #dc2626);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.cum-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
+}
+
+/* ── Success state ── */
+.cum-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-4);
+}
+
+.cum-success__icon {
+  font-size: 2.5rem;
+  color: var(--color-success, #16a34a);
+  margin: 0;
+}
+
+.cum-success__msg {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--color-text);
+  margin: 0;
+  text-align: center;
+}
+
+/* ── Customer typeahead ── */
+.cum-typeahead {
+  position: relative;
+}
+
+.cum-optional {
+  font-weight: 400;
+  color: var(--color-text-3);
+  font-size: 0.8rem;
+}
+
+.cum-typeahead__dropdown {
+  position: absolute;
+  z-index: 300;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  list-style: none;
+  margin: 0;
+  padding: var(--space-1) 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.cum-typeahead__item {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.cum-typeahead__item:hover {
+  background: var(--color-bg-2);
+}
+
+.cum-typeahead__item-name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.cum-typeahead__item-sub {
+  font-size: 0.775rem;
+  color: var(--color-text-3);
+}
+
+.cum-customer-chip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-success, #16a34a);
+  background: var(--color-success-bg, #f0fdf4);
+  border-radius: var(--radius-md);
+}
+
+.cum-customer-chip__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.cum-customer-chip__name {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cum-customer-chip__email {
+  display: block;
+  font-size: 0.775rem;
+  color: var(--color-text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cum-customer-chip__clear {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-3);
+  font-size: 0.8rem;
+  padding: 4px;
+  border-radius: 4px;
+  line-height: 1;
+  transition: color var(--transition-fast);
+}
+
+.cum-customer-chip__clear:hover {
+  color: var(--color-danger, #dc2626);
+}

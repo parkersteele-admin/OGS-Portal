@@ -12,27 +12,21 @@
  *  5. Edit User modal  — change role (CF) + activate/deactivate (Firestore)
  */
 
-import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
+import React, { useState, useMemo, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getDocs, query, orderBy } from 'firebase/firestore'
-import { sendPasswordResetEmail } from 'firebase/auth'
-import { auth } from '../../lib/firebase'
 import { usersCol } from '../../lib/firestore'
 import {
   assignUserRole,
   deactivateUser,
   reactivateUser,
-  createAppUser,
-  type CreateUserInput,
 } from '../../services/userService'
-import { searchCustomers } from '../../services/customerService'
 import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
-import { Input } from '../../components/ui/Input'
+import { CreateUserModal } from '../../components/ui/CreateUserModal'
 import { formatDate } from '../../utils/format'
 import type { AppUser } from '../../types/user'
 import type { UserRole } from '../../types/user'
-import type { Customer } from '../../types/customer'
 import './UserManagement.css'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -90,228 +84,6 @@ const StatCard: React.FC<StatCardProps> = ({ role, count, total }) => (
     )}
   </div>
 )
-
-// ── Customer typeahead ────────────────────────────────────────────────────────
-
-interface CustomerSearchProps {
-  selected: Customer | null
-  onSelect: (c: Customer | null) => void
-}
-
-const CustomerSearch: React.FC<CustomerSearchProps> = ({ selected, onSelect }) => {
-  const [term,    setTerm]    = useState('')
-  const [results, setResults] = useState<Customer[]>([])
-  const [open,    setOpen]    = useState(false)
-  const timerRef              = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-  const containerRef          = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
-  const handleInput = (value: string) => {
-    setTerm(value)
-    setOpen(true)
-    clearTimeout(timerRef.current)
-    if (value.length < 2) { setResults([]); return }
-    timerRef.current = setTimeout(async () => {
-      const res = await searchCustomers(value)
-      setResults(res.slice(0, 8))
-    }, 250)
-  }
-
-  const handleSelect = (c: Customer) => {
-    onSelect(c)
-    setTerm(c.name)
-    setOpen(false)
-    setResults([])
-  }
-
-  const handleClear = () => {
-    onSelect(null)
-    setTerm('')
-    setResults([])
-  }
-
-  if (selected) {
-    return (
-      <div className="um-customer-chip">
-        <div className="um-customer-chip__info">
-          <span className="um-customer-chip__name">{selected.name}</span>
-          <span className="um-customer-chip__email">{selected.email}</span>
-        </div>
-        <button type="button" className="um-customer-chip__clear" onClick={handleClear} aria-label="Remove">
-          ✕
-        </button>
-      </div>
-    )
-  }
-
-  return (
-    <div className="um-typeahead" ref={containerRef}>
-      <div className="ui-field">
-        <label className="ui-field__label">Link to Customer Record <span className="um-optional">(optional)</span></label>
-        <input
-          className="ui-input"
-          type="search"
-          placeholder="Search by name or email…"
-          value={term}
-          onChange={(e) => handleInput(e.target.value)}
-          onFocus={() => term.length >= 2 && setOpen(true)}
-          autoComplete="off"
-        />
-      </div>
-      {open && results.length > 0 && (
-        <ul className="um-typeahead__dropdown" role="listbox">
-          {results.map((c) => (
-            <li
-              key={c.id}
-              className="um-typeahead__item"
-              role="option"
-              aria-selected={false}
-              onMouseDown={() => handleSelect(c)}
-            >
-              <span className="um-typeahead__item-name">{c.name}</span>
-              <span className="um-typeahead__item-sub">{c.email}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  )
-}
-
-// ── Create User Modal ─────────────────────────────────────────────────────────
-
-interface CreateUserModalProps {
-  onClose:   () => void
-  onCreated: () => void
-}
-
-const CreateUserModal: React.FC<CreateUserModalProps> = ({ onClose, onCreated }) => {
-  const [name,     setName]     = useState('')
-  const [email,    setEmail]    = useState('')
-  const [role,     setRole]     = useState<UserRole>('driver')
-  const [customer, setCustomer] = useState<Customer | null>(null)
-  const [error,    setError]    = useState('')
-  const [success,  setSuccess]  = useState(false)
-
-  const mutation = useMutation({
-    mutationFn: async () => {
-      const payload: CreateUserInput = {
-        name:  name.trim(),
-        email: email.trim().toLowerCase(),
-        role,
-        customerId: role === 'customer' ? customer?.id : undefined,
-      }
-      const uid = await createAppUser(payload)
-
-      // Send password-setup email. The CF may already do this; this is a
-      // belt-and-suspenders call that fails silently if already sent.
-      try {
-        await sendPasswordResetEmail(auth, payload.email)
-      } catch {
-        console.warn('[UserManagement] sendPasswordResetEmail: CF may have already sent it')
-      }
-
-      return uid
-    },
-    onSuccess: () => {
-      setSuccess(true)
-      setTimeout(() => {
-        onCreated()
-      }, 1200)
-    },
-    onError: (err: Error) => {
-      setError(err.message || 'Failed to create user. Please try again.')
-    },
-  })
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-    if (!name.trim())  { setError('Full name is required.'); return }
-    if (!email.trim()) { setError('Email address is required.'); return }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      setError('Enter a valid email address.')
-      return
-    }
-    mutation.mutate()
-  }
-
-  return (
-    <Modal open onClose={onClose} title="Create User" size="md">
-      {success ? (
-        <div className="um-success">
-          <p className="um-success__icon">✓</p>
-          <p className="um-success__msg">User created! Password-setup email sent.</p>
-        </div>
-      ) : (
-        <form className="um-form" onSubmit={handleSubmit} noValidate>
-          <Input
-            label="Full Name"
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Jane Smith"
-            autoFocus
-            required
-          />
-          <Input
-            label="Email Address"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="jane@example.com"
-            required
-          />
-          <div className="ui-field">
-            <label className="ui-field__label">Role</label>
-            <select
-              className="um-select"
-              value={role}
-              onChange={(e) => {
-                setRole(e.target.value as UserRole)
-                if (e.target.value !== 'customer') setCustomer(null)
-              }}
-            >
-              {ALL_ROLES.map((r) => (
-                <option key={r} value={r}>{ROLE_LABELS[r]}</option>
-              ))}
-            </select>
-          </div>
-
-          {role === 'customer' && (
-            <CustomerSearch selected={customer} onSelect={setCustomer} />
-          )}
-
-          <p className="um-form__hint">
-            A password-setup email will be sent automatically. The user sets their own password on first sign-in.
-          </p>
-
-          {error && (
-            <p className="um-form__error" role="alert">{error}</p>
-          )}
-
-          <div className="um-form__actions">
-            <Button type="button" variant="ghost" onClick={onClose} disabled={mutation.isPending}>
-              Cancel
-            </Button>
-            <Button type="submit" variant="primary" loading={mutation.isPending}>
-              Create User
-            </Button>
-          </div>
-        </form>
-      )}
-    </Modal>
-  )
-}
 
 // ── Edit User Modal ───────────────────────────────────────────────────────────
 

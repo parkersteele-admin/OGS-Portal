@@ -171,6 +171,15 @@
   color: var(--color-info);
 }
 
+.topbar__dropdown-item--create-user {
+  color: var(--color-success, #16a34a);
+}
+
+.topbar__dropdown-item--create-user:hover:not(:disabled) {
+  background: #f0fdf4;
+  color: var(--color-success, #16a34a);
+}
+
 /* Orange ring + dot indicator when viewing as another user */
 .topbar__avatar--viewing-as {
   outline: 2px solid var(--color-brand);
