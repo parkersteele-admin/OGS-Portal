@@ -7,6 +7,7 @@ export type ProductCategory =
   | 'CO₂ Cylinders'
   | 'Nitrogen'
   | 'Beer Gas'
+  | 'Propane'
   | 'Rentals'
   | 'Fees'
   | string  // allow future categories

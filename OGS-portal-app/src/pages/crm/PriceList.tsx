@@ -31,7 +31,7 @@ function fmtDate(ts: { toDate?: () => Date } | undefined) {
   return ts.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-const CATEGORIES: ProductCategory[] = ['CO\u2082 Cylinders', 'Nitrogen', 'Beer Gas', 'Rentals', 'Fees']
+const CATEGORIES: ProductCategory[] = ['CO\u2082 Cylinders', 'Nitrogen', 'Beer Gas', 'Propane', 'Rentals', 'Fees']
 
 // ── Inline-editable price cell ────────────────────────────────────────────────
 
