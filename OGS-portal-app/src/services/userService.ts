@@ -59,11 +59,11 @@ export async function assignUserRole(userId: string, role: UserRole): Promise<vo
     }
     const { httpsCallable } = await import('firebase/functions')
     const { functions } = await import('../lib/firebase')
-    const fn = httpsCallable<{ userId: string; role: UserRole }, void>(
+    const fn = httpsCallable<{ uid: string; role: UserRole }, void>(
       functions,
       'setUserRole',
     )
-    await fn({ userId, role })
+    await fn({ uid: userId, role })
     // Optimistically update the Firestore doc — the Function also updates it server-side
     await updateDoc(doc(db, 'users', userId), { role, updatedAt: serverTimestamp() })
   })
