@@ -85,8 +85,9 @@ export async function createCustomer(data: CreateCustomerInput): Promise<string>
     // Geocode address in the background — coordinates are optional on Customer.
     const coords = await geocodeAddress(data).catch(() => null)
 
+    const cleanData = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined))
     const ref = await addDoc(customersCol, {
-      ...data,
+      ...cleanData,
       status: 'active' as CustomerStatus,
       creditLimit: data.creditLimit ?? 5000,
       // geocodeCustomer Cloud Function handles geocoding server-side.

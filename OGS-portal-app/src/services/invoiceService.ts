@@ -94,9 +94,10 @@ export async function createInvoice(data: CreateInvoiceInput, taxRate = 0): Prom
   return serviceCall(async () => {
     const totals = calculateInvoiceTotals(data.lineItems, taxRate)
     const invoiceNumber = `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`
+    const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined))
     const ref = await addDoc(invoicesCol, {
       invoiceNumber,
-      ...data,
+      ...clean,
       ...totals,
       status: 'draft' as InvoiceStatus,
       issuedAt: serverTimestamp(),

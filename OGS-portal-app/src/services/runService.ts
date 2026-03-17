@@ -90,9 +90,10 @@ export function subscribeToRunStops(
 export async function createRun(data: CreateRunInput): Promise<string> {
   return serviceCall(async () => {
     const runNumber = `RUN-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`
+    const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined))
     const ref = await addDoc(runsCol, {
       runNumber,
-      ...data,
+      ...clean,
       status: 'scheduled' as RunStatus,
       stopIds: [],
       createdAt: serverTimestamp(),
@@ -125,8 +126,9 @@ export async function deleteRun(id: string): Promise<void> {
 
 export async function addRunStop(data: CreateRunStopInput): Promise<string> {
   return serviceCall(async () => {
+    const cleanStop = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined))
     const stopRef = await addDoc(runStopsCol(data.runId), {
-      ...data,
+      ...cleanStop,
       status: 'pending' as RunStopStatus,
     } as unknown as RunStop)
     // Keep the parent run's stopIds array in sync

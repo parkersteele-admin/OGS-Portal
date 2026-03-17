@@ -109,11 +109,12 @@ export function subscribeToCustomerTanks(
 /** Creates the tank in both /tanks and /customers/{id}/tanks for query flexibility. */
 export async function createTank(data: CreateTankInput): Promise<string> {
   return serviceCall(async () => {
+    // Strip undefined fields — Firestore rejects them
+    const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined))
     const payload = {
-      ...data,
+      ...clean,
       ownership: data.ownership ?? ('company' as TankOwnership),
       status: 'available' as TankStatus,
-      currentLevelPct: undefined,
     }
     // Write to top-level collection
     const ref = await addDoc(tanksCol, payload as never)

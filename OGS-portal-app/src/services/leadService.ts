@@ -81,8 +81,9 @@ export function subscribeToLeads(
 
 export async function createLead(data: CreateLeadInput): Promise<string> {
   return serviceCall(async () => {
+    const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined))
     const ref = await addDoc(leadsCol, {
-      ...data,
+      ...clean,
       status: 'new' as LeadStatus,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -95,9 +96,10 @@ export async function updateLead(
   id: string,
   data: Partial<Omit<Lead, 'id' | 'createdAt'>>,
 ): Promise<void> {
-  return serviceCall(() =>
-    updateDoc(doc(db, 'leads', id), { ...data, updatedAt: serverTimestamp() }),
-  )
+  return serviceCall(() => {
+    const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined))
+    return updateDoc(doc(db, 'leads', id), { ...clean, updatedAt: serverTimestamp() })
+  })
 }
 
 export async function advanceLeadStage(id: string, nextStatus: LeadStatus): Promise<void> {
