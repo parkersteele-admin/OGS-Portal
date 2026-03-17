@@ -131,7 +131,7 @@ service firebase.storage {
     // Written by Admin SDK (bypasses rules). Reads open to admin/sales.
     // Customers access via the signed URL embedded in the email — no rule needed.
     match /ogs-portal/quotes/{fileId} {
-      allow read:  if isAuthenticated() && (isAdmin() || isSales());
+      allow read:  if isAuthenticated() && (isAdmin() || hasRole('sales'));
       allow write: if false; // Admin SDK (Functions) only
     }
 
