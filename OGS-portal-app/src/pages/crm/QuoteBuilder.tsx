@@ -18,7 +18,7 @@ import React, {
   useCallback,
   useMemo,
 } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   createQuote,
@@ -328,7 +328,7 @@ interface QuoteBuilderPanelProps {
   onSaved:     (id: string) => void
 }
 
-const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
+export const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
   editQuote, prefillLeadId, onClose, onSaved,
 }) => {
   const { user }      = useAuth()
@@ -917,15 +917,11 @@ const QuoteTable: React.FC<QuoteTableProps> = ({
 // ── Main Component ────────────────────────────────────────────────────────────
 
 const QuoteBuilder: React.FC = () => {
-  const [searchParams]    = useSearchParams()
+  const navigate          = useNavigate()
   const queryClient       = useQueryClient()
 
-  const [panelOpen,   setPanelOpen]   = useState(() => searchParams.get('new') === '1')
-  const [editQuote,   setEditQuote]   = useState<Quote | null>(null)
   const [statusFilter,setStatusFilter]= useState<QuoteStatus | 'all'>('all')
   const [deletingId,  setDeletingId]  = useState<string | null>(null)
-
-  const prefillLeadId = searchParams.get('leadId') ?? undefined
 
   const { data: quotesPage, isLoading } = useQuery({
     queryKey: ['quotes', statusFilter],
@@ -949,27 +945,11 @@ const QuoteBuilder: React.FC = () => {
     onError: () => setDeletingId(null),
   })
 
-  const handleNew = () => {
-    setEditQuote(null)
-    setPanelOpen(true)
-  }
-
-  const handleEdit = (quote: Quote) => {
-    setEditQuote(quote)
-    setPanelOpen(true)
-  }
-
-  const handleClose = () => {
-    setPanelOpen(false)
-    setEditQuote(null)
-  }
-
-  const handleSaved = () => {
-    queryClient.invalidateQueries({ queryKey: ['quotes'] })
-  }
+  const handleNew  = () => navigate('/crm/quotes/new')
+  const handleEdit = (quote: Quote) => navigate(`/crm/quotes/${quote.id}`)
 
   return (
-    <div className={`qb-page${panelOpen ? ' qb-page--panel-open' : ''}`}>
+    <div className="qb-page">
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <header className="qb-header">
@@ -1002,18 +982,6 @@ const QuoteBuilder: React.FC = () => {
         />
       </div>
 
-      {/* ── Slide-in builder panel ───────────────────────────────────────────── */}
-      {panelOpen && (
-        <>
-          <div className="qb-panel-backdrop" onClick={handleClose} />
-          <QuoteBuilderPanel
-            editQuote={editQuote}
-            prefillLeadId={prefillLeadId}
-            onClose={handleClose}
-            onSaved={handleSaved}
-          />
-        </>
-      )}
     </div>
   )
 }

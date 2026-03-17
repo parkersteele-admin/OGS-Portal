@@ -42,6 +42,7 @@ import CustomersPage from './pages/crm/CustomersPage'
 import CustomerRecord from './pages/crm/CustomerRecord'
 import LeadsPage from './pages/crm/LeadsPage'
 import QuotesPage from './pages/crm/QuotesPage'
+import QuoteEditorPage from './pages/crm/QuoteEditorPage'
 import CrmBillingPage from './pages/crm/CrmBillingPage'
 import AgingPage from './pages/crm/AgingPage'
 import PriceList from './pages/crm/PriceList'
@@ -145,6 +146,8 @@ export const Router: React.FC = () => (
         <Route path="customers/:customerId" element={<CustomerRecord />} />
         <Route path="leads" element={<LeadsPage />} />
         <Route path="quotes" element={<QuotesPage />} />
+        <Route path="quotes/new" element={<QuoteEditorPage />} />
+        <Route path="quotes/:quoteId" element={<QuoteEditorPage />} />
         <Route path="billing" element={<CrmBillingPage />} />
         <Route path="aging" element={<AgingPage />} />
         <Route path="price-list" element={<PriceList />} />
