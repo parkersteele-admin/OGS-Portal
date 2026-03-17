@@ -1,0 +1,217 @@
+/* ── ProductCombobox ══════════════════════════════════════════════════════════
+   BEM prefix: pcb-
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.pcb-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+}
+
+.pcb-label {
+  font-size: var(--font-size-13);
+  font-weight: 500;
+  color: var(--color-text-2);
+}
+
+/* Trigger */
+.pcb-trigger {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  padding: 0 var(--space-3);
+  min-height: 40px;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  gap: var(--space-2);
+}
+
+.pcb-trigger:focus,
+.pcb-trigger--open {
+  outline: none;
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 2px rgba(232, 119, 34, 0.15);
+}
+
+.pcb-trigger--disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Input (search mode) */
+.pcb-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: var(--font-size-14);
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  background: transparent;
+  padding: 0;
+  min-width: 0;
+}
+
+.pcb-input::placeholder {
+  color: var(--color-text-3);
+}
+
+/* Value display */
+.pcb-value {
+  flex: 1;
+  font-size: var(--font-size-14);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pcb-value--placeholder {
+  color: var(--color-text-3);
+}
+
+.pcb-selected {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pcb-selected__sku {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  background: var(--color-bg-3, #f3f4f6);
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-3);
+  flex-shrink: 0;
+}
+
+/* Trigger actions (clear + chevron) */
+.pcb-trigger__actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.pcb-clear {
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--color-text-3);
+  border-radius: var(--radius-sm);
+  line-height: 1;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.pcb-clear:hover {
+  background: var(--color-bg-3, #f3f4f6);
+  color: var(--color-text);
+}
+
+.pcb-chevron {
+  font-size: 10px;
+  color: var(--color-text-3);
+}
+
+/* Dropdown */
+.pcb-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 300;
+  animation: pcb-dropdown-in 110ms ease;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+@keyframes pcb-dropdown-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.pcb-dropdown__empty {
+  padding: var(--space-4);
+  font-size: var(--font-size-13);
+  color: var(--color-text-3);
+  text-align: center;
+}
+
+/* List */
+.pcb-list {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-1) 0;
+}
+
+/* Group header */
+.pcb-group {
+  font-size: var(--font-size-11);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-3);
+  padding: var(--space-2) var(--space-4) var(--space-1);
+  list-style: none;
+  border-top: 1px solid var(--color-border);
+}
+
+.pcb-list li:first-child.pcb-group {
+  border-top: none;
+}
+
+/* Option */
+.pcb-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  cursor: pointer;
+  list-style: none;
+  transition: background var(--transition-fast);
+}
+
+.pcb-option:hover,
+.pcb-option--active {
+  background: var(--color-bg-2);
+}
+
+.pcb-option--selected {
+  background: var(--color-brand-light);
+}
+
+.pcb-option__sku {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  background: var(--color-bg-3, #f3f4f6);
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-3);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.pcb-option__name {
+  flex: 1;
+  font-size: var(--font-size-13);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pcb-option__unit {
+  font-size: var(--font-size-11);
+  color: var(--color-text-3);
+  flex-shrink: 0;
+}

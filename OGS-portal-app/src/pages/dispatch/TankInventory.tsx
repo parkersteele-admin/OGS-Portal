@@ -29,6 +29,8 @@ import {
 } from 'firebase/firestore'
 import { db } from '../../lib/firebase'
 import { tanksCol, productsCol } from '../../lib/firestore'
+import { ProductCombobox } from '../../components/ui/ProductCombobox'
+import type { ProductDropdownItem } from '../../services/productService'
 import {
   createTank,
   updateTank,
@@ -618,20 +620,35 @@ interface AddCylinderModalProps {
 }
 
 function AddCylinderModal({ onClose, onCreated }: AddCylinderModalProps) {
-  const [serial, setSerial] = useState('')
-  const [gasType, setGasType] = useState('')
-  const [sizeLabel, setSizeLabel] = useState('')
+  const [productId,     setProductId]     = useState('')
+  const [serial,        setSerial]        = useState('')
+  const [gasType,       setGasType]       = useState('')
+  const [sizeLabel,     setSizeLabel]     = useState('')
   const [capacityValue, setCapacityValue] = useState('')
-  const [capacityUnit, setCapacityUnit] = useState('gal')
-  const [monthlyRate, setMonthlyRate] = useState('')
-  const [ownership, setOwnership] = useState<'company' | 'customer'>('company')
-  const [notes, setNotes] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
+  const [capacityUnit,  setCapacityUnit]  = useState('gal')
+  const [monthlyRate,   setMonthlyRate]   = useState('')
+  const [ownership,     setOwnership]     = useState<'company' | 'customer'>('company')
+  const [notes,         setNotes]         = useState('')
+  const [busy,          setBusy]          = useState(false)
+  const [error,         setError]         = useState('')
 
   // Gas type presets
   const GAS_TYPES = ['CO2', 'Nitrogen', 'Propane', 'Oxygen', 'Argon', 'Helium']
   const CAPACITY_UNITS = ['gal', 'lb', 'cf', 'L']
+
+  function handleProductSelect(item: ProductDropdownItem | null) {
+    setProductId(item?.id ?? '')
+    if (item) {
+      // Auto-fill gas type from product name
+      const name = item.name.toLowerCase()
+      if (name.includes('carbon dioxide') || name.includes('co2')) setGasType('CO2')
+      else if (name.includes('nitrogen')) setGasType('Nitrogen')
+      else if (name.includes('argon')) setGasType('Argon')
+      else setGasType(item.category)
+      // Auto-fill size label
+      if (item.sku) setSizeLabel(item.sku)
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -655,7 +672,8 @@ function AddCylinderModal({ onClose, onCreated }: AddCylinderModalProps) {
         ownership,
         monthlyRate: monthlyRate ? Number(monthlyRate) : undefined,
         notes: notes || undefined,
-      })
+        ...(productId ? { productId } : {}),
+      } as Parameters<typeof createTank>[0])
       onCreated()
       onClose()
     } catch (err) {
@@ -673,6 +691,13 @@ function AddCylinderModal({ onClose, onCreated }: AddCylinderModalProps) {
         </div>
         <form className="ti-modal__body" onSubmit={handleSubmit} noValidate>
           {error && <div className="ti-form-error">{error}</div>}
+
+          <ProductCombobox
+            label="Catalog Product (optional)"
+            value={productId}
+            onSelect={handleProductSelect}
+            placeholder="Link to a catalog product…"
+          />
 
           <div className="ti-form-grid">
             <Input label="Serial Number *" value={serial} onChange={(e) => setSerial(e.target.value)} placeholder="e.g. CO2-0042" required />

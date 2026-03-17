@@ -7,11 +7,13 @@ import type { SidebarItem } from '../ui/Sidebar'
 import './Layout.css'
 
 const NAV_ITEMS: SidebarItem[] = [
-  { to: '/crm/customers', label: 'Customers', icon: '◷' },
-  { to: '/crm/leads',     label: 'Leads',     icon: '▷' },
-  { to: '/crm/quotes',    label: 'Quotes',    icon: '◈' },
-  { to: '/crm/billing',   label: 'Billing',   icon: '$' },
-  { to: '/crm/aging',     label: 'Aging',     icon: '↓' },
+  { to: '/crm/customers',     label: 'Customers',      icon: '◇' },
+  { to: '/crm/leads',         label: 'Leads',          icon: '▷' },
+  { to: '/crm/quotes',        label: 'Quotes',         icon: '◈' },
+  { to: '/crm/billing',       label: 'Billing',        icon: '$' },
+  { to: '/crm/aging',         label: 'Aging',          icon: '↓' },
+  { to: '/crm/price-list',    label: 'Price List',     icon: '⊟' },
+  { to: '/crm/merchandising', label: 'Merchandising',  icon: '☉' },
 ]
 
 export const CrmLayout: React.FC = () => (

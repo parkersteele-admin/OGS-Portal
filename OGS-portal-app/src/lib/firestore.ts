@@ -64,3 +64,16 @@ export const quotesCol = col<Quote>('quotes')
 
 // ── Products ──────────────────────────────────────────────────────────────────
 export const productsCol = col<Product>('products')
+
+// ── Audit Log ─────────────────────────────────────────────────────────────────
+export type AuditLogEntry = {
+  id: string
+  entity: string
+  entityId: string
+  field: string
+  oldValue: string | number | boolean | null
+  newValue: string | number | boolean | null
+  changedBy: string   // uid
+  changedAt: import('firebase/firestore').Timestamp
+}
+export const auditLogCol = col<AuditLogEntry>('auditLog')

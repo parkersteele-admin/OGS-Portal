@@ -44,8 +44,13 @@ import LeadsPage from './pages/crm/LeadsPage'
 import QuotesPage from './pages/crm/QuotesPage'
 import CrmBillingPage from './pages/crm/CrmBillingPage'
 import AgingPage from './pages/crm/AgingPage'
+import PriceList from './pages/crm/PriceList'
+import MerchandisingPanel from './pages/crm/MerchandisingPanel'
 import BillingDashboard from './pages/billing/BillingDashboard'
 import UserManagement from './pages/admin/UserManagement'
+
+// Customer catalog
+import ProductCatalog from './pages/customer/ProductCatalog'
 
 // ── Root redirect: auth-aware, sends each role to their home ─────────────────
 const RootRedirect: React.FC = () => {
@@ -85,6 +90,7 @@ export const Router: React.FC = () => (
         <Route path="invoices/:invoiceId/pay" element={<PayInvoicePage />} />
         <Route path="autopay" element={<ManageAutopay />} />
         <Route path="tanks" element={<TankLevelsPage />} />
+        <Route path="catalog" element={<ProductCatalog />} />
       </Route>
 
       {/* Ops Portal */}
@@ -141,6 +147,8 @@ export const Router: React.FC = () => (
         <Route path="quotes" element={<QuotesPage />} />
         <Route path="billing" element={<CrmBillingPage />} />
         <Route path="aging" element={<AgingPage />} />
+        <Route path="price-list" element={<PriceList />} />
+        <Route path="merchandising" element={<MerchandisingPanel />} />
       </Route>
 
       {/* Admin Portal */}

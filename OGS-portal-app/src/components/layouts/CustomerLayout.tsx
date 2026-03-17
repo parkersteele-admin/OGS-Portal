@@ -15,6 +15,7 @@ const NAV_ITEMS: SidebarItem[] = [
   { to: '/portal/invoices',  label: 'Invoices',   icon: '$' },
   { to: '/portal/autopay',   label: 'Autopay',    icon: '↺' },
   { to: '/portal/tanks',     label: 'My Tanks',   icon: '⊙' },
+  { to: '/portal/catalog',   label: 'Products',   icon: '⊟' },
 ]
 
 const MOBILE_ITEMS: MobileNavItem[] = NAV_ITEMS.slice(0, 4).map(

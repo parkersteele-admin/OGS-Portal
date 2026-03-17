@@ -10,7 +10,7 @@
  */
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getDocs, query, where } from 'firebase/firestore'
 import { productsCol, customerTanksCol } from '../../lib/firestore'
@@ -646,7 +646,11 @@ interface ReorderState {
 const OrderPage: React.FC = () => {
   const { user }   = useAuth()
   const location   = useLocation()
+  const [searchParams] = useSearchParams()
   const customerId = user?.customerId ?? ''
+
+  // Pre-selected product from /portal/catalog click
+  const preselectedProductId = searchParams.get('productId') ?? ''
 
   // Check if navigated here via Reorder button from order history
   const reorder = (location.state as { reorder?: ReorderState } | null)?.reorder
@@ -655,7 +659,9 @@ const OrderPage: React.FC = () => {
   const [wizState, setWizState] = useState<WizardState>(
     reorder
       ? { ...INITIAL, productId: reorder.productId, quantity: reorder.quantity, tier: reorder.tier, notes: reorder.notes }
-      : INITIAL,
+      : preselectedProductId
+        ? { ...INITIAL, productId: preselectedProductId }
+        : INITIAL,
   )
   const [orderId, setOrderId]   = useState<string | null>(null)
 
