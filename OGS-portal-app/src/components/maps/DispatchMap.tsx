@@ -40,7 +40,6 @@ import type { Customer } from '../../types/customer'
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 type LatLngLiteral  = { lat: number; lng: number }
-type MapTypeStyle   = { featureType?: string; elementType?: string; stylers: Record<string, string>[] }
 
 const CENTRAL_OHIO: LatLngLiteral = { lat: 40.0, lng: -82.9 }
 const DEFAULT_ZOOM = 10
@@ -50,14 +49,6 @@ const COLOR_BRAND     = '#E87722'
 const COLOR_COMPLETED = '#22c55e'
 const COLOR_PENDING   = '#6b7280'
 const COLOR_WHITE     = '#ffffff'
-
-// Minimal map style — hides POIs, transit, business labels while keeping roads
-const MAP_STYLE: MapTypeStyle[] = [
-  { featureType: 'poi',             elementType: 'all',    stylers: [{ visibility: 'off' }] },
-  { featureType: 'transit',         elementType: 'all',    stylers: [{ visibility: 'off' }] },
-  { featureType: 'administrative',  elementType: 'labels', stylers: [{ visibility: 'simplified' }] },
-  { featureType: 'road',            elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
-]
 
 // ── Stop detail popover ────────────────────────────────────────────────────────
 
@@ -342,7 +333,6 @@ export function DispatchMap({
           defaultCenter={center}
           defaultZoom={zoom}
           mapId={mapId}
-          styles={MAP_STYLE}
           disableDefaultUI={false}
           gestureHandling="cooperative"
           onClick={handleMapClick}
