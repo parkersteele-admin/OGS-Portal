@@ -562,13 +562,19 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
 
       {/* Footer actions */}
       <div className="lp-panel__footer">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate(`/crm/quotes?new=1&leadId=${lead.id}`)}
-        >
-          📋 Send quote
-        </Button>
+        {['qualified', 'proposal', 'won'].includes(lead.status) ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate(`/crm/quotes/new?leadId=${lead.id}`)}
+          >
+            📋 Send quote
+          </Button>
+        ) : (
+          <Button variant="ghost" size="sm" disabled title="Advance to Qualified before quoting">
+            📋 Send quote
+          </Button>
+        )}
 
         {lead.status === 'won' && lead.convertedToCustomerId ? (
           <Button
@@ -655,8 +661,9 @@ const LeadCard: React.FC<LeadCardProps> = ({
         </select>
         <button
           className="lp-card__quote-btn"
-          title="Send quote"
-          onClick={e => { e.stopPropagation(); onQuote(lead) }}
+          title={['qualified', 'proposal', 'won'].includes(lead.status) ? 'Send quote' : 'Qualify lead first'}
+          disabled={!['qualified', 'proposal', 'won'].includes(lead.status)}
+          onClick={e => { e.stopPropagation(); if (['qualified', 'proposal', 'won'].includes(lead.status)) onQuote(lead) }}
         >
           📋
         </button>
@@ -906,7 +913,7 @@ const LeadsPipeline: React.FC = () => {
   }, [])
 
   const handleQuoteLead = useCallback((lead: Lead) => {
-    navigate(`/crm/quotes?new=1&leadId=${lead.id}`)
+    navigate(`/crm/quotes/new?leadId=${lead.id}`)
   }, [navigate])
 
   // Add lead mutation

@@ -20,7 +20,7 @@ import React, {
   useCallback,
   useMemo,
 } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   getQuote,
@@ -165,7 +165,9 @@ const PdfPreviewModal: React.FC<{ url: string; onClose: () => void }> = ({ url, 
 const QuoteEditorPage: React.FC = () => {
   const navigate      = useNavigate()
   const { quoteId }   = useParams<{ quoteId: string }>()
+  const [searchParams] = useSearchParams()
   const isNew         = !quoteId || quoteId === 'new'
+  const prefillLeadId = isNew ? (searchParams.get('leadId') ?? '') : ''
   const { user }      = useAuth()
   const queryClient   = useQueryClient()
 
@@ -210,7 +212,7 @@ const QuoteEditorPage: React.FC = () => {
 
   // ── Form state ────────────────────────────────────────────────────────────
 
-  const [recipientId,    setRecipientId]    = useState('')
+  const [recipientId,    setRecipientId]    = useState(prefillLeadId)
   const [validUntil,     setValidUntil]     = useState(() => {
     const d = new Date(); d.setDate(d.getDate() + 30)
     return d.toISOString().slice(0, 10)
