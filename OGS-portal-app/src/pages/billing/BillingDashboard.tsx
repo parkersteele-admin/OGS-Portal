@@ -27,6 +27,7 @@ import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
 import {
   markInvoicePaid,
+  markInvoiceSent,
   voidInvoice,
   generateInvoicePdf,
 } from '../../services/invoiceService'
@@ -279,6 +280,11 @@ export const BillingDashboard: React.FC = () => {
   // ── Mutations ────────────────────────────────────────────────────────────
   const paidMutation = useMutation({
     mutationFn: (id: string) => markInvoicePaid(id),
+    onSuccess:  () => queryClient.invalidateQueries({ queryKey: ['billing'] }),
+  })
+
+  const sentMutation = useMutation({
+    mutationFn: (id: string) => markInvoiceSent(id),
     onSuccess:  () => queryClient.invalidateQueries({ queryKey: ['billing'] }),
   })
 
@@ -595,6 +601,16 @@ export const BillingDashboard: React.FC = () => {
                           >
                             View
                           </button>
+                          {inv.status === 'draft' && (
+                            <button
+                              type="button"
+                              className="bd__action-btn bd__action-btn--primary"
+                              onClick={() => sentMutation.mutate(inv.id)}
+                              disabled={sentMutation.isPending}
+                            >
+                              Send
+                            </button>
+                          )}
                           <button
                             type="button"
                             className="bd__action-btn"

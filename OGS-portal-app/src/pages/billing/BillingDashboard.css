@@ -305,6 +305,15 @@
   cursor: not-allowed;
 }
 
+.bd__action-btn--primary {
+  color: var(--color-brand);
+  border-color: var(--color-brand);
+}
+
+.bd__action-btn--primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-brand) 10%, transparent);
+}
+
 .bd__action-btn--success {
   color: var(--color-success);
   border-color: var(--color-success);

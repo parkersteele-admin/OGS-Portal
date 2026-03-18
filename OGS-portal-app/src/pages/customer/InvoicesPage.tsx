@@ -22,7 +22,7 @@ import './Invoices.css'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const OUTSTANDING_STATUSES: InvoiceStatus[] = ['sent', 'overdue']
+const OUTSTANDING_STATUSES: InvoiceStatus[] = ['draft', 'sent', 'overdue']
 
 type FilterTab = 'all' | 'outstanding' | 'paid'
 
