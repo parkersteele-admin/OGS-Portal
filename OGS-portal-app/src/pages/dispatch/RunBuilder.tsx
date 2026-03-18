@@ -12,14 +12,13 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
-  addDoc,
   writeBatch,
   doc,
   serverTimestamp,
   getDocs,
 } from 'firebase/firestore'
 import { db } from '../../lib/firebase'
-import { runStopsCol, notificationsCol, customersCol, productsCol } from '../../lib/firestore'
+import { runStopsCol, customersCol, productsCol } from '../../lib/firestore'
 import { usePendingOrders } from '../../hooks/usePendingOrders'
 import { createRun } from '../../services/runService'
 import { updateOrder } from '../../services/orderService'
@@ -770,8 +769,6 @@ export default function RunBuilder() {
     setCreateError(null)
 
     try {
-      const driver = drivers.find(d => d.id === setup.driverId)
-
       // 1. Create run document
       const runId = await createRun({
         driverId:      setup.driverId,
@@ -813,22 +810,8 @@ export default function RunBuilder() {
         )
       )
 
-      // 4. Send notification to assigned driver
-      if (driver) {
-        await addDoc(notificationsCol, {
-          userId:   driver.id,
-          type:     'run_assigned',
-          title:    'New run assigned',
-          body:     `${setup.name || defaultRunName(setup.date)} · ${stops.length} stop${stops.length !== 1 ? 's' : ''} on ${fmtDate(setup.date)}`,
-          link:     '/driver/schedule',
-          entityId: runId,
-          priority: 'high',
-          read:     false,
-          createdAt: serverTimestamp(),
-        } as never)
-      }
-
-      // 5. Navigate to dispatch map for this run
+      // 4. Navigate to dispatch map for this run
+      // (driver notification is sent server-side by the onRunCreated Cloud Function)
       navigate('/ops/dispatch', { state: { runId }, replace: true })
 
     } catch (err: unknown) {

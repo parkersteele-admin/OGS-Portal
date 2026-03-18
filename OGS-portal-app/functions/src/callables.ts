@@ -8,6 +8,7 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https'
 import { db } from './admin'
 import { GOOGLE_MAPS_KEY, SENDGRID_API_KEY, requireSecret } from './config'
+import { performGeocode } from './triggers/geocodeCustomer'
 import { generateInvoicePdf as generatePdf } from './pdf/generateInvoicePdf'
 import { generateQuotePdf as generateQuotePdfCore } from './pdf/generateQuotePdf'
 import { sendEmail } from './email/sendEmail'
@@ -294,6 +295,43 @@ export const optimizeRoute = onCall(
     await batch.commit()
 
     return { optimizedOrder }
+  },
+)
+
+// ── backfillGeocodeCustomers ───────────────────────────────────────────────────
+
+/**
+ * One-time admin callable: geocodes all customers missing lat/lng.
+ * Safe to call multiple times — skips already-geocoded customers.
+ *
+ * Access: admin only
+ * Output: { processed: number, skipped: number, failed: number }
+ */
+export const backfillGeocodeCustomers = onCall(
+  { secrets: [GOOGLE_MAPS_KEY] },
+  async (request) => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
+    if (request.auth.token.role !== 'admin') throw new HttpsError('permission-denied', 'Admin only.')
+
+    const snap = await db.collection('customers').get()
+    let processed = 0, skipped = 0, failed = 0
+
+    for (const doc of snap.docs) {
+      const data = doc.data() as Record<string, unknown>
+      if (data['lat'] && data['lng'] && data['geocodeStatus'] === 'ok') {
+        skipped++
+        continue
+      }
+      try {
+        await performGeocode(doc.id, data)
+        processed++
+      } catch {
+        failed++
+      }
+    }
+
+    console.log(`backfillGeocodeCustomers: processed=${processed} skipped=${skipped} failed=${failed}`)
+    return { processed, skipped, failed }
   },
 )
 

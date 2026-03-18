@@ -42,7 +42,7 @@
  */
 
 import { onSchedule } from 'firebase-functions/v2/scheduler'
-import { db } from './admin'
+// import { db } from './admin' // TODO: uncomment when implementing
 
 /** How many days ahead to look for upcoming deliveries. */
 const LOOKAHEAD_DAYS = 3

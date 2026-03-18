@@ -45,13 +45,14 @@ export { createStripePaymentIntent }                              from './stripe
 export { createSetupIntent, savePaymentMethod, removePaymentMethod } from './stripe/index'
 export { onOrderComplete }                                        from './orders'
 export { onDeliveryComplete }                                     from './triggers/onDeliveryComplete'
+export { onRunCreated }                                           from './triggers/onRunCreated'
 export { geocodeCustomerOnCreate, geocodeCustomerOnUpdate }       from './triggers/geocodeCustomer'
 export { processAutopay }         from './scheduled/processAutopay'
 export { lowLevelAlertCheck }     from './scheduled/lowLevelAlertCheck'
 export { overdueInvoiceCheck }    from './scheduled/overdueInvoiceCheck'
 export { certExpiryCheck }        from './scheduled/certExpiryCheck'
 export { scheduleRecurringOrders } from './scheduleRecurringOrders'
-export { generateInvoicePdf, generateQuotePdf, optimizeRoute }    from './callables'
+export { generateInvoicePdf, generateQuotePdf, optimizeRoute, backfillGeocodeCustomers } from './callables'
 export { optimizeOrderRoute }                                     from './maps/optimizeRoute'
 
 export const healthCheck = onRequest((_req, res) => {

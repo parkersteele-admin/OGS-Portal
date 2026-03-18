@@ -75,7 +75,7 @@ function buildAddressString(data: Record<string, unknown>): string {
   return [street, city, `${state} ${zip}`.trim()].filter(Boolean).join(', ')
 }
 
-async function performGeocode(
+export async function performGeocode(
   customerId: string,
   customerData: Record<string, unknown>,
 ): Promise<void> {

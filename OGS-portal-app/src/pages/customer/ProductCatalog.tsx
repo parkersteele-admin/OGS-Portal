@@ -18,63 +18,41 @@ function fmt(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n)
 }
 
-const GAS_ICON: Record<string, string> = {
-  co2:      '🧊',
-  carbon:   '🧊',
-  nitrogen: '💨',
-  beer:     '🍺',
-  argon:    '⚗️',
-  rental:   '🔄',
-  fee:      '📋',
-}
+// ── Product row (list item) ──────────────────────────────────────────────────
 
-function productIcon(name: string): string {
-  const key = name.toLowerCase()
-  for (const [k, icon] of Object.entries(GAS_ICON)) {
-    if (key.includes(k)) return icon
-  }
-  return '📦'
-}
-
-// ── Product card ──────────────────────────────────────────────────────────────
-
-interface ProductCardProps {
+interface ProductRowProps {
   product: Product
   onOrder: (productId: string) => void
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({ product, onOrder }) => (
-  <article className="pc-card" aria-label={product.name}>
-    {product.isFeatured && (
-      <span className="pc-card__badge" aria-label="Popular product">Popular</span>
-    )}
-    <div className="pc-card__icon" aria-hidden="true">{productIcon(product.name)}</div>
-    <div className="pc-card__body">
-      <h3 className="pc-card__name">{product.name}</h3>
-      {product.sizeLabel && (
-        <div className="pc-card__size">{product.sizeLabel}</div>
-      )}
-      {product.description && (
-        <p className="pc-card__desc">{product.description}</p>
+const ProductRow: React.FC<ProductRowProps> = ({ product, onOrder }) => (
+  <div className="pc-row" role="row" aria-label={product.name}>
+    <div className="pc-row__main">
+      <span className="pc-row__name">
+        {product.name}
+        {product.isFeatured && <span className="pc-row__popular">Popular</span>}
+      </span>
+      {(product.sizeLabel || product.description) && (
+        <span className="pc-row__meta">
+          {[product.sizeLabel, product.description].filter(Boolean).join(' · ')}
+        </span>
       )}
     </div>
-    <div className="pc-card__footer">
-      <div className="pc-card__pricing">
-        <span className="pc-card__price">{fmt(product.basePrice)}</span>
-        <span className="pc-card__unit"> / {product.unit}</span>
-        {product.rentalPrice != null && product.rentalPrice > 0 && (
-          <div className="pc-card__rental">+ {fmt(product.rentalPrice)}/mo rental</div>
-        )}
-      </div>
-      <button
-        className="pc-card__order-btn"
-        onClick={() => onOrder(product.id)}
-        aria-label={`Order ${product.name}`}
-      >
-        Add to Order
-      </button>
+    <div className="pc-row__pricing">
+      <span className="pc-row__price">{fmt(product.basePrice)}</span>
+      <span className="pc-row__unit">/ {product.unit}</span>
+      {product.rentalPrice != null && product.rentalPrice > 0 && (
+        <span className="pc-row__rental">+&nbsp;{fmt(product.rentalPrice)}/mo rental</span>
+      )}
     </div>
-  </article>
+    <button
+      className="pc-row__btn"
+      onClick={() => onOrder(product.id)}
+      aria-label={`Order ${product.name}`}
+    >
+      Order
+    </button>
+  </div>
 )
 
 // ── Category section ──────────────────────────────────────────────────────────
@@ -99,7 +77,7 @@ const CategorySection: React.FC<CategorySectionProps> = ({
     >
       <h2 className="pc-category__title">{category}</h2>
       <div className="pc-category__meta">
-        <span className="pc-category__count">{products.length} product{products.length !== 1 ? 's' : ''}</span>
+        <span className="pc-category__count">{products.length} item{products.length !== 1 ? 's' : ''}</span>
         <span className="pc-category__chevron" aria-hidden="true">{collapsed ? '▸' : '▾'}</span>
       </div>
     </button>
@@ -107,10 +85,11 @@ const CategorySection: React.FC<CategorySectionProps> = ({
     {!collapsed && (
       <div
         id={`pc-cat-${category.replace(/\s/g, '-')}`}
-        className="pc-category__grid"
+        className="pc-category__list"
+        role="rowgroup"
       >
         {products.map((p) => (
-          <ProductCard key={p.id} product={p} onOrder={onOrder} />
+          <ProductRow key={p.id} product={p} onOrder={onOrder} />
         ))}
       </div>
     )}
@@ -172,21 +151,16 @@ const ProductCatalog: React.FC = () => {
     grouped[cat] = filtered.filter((p) => p.category === cat)
   }
 
-  const featuredCount = filtered.filter((p) => p.isFeatured).length
-  const featured = featuredCount > 0 ? filtered.filter((p) => p.isFeatured) : []
-
   return (
     <div className="pc-page">
-      {/* Hero */}
-      <div className="pc-hero">
-        <h1 className="pc-hero__title">Our Products</h1>
-        <p className="pc-hero__tagline">Reliable Gas. Local Service. Built for Ohio.</p>
-      </div>
-
-      {/* Search */}
-      <div className="pc-search-wrap">
+      {/* Page header */}
+      <div className="pc-header">
+        <div>
+          <h1 className="pc-header__title">Product Catalog</h1>
+          <p className="pc-header__sub">Select a product to place an order</p>
+        </div>
         <div className="pc-search">
-          <svg className="pc-search__icon" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <svg className="pc-search__icon" width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
             <path d="M11 11L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
@@ -211,17 +185,12 @@ const ProductCatalog: React.FC = () => {
         </div>
       ) : (
         <div className="pc-content">
-          {/* Featured strip */}
-          {featured.length > 0 && !search && (
-            <section className="pc-featured" aria-label="Popular products">
-              <h2 className="pc-featured__title">⭐ Popular Picks</h2>
-              <div className="pc-featured__grid">
-                {featured.map((p) => (
-                  <ProductCard key={p.id} product={p} onOrder={handleOrder} />
-                ))}
-              </div>
-            </section>
-          )}
+          {/* Column headers */}
+          <div className="pc-list-header" aria-hidden="true">
+            <span>Product</span>
+            <span>Unit Price</span>
+            <span />
+          </div>
 
           {/* All categories */}
           <div className="pc-categories">
