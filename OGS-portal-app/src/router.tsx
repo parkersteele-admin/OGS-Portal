@@ -54,6 +54,9 @@ import UserManagement from './pages/admin/UserManagement'
 // Customer catalog
 import ProductCatalog from './pages/customer/ProductCatalog'
 
+// New Order module
+import NewOrderPage from './modules/orders/new/NewOrderPage'
+
 // ── Root redirect: auth-aware, sends each role to their home ─────────────────
 const RootRedirect: React.FC = () => {
   const { user, loading, role } = useAuth()
@@ -171,6 +174,16 @@ export const Router: React.FC = () => (
 
       {/* 404 fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
+
+      {/* New Order — accessible to customer, dispatch, admin, sales */}
+      <Route
+        path="/orders/new"
+        element={
+          <ProtectedRoute role={['customer', 'dispatch', 'admin', 'sales']}>
+            <NewOrderPage />
+          </ProtectedRoute>
+        }
+      />
     </Routes>
   </BrowserRouter>
 )

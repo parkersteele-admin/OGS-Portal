@@ -50,6 +50,7 @@ export { processAutopay }         from './scheduled/processAutopay'
 export { lowLevelAlertCheck }     from './scheduled/lowLevelAlertCheck'
 export { overdueInvoiceCheck }    from './scheduled/overdueInvoiceCheck'
 export { certExpiryCheck }        from './scheduled/certExpiryCheck'
+export { scheduleRecurringOrders } from './scheduleRecurringOrders'
 export { generateInvoicePdf, generateQuotePdf, optimizeRoute }    from './callables'
 export { optimizeOrderRoute }                                     from './maps/optimizeRoute'
 

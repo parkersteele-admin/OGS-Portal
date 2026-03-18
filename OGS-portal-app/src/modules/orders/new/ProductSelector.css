@@ -1,0 +1,116 @@
+/* src/modules/orders/new/ProductSelector.css */
+
+.ps {
+  position: relative;
+  width: 100%;
+}
+
+.ps__input {
+  width: 100%;
+  height: 34px;
+  padding: 0 var(--space-3);
+  font-size: var(--font-size-13);
+  font-family: var(--font-sans);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text);
+  outline: none;
+  transition: border-color var(--transition-fast);
+  box-sizing: border-box;
+}
+
+.ps__input:focus,
+.ps__input--open {
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 2px var(--color-brand-border);
+}
+
+.ps__input:disabled {
+  background: var(--color-bg-2);
+  color: var(--color-text-3);
+  cursor: default;
+}
+
+/* Dropdown */
+.ps__dropdown {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  max-height: 320px;
+  overflow-y: auto;
+  z-index: 200;
+}
+
+.ps__empty {
+  padding: var(--space-4) var(--space-4);
+  font-size: var(--font-size-13);
+  color: var(--color-text-3);
+}
+
+.ps__group {
+  padding: var(--space-2) 0;
+}
+
+.ps__group + .ps__group {
+  border-top: 1px solid var(--color-bg-3);
+}
+
+.ps__group-label {
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--font-size-11);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-3);
+}
+
+.ps__option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2) var(--space-4);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.ps__option:hover {
+  background: var(--color-bg-2);
+}
+
+.ps__option--selected {
+  background: var(--color-brand-light);
+}
+
+.ps__option--dimmed {
+  opacity: 0.45;
+}
+
+.ps__option-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ps__option-name {
+  font-size: var(--font-size-13);
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.ps__popular {
+  font-size: var(--font-size-11);
+  font-weight: 600;
+  color: var(--color-brand);
+  letter-spacing: 0.02em;
+}
+
+.ps__option-size {
+  font-size: var(--font-size-12);
+  color: var(--color-text-3);
+}

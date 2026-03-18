@@ -1,0 +1,260 @@
+/* src/modules/orders/new/OrderLineItems.css */
+
+.oli {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.oli-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-13);
+}
+
+/* Header */
+.oli-thead {
+  background: var(--color-bg-2);
+}
+
+.oli-th {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-size-12);
+  font-weight: 600;
+  text-align: left;
+  color: var(--color-text-2);
+  white-space: nowrap;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.oli-th--qty,
+.oli-th--price,
+.oli-th--total {
+  text-align: right;
+}
+
+.oli-th--rental {
+  text-align: center;
+}
+
+.oli-th--remove {
+  width: 32px;
+}
+
+/* Column widths */
+.oli-th--product  { min-width: 220px; }
+.oli-th--size     { width: 120px; }
+.oli-th--qty      { width: 72px; }
+.oli-th--price    { width: 100px; }
+.oli-th--rental   { width: 110px; }
+.oli-th--total    { width: 100px; }
+
+/* Body rows */
+.oli-row {
+  border-bottom: 1px solid var(--color-bg-3);
+  transition: background var(--transition-fast);
+}
+
+.oli-row:hover {
+  background: var(--color-bg-2);
+}
+
+.oli-td {
+  padding: var(--space-2) var(--space-3);
+  vertical-align: middle;
+}
+
+.oli-td--qty,
+.oli-td--price,
+.oli-td--total {
+  text-align: right;
+}
+
+.oli-td--rental {
+  text-align: center;
+}
+
+/* Empty state */
+.oli-empty {
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+  color: var(--color-text-3);
+  font-size: var(--font-size-13);
+}
+
+/* Size label */
+.oli-size-label {
+  color: var(--color-text-2);
+  white-space: nowrap;
+}
+
+/* Qty input */
+.oli-qty-input {
+  width: 60px;
+  height: 32px;
+  padding: 0 var(--space-2);
+  text-align: right;
+  font-size: var(--font-size-13);
+  font-family: var(--font-sans);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  outline: none;
+  background: var(--color-bg);
+  color: var(--color-text);
+  transition: border-color var(--transition-fast);
+  /* Hide spinner arrows */
+  -moz-appearance: textfield;
+}
+
+.oli-qty-input::-webkit-outer-spin-button,
+.oli-qty-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.oli-qty-input:focus {
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 2px var(--color-brand-border);
+}
+
+/* Unit price — read-only */
+.oli-price-ro {
+  color: var(--color-text-2);
+  display: block;
+  text-align: right;
+}
+
+/* Unit price — editable (dispatch/admin) */
+.oli-price-input {
+  width: 88px;
+  height: 32px;
+  padding: 0 var(--space-2);
+  text-align: right;
+  font-size: var(--font-size-13);
+  font-family: var(--font-sans);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  outline: none;
+  background: var(--color-bg);
+  color: var(--color-text);
+  transition: border-color var(--transition-fast);
+  -moz-appearance: textfield;
+}
+
+.oli-price-input::-webkit-outer-spin-button,
+.oli-price-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.oli-price-input--editable {
+  background: var(--color-brand-light);
+  border-color: var(--color-brand-border);
+  color: var(--color-brand-dark);
+}
+
+.oli-price-input--editable:focus {
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 2px var(--color-brand-border);
+}
+
+/* Rental */
+.oli-rental-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  justify-content: center;
+}
+
+.oli-rental-check {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--color-brand);
+  cursor: pointer;
+}
+
+.oli-rental-price {
+  font-size: var(--font-size-12);
+  color: var(--color-text-2);
+}
+
+.oli-rental-na {
+  color: var(--color-text-3);
+  display: block;
+  text-align: center;
+}
+
+/* Line total */
+.oli-line-total {
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+/* Remove button */
+.oli-remove-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: none;
+  color: var(--color-text-3);
+  font-size: var(--font-size-16);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.oli-remove-btn:hover {
+  background: #fee2e2;
+  color: var(--color-danger);
+}
+
+/* Footer */
+tfoot tr td {
+  padding: var(--space-3) var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.oli-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-size-13);
+  font-weight: 500;
+  color: var(--color-brand);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: var(--space-1) 0;
+  border-radius: var(--radius-sm);
+  transition: opacity var(--transition-fast);
+}
+
+.oli-add-btn:hover {
+  opacity: 0.75;
+}
+
+.oli-subtotal-cell {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  padding-right: var(--space-3);
+}
+
+.oli-subtotal-label {
+  font-size: var(--font-size-11);
+  color: var(--color-text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.oli-subtotal-value {
+  font-size: var(--font-size-16);
+  font-weight: 700;
+  color: var(--color-text);
+}

@@ -1,0 +1,186 @@
+/* src/modules/orders/new/RecurringSetup.css */
+
+.rs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* Fieldset */
+.rs__fieldset {
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.rs__legend {
+  font-size: var(--font-size-13);
+  font-weight: 600;
+  color: var(--color-text-2);
+  margin-bottom: var(--space-3);
+}
+
+/* Frequency buttons grid */
+.rs__freq-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.rs__freq-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font-size: var(--font-size-13);
+  font-weight: 500;
+  color: var(--color-text-2);
+  cursor: pointer;
+  background: var(--color-bg);
+  transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+  text-align: center;
+}
+
+.rs__freq-btn:hover {
+  border-color: var(--color-brand);
+  color: var(--color-text);
+}
+
+.rs__freq-btn--active {
+  border-color: var(--color-brand);
+  background: var(--color-brand-light);
+  color: var(--color-brand-dark);
+}
+
+.rs__freq-radio {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+/* Custom interval */
+.rs__custom-interval {
+  margin-top: var(--space-3);
+}
+
+/* Fields */
+.rs__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.rs__label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--font-size-13);
+  font-weight: 500;
+  color: var(--color-text-2);
+}
+
+.rs__label--mt {
+  margin-top: var(--space-2);
+}
+
+.rs__input {
+  height: 36px;
+  padding: 0 var(--space-3);
+  font-size: var(--font-size-13);
+  font-family: var(--font-sans);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text);
+  outline: none;
+  transition: border-color var(--transition-fast);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.rs__input:focus {
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 2px var(--color-brand-border);
+}
+
+.rs__input--narrow {
+  width: 100px;
+}
+
+.rs__no-end {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-13);
+  color: var(--color-text-2);
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.rs__checkbox {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--color-brand);
+  cursor: pointer;
+}
+
+/* Summary */
+.rs__summary {
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-brand-light);
+  border: 1px solid var(--color-brand-border);
+  border-radius: var(--radius);
+  font-size: var(--font-size-13);
+  color: var(--color-text);
+  line-height: 1.5;
+}
+
+/* Actions */
+.rs__actions {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: flex-end;
+}
+
+.rs__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  padding: 0 var(--space-5);
+  font-size: var(--font-size-13);
+  font-weight: 500;
+  font-family: var(--font-sans);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: opacity var(--transition-fast), background var(--transition-fast);
+  border: 1px solid transparent;
+}
+
+.rs__btn--primary {
+  background: var(--color-brand);
+  color: #fff;
+  border-color: var(--color-brand);
+}
+
+.rs__btn--primary:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.rs__btn--primary:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.rs__btn--ghost {
+  background: none;
+  color: var(--color-text-2);
+  border-color: var(--color-border);
+}
+
+.rs__btn--ghost:hover {
+  background: var(--color-bg-2);
+}
