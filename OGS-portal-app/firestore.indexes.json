@@ -397,6 +397,35 @@
         { "fieldPath": "fileType",   "order": "ASCENDING" },
         { "fieldPath": "createdAt",  "order": "DESCENDING" }
       ]
+    },
+
+    // ── tanks ─────────────────────────────────────────────────────────────────
+
+    // subscribeToDriverTruckTanks: where(status=on_truck) + where(driverId)
+    {
+      "collectionGroup": "tanks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status",   "order": "ASCENDING" },
+        { "fieldPath": "driverId", "order": "ASCENDING" }
+      ]
+    },
+    // getDriverPendingReturns: where(status=deployed) + where(driverId)
+    {
+      "collectionGroup": "tanks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status",                 "order": "ASCENDING" },
+        { "fieldPath": "pendingReturnDriverId",  "order": "ASCENDING" }
+      ]
+    },
+    // tank events: orderBy(timestamp desc)
+    {
+      "collectionGroup": "events",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
     }
 
   ],

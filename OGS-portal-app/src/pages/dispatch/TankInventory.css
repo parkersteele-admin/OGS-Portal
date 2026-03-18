@@ -1140,3 +1140,104 @@
   .ti-form-grid { grid-template-columns: 1fr; }
   .ti-tabs { overflow-x: auto; }
 }
+
+/* ── QR modal ──────────────────────────────────────────────────────────────── */
+
+.ti-modal--qr { max-width: 320px; }
+
+.ti-qr-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.ti-qr-serial {
+  font-size: var(--font-size-14);
+  color: var(--color-text-2);
+  margin: 0;
+}
+
+.ti-qr-hint {
+  font-size: var(--font-size-12);
+  color: var(--color-text-3);
+  text-align: center;
+  margin: 0;
+}
+
+/* ── Tank timeline ─────────────────────────────────────────────────────────── */
+
+.ti-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  position: relative;
+  padding-left: 28px;
+}
+.ti-timeline::before {
+  content: '';
+  position: absolute;
+  left: 10px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--color-border);
+}
+
+.ti-timeline__item {
+  position: relative;
+  padding-bottom: var(--space-4);
+}
+
+.ti-timeline__dot {
+  position: absolute;
+  left: -22px;
+  top: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  z-index: 1;
+  border: 2px solid var(--color-bg);
+}
+
+.ti-timeline__content {
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
+}
+
+.ti-timeline__label {
+  font-size: var(--font-size-13);
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 2px;
+}
+
+.ti-timeline__actor {
+  font-size: var(--font-size-12);
+  color: var(--color-text-2);
+}
+
+.ti-timeline__detail {
+  font-size: var(--font-size-12);
+  color: var(--color-text-3);
+}
+
+.ti-timeline__time {
+  font-size: var(--font-size-11);
+  color: var(--color-text-3);
+  margin-top: 4px;
+}
+
+/* ── on_truck status badge ─────────────────────────────────────────────────── */
+
+.ti-status-badge--on_truck {
+  background: #dbeafe;
+  color: #1e40af;
+}

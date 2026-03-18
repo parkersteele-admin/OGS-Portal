@@ -52,6 +52,9 @@ import type { AppFile } from '../../types/file'
 import type { DeliveryTier } from '../../types/order'
 import './TankInventory.css'
 import * as XLSX from 'xlsx'
+import { QRCodeSVG } from 'qrcode.react'
+import { subscribeToTankEvents } from '../../services/tankService'
+import type { TankEvent } from '../../types/tank'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -60,6 +63,7 @@ const LOW_LEVEL_THRESHOLD = 25     // % — show in alert section
 
 const STATUS_LABELS: Record<TankStatus, string> = {
   available:  'Available',
+  on_truck:   'On Truck',
   deployed:   'Deployed',
   returned:   'Returned',
   inspection: 'Inspection',
@@ -119,10 +123,11 @@ interface StockGroup {
   key: string
   gasType: string
   sizeLabel: string
-  available: number
-  deployed: number
+  available:  number
+  on_truck:   number
+  deployed:   number
   inspection: number
-  returned: number
+  returned:   number
 }
 
 function StockCard({ group }: { group: StockGroup }) {
@@ -398,6 +403,7 @@ function CylinderDetailPanel({ tank, customer, onClose, onRefill, onEdit }: Cyli
   const [editRate, setEditRate] = useState(false)
   const [rateVal, setRateVal] = useState(String(tank.monthlyRate ?? ''))
   const [savingRate, setSavingRate] = useState(false)
+  const [showQR, setShowQR] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -443,6 +449,7 @@ function CylinderDetailPanel({ tank, customer, onClose, onRefill, onEdit }: Cyli
   const days = daysUntil(tank.nextInspectionDate)
 
   return (
+    <>
     <div className="ti-panel-overlay" onClick={onClose}>
       <div
         className="ti-panel"
@@ -607,10 +614,19 @@ function CylinderDetailPanel({ tank, customer, onClose, onRefill, onEdit }: Cyli
               {uploading ? `Uploading ${uploadPct}%…` : '+ Upload Document'}
             </Button>
           </section>
+
+          {/* Event timeline */}
+          <section className="ti-panel__section">
+            <div className="ti-panel__section-title">Activity Timeline</div>
+            <TankTimeline tankId={tank.id} />
+          </section>
         </div>
 
         {/* Footer */}
         <div className="ti-panel__footer">
+          <Button variant="ghost" size="sm" onClick={() => setShowQR(true)}>
+            📱 QR Code
+          </Button>
           <Button variant="secondary" size="sm" onClick={onEdit}>
             ✏️ Edit
           </Button>
@@ -622,6 +638,8 @@ function CylinderDetailPanel({ tank, customer, onClose, onRefill, onEdit }: Cyli
         </div>
       </div>
     </div>
+    {showQR && <TankQRModal tank={tank} onClose={() => setShowQR(false)} />}
+    </>
   )
 }
 
@@ -804,6 +822,79 @@ function AddCylinderModal({ onClose, onCreated }: AddCylinderModalProps) {
           </div>
         </form>
       </div>
+    </div>
+  )
+}
+
+// ── Tank QR code modal ─────────────────────────────────────────────────────────
+
+function TankQRModal({ tank, onClose }: { tank: Tank; onClose: () => void }) {
+  const qrValue = `https://ogs-portal.web.app/driver/truck?scan=${tank.id}`
+  return (
+    <div className="ti-overlay" onClick={onClose}>
+      <div className="ti-modal ti-modal--qr" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Tank QR code">
+        <div className="ti-modal__header">
+          <h2 className="ti-modal__title">QR Code — {tank.serialNumber}</h2>
+          <button className="ti-modal__close" onClick={onClose} aria-label="Close">✕</button>
+        </div>
+        <div className="ti-qr-body">
+          <QRCodeSVG value={qrValue} size={220} includeMargin />
+          <p className="ti-qr-serial">{tank.gasType} · {tank.sizeLabel}</p>
+          <p className="ti-qr-hint">Scan with driver app to load / return this tank</p>
+          <Button variant="secondary" size="sm" onClick={() => window.print()}>🖨 Print</Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Tank event timeline ────────────────────────────────────────────────────────
+
+const EVENT_LABELS: Record<string, { icon: string; label: string; color: string }> = {
+  created:                { icon: '🏭', label: 'Added to inventory', color: '#6b7280' },
+  loaded_to_truck:        { icon: '🚛', label: 'Loaded to truck',    color: '#3b82f6' },
+  unloaded_from_truck:    { icon: '📦', label: 'Unloaded from truck', color: '#6b7280' },
+  delivered_to_customer:  { icon: '✅', label: 'Delivered to customer', color: '#22c55e' },
+  empty_returned:         { icon: '🔙', label: 'Empty returned',     color: '#f59e0b' },
+  status_changed:         { icon: '🔄', label: 'Status changed',     color: '#8b5cf6' },
+  inspection_updated:     { icon: '🔍', label: 'Inspection updated', color: '#0ea5e9' },
+}
+
+function TankTimeline({ tankId }: { tankId: string }) {
+  const [events, setEvents] = useState<TankEvent[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    setLoading(true)
+    const unsub = subscribeToTankEvents(tankId, (evts) => {
+      setEvents(evts)
+      setLoading(false)
+    })
+    return unsub
+  }, [tankId])
+
+  if (loading) return <p className="ti-panel__hint">Loading timeline…</p>
+  if (events.length === 0) return <p className="ti-panel__hint">No events recorded yet.</p>
+
+  return (
+    <div className="ti-timeline">
+      {events.map((evt, i) => {
+        const cfg = EVENT_LABELS[evt.type] ?? { icon: '•', label: evt.type, color: '#6b7280' }
+        const ts = evt.timestamp?.toDate ? evt.timestamp.toDate() : null
+        return (
+          <div key={evt.id} className={`ti-timeline__item${i === 0 ? ' ti-timeline__item--first' : ''}`}>
+            <div className="ti-timeline__dot" style={{ background: cfg.color }}>{cfg.icon}</div>
+            <div className="ti-timeline__content">
+              <div className="ti-timeline__label">{cfg.label}</div>
+              {evt.actorName && <div className="ti-timeline__actor">{evt.actorName}</div>}
+              {evt.customerName && <div className="ti-timeline__detail">Customer: {evt.customerName}</div>}
+              {evt.signedBy && <div className="ti-timeline__detail">Signed by: {evt.signedBy}</div>}
+              {evt.note && <div className="ti-timeline__detail">{evt.note}</div>}
+              {ts && <div className="ti-timeline__time">{ts.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</div>}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -1131,11 +1222,12 @@ export default function TankInventory() {
         gasType: t.gasType,
         sizeLabel: t.sizeLabel,
         available: 0,
+        on_truck: 0,
         deployed: 0,
         inspection: 0,
         returned: 0,
       }
-      existing[t.status] = (existing[t.status] ?? 0) + 1
+      ;(existing as unknown as Record<string, number>)[t.status] = ((existing as unknown as Record<string, number>)[t.status] ?? 0) + 1
       map.set(key, existing)
     })
     return [...map.values()].sort((a, b) =>
@@ -1156,12 +1248,13 @@ export default function TankInventory() {
 
   const tabCounts = useMemo(
     () => ({
-      all: allTanks.length,
-      available: allTanks.filter((t) => t.status === 'available').length,
-      deployed: allTanks.filter((t) => t.status === 'deployed').length,
-      returned: allTanks.filter((t) => t.status === 'returned').length,
+      all:        allTanks.length,
+      available:  allTanks.filter((t) => t.status === 'available').length,
+      on_truck:   allTanks.filter((t) => t.status === 'on_truck').length,
+      deployed:   allTanks.filter((t) => t.status === 'deployed').length,
+      returned:   allTanks.filter((t) => t.status === 'returned').length,
       inspection: allTanks.filter((t) => t.status === 'inspection').length,
-    }),
+    } as Record<TabKey, number>),
     [allTanks],
   )
 

@@ -11,12 +11,13 @@ import {
   where,
   orderBy,
   serverTimestamp,
+  collection,
   type QueryConstraint,
   type Unsubscribe,
 } from 'firebase/firestore'
 import { db } from '../lib/firebase'
-import { tanksCol, customerTanksCol } from '../lib/firestore'
-import type { Tank, TankStatus, TankOwnership } from '../types/tank'
+import { tanksCol, customerTanksCol, tankEventsCol } from '../lib/firestore'
+import type { Tank, TankStatus, TankOwnership, TankEvent, TankEventType } from '../types/tank'
 import {
   serviceCall,
   fromSnap,
@@ -46,7 +47,8 @@ export interface CreateTankInput {
 
 // Valid lifecycle transitions
 const VALID_TRANSITIONS: Record<TankStatus, TankStatus[]> = {
-  available:  ['deployed', 'inspection'],
+  available:  ['on_truck', 'deployed', 'inspection'],
+  on_truck:   ['available', 'deployed', 'returned'],
   deployed:   ['returned', 'inspection'],
   returned:   ['available', 'inspection'],
   inspection: ['available', 'returned'],
@@ -183,5 +185,161 @@ export async function getTanksDueForInspection(days = 30): Promise<Tank[]> {
       ),
     )
     return snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Tank)
+  })
+}
+
+// ── Tank event log ────────────────────────────────────────────────────────────
+
+async function addTankEvent(
+  tankId: string,
+  type: TankEventType,
+  actorId: string,
+  actorName: string,
+  extra?: Partial<Omit<TankEvent, 'id' | 'type' | 'timestamp' | 'actorId' | 'actorName'>>,
+): Promise<void> {
+  const eventsCol = collection(db, `tanks/${tankId}/events`)
+  await addDoc(eventsCol, {
+    type,
+    timestamp: serverTimestamp(),
+    actorId,
+    actorName,
+    ...extra,
+  })
+}
+
+export async function getTankEvents(tankId: string): Promise<TankEvent[]> {
+  return serviceCall(async () => {
+    const evCol = tankEventsCol(tankId)
+    const snap = await getDocs(query(evCol, orderBy('timestamp', 'desc')))
+    return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<TankEvent, 'id'>) }))
+  })
+}
+
+export function subscribeToTankEvents(
+  tankId: string,
+  callback: (events: TankEvent[]) => void,
+): Unsubscribe {
+  const evCol = tankEventsCol(tankId)
+  return onSnapshot(query(evCol, orderBy('timestamp', 'desc')), (snap) => {
+    callback(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<TankEvent, 'id'>) })))
+  })
+}
+
+// ── Driver operations ─────────────────────────────────────────────────────────
+
+/** Load a tank from inventory onto a driver's truck. */
+export async function loadTankToTruck(
+  tankId: string,
+  driverId: string,
+  driverName: string,
+): Promise<void> {
+  return serviceCall(async () => {
+    const tank = await getTank(tankId)
+    if (tank.status !== 'available') {
+      throw new OgsValidationError(
+        `Tank ${tank.serialNumber} is not available (currently: ${tank.status}).`,
+      )
+    }
+    await updateTank(tankId, {
+      status: 'on_truck',
+      driverId,
+      driverName,
+      loadedAt: serverTimestamp() as unknown as Tank['loadedAt'],
+    })
+    await addTankEvent(tankId, 'loaded_to_truck', driverId, driverName)
+  })
+}
+
+/** Mark a tank as delivered to a customer (driver action). */
+export async function deliverTankToCustomer(
+  tankId: string,
+  customerId: string,
+  customerName: string,
+  driverId: string,
+  driverName: string,
+  signedBy?: string,
+): Promise<void> {
+  return serviceCall(async () => {
+    const tank = await getTank(tankId)
+    if (tank.status !== 'on_truck') {
+      throw new OgsValidationError(`Tank ${tank.serialNumber} is not on a truck.`)
+    }
+    await updateTank(tankId, {
+      status: 'deployed',
+      customerId,
+      driverId: undefined,
+      driverName: undefined,
+    })
+    await addTankEvent(tankId, 'delivered_to_customer', driverId, driverName, {
+      customerId,
+      customerName,
+      signedBy,
+    })
+  })
+}
+
+/** Driver checks in an empty tank returned from a customer. */
+export async function checkInEmptyTank(
+  tankId: string,
+  driverId: string,
+  driverName: string,
+  note?: string,
+): Promise<void> {
+  return serviceCall(async () => {
+    const tank = await getTank(tankId)
+    if (tank.status !== 'deployed') {
+      throw new OgsValidationError(
+        `Tank ${tank.serialNumber} is not deployed at a customer (currently: ${tank.status}).`,
+      )
+    }
+    await updateTank(tankId, {
+      status: 'returned',
+      driverId: undefined,
+      driverName: undefined,
+      customerId: 'WAREHOUSE',
+    })
+    await addTankEvent(tankId, 'empty_returned', driverId, driverName, { note })
+  })
+}
+
+/** Get all tanks currently on a specific driver's truck. */
+export async function getDriverTruckTanks(driverId: string): Promise<Tank[]> {
+  return serviceCall(async () => {
+    const snap = await getDocs(
+      query(tanksCol, where('status', '==', 'on_truck'), where('driverId', '==', driverId)),
+    )
+    return snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Tank)
+  })
+}
+
+/** Subscribe to all tanks on a driver's truck in real time. */
+export function subscribeToDriverTruckTanks(
+  driverId: string,
+  callback: (tanks: Tank[]) => void,
+): Unsubscribe {
+  return onSnapshot(
+    query(tanksCol, where('status', '==', 'on_truck'), where('driverId', '==', driverId)),
+    (snap) => callback(snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Tank)),
+  )
+}
+
+/**
+ * Returns deployed tanks that the driver last touched —
+ * used to determine if a driver has empties waiting to be checked in.
+ */
+export async function getDriverPendingReturns(driverId: string): Promise<Tank[]> {
+  return serviceCall(async () => {
+    const snap = await getDocs(
+      query(
+        tanksCol,
+        where('status', '==', 'deployed'),
+        // We store lastDriverId for return tracking — fall back to basic deployed check
+      ),
+    )
+    // Filter client-side by driverId presence in events is complex;
+    // instead we track pendingReturn via a dedicated field:
+    return snap.docs
+      .map((d) => ({ ...d.data(), id: d.id }) as Tank)
+      .filter((t) => (t as Tank & { pendingReturnDriverId?: string }).pendingReturnDriverId === driverId)
   })
 }

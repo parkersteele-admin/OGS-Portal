@@ -1,9 +1,30 @@
 import type { Timestamp } from 'firebase/firestore'
 
-export type TankStatus = 'available' | 'deployed' | 'returned' | 'inspection'
+export type TankStatus = 'available' | 'on_truck' | 'deployed' | 'returned' | 'inspection'
 
 /** Who legally owns the physical tank. */
 export type TankOwnership = 'company' | 'customer'
+
+export type TankEventType =
+  | 'created'
+  | 'loaded_to_truck'
+  | 'unloaded_from_truck'
+  | 'delivered_to_customer'
+  | 'empty_returned'
+  | 'status_changed'
+  | 'inspection_updated'
+
+export interface TankEvent {
+  id: string
+  type: TankEventType
+  timestamp: Timestamp
+  actorId: string
+  actorName: string
+  note?: string
+  customerId?: string
+  customerName?: string
+  signedBy?: string
+}
 
 export interface Tank {
   id: string
@@ -26,4 +47,10 @@ export interface Tank {
   lastInspectionDate?: Timestamp
   nextInspectionDate?: Timestamp
   notes?: string
+  /** Driver UID when status is on_truck */
+  driverId?: string
+  /** Driver display name when status is on_truck */
+  driverName?: string
+  /** Loaded onto truck at */
+  loadedAt?: Timestamp
 }

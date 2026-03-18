@@ -36,6 +36,7 @@ import InventoryPage from './pages/dispatch/InventoryPage'
 import SchedulePage from './pages/driver/SchedulePage'
 import StopPage from './pages/driver/StopPage'
 import CapturePage from './pages/driver/CapturePage'
+import TruckPage from './pages/driver/TruckPage'
 
 // CRM
 import CustomersPage from './pages/crm/CustomersPage'
@@ -130,6 +131,7 @@ export const Router: React.FC = () => (
         <Route path="stop/:id" element={<StopPage />} />
         <Route path="capture/:id" element={<CapturePage />} />
         <Route path="summary/:runId" element={<StopPage />} />
+        <Route path="truck" element={<TruckPage />} />
       </Route>
 
       {/* CRM Portal */}

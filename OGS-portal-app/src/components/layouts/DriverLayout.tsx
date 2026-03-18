@@ -10,6 +10,7 @@ import './Layout.css'
 
 const NAV_ITEMS: SidebarItem[] = [
   { to: '/driver/schedule', label: 'My Schedule', icon: '∷' },
+  { to: '/driver/truck',    label: 'My Truck',    icon: '🚛' },
 ]
 
 const MOBILE_ITEMS: MobileNavItem[] = NAV_ITEMS.map(

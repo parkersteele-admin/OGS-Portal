@@ -99,9 +99,28 @@ service cloud.firestore {
 
     // ── Tanks (top-level) ─────────────────────────────────────────────────────
     match /tanks/{tankId} {
-      allow read:  if isDispatch()
+      allow read:  if isDispatch() || isDriver()
         || (isCustomer() && resource.data.customerId == linkedCustomerId());
-      allow write: if isDispatch();
+      // Drivers can only update their own on_truck tanks or return deployed tanks
+      allow update: if isDispatch()
+        || (isDriver() && (
+          // Loading available → on_truck (their driverId)
+          (resource.data.status == 'available' && request.resource.data.status == 'on_truck'
+           && request.resource.data.driverId == request.auth.uid)
+          // Delivering on_truck → deployed
+          || (resource.data.status == 'on_truck' && resource.data.driverId == request.auth.uid
+              && request.resource.data.status == 'deployed')
+          // Checking in deployed → returned
+          || (resource.data.status == 'deployed' && request.resource.data.status == 'returned')
+        ));
+      allow create, delete: if isDispatch();
+
+      match /events/{eventId} {
+        allow read:  if isDispatch() || isDriver()
+          || (isCustomer() && get(/databases/$(database)/documents/tanks/$(tankId)).data.customerId == linkedCustomerId());
+        allow create: if isDispatch() || isDriver();
+        allow update, delete: if false;
+      }
     }
 
 
