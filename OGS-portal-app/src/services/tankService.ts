@@ -133,10 +133,14 @@ export async function updateTank(
   return serviceCall(async () => {
     const update = { ...data, updatedAt: serverTimestamp() }
     const tank = await getTank(id)
-    await Promise.all([
-      updateDoc(doc(db, 'tanks', id), update),
-      updateDoc(doc(db, `customers/${tank.customerId}/tanks`, id), update),
-    ])
+    const writes: Promise<void>[] = [updateDoc(doc(db, 'tanks', id), update)]
+    // Only sync the customer subcollection when a customerId exists AND the
+    // status change is not a driver-only operation (loaded/returned have no
+    // customer context). Subcollection writes require dispatch permissions.
+    if (tank.customerId && data.status !== 'on_truck' && data.status !== 'returned') {
+      writes.push(updateDoc(doc(db, `customers/${tank.customerId}/tanks`, id), update))
+    }
+    await Promise.all(writes)
   })
 }
 

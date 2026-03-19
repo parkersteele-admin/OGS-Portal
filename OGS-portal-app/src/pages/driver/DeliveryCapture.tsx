@@ -209,9 +209,10 @@ export default function DeliveryCapture() {
   const [sigUploading, setSigUploading]   = useState(false)
 
   // Step 5 — confirm dialog
-  const [showConfirm, setShowConfirm] = useState(false)
-  const [submitting,  setSubmitting]  = useState(false)
-  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [showConfirm,    setShowConfirm]    = useState(false)
+  const [submitting,     setSubmitting]     = useState(false)
+  const [submitError,    setSubmitError]    = useState<string | null>(null)
+  const [deliveryNotes,  setDeliveryNotes]  = useState('')
 
   // Skip stop drawer
   const [showSkip,    setShowSkip]    = useState(false)
@@ -339,9 +340,9 @@ export default function DeliveryCapture() {
     try {
       const updates: Partial<Omit<RunStop, 'id' | 'runId'>> = {
         gallonsDelivered: qtyDelivered,
-        notes: stop.notes,
+        notes: deliveryNotes.trim() || undefined,
       }
-      if (photoUrl)  updates.photoUrls  = [photoUrl]
+      if (photoUrl)  updates.photoUrls   = [photoUrl]
       if (sigUrl)    updates.signatureUrl = sigUrl
 
       await updateRunStop(runId, stop.id, updates)
@@ -679,6 +680,20 @@ export default function DeliveryCapture() {
                   : '—'}
               </span>
             </div>
+          </div>
+
+          <div className="dc-field">
+            <label className="dc-field__label" htmlFor="dc-delivery-notes">
+              Delivery notes <span className="dc-field__hint">(optional)</span>
+            </label>
+            <textarea
+              id="dc-delivery-notes"
+              className="dc-textarea"
+              rows={3}
+              placeholder="e.g. left at side door, gate code 1234, spoke with John…"
+              value={deliveryNotes}
+              onChange={(e) => setDeliveryNotes(e.target.value)}
+            />
           </div>
 
           {submitError && (

@@ -121,6 +121,57 @@
   border: 1px solid var(--color-border);
 }
 
+.rs-status-badge--cancelled {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+
+/* ── Reassign driver ───────────────────────────────────────────────────────── */
+.rs-reassign {
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4) var(--space-5);
+}
+
+.rs-reassign__title {
+  font-size: var(--font-size-14);
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0 0 var(--space-3);
+}
+
+.rs-reassign__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.rs-reassign__select {
+  flex: 1;
+  min-width: 200px;
+  padding: var(--space-2) var(--space-3);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius);
+  font-size: var(--font-size-14);
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+.rs-reassign__select:focus {
+  outline: none;
+  border-color: var(--color-brand);
+}
+
+.rs-reassign__error {
+  margin: var(--space-2) 0 0;
+  font-size: var(--font-size-13);
+  color: var(--color-danger);
+}
+
 /* ── KPI cards row ─────────────────────────────────────────────────────────── */
 
 .rs-kpis {

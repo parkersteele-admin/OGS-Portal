@@ -454,6 +454,13 @@ export default function DispatchMapPage() {
       null,
   )
 
+  // Keep runId in sync when the URL param changes (e.g. after RunSelector navigation)
+  useEffect(() => {
+    if (params.runId && params.runId !== runId) {
+      setRunId(params.runId)
+    }
+  }, [params.runId])
+
   const { run, stops, loading } = useActiveRun(runId)
   const [driver, setDriver] = useState<AppUser | null>(null)
   const [customers, setCustomers] = useState<Record<string, Customer>>({})
@@ -535,7 +542,9 @@ export default function DispatchMapPage() {
     if (!runId) return
     setEndingRun(true)
     try {
-      await updateRun(runId, { status: 'completed' as RunStatus })
+      const hasPending = stops.some((s) => s.status === 'pending' || s.status === 'arrived')
+      const newStatus: RunStatus = hasPending ? 'cancelled' : 'completed'
+      await updateRun(runId, { status: newStatus })
       navigate('/ops/dashboard')
     } catch {
       setEndingRun(false)
@@ -553,7 +562,7 @@ export default function DispatchMapPage() {
     (s) => s.status === 'completed' || s.status === 'skipped',
   ).length
 
-  // ── No run selected → show run picker ────────────────────────────────────────
+  // No run selected → show run picker
   if (!runId) {
     return (
       <div className="dm-page">
@@ -561,7 +570,7 @@ export default function DispatchMapPage() {
           <span className="dm-topbar__title">Dispatch</span>
         </div>
         <div className="dm-body">
-          <RunSelector onSelect={setRunId} />
+          <RunSelector onSelect={(id) => navigate(`/ops/dispatch/${id}`, { replace: true })} />
         </div>
       </div>
     )

@@ -29,6 +29,9 @@ import { db } from '../../lib/firebase'
 import { ordersCol, customersCol, invoicesCol, productsCol } from '../../lib/firestore'
 import { getRun, getRunStops, updateRun } from '../../services/runService'
 import { updateOrder } from '../../services/orderService'
+import { getUsersByRole } from '../../services/userService'
+import { useAuth } from '../../hooks/useAuth'
+import type { AppUser } from '../../types/user'
 import type { Run, RunStop } from '../../types/run'
 import type { Order } from '../../types/order'
 import type { Invoice } from '../../types/billing'
@@ -139,6 +142,7 @@ function downloadCsv(
 export default function RunSummary() {
   const { runId }  = useParams<{ runId: string }>()
   const navigate   = useNavigate()
+  const { isDispatch } = useAuth()
 
   const [run,        setRun]        = useState<Run | null>(null)
   const [stops,      setStops]      = useState<RunStop[]>([])
@@ -152,6 +156,19 @@ export default function RunSummary() {
   const [closingRun, setClosingRun] = useState(false)
   const [rescheduling, setRescheduling] = useState<Record<string, boolean>>({})
   const [rescheduled,  setRescheduled]  = useState<Set<string>>(new Set())
+  const [drivers,         setDrivers]         = useState<AppUser[]>([])
+  const [reassignDriverId, setReassignDriverId] = useState<string>('')
+  const [reassigning,      setReassigning]      = useState(false)
+  const [reassignError,    setReassignError]    = useState<string | null>(null)
+
+  // ── Load drivers for reassignment ──────────────────────────────────────────
+
+  useEffect(() => {
+    if (!isDispatch) return
+    getUsersByRole('driver')
+      .then((ds) => setDrivers(ds.filter((d) => d.active)))
+      .catch(() => { /* non-critical */ })
+  }, [isDispatch])
 
   // ── Data loading ─────────────────────────────────────────────────────────────
 
@@ -261,13 +278,33 @@ export default function RunSummary() {
   // ── Actions ───────────────────────────────────────────────────────────────────
 
   async function handleCloseRun() {
-    if (!run || run.status === 'completed') return
+    if (!run || run.status === 'completed' || run.status === 'cancelled') return
     setClosingRun(true)
     try {
-      await updateRun(run.id, { status: 'completed' })
-      setRun((prev) => (prev ? { ...prev, status: 'completed' } : prev))
+      // If any stops are still pending/arrived the run is being ended early → cancelled.
+      const hasPending = stops.some((s) => s.status === 'pending' || s.status === 'arrived')
+      const newStatus = hasPending ? 'cancelled' : 'completed'
+      await updateRun(run.id, { status: newStatus })
+      setRun((prev) => (prev ? { ...prev, status: newStatus } : prev))
     } finally {
       setClosingRun(false)
+    }
+  }
+
+  async function handleReassign() {
+    if (!run || !reassignDriverId) return
+    setReassigning(true)
+    setReassignError(null)
+    try {
+      await updateRun(run.id, { driverId: reassignDriverId })
+      const driver = drivers.find((d) => d.id === reassignDriverId)
+      setRun((prev) => (prev ? { ...prev, driverId: reassignDriverId } : prev))
+      setDriverName(driver?.name ?? reassignDriverId)
+      setReassignDriverId('')
+    } catch (err: unknown) {
+      setReassignError(err instanceof Error ? err.message : 'Reassignment failed.')
+    } finally {
+      setReassigning(false)
     }
   }
 
@@ -330,10 +367,14 @@ export default function RunSummary() {
         <div className="rs-header__right">
           <span
             className={`rs-status-badge rs-status-badge--${
-              run.status === 'completed' ? 'complete' : run.status
+              run.status === 'completed' ? 'complete'
+              : run.status === 'cancelled' ? 'cancelled'
+              : run.status
             }`}
           >
-            {run.status === 'completed' ? '✓ Complete' : run.status.replace('-', ' ')}
+            {run.status === 'completed' ? '✓ Complete'
+              : run.status === 'cancelled' ? '✕ Cancelled'
+              : run.status.replace('-', ' ')}
           </span>
         </div>
       </div>
@@ -598,7 +639,39 @@ export default function RunSummary() {
         )}
       </div>
 
-      {/* ── 6. Actions ── */}
+      {/* ── 6. Reassign driver (dispatch/admin only, not on completed runs) ── */}
+      {isDispatch && run.status !== 'completed' && (
+        <div className="rs-reassign">
+          <h3 className="rs-reassign__title">Reassign Driver</h3>
+          <div className="rs-reassign__row">
+            <select
+              className="rs-reassign__select"
+              value={reassignDriverId}
+              onChange={(e) => setReassignDriverId(e.target.value)}
+            >
+              <option value="">Select new driver…</option>
+              {drivers
+                .filter((d) => d.id !== run.driverId)
+                .map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+            </select>
+            <Button
+              variant="secondary"
+              loading={reassigning}
+              disabled={!reassignDriverId}
+              onClick={handleReassign}
+            >
+              Reassign
+            </Button>
+          </div>
+          {reassignError && (
+            <p className="rs-reassign__error">{reassignError}</p>
+          )}
+        </div>
+      )}
+
+      {/* ── 7. Actions ── */}
       <div className="rs-actions">
         <div className="rs-actions__left">
           <button className="rs-back-link" onClick={() => navigate('/ops/dashboard')}>
@@ -612,13 +685,15 @@ export default function RunSummary() {
           >
             ⬇ Download Run Report
           </Button>
-          {run.status !== 'completed' && (
+          {run.status !== 'completed' && run.status !== 'cancelled' && (
             <Button
-              variant="primary"
+              variant={stops.some((s) => s.status === 'pending' || s.status === 'arrived') ? 'danger' : 'primary'}
               loading={closingRun}
               onClick={handleCloseRun}
             >
-              Close Run
+              {stops.some((s) => s.status === 'pending' || s.status === 'arrived')
+                ? 'End Run Early'
+                : 'Close Run'}
             </Button>
           )}
         </div>
