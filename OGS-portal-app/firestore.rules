@@ -161,8 +161,14 @@ service cloud.firestore {
 
     // ── Runs ──────────────────────────────────────────────────────────────────
     match /runs/{runId} {
-      allow read:              if isDispatch() || isDriver();
-      allow create, update, delete: if isDispatch();
+      allow read:           if isDispatch() || isDriver();
+      allow create, delete: if isDispatch();
+      // Drivers may update load/start fields on runs assigned to them.
+      allow update: if isDispatch()
+        || (isDriver()
+            && resource.data.driverId == request.auth.uid
+            && onlyUpdatesFields(['loadStatus', 'loadCompletedAt', 'loadedBy',
+                                   'status', 'startedAt', 'updatedAt']));
 
       // Run stops (subcollection)
       match /stops/{stopId} {
