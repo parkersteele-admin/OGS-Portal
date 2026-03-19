@@ -213,7 +213,7 @@ const DashboardPage: React.FC = () => {
 
       {/* ── Page header ───────────────────────────────────────────────────── */}
       <header className="cust-db__header">
-        <h1 className="cust-db__title">Account dashboard</h1>
+        <h1 className="cust-db__title">Dashboard</h1>
         <div className="cust-db__header-actions">
           <Button
             variant="secondary"
@@ -227,7 +227,7 @@ const DashboardPage: React.FC = () => {
             size="sm"
             onClick={() => navigate('/portal/order')}
           >
-            + Place order
+            Place order
           </Button>
         </div>
       </header>
@@ -258,8 +258,12 @@ const DashboardPage: React.FC = () => {
         </div>
       )}
 
-      {/* ── Stat cards ────────────────────────────────────────────────────── */}
-      <div className="cust-db__stats">
+      {/* ── Overview ──────────────────────────────────────────────────────── */}
+      <section className="cust-db__section">
+        <div className="cust-db__section-head">
+          <h2 className="cust-db__section-title">Overview</h2>
+        </div>
+        <div className="cust-db__stats">
 
         {/* Outstanding balance */}
         <div className="cust-db__stat">
@@ -296,10 +300,15 @@ const DashboardPage: React.FC = () => {
           </span>
         </div>
 
-      </div>
+        </div>
+      </section>
 
-      {/* ── Two-column grid ────────────────────────────────────────────────── */}
-      <div className="cust-db__grid">
+      {/* ── Operations ─────────────────────────────────────────────────────── */}
+      <section className="cust-db__section">
+        <div className="cust-db__section-head">
+          <h2 className="cust-db__section-title">Operations</h2>
+        </div>
+        <div className="cust-db__grid">
 
         {/* Active tanks */}
         <div className="cust-db__card">
@@ -309,7 +318,7 @@ const DashboardPage: React.FC = () => {
               className="cust-db__card-link"
               onClick={() => navigate('/portal/tanks')}
             >
-              Report levels →
+              Manage tanks
             </button>
           </div>
           <div className="cust-db__card-body">
@@ -329,7 +338,7 @@ const DashboardPage: React.FC = () => {
               className="cust-db__card-link"
               onClick={() => navigate('/portal/invoices')}
             >
-              View all →
+              View all
             </button>
           </div>
           <div className="cust-db__card-body">
@@ -341,17 +350,17 @@ const DashboardPage: React.FC = () => {
           </div>
         </div>
 
-      </div>
+        </div>
 
-      {/* ── Recent orders (full width) ────────────────────────────────────── */}
-      <div className="cust-db__card cust-db__card--full">
+        {/* ── Recent orders (full width) ──────────────────────────────────── */}
+        <div className="cust-db__card cust-db__card--full">
         <div className="cust-db__card-header">
           <span className="cust-db__card-title">Recent orders</span>
           <button
             className="cust-db__card-link"
             onClick={() => navigate('/portal/orders')}
           >
-            View all →
+            View all
           </button>
         </div>
         <div className="cust-db__card-body">
@@ -375,7 +384,8 @@ const DashboardPage: React.FC = () => {
             </>
           )}
         </div>
-      </div>
+        </div>
+      </section>
 
       {/* ── Mobile sticky footer ──────────────────────────────────────────── */}
       <div className="cust-db__mobile-actions" aria-hidden="true">
@@ -393,7 +403,7 @@ const DashboardPage: React.FC = () => {
           className="cust-db__mobile-btn"
           onClick={() => navigate('/portal/order')}
         >
-          + Place order
+          Place order
         </Button>
       </div>
 

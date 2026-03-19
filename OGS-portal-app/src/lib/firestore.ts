@@ -66,6 +66,7 @@ export const quotesCol = col<Quote>('quotes')
 
 // ── Products ──────────────────────────────────────────────────────────────────
 export const productsCol = col<Product>('products')
+export const productPricingCol = col<import('../types/product').ProductPricingInternal>('productPricing')
 
 // ── Audit Log ─────────────────────────────────────────────────────────────────
 export type AuditLogEntry = {

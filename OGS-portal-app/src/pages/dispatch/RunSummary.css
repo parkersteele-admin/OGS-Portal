@@ -116,8 +116,8 @@
 }
 
 .rs-status-badge--scheduled {
-  background: #f3f4f6;
-  color: #374151;
+  background: var(--color-bg-3);
+  color: var(--color-text-2);
   border: 1px solid var(--color-border);
 }
 
@@ -394,7 +394,7 @@
 .rs-stop-badge--completed { background: #d1fae5; color: #065f46; }
 .rs-stop-badge--skipped   { background: #fee2e2; color: #991b1b; }
 .rs-stop-badge--arrived   { background: #fef3c7; color: #92400e; }
-.rs-stop-badge--pending   { background: #f3f4f6; color: #6b7280; }
+.rs-stop-badge--pending   { background: var(--color-bg-3); color: var(--color-text-3); }
 
 /* ── Skipped stop list ─────────────────────────────────────────────────────── */
 
@@ -504,7 +504,7 @@
 }
 
 .rs-fin-dot--autopay { background: var(--color-success); }
-.rs-fin-dot--manual  { background: #6b7280; }
+.rs-fin-dot--manual  { background: var(--color-text-3); }
 
 .rs-fin-row__right {
   display: flex;

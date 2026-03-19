@@ -39,7 +39,7 @@ import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { Modal } from '../../components/ui/Modal'
 import { ProductCombobox } from '../../components/ui/ProductCombobox'
-import type { ProductDropdownItem } from '../../services/productService'
+import { getProductDropdown, type ProductDropdownItem } from '../../services/productService'
 import type { Quote, QuoteItem, QuoteStatus } from '../../types/crm'
 import type { Customer } from '../../types/customer'
 import type { Lead } from '../../types/crm'
@@ -50,9 +50,16 @@ import './QuoteEditorPage.css'
 interface DraftLineItem {
   _id:         string
   productId:   string
+  productName: string
   skuLabel:    string
   description: string
   quantity:    number
+  basePrice:   number
+  cost:        number
+  minMarginPercent: number
+  minPrice:    number
+  marginPercent: number
+  profit:      number
   unitPrice:   number
   amount:      number
 }
@@ -79,15 +86,63 @@ const STATUS_BADGE: Record<QuoteStatus, { label: string; variant: 'success' | 'w
 const EMPTY_ROW = (): DraftLineItem => ({
   _id:         crypto.randomUUID(),
   productId:   '',
+  productName: '',
   skuLabel:    '',
   description: '',
   quantity:    1,
+  basePrice:   0,
+  cost:        0,
+  minMarginPercent: 0.2,
+  minPrice:    0,
+  marginPercent: 0,
+  profit:      0,
   unitPrice:   0,
   amount:      0,
 })
 
-function rowAmount(r: DraftLineItem) {
-  return parseFloat((r.quantity * r.unitPrice).toFixed(2))
+function normalizeMarginInput(value: number): number {
+  if (!Number.isFinite(value)) return 0
+  const normalized = value > 1 ? value / 100 : value
+  return Math.min(Math.max(normalized, 0), 0.95)
+}
+
+function calcMinPrice(cost: number, minMarginPercent: number): number {
+  const safeCost = Number.isFinite(cost) ? Math.max(cost, 0) : 0
+  const safeMargin = Math.min(Math.max(minMarginPercent, 0), 0.95)
+  return parseFloat((safeCost / (1 - safeMargin)).toFixed(2))
+}
+
+function calcMarginPercent(price: number, cost: number): number {
+  if (!Number.isFinite(price) || price <= 0) return 0
+  return (price - cost) / price
+}
+
+function recalcRow(row: DraftLineItem): DraftLineItem {
+  const quantity = Number.isFinite(row.quantity) ? Math.max(row.quantity, 0) : 0
+  const cost = Number.isFinite(row.cost) ? Math.max(row.cost, 0) : 0
+  const minMarginPercent = normalizeMarginInput(row.minMarginPercent)
+  const minPrice = calcMinPrice(cost, minMarginPercent)
+
+  const marginPercent = normalizeMarginInput(row.marginPercent)
+  const calculatedUnitPrice = parseFloat((cost / (1 - marginPercent)).toFixed(2))
+  const unitPrice = Number.isFinite(calculatedUnitPrice)
+    ? calculatedUnitPrice
+    : parseFloat((row.unitPrice || 0).toFixed(2))
+
+  const amount = parseFloat((quantity * unitPrice).toFixed(2))
+  const profit = parseFloat(((unitPrice - cost) * quantity).toFixed(2))
+
+  return {
+    ...row,
+    quantity,
+    cost,
+    minMarginPercent,
+    minPrice,
+    marginPercent,
+    unitPrice,
+    amount,
+    profit,
+  }
 }
 
 function toQuoteItem(r: DraftLineItem): QuoteItem {
@@ -102,15 +157,24 @@ interface LineItemRowProps {
   onChange:        (id: string, field: keyof DraftLineItem, val: string | number) => void
   onProductSelect: (id: string, p: ProductDropdownItem | null) => void
   onRemove:        (id: string) => void
+  hasMarginViolation: boolean
   disabled?:       boolean
 }
 
-const LineItemRow: React.FC<LineItemRowProps> = ({ row, index, onChange, onProductSelect, onRemove, disabled }) => {
-  const handleNum = (field: 'quantity' | 'unitPrice') => (e: React.ChangeEvent<HTMLInputElement>) =>
+const LineItemRow: React.FC<LineItemRowProps> = ({
+  row,
+  index,
+  onChange,
+  onProductSelect,
+  onRemove,
+  hasMarginViolation,
+  disabled,
+}) => {
+  const handleNum = (field: 'quantity' | 'marginPercent') => (e: React.ChangeEvent<HTMLInputElement>) =>
     onChange(row._id, field, parseFloat(e.target.value) || 0)
 
   return (
-    <div className="qep-row">
+    <div className={`qep-row${hasMarginViolation ? ' qep-row--warn' : ''}`}>
       <span className="qep-row__num">{index + 1}</span>
 
       <div className="qep-row__product">
@@ -133,10 +197,49 @@ const LineItemRow: React.FC<LineItemRowProps> = ({ row, index, onChange, onProdu
       <input className="ui-input qep-row__qty" type="number" min="0" step="0.01"
         placeholder="Qty" value={row.quantity || ''} onChange={handleNum('quantity')} disabled={disabled} />
 
-      <input className="ui-input qep-row__price" type="number" min="0" step="0.01"
-        placeholder="Unit price" value={row.unitPrice || ''} onChange={handleNum('unitPrice')} disabled={disabled} />
+      <span className="qep-row__metric">{formatCurrency(row.cost)}</span>
+
+      <span className="qep-row__metric">{formatCurrency(row.basePrice)}</span>
+
+      <div className="qep-row__margin-control">
+        <input
+          className="qep-row__margin-slider"
+          type="range"
+          min={Math.round(row.minMarginPercent * 100)}
+          max={Math.max(90, Math.round(row.minMarginPercent * 100) + 40)}
+          step={0.5}
+          value={parseFloat((row.marginPercent * 100).toFixed(2))}
+          onChange={handleNum('marginPercent')}
+          disabled={disabled || !row.productId}
+        />
+        <input
+          className="ui-input qep-row__margin-input"
+          type="number"
+          min={0}
+          max={95}
+          step={0.1}
+          placeholder="Margin %"
+          value={parseFloat((row.marginPercent * 100).toFixed(2)) || ''}
+          onChange={handleNum('marginPercent')}
+          disabled={disabled || !row.productId}
+        />
+      </div>
+
+      <span className="qep-row__metric">{formatCurrency(row.unitPrice)}</span>
+
+      <span className={`qep-row__metric${row.profit < 0 ? ' qep-row__metric--danger' : ''}`}>{formatCurrency(row.profit)}</span>
+
+      <span className={`qep-row__metric${hasMarginViolation ? ' qep-row__metric--danger' : ''}`}>
+        {(row.marginPercent * 100).toFixed(1)}%
+      </span>
 
       <span className="qep-row__amount">{formatCurrency(row.amount)}</span>
+
+      {hasMarginViolation && (
+        <span className="qep-row__warning">
+          Min {Math.round(row.minMarginPercent * 1000) / 10}% ({formatCurrency(row.minPrice)})
+        </span>
+      )}
 
       <button className="qep-row__remove" onClick={() => onRemove(row._id)} disabled={disabled}
         aria-label="Remove" title="Remove">✕</button>
@@ -174,6 +277,7 @@ const QuoteEditorPage: React.FC = () => {
   // ── Load recipients (customers + leads) ───────────────────────────────────
 
   const [recipients, setRecipients] = useState<RecipientOption[]>([])
+  const [productMap, setProductMap] = useState<Record<string, ProductDropdownItem>>({})
 
   useEffect(() => {
     let mounted = true
@@ -203,6 +307,20 @@ const QuoteEditorPage: React.FC = () => {
       })
     })
     return () => { mounted = false; unsub() }
+  }, [])
+
+  useEffect(() => {
+    let mounted = true
+    getProductDropdown()
+      .then((items) => {
+        if (!mounted) return
+        setProductMap(Object.fromEntries(items.map((item) => [item.id, item])))
+      })
+      .catch(() => {
+        if (!mounted) return
+        setProductMap({})
+      })
+    return () => { mounted = false }
   }, [])
 
   // ── Load existing quote ───────────────────────────────────────────────────
@@ -242,12 +360,19 @@ const QuoteEditorPage: React.FC = () => {
       setRows(q.lineItems.map(item => ({
         _id:         crypto.randomUUID(),
         productId:   item.productId,
+        productName: '',
         skuLabel:    '',
         description: item.description,
         quantity:    item.quantity,
+        basePrice:   item.unitPrice,
+        cost:        0,
+        minMarginPercent: 0.2,
+        minPrice:    0,
+        marginPercent: 0,
+        profit:      0,
         unitPrice:   item.unitPrice,
         amount:      item.amount,
-      })))
+      })).map(recalcRow))
       setNotes(q.notes ?? '')
       setStatus(q.status)
       if (q.validUntil) {
@@ -273,42 +398,97 @@ const QuoteEditorPage: React.FC = () => {
     () => parseFloat(rows.reduce((s, r) => s + r.amount, 0).toFixed(2)),
     [rows],
   )
+  const totalCost = useMemo(
+    () => parseFloat(rows.reduce((s, r) => s + (r.cost * r.quantity), 0).toFixed(2)),
+    [rows],
+  )
+  const totalLineProfit = useMemo(
+    () => parseFloat(rows.reduce((s, r) => s + r.profit, 0).toFixed(2)),
+    [rows],
+  )
   const rentalTotal = useMemo(
     () => includeRental ? parseFloat((rentalRate * rentalMonths).toFixed(2)) : 0,
     [includeRental, rentalRate, rentalMonths],
   )
   const effectiveDelivery = includeDelivery ? deliveryFee : 0
   const total = parseFloat((subtotal + effectiveDelivery + rentalTotal).toFixed(2))
+  const totalProfit = parseFloat((totalLineProfit + effectiveDelivery + rentalTotal).toFixed(2))
+  const overallMarginPercent = total > 0 ? totalProfit / total : 0
+  const marginViolations = useMemo(
+    () => rows.filter((r) => r.productId && r.marginPercent + 0.0001 < r.minMarginPercent),
+    [rows],
+  )
 
   // ── Row helpers ───────────────────────────────────────────────────────────
 
   const handleRowChange = useCallback((id: string, field: keyof DraftLineItem, value: string | number) => {
     setRows(prev => prev.map(r => {
       if (r._id !== id) return r
-      const updated = { ...r, [field]: value }
-      updated.amount = rowAmount(updated)
-      return updated
+      const nextValue = field === 'marginPercent'
+        ? normalizeMarginInput(Number(value))
+        : value
+      return recalcRow({ ...r, [field]: nextValue })
     }))
   }, [])
 
   const handleProductSelect = useCallback((id: string, product: ProductDropdownItem | null) => {
     setRows(prev => prev.map(r => {
       if (r._id !== id) return r
-      if (!product) return { ...r, productId: '', skuLabel: '' }
+      if (!product) {
+        return recalcRow({
+          ...r,
+          productId: '',
+          productName: '',
+          skuLabel: '',
+          cost: 0,
+          basePrice: 0,
+          minMarginPercent: 0.2,
+          minPrice: 0,
+          marginPercent: 0,
+          unitPrice: 0,
+        })
+      }
+
+      const baseMargin = calcMarginPercent(product.basePrice, product.cost)
+      const marginPercent = Math.max(baseMargin, product.minMarginPercent)
+
       const updated: DraftLineItem = {
         ...r,
         productId:   product.id,
+        productName: product.name,
         skuLabel:    product.sku,
         description: `${product.name}${product.unit ? ` (${product.unit})` : ''}`,
-        unitPrice:   product.basePrice,
+        basePrice:   product.basePrice,
+        cost:        product.cost,
+        minMarginPercent: product.minMarginPercent,
+        minPrice:    product.minPrice,
+        marginPercent,
       }
-      updated.amount = rowAmount(updated)
-      return updated
+      return recalcRow(updated)
     }))
   }, [])
 
   const addRow  = () => setRows(prev => [...prev, EMPTY_ROW()])
   const removeRow = (id: string) => setRows(prev => prev.filter(r => r._id !== id))
+
+  useEffect(() => {
+    if (Object.keys(productMap).length === 0) return
+    setRows((prev) => prev.map((row) => {
+      if (!row.productId) return row
+      const product = productMap[row.productId]
+      if (!product) return row
+      const marginPercent = calcMarginPercent(row.unitPrice, product.cost)
+      return recalcRow({
+        ...row,
+        productName: product.name,
+        basePrice: product.basePrice,
+        cost: product.cost,
+        minMarginPercent: product.minMarginPercent,
+        minPrice: product.minPrice,
+        marginPercent,
+      })
+    }))
+  }, [productMap])
 
   // ── Build payload ─────────────────────────────────────────────────────────
 
@@ -327,6 +507,9 @@ const QuoteEditorPage: React.FC = () => {
   const validate = (): string | null => {
     if (!recipientId) return 'Please select a customer or lead.'
     if (rows.every(r => !r.description.trim() && r.amount === 0)) return 'Add at least one line item.'
+    if (marginViolations.length > 0) {
+      return `Margin is below minimum on ${marginViolations.length} line item${marginViolations.length === 1 ? '' : 's'}.`
+    }
     if (!validUntil) return 'Please set a valid-until date.'
     return null
   }
@@ -455,6 +638,12 @@ const QuoteEditorPage: React.FC = () => {
 
       {error && <div className="qep-error" role="alert">{error}</div>}
 
+      {marginViolations.length > 0 && (
+        <div className="qep-error qep-error--warn" role="alert">
+          {marginViolations.length} line item{marginViolations.length === 1 ? '' : 's'} below minimum margin. Raise margin or lower cost before saving.
+        </div>
+      )}
+
       <div className="qep-body">
 
         {/* ── Two-column layout: form left, summary right ── */}
@@ -527,20 +716,29 @@ const QuoteEditorPage: React.FC = () => {
             {/* Line items */}
             <section className="qep-section">
               <h2 className="qep-section__title">Line items</h2>
-              <div className="qep-rows-header">
-                <span />
-                <span className="qep-col-label">Product / Description</span>
-                <span className="qep-col-label">Qty</span>
-                <span className="qep-col-label">Unit price</span>
-                <span className="qep-col-label qep-col-label--right">Amount</span>
-                <span />
-              </div>
-              <div className="qep-rows">
-                {rows.map((row, i) => (
-                  <LineItemRow key={row._id} row={row} index={i}
-                    onChange={handleRowChange} onProductSelect={handleProductSelect}
-                    onRemove={removeRow} disabled={isReadOnly} />
-                ))}
+              <div className="qep-lines-table">
+                <div className="qep-rows-header">
+                  <span />
+                  <span className="qep-col-label">Product / Description</span>
+                  <span className="qep-col-label">Qty</span>
+                  <span className="qep-col-label">Cost</span>
+                  <span className="qep-col-label">Base</span>
+                  <span className="qep-col-label">Margin</span>
+                  <span className="qep-col-label">Final Price</span>
+                  <span className="qep-col-label">Profit</span>
+                  <span className="qep-col-label">Margin %</span>
+                  <span className="qep-col-label qep-col-label--right">Amount</span>
+                  <span />
+                </div>
+                <div className="qep-rows">
+                  {rows.map((row, i) => (
+                    <LineItemRow key={row._id} row={row} index={i}
+                      onChange={handleRowChange} onProductSelect={handleProductSelect}
+                      onRemove={removeRow}
+                      hasMarginViolation={Boolean(row.productId) && row.marginPercent + 0.0001 < row.minMarginPercent}
+                      disabled={isReadOnly} />
+                  ))}
+                </div>
               </div>
               {!isReadOnly && (
                 <button className="qep-add-row" onClick={addRow}>+ Add line item</button>
@@ -598,10 +796,9 @@ const QuoteEditorPage: React.FC = () => {
             <div className="qep-summary">
               <h3 className="qep-summary__title">Summary</h3>
               <div className="qep-summary__rows">
-                <div className="qep-summary__row">
-                  <span>Subtotal</span>
-                  <span>{formatCurrency(subtotal)}</span>
-                </div>
+                <div className="qep-summary__row"><span>Revenue (products)</span><span>{formatCurrency(subtotal)}</span></div>
+                <div className="qep-summary__row"><span>Total cost</span><span>{formatCurrency(totalCost)}</span></div>
+                <div className="qep-summary__row"><span>Line profit</span><span>{formatCurrency(totalLineProfit)}</span></div>
                 {includeDelivery && effectiveDelivery > 0 && (
                   <div className="qep-summary__row">
                     <span>Delivery fee</span>
@@ -615,8 +812,16 @@ const QuoteEditorPage: React.FC = () => {
                   </div>
                 )}
                 <div className="qep-summary__row qep-summary__row--total">
-                  <span>Total</span>
+                  <span>Total revenue</span>
                   <span>{formatCurrency(total)}</span>
+                </div>
+                <div className="qep-summary__row">
+                  <span>Total profit</span>
+                  <span>{formatCurrency(totalProfit)}</span>
+                </div>
+                <div className="qep-summary__row">
+                  <span>Overall margin</span>
+                  <span>{(overallMarginPercent * 100).toFixed(1)}%</span>
                 </div>
               </div>
 

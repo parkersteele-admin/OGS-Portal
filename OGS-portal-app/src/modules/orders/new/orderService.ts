@@ -18,8 +18,10 @@ import {
   serverTimestamp,
 } from 'firebase/firestore'
 import { db } from '../../../lib/firebase'
-import type { Product } from '../../../types/models'
 import type { NewOrder, SavedOrder, ReorderPoint, RecurringSchedule, LineItem } from './types'
+import { getVisibleProducts } from '../../../services/productService'
+
+export { getVisibleProducts }
 
 // ── Collection helpers ────────────────────────────────────────────────────────
 
@@ -29,20 +31,6 @@ function savedOrdersCol(customerId: string) {
 
 function reorderPointsCol(customerId: string) {
   return collection(db, `customers/${customerId}/reorderPoints`)
-}
-
-// ── Products ──────────────────────────────────────────────────────────────────
-
-export async function getVisibleProducts(): Promise<Product[]> {
-  const snap = await getDocs(
-    query(
-      collection(db, 'products'),
-      where('isVisible', '==', true),
-      orderBy('category'),
-      orderBy('sortOrder'),
-    ),
-  )
-  return snap.docs.map((d) => ({ ...d.data(), id: d.id }) as unknown as Product)
 }
 
 // ── New Order writes ──────────────────────────────────────────────────────────

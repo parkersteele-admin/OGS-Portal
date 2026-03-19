@@ -34,8 +34,19 @@ service cloud.firestore {
     }
 
     // admin + sales
+    function hasUserDocRole(allowedRoles) {
+      return isAuthenticated()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in allowedRoles;
+    }
+
     function isSales() {
-      return isAuthenticated() && getRole() in ['admin', 'sales'];
+      // Prefer custom claims, but allow a users/{uid}.role fallback for
+      // accounts whose token claim has not refreshed yet.
+      return isAuthenticated()
+        && (
+          getRole() in ['admin', 'sales']
+          || hasUserDocRole(['admin', 'sales'])
+        );
     }
 
     function isCustomer() {
@@ -57,6 +68,13 @@ service cloud.firestore {
     // True when the write only touches the listed field names.
     function onlyUpdatesFields(fields) {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
+    }
+
+    // Internal pricing fields must live in /productPricing, never /products.
+    function hasNoInternalPricingFields() {
+      return !('cost' in request.resource.data)
+        && !('minMarginPercent' in request.resource.data)
+        && !('minPrice' in request.resource.data);
     }
 
 
@@ -190,9 +208,15 @@ service cloud.firestore {
     // ── Products (price catalog) ──────────────────────────────────────────────
     match /products/{productId} {
       allow read:   if isAuthenticated();
-      allow create: if isAdmin();
-      allow update: if isSales();   // admin + sales can edit prices, visibility, etc.
+      allow create: if isAdmin() && hasNoInternalPricingFields();
+      allow update: if isSales() && hasNoInternalPricingFields();   // admin + sales can edit prices, visibility, etc.
       allow delete: if isAdmin();
+    }
+
+
+    // ── Internal product pricing (cost/margin controls) ─────────────────────
+    match /productPricing/{productId} {
+      allow read, write: if isSales();
     }
 
 

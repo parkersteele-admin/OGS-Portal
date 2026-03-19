@@ -1,12 +1,7 @@
 /**
  * src/pages/customer/OrderPage.tsx
  *
- * Customer portal — Place an Order (3-step wizard)
- *
- * Step 1 — Select product
- * Step 2 — Quantity + delivery tier + date + notes
- * Step 3 — Review & confirm
- * Success — Confirmation screen
+ * Customer portal — multi-item order builder
  */
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react'
@@ -17,7 +12,7 @@ import { productsCol, customerTanksCol } from '../../lib/firestore'
 import { useAuth } from '../../hooks/useAuth'
 import { useCustomer } from '../../hooks/queries'
 import {
-  createOrder,
+  createBatchOrders,
   calculateOrderPricing,
 } from '../../services/orderService'
 import { Button } from '../../components/ui/Button'
@@ -27,29 +22,28 @@ import type { Tank } from '../../types/tank'
 import type { DeliveryTier } from '../../types/order'
 import './PlaceOrder.css'
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+interface OrderItem {
+  productId: string
+  tankId: string
+  quantity: number
+}
 
 interface WizardState {
-  productId:    string
-  tankId:       string
-  quantity:     number
-  tier:         DeliveryTier
-  scheduledDate: string   // YYYY-MM-DD
-  notes:        string
+  items: OrderItem[]
+  tier: DeliveryTier
+  scheduledDate: string
+  notes: string
 }
 
 const INITIAL: WizardState = {
-  productId:    '',
-  tankId:       '',
-  quantity:     1,
-  tier:         'standard',
+  items: [],
+  tier: 'standard',
   scheduledDate: '',
-  notes:        '',
+  notes: '',
 }
 
 const DELIVERY_FEE = 35
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
+const STEPS = ['Build your order', 'Delivery details', 'Review & confirm']
 
 function fmtCurrency(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n)
@@ -61,10 +55,8 @@ function addDays(base: Date, days: number): string {
   return d.toISOString().split('T')[0]
 }
 
-/** YYYY-MM-DD → "Mon, Jan 1" */
 function fmtDateStr(s: string): string {
   if (!s) return '—'
-  // parse as local midnight to prevent UTC offset flipping the day
   const [y, m, d] = s.split('-').map(Number)
   const date = new Date(y, m - 1, d)
   return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
@@ -83,35 +75,68 @@ function dateConstraints(tier: DeliveryTier): { min: string; max: string } {
   }
 }
 
-// ── Gas-type icon map (simple emoji fallbacks) ────────────────────────────────
-const GAS_ICON: Record<string, string> = {
-  co2:      '🧊',
-  nitrogen: '💨',
-  propane:  '🔥',
-  argon:    '⚗️',
-  helium:   '🎈',
-  oxygen:   '💧',
+function normalizeQuantity(value: number): number {
+  if (!Number.isFinite(value)) return 1
+  return Math.max(1, Math.floor(value))
 }
-function productIcon(name: string): string {
-  const key = name.toLowerCase().replace(/[^a-z₂]/g, '')
-  for (const [k, icon] of Object.entries(GAS_ICON)) {
-    if (key.includes(k)) return icon
+
+function matchingTanksForProduct(product: Product, tanks: Tank[]): Tank[] {
+  const productName = product.name.toLowerCase()
+  return tanks.filter(
+    (tank) =>
+      tank.gasType.toLowerCase() === productName ||
+      productName.includes(tank.gasType.toLowerCase()),
+  )
+}
+
+interface SummaryLine {
+  item: OrderItem
+  product: Product
+  subtotal: number
+}
+
+interface OrderSummaryData {
+  lines: SummaryLine[]
+  itemsCount: number
+  unitsCount: number
+  subtotal: number
+  deliveryFee: number
+  total: number
+}
+
+function summarizeOrder(items: OrderItem[], products: Product[], tier: DeliveryTier): OrderSummaryData {
+  const lines = items
+    .map((item) => {
+      const product = products.find((entry) => entry.id === item.productId)
+      if (!product) return null
+      const pricing = calculateOrderPricing(item.quantity, product.pricePerUnit, tier, 0)
+      return {
+        item,
+        product,
+        subtotal: pricing.subtotal,
+      }
+    })
+    .filter((line): line is SummaryLine => line !== null)
+
+  const subtotal = lines.reduce((sum, line) => sum + line.subtotal, 0)
+  const deliveryFee = lines.length > 0 ? DELIVERY_FEE : 0
+
+  return {
+    lines,
+    itemsCount: lines.length,
+    unitsCount: items.reduce((sum, item) => sum + item.quantity, 0),
+    subtotal,
+    deliveryFee,
+    total: subtotal + deliveryFee,
   }
-  return '📦'
 }
-
-// ── Progress indicator ────────────────────────────────────────────────────────
-
-const STEPS = ['Select product', 'Quantity & delivery', 'Review & confirm']
 
 const ProgressBar: React.FC<{ step: number }> = ({ step }) => (
   <div className="po-progress" role="navigation" aria-label="Order steps">
     {STEPS.map((label, i) => (
       <React.Fragment key={label}>
         <div className={`po-progress__step ${i < step ? 'po-progress__step--done' : ''} ${i === step ? 'po-progress__step--active' : ''}`}>
-          <div className="po-progress__circle">
-            {i < step ? '✓' : i + 1}
-          </div>
+          <div className="po-progress__circle">{i < step ? '✓' : i + 1}</div>
           <span className="po-progress__label">{label}</span>
         </div>
         {i < STEPS.length - 1 && (
@@ -122,162 +147,277 @@ const ProgressBar: React.FC<{ step: number }> = ({ step }) => (
   </div>
 )
 
-// ══════════════════════════════════════════════════════════════════════════════
-// STEP 1 — Product selector
-// ══════════════════════════════════════════════════════════════════════════════
-
-interface Step1Props {
-  customerId: string
-  state:      WizardState
-  onChange:   (patch: Partial<WizardState>) => void
-  onNext:     () => void
+interface QuantityControlProps {
+  value: number
+  unitLabel?: string
+  onChange: (value: number) => void
+  compact?: boolean
 }
 
-const Step1: React.FC<Step1Props> = ({ customerId, state, onChange, onNext }) => {
-  const { data: products = [], isLoading } = useQuery<Product[]>({
-    queryKey: ['products', 'active'],
-    queryFn:  async () => {
-      const snap = await getDocs(query(productsCol, where('active', '==', true)))
-      return snap.docs.map((d) => ({ ...d.data(), id: d.id } as Product))
-    },
-    staleTime: 10 * 60 * 1000,
-  })
+const QuantityControl: React.FC<QuantityControlProps> = ({ value, unitLabel, onChange, compact = false }) => (
+  <div className={`po-stepper ${compact ? 'po-stepper--compact' : ''}`}>
+    <button
+      type="button"
+      className="po-stepper__btn"
+      aria-label="Decrease quantity"
+      disabled={value <= 1}
+      onClick={() => onChange(value - 1)}
+    >
+      −
+    </button>
+    <input
+      type="number"
+      className="po-stepper__input"
+      min={1}
+      value={value}
+      aria-label={unitLabel ? `Quantity in ${unitLabel}` : 'Quantity'}
+      onChange={(e) => {
+        const nextValue = parseInt(e.target.value, 10)
+        if (!Number.isNaN(nextValue)) onChange(nextValue)
+      }}
+    />
+    <button
+      type="button"
+      className="po-stepper__btn"
+      aria-label="Increase quantity"
+      onClick={() => onChange(value + 1)}
+    >
+      +
+    </button>
+  </div>
+)
 
-  const { data: tanks = [] } = useQuery<Tank[]>({
-    queryKey: ['customer-tanks', customerId],
-    queryFn:  async () => {
-      const snap = await getDocs(
-        query(customerTanksCol(customerId), where('status', '==', 'deployed')),
-      )
-      return snap.docs.map((d) => ({ ...d.data(), id: d.id } as Tank))
-    },
-    enabled: !!customerId,
-    staleTime: 5 * 60 * 1000,
-  })
+const TIER_INFO: Record<DeliveryTier, { label: string; hint: string; badge: string | null; badgeVariant: 'warning' | 'danger' | null }> = {
+  standard: {
+    label: 'Standard',
+    hint: 'Scheduled within the next 7 days',
+    badge: null,
+    badgeVariant: null,
+  },
+  'next-day': {
+    label: 'Next day',
+    hint: 'Delivered tomorrow',
+    badge: '+10% upcharge',
+    badgeVariant: 'warning',
+  },
+  'same-day': {
+    label: 'Same day',
+    hint: 'Subject to availability',
+    badge: '+25% upcharge',
+    badgeVariant: 'danger',
+  },
+}
 
-  const selectedProduct = products.find((p) => p.id === state.productId)
+interface OrderSummaryPanelProps {
+  title: string
+  summary: OrderSummaryData
+  tier: DeliveryTier
+  emptyLabel: string
+  continueLabel?: string
+  continueDisabled?: boolean
+  continueLoading?: boolean
+  onContinue?: () => void
+  editable?: boolean
+  onQuantityChange?: (productId: string, quantity: number) => void
+  onRemove?: (productId: string) => void
+}
 
-  // Tanks that match the selected product's gas type
-  const matchingTanks = useMemo(() => {
-    if (!selectedProduct) return []
-    return tanks.filter(
-      (t) => t.gasType.toLowerCase() === selectedProduct.name.toLowerCase() ||
-             selectedProduct.name.toLowerCase().includes(t.gasType.toLowerCase()),
-    )
-  }, [tanks, selectedProduct])
-
-  return (
-    <div className="po-step">
-      <h2 className="po-step__title">Select a product</h2>
-      <p className="po-step__sub">Choose what you need delivered.</p>
-
-      {isLoading ? (
-        <div className="po-spinner" aria-label="Loading products" />
-      ) : (
-        <div className="po-product-grid">
-          {products.map((product) => (
-            <button
-              key={product.id}
-              type="button"
-              className={`po-product-card ${state.productId === product.id ? 'po-product-card--selected' : ''}`}
-              onClick={() => onChange({ productId: product.id, tankId: '' })}
-              aria-pressed={state.productId === product.id}
-            >
-              <span className="po-product-card__icon">{productIcon(product.name)}</span>
-              <span className="po-product-card__name">{product.name}</span>
-              {product.description && (
-                <span className="po-product-card__desc">{product.description}</span>
-              )}
-              <span className="po-product-card__price">
-                {fmtCurrency(product.pricePerUnit)} / {product.unit}
-              </span>
-            </button>
-          ))}
+const OrderSummaryPanel: React.FC<OrderSummaryPanelProps> = ({
+  title,
+  summary,
+  tier,
+  emptyLabel,
+  continueLabel,
+  continueDisabled,
+  continueLoading = false,
+  onContinue,
+  editable = false,
+  onQuantityChange,
+  onRemove,
+}) => (
+  <aside className="po-summary" aria-label="Order summary">
+    <div className="po-summary__inner">
+      <div className="po-summary__header">
+        <div>
+          <p className="po-summary__eyebrow">Order summary</p>
+          <h3 className="po-summary__title">{title}</h3>
         </div>
-      )}
+        <Badge variant="neutral">{summary.itemsCount} items</Badge>
+      </div>
 
-      {/* Tank selection — only shown when a product is selected and customer has matching tanks */}
-      {selectedProduct && matchingTanks.length > 0 && (
-        <div className="po-tank-select">
-          <p className="po-tank-select__label">
-            Associate with one of your {selectedProduct.name} tanks (optional)
-          </p>
-          <div className="po-tank-select__list">
-            <button
-              type="button"
-              className={`po-tank-pill ${!state.tankId ? 'po-tank-pill--selected' : ''}`}
-              onClick={() => onChange({ tankId: '' })}
-            >
-              No specific tank
-            </button>
-            {matchingTanks.map((tank) => (
-              <button
-                key={tank.id}
-                type="button"
-                className={`po-tank-pill ${state.tankId === tank.id ? 'po-tank-pill--selected' : ''}`}
-                onClick={() => onChange({ tankId: tank.id })}
-              >
-                {tank.serialNumber}
-                {tank.currentLevelPct !== undefined && (
-                  <span className="po-tank-pill__level"> · {tank.currentLevelPct}%</span>
+      {summary.lines.length === 0 ? (
+        <div className="po-summary__empty">{emptyLabel}</div>
+      ) : (
+        <>
+          <div className="po-summary__meta">
+            <span>{summary.unitsCount} total units</span>
+            <span>{TIER_INFO[tier].label} delivery</span>
+          </div>
+
+          <div className="po-summary__list">
+            {summary.lines.map(({ item, product, subtotal }) => (
+              <div key={product.id} className="po-summary__line">
+                <div className="po-summary__line-top">
+                  <div>
+                    <p className="po-summary__line-name">{product.name}</p>
+                    <p className="po-summary__line-price">{fmtCurrency(product.pricePerUnit)} / {product.unit}</p>
+                  </div>
+                  <div className="po-summary__line-total">{fmtCurrency(subtotal)}</div>
+                </div>
+
+                {editable && onQuantityChange ? (
+                  <div className="po-summary__line-controls">
+                    <QuantityControl
+                      value={item.quantity}
+                      unitLabel={product.unit}
+                      compact
+                      onChange={(quantity) => onQuantityChange(product.id, normalizeQuantity(quantity))}
+                    />
+                    {onRemove && (
+                      <button
+                        type="button"
+                        className="po-summary__remove"
+                        onClick={() => onRemove(product.id)}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="po-summary__line-meta">Qty {item.quantity} {product.unit}</div>
                 )}
-              </button>
+              </div>
             ))}
           </div>
+
+          <div className="po-summary__totals">
+            <div className="po-summary__row">
+              <span>Products</span>
+              <span>{fmtCurrency(summary.subtotal)}</span>
+            </div>
+            <div className="po-summary__row">
+              <span>Delivery</span>
+              <span>{fmtCurrency(summary.deliveryFee)}</span>
+            </div>
+            <div className="po-summary__row po-summary__row--total">
+              <span>Estimated total</span>
+              <span>{fmtCurrency(summary.total)}</span>
+            </div>
+          </div>
+
+          {continueLabel && onContinue && (
+            <Button
+              variant="primary"
+              size="lg"
+              className="po-summary__cta"
+              disabled={continueDisabled}
+              loading={continueLoading}
+              onClick={onContinue}
+            >
+              {continueLabel}
+            </Button>
+          )}
+        </>
+      )}
+    </div>
+  </aside>
+)
+
+interface ProductCardProps {
+  product: Product
+  item?: OrderItem
+  matchingTanks: Tank[]
+  onToggle: (productId: string) => void
+  onQuantityChange: (productId: string, quantity: number) => void
+  onTankChange: (productId: string, tankId: string) => void
+}
+
+const ProductCard: React.FC<ProductCardProps> = ({
+  product,
+  item,
+  matchingTanks,
+  onToggle,
+  onQuantityChange,
+  onTankChange,
+}) => {
+  const isSelected = !!item
+
+  return (
+    <article className={`po-product-card ${isSelected ? 'po-product-card--selected' : ''}`}>
+      <div className="po-product-card__top">
+        <div>
+          <p className="po-product-card__eyebrow">{product.category}</p>
+          <h3 className="po-product-card__name">{product.name}</h3>
+        </div>
+        <button
+          type="button"
+          className={`po-product-card__action ${isSelected ? 'po-product-card__action--selected' : ''}`}
+          onClick={() => onToggle(product.id)}
+        >
+          {isSelected ? 'Selected' : 'Add item'}
+        </button>
+      </div>
+
+      {product.description && <p className="po-product-card__desc">{product.description}</p>}
+
+      <div className="po-product-card__meta">
+        <span className="po-product-card__price">{fmtCurrency(product.pricePerUnit)}</span>
+        <span className="po-product-card__unit">per {product.unit}</span>
+      </div>
+
+      {isSelected && item && (
+        <div className="po-product-card__builder">
+          <div className="po-product-card__field">
+            <span className="po-product-card__label">Quantity</span>
+            <QuantityControl
+              value={item.quantity}
+              unitLabel={product.unit}
+              onChange={(quantity) => onQuantityChange(product.id, normalizeQuantity(quantity))}
+            />
+          </div>
+
+          {matchingTanks.length > 0 && (
+            <div className="po-product-card__field">
+              <span className="po-product-card__label">Tank association</span>
+              <div className="po-tank-select__list">
+                <button
+                  type="button"
+                  className={`po-tank-pill ${!item.tankId ? 'po-tank-pill--selected' : ''}`}
+                  onClick={() => onTankChange(product.id, '')}
+                >
+                  No specific tank
+                </button>
+                {matchingTanks.map((tank) => (
+                  <button
+                    key={tank.id}
+                    type="button"
+                    className={`po-tank-pill ${item.tankId === tank.id ? 'po-tank-pill--selected' : ''}`}
+                    onClick={() => onTankChange(product.id, tank.id)}
+                  >
+                    {tank.serialNumber}
+                    {tank.currentLevelPct !== undefined && (
+                      <span className="po-tank-pill__level"> · {tank.currentLevelPct}%</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
-
-      <div className="po-nav">
-        <span />
-        <Button
-          variant="primary"
-          size="md"
-          disabled={!state.productId}
-          onClick={onNext}
-        >
-          Next: Quantity & delivery →
-        </Button>
-      </div>
-    </div>
+    </article>
   )
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// STEP 2 — Quantity + delivery + date + notes
-// ══════════════════════════════════════════════════════════════════════════════
-
 interface TierCardProps {
-  tier:     DeliveryTier
+  tier: DeliveryTier
   selected: boolean
   onSelect: () => void
 }
 
-const TIER_INFO: Record<DeliveryTier, { label: string; hint: string; badge: string | null; badgeVariant: 'warning' | 'danger' | null; upcharge: number }> = {
-  standard: {
-    label:       'Standard',
-    hint:        'Scheduled within the next 7 days',
-    badge:       null,
-    badgeVariant: null,
-    upcharge:    0,
-  },
-  'next-day': {
-    label:       'Next day',
-    hint:        'Delivered tomorrow',
-    badge:       '+15% upcharge',
-    badgeVariant: 'warning',
-    upcharge:    0.15,
-  },
-  'same-day': {
-    label:       'Same day',
-    hint:        'Subject to availability',
-    badge:       '+30% upcharge',
-    badgeVariant: 'danger',
-    upcharge:    0.30,
-  },
-}
-
 const TierCard: React.FC<TierCardProps> = ({ tier, selected, onSelect }) => {
   const info = TIER_INFO[tier]
+
   return (
     <button
       type="button"
@@ -287,336 +427,339 @@ const TierCard: React.FC<TierCardProps> = ({ tier, selected, onSelect }) => {
     >
       <div className="po-tier-card__top">
         <span className="po-tier-card__label">{info.label}</span>
-        {info.badge && (
-          <Badge variant={info.badgeVariant ?? 'neutral'}>{info.badge}</Badge>
-        )}
+        {info.badge && <Badge variant={info.badgeVariant ?? 'neutral'}>{info.badge}</Badge>}
       </div>
       <span className="po-tier-card__hint">{info.hint}</span>
     </button>
   )
 }
 
-interface Step2Props {
-  products:   Product[]
-  state:      WizardState
-  onChange:   (patch: Partial<WizardState>) => void
-  onBack:     () => void
-  onNext:     () => void
+interface Step1Props {
+  products: Product[]
+  tanks: Tank[]
+  state: WizardState
+  onToggleProduct: (productId: string) => void
+  onQuantityChange: (productId: string, quantity: number) => void
+  onTankChange: (productId: string, tankId: string) => void
+  onNext: () => void
 }
 
-const Step2: React.FC<Step2Props> = ({ products, state, onChange, onBack, onNext }) => {
-  const product = products.find((p) => p.id === state.productId)
-  const pricing = product
-    ? calculateOrderPricing(state.quantity, product.pricePerUnit, state.tier, DELIVERY_FEE)
-    : null
+const Step1: React.FC<Step1Props> = ({
+  products,
+  tanks,
+  state,
+  onToggleProduct,
+  onQuantityChange,
+  onTankChange,
+  onNext,
+}) => {
+  const summary = useMemo(() => summarizeOrder(state.items, products, state.tier), [state.items, products, state.tier])
 
+  return (
+    <section className="po-builder">
+      <div className="po-builder__main">
+        <div className="po-step-heading">
+          <h2 className="po-step__title">Build your order</h2>
+          <p className="po-step__sub">Add multiple products, set quantities, and associate tanks where needed.</p>
+        </div>
+
+        <div className="po-product-grid">
+          {products.map((product) => {
+            const item = state.items.find((entry) => entry.productId === product.id)
+            const matchingTanks = matchingTanksForProduct(product, tanks)
+
+            return (
+              <ProductCard
+                key={product.id}
+                product={product}
+                item={item}
+                matchingTanks={matchingTanks}
+                onToggle={onToggleProduct}
+                onQuantityChange={onQuantityChange}
+                onTankChange={onTankChange}
+              />
+            )
+          })}
+        </div>
+      </div>
+
+      <OrderSummaryPanel
+        title="Current build"
+        summary={summary}
+        tier={state.tier}
+        emptyLabel="Select at least one product to start building the order."
+        continueLabel="Continue to delivery"
+        continueDisabled={summary.lines.length === 0}
+        onContinue={onNext}
+        editable
+        onQuantityChange={onQuantityChange}
+        onRemove={onToggleProduct}
+      />
+    </section>
+  )
+}
+
+interface Step2Props {
+  products: Product[]
+  state: WizardState
+  onChange: (patch: Partial<WizardState>) => void
+  onQuantityChange: (productId: string, quantity: number) => void
+  onRemoveItem: (productId: string) => void
+  onBack: () => void
+  onNext: () => void
+}
+
+const Step2: React.FC<Step2Props> = ({
+  products,
+  state,
+  onChange,
+  onQuantityChange,
+  onRemoveItem,
+  onBack,
+  onNext,
+}) => {
+  const summary = useMemo(() => summarizeOrder(state.items, products, state.tier), [state.items, products, state.tier])
   const { min: dateMin, max: dateMax } = dateConstraints(state.tier)
 
-  // When tier changes, reset scheduledDate to the new min (auto-select)
+  const canProceed =
+    summary.lines.length > 0 &&
+    state.scheduledDate >= dateMin &&
+    state.scheduledDate <= dateMax
+
   const handleTierSelect = (tier: DeliveryTier) => {
     const { min } = dateConstraints(tier)
     onChange({ tier, scheduledDate: min })
   }
 
-  const canProceed =
-    state.quantity >= 1 && state.scheduledDate >= dateMin && state.scheduledDate <= dateMax
-
   return (
-    <div className="po-step">
-      <h2 className="po-step__title">Quantity & delivery</h2>
-      <p className="po-step__sub">
-        Ordering: <strong>{product?.name}</strong>
-      </p>
-
-      {/* Quantity stepper */}
-      <div className="po-field-group">
-        <label className="po-label">Quantity ({product?.unit ?? 'units'})</label>
-        <div className="po-stepper">
-          <button
-            type="button"
-            className="po-stepper__btn"
-            aria-label="Decrease quantity"
-            disabled={state.quantity <= 1}
-            onClick={() => onChange({ quantity: Math.max(1, state.quantity - 1) })}
-          >
-            −
-          </button>
-          <input
-            type="number"
-            className="po-stepper__input"
-            min={1}
-            value={state.quantity}
-            aria-label="Quantity"
-            onChange={(e) => {
-              const v = parseInt(e.target.value, 10)
-              if (!isNaN(v) && v >= 1) onChange({ quantity: v })
-            }}
-          />
-          <button
-            type="button"
-            className="po-stepper__btn"
-            aria-label="Increase quantity"
-            onClick={() => onChange({ quantity: state.quantity + 1 })}
-          >
-            +
-          </button>
+    <section className="po-builder">
+      <div className="po-builder__main po-builder__main--details">
+        <div className="po-step-heading">
+          <h2 className="po-step__title">Delivery details</h2>
+          <p className="po-step__sub">Set fulfillment speed, requested date, and operational notes for the full order.</p>
         </div>
-      </div>
 
-      {/* Delivery tier */}
-      <div className="po-field-group">
-        <label className="po-label">Delivery tier</label>
-        <div className="po-tier-grid">
-          {(['standard', 'next-day', 'same-day'] as DeliveryTier[]).map((tier) => (
-            <TierCard
-              key={tier}
-              tier={tier}
-              selected={state.tier === tier}
-              onSelect={() => handleTierSelect(tier)}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Date picker */}
-      <div className="po-field-group">
-        <label className="po-label" htmlFor="po-date">Requested delivery date</label>
-        <input
-          id="po-date"
-          type="date"
-          className="po-date-input"
-          min={dateMin}
-          max={dateMax}
-          value={state.scheduledDate}
-          onChange={(e) => onChange({ scheduledDate: e.target.value })}
-        />
-        {state.tier === 'same-day' && (
-          <p className="po-field-hint">Same-day deliveries are subject to driver availability.</p>
-        )}
-      </div>
-
-      {/* Notes */}
-      <div className="po-field-group">
-        <label className="po-label" htmlFor="po-notes">Order notes <span className="po-optional">(optional)</span></label>
-        <textarea
-          id="po-notes"
-          className="po-textarea"
-          rows={3}
-          placeholder="Access instructions, tank location, special requests…"
-          value={state.notes}
-          onChange={(e) => onChange({ notes: e.target.value })}
-        />
-      </div>
-
-      {/* Live price calculator */}
-      {pricing && (
-        <div className="po-price-box">
-          <div className="po-price-row">
-            <span>{product?.name} × {state.quantity} {product?.unit}</span>
-            <span>{fmtCurrency(pricing.unitPrice * state.quantity)}</span>
-          </div>
-          {pricing.upchargePercent > 0 && (
-            <div className="po-price-row po-price-row--upcharge">
-              <span>{TIER_INFO[state.tier].label} upcharge ({Math.round(pricing.upchargePercent * 100)}%)</span>
-              <span>+{fmtCurrency(pricing.subtotal - pricing.unitPrice * state.quantity)}</span>
+        <div className="po-section-card">
+          <div className="po-field-group">
+            <label className="po-label">Delivery tier</label>
+            <div className="po-tier-grid">
+              {(['standard', 'next-day', 'same-day'] as DeliveryTier[]).map((tier) => (
+                <TierCard
+                  key={tier}
+                  tier={tier}
+                  selected={state.tier === tier}
+                  onSelect={() => handleTierSelect(tier)}
+                />
+              ))}
             </div>
-          )}
-          <div className="po-price-row">
-            <span>Delivery fee</span>
-            <span>{fmtCurrency(pricing.deliveryFee)}</span>
           </div>
-          <div className="po-price-row po-price-row--total">
-            <span>Total</span>
-            <span>{fmtCurrency(pricing.total)}</span>
+
+          <div className="po-field-group">
+            <label className="po-label" htmlFor="po-date">Requested delivery date</label>
+            <input
+              id="po-date"
+              type="date"
+              className="po-date-input"
+              min={dateMin}
+              max={dateMax}
+              value={state.scheduledDate}
+              onChange={(e) => onChange({ scheduledDate: e.target.value })}
+            />
+            <p className="po-field-hint">Available window: {fmtDateStr(dateMin)} to {fmtDateStr(dateMax)}.</p>
+          </div>
+
+          <div className="po-field-group">
+            <label className="po-label" htmlFor="po-notes">Order notes <span className="po-optional">(optional)</span></label>
+            <textarea
+              id="po-notes"
+              className="po-textarea"
+              rows={4}
+              placeholder="Access instructions, dock notes, site contact, special handling…"
+              value={state.notes}
+              onChange={(e) => onChange({ notes: e.target.value })}
+            />
           </div>
         </div>
-      )}
 
-      <div className="po-nav">
-        <Button variant="ghost" size="md" onClick={onBack}>← Back</Button>
-        <Button variant="primary" size="md" disabled={!canProceed} onClick={onNext}>
-          Review order →
-        </Button>
+        <div className="po-nav po-nav--inline">
+          <Button variant="ghost" size="md" onClick={onBack}>← Back to products</Button>
+        </div>
       </div>
-    </div>
+
+      <OrderSummaryPanel
+        title="Ready for review"
+        summary={summary}
+        tier={state.tier}
+        emptyLabel="Your order is empty."
+        continueLabel="Review and confirm"
+        continueDisabled={!canProceed}
+        onContinue={onNext}
+        editable
+        onQuantityChange={onQuantityChange}
+        onRemove={onRemoveItem}
+      />
+    </section>
   )
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// STEP 3 — Review & confirm
-// ══════════════════════════════════════════════════════════════════════════════
-
 interface Step3Props {
-  products:   Product[]
-  state:      WizardState
+  products: Product[]
+  state: WizardState
   customerId: string
-  onBack:     () => void
-  onConfirm:  (orderId: string) => void
+  tanks: Tank[]
+  onBack: () => void
+  onConfirm: (orderIds: string[]) => void
 }
 
-const Step3: React.FC<Step3Props> = ({ products, state, customerId, onBack, onConfirm }) => {
+const Step3: React.FC<Step3Props> = ({ products, state, customerId, tanks, onBack, onConfirm }) => {
   const { data: customer } = useCustomer(customerId)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  const product = products.find((p) => p.id === state.productId)
-  const pricing = product
-    ? calculateOrderPricing(state.quantity, product.pricePerUnit, state.tier, DELIVERY_FEE)
-    : null
-
-  const tierInfo = TIER_INFO[state.tier]
+  const summary = useMemo(() => summarizeOrder(state.items, products, state.tier), [state.items, products, state.tier])
 
   const handleSubmit = async () => {
-    if (!product || !customerId) return
+    if (!customerId || summary.lines.length === 0) return
+
     setSubmitting(true)
     setError(null)
+
     try {
-      const orderId = await createOrder(
-        {
+      const ids = await createBatchOrders(
+        summary.lines.map(({ item, product }) => ({
           customerId,
-          productId:    product.id,
-          tankId:       state.tankId || undefined,
-          quantity:     state.quantity,
+          productId: product.id,
+          tankId: item.tankId || undefined,
+          quantity: item.quantity,
           deliveryTier: state.tier,
-          notes:        state.notes || undefined,
-        },
-        product.pricePerUnit,
+          notes: state.notes || undefined,
+          unitPrice: product.pricePerUnit,
+        })),
+        DELIVERY_FEE,
       )
-      onConfirm(orderId)
+      onConfirm(ids)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to place order. Please try again.')
       setSubmitting(false)
     }
   }
 
-  if (!product || !pricing) return null
-
   const deliveryAddress = customer
     ? [customer.address, customer.city, customer.state, customer.zip].filter(Boolean).join(', ')
     : 'Your delivery address'
 
   return (
-    <div className="po-step">
-      <h2 className="po-step__title">Review your order</h2>
-      <p className="po-step__sub">Please confirm the details before placing.</p>
+    <section className="po-builder">
+      <div className="po-builder__main po-builder__main--review">
+        <div className="po-step-heading">
+          <h2 className="po-step__title">Review and confirm</h2>
+          <p className="po-step__sub">Validate the line items and delivery plan before submitting the order set.</p>
+        </div>
 
-      <div className="po-review-card">
-        <div className="po-review-row">
-          <span className="po-review-label">Product</span>
-          <span className="po-review-value">{product.name}</span>
-        </div>
-        <div className="po-review-row">
-          <span className="po-review-label">Quantity</span>
-          <span className="po-review-value">{state.quantity} {product.unit}</span>
-        </div>
-        <div className="po-review-row">
-          <span className="po-review-label">Delivery tier</span>
-          <span className="po-review-value">
-            {tierInfo.label}
-            {tierInfo.badge && (
-              <Badge variant={tierInfo.badgeVariant ?? 'neutral'} >{tierInfo.badge}</Badge>
-            )}
-          </span>
-        </div>
-        <div className="po-review-row">
-          <span className="po-review-label">Requested date</span>
-          <span className="po-review-value">{fmtDateStr(state.scheduledDate)}</span>
-        </div>
-        <div className="po-review-row">
-          <span className="po-review-label">Deliver to</span>
-          <span className="po-review-value">{deliveryAddress}</span>
-        </div>
-        {state.notes && (
-          <div className="po-review-row">
-            <span className="po-review-label">Notes</span>
-            <span className="po-review-value po-review-value--notes">{state.notes}</span>
+        <div className="po-review-card">
+          <div className="po-review-section">
+            <p className="po-review-section__label">Line items</p>
+            <div className="po-review-list">
+              {summary.lines.map(({ item, product, subtotal }) => {
+                const tank = tanks.find((entry) => entry.id === item.tankId)
+
+                return (
+                  <div key={product.id} className="po-review-list__item">
+                    <div>
+                      <p className="po-review-list__name">{product.name}</p>
+                      <p className="po-review-list__meta">{item.quantity} {product.unit} · {fmtCurrency(product.pricePerUnit)} / {product.unit}</p>
+                      {tank && <p className="po-review-list__meta">Tank {tank.serialNumber}</p>}
+                    </div>
+                    <div className="po-review-list__total">{fmtCurrency(subtotal)}</div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
-        )}
 
-        <div className="po-review-divider" />
+          <div className="po-review-divider" />
 
-        {/* Price breakdown */}
-        <div className="po-review-row">
-          <span className="po-review-label">Product subtotal</span>
-          <span className="po-review-value">{fmtCurrency(pricing.unitPrice * state.quantity)}</span>
-        </div>
-        {pricing.upchargePercent > 0 && (
           <div className="po-review-row">
-            <span className="po-review-label">
-              {tierInfo.label} upcharge ({Math.round(pricing.upchargePercent * 100)}%)
-            </span>
+            <span className="po-review-label">Delivery tier</span>
             <span className="po-review-value">
-              +{fmtCurrency(pricing.subtotal - pricing.unitPrice * state.quantity)}
+              {TIER_INFO[state.tier].label}
+              {TIER_INFO[state.tier].badge && (
+                <Badge variant={TIER_INFO[state.tier].badgeVariant ?? 'neutral'}>{TIER_INFO[state.tier].badge}</Badge>
+              )}
             </span>
           </div>
-        )}
-        <div className="po-review-row">
-          <span className="po-review-label">Delivery fee</span>
-          <span className="po-review-value">{fmtCurrency(pricing.deliveryFee)}</span>
+          <div className="po-review-row">
+            <span className="po-review-label">Requested date</span>
+            <span className="po-review-value">{fmtDateStr(state.scheduledDate)}</span>
+          </div>
+          <div className="po-review-row">
+            <span className="po-review-label">Deliver to</span>
+            <span className="po-review-value">{deliveryAddress}</span>
+          </div>
+          {state.notes && (
+            <div className="po-review-row">
+              <span className="po-review-label">Notes</span>
+              <span className="po-review-value po-review-value--notes">{state.notes}</span>
+            </div>
+          )}
         </div>
-        <div className="po-review-row po-review-row--total">
-          <span className="po-review-label">Total</span>
-          <span className="po-review-value">{fmtCurrency(pricing.total)}</span>
+
+        {error && <div className="po-error" role="alert">{error}</div>}
+
+        <div className="po-nav po-nav--inline">
+          <Button variant="ghost" size="md" onClick={onBack} disabled={submitting}>← Back to delivery</Button>
         </div>
       </div>
 
-      {error && (
-        <div className="po-error" role="alert">{error}</div>
-      )}
-
-      <div className="po-nav po-nav--confirm">
-        <Button variant="ghost" size="md" onClick={onBack} disabled={submitting}>
-          ← Edit order
-        </Button>
-        <Button
-          variant="primary"
-          size="lg"
-          className="po-confirm-btn"
-          loading={submitting}
-          onClick={handleSubmit}
-        >
-          Place order
-        </Button>
-      </div>
-    </div>
+      <OrderSummaryPanel
+        title="Submit order"
+        summary={summary}
+        tier={state.tier}
+        emptyLabel="Your order is empty."
+        continueLabel="Place order"
+        continueDisabled={submitting || summary.lines.length === 0}
+        continueLoading={submitting}
+        onContinue={handleSubmit}
+      />
+    </section>
   )
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// SUCCESS screen
-// ══════════════════════════════════════════════════════════════════════════════
-
 interface SuccessProps {
-  orderId:  string
-  state:    WizardState
+  orderIds: string[]
+  state: WizardState
   products: Product[]
 }
 
-const SuccessScreen: React.FC<SuccessProps> = ({ orderId, state, products }) => {
+const SuccessScreen: React.FC<SuccessProps> = ({ orderIds, state, products }) => {
   const navigate = useNavigate()
-  const product  = products.find((p) => p.id === state.productId)
-  const tierInfo = TIER_INFO[state.tier]
+  const productNames = state.items
+    .map((item) => products.find((product) => product.id === item.productId)?.name)
+    .filter((name): name is string => !!name)
 
   return (
     <div className="po-success">
       <div className="po-success__icon" aria-hidden="true">✓</div>
-      <h2 className="po-success__title">Order placed!</h2>
+      <h2 className="po-success__title">Order submitted</h2>
       <p className="po-success__sub">
-        Your {product?.name} order has been received and is pending scheduling.
+        {orderIds.length} delivery request{orderIds.length === 1 ? '' : 's'} for {productNames.join(', ')} have been created and sent to scheduling.
       </p>
 
       <div className="po-success__detail">
         <div className="po-success__row">
+          <span>Items</span>
+          <span>{state.items.length}</span>
+        </div>
+        <div className="po-success__row">
           <span>Delivery tier</span>
-          <span>{tierInfo.label}</span>
+          <span>{TIER_INFO[state.tier].label}</span>
         </div>
         <div className="po-success__row">
           <span>Requested date</span>
           <span>{fmtDateStr(state.scheduledDate)}</span>
         </div>
         <div className="po-success__row">
-          <span>Order ref</span>
-          <span className="po-success__id">{orderId.slice(0, 8).toUpperCase()}</span>
+          <span>Order refs</span>
+          <span className="po-success__id">{orderIds.map((id) => id.slice(0, 8).toUpperCase()).join(', ')}</span>
         </div>
       </div>
 
@@ -632,67 +775,106 @@ const SuccessScreen: React.FC<SuccessProps> = ({ orderId, state, products }) => 
   )
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// ROOT — wizard controller
-// ══════════════════════════════════════════════════════════════════════════════
-
 interface ReorderState {
   productId: string
-  quantity:  number
-  tier:      DeliveryTier
-  notes:     string
+  quantity: number
+  tier: DeliveryTier
+  notes: string
 }
 
 const OrderPage: React.FC = () => {
-  const { user }   = useAuth()
-  const location   = useLocation()
+  const { user } = useAuth()
+  const location = useLocation()
   const [searchParams] = useSearchParams()
   const customerId = user?.customerId ?? ''
-
-  // Pre-selected product from /portal/catalog click
   const preselectedProductId = searchParams.get('productId') ?? ''
-
-  // Check if navigated here via Reorder button from order history
   const reorder = (location.state as { reorder?: ReorderState } | null)?.reorder
 
-  const [step, setStep]         = useState(reorder ? 1 : 0)
+  const [step, setStep] = useState(reorder ? 1 : 0)
   const [wizState, setWizState] = useState<WizardState>(
     reorder
-      ? { ...INITIAL, productId: reorder.productId, quantity: reorder.quantity, tier: reorder.tier, notes: reorder.notes }
+      ? {
+          items: [{ productId: reorder.productId, quantity: reorder.quantity, tankId: '' }],
+          tier: reorder.tier,
+          scheduledDate: '',
+          notes: reorder.notes,
+        }
       : preselectedProductId
-        ? { ...INITIAL, productId: preselectedProductId }
+        ? {
+            ...INITIAL,
+            items: [{ productId: preselectedProductId, quantity: 1, tankId: '' }],
+          }
         : INITIAL,
   )
-  const [orderId, setOrderId]   = useState<string | null>(null)
+  const [orderIds, setOrderIds] = useState<string[] | null>(null)
 
-  // Pre-fill scheduled date when reordering
   useEffect(() => {
     if (reorder && !wizState.scheduledDate) {
       const { min } = dateConstraints(reorder.tier)
       setWizState((prev) => ({ ...prev, scheduledDate: min }))
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [reorder, wizState.scheduledDate])
 
-  // Product list shared between step 1, 2, 3 to avoid duplicate fetches
-  const { data: products = [] } = useQuery<Product[]>({
+  const { data: products = [], isLoading: productsLoading } = useQuery<Product[]>({
     queryKey: ['products', 'active'],
-    queryFn:  async () => {
+    queryFn: async () => {
       const snap = await getDocs(query(productsCol, where('active', '==', true)))
-      return snap.docs.map((d) => ({ ...d.data(), id: d.id } as Product))
+      return snap.docs.map((docSnap) => ({ ...docSnap.data(), id: docSnap.id } as Product))
     },
     staleTime: 10 * 60 * 1000,
   })
 
-  const patch = useCallback(
-    (p: Partial<WizardState>) => setWizState((prev) => ({ ...prev, ...p })),
-    [],
-  )
+  const { data: tanks = [], isLoading: tanksLoading } = useQuery<Tank[]>({
+    queryKey: ['customer-tanks', customerId],
+    queryFn: async () => {
+      const snap = await getDocs(query(customerTanksCol(customerId), where('status', '==', 'deployed')))
+      return snap.docs.map((docSnap) => ({ ...docSnap.data(), id: docSnap.id } as Tank))
+    },
+    enabled: !!customerId,
+    staleTime: 5 * 60 * 1000,
+  })
 
-  if (orderId) {
+  const patch = useCallback((nextPatch: Partial<WizardState>) => {
+    setWizState((prev) => ({ ...prev, ...nextPatch }))
+  }, [])
+
+  const toggleProduct = useCallback((productId: string) => {
+    setWizState((prev) => {
+      const exists = prev.items.some((item) => item.productId === productId)
+      return {
+        ...prev,
+        items: exists
+          ? prev.items.filter((item) => item.productId !== productId)
+          : [...prev.items, { productId, tankId: '', quantity: 1 }],
+      }
+    })
+  }, [])
+
+  const updateItem = useCallback((productId: string, patchItem: Partial<OrderItem>) => {
+    setWizState((prev) => ({
+      ...prev,
+      items: prev.items.map((item) => (
+        item.productId === productId
+          ? {
+              ...item,
+              ...patchItem,
+              quantity: normalizeQuantity(patchItem.quantity ?? item.quantity),
+            }
+          : item
+      )),
+    }))
+  }, [])
+
+  const handleNextFromStep1 = useCallback(() => {
+    const { min } = dateConstraints(wizState.tier)
+    if (!wizState.scheduledDate) patch({ scheduledDate: min })
+    setStep(1)
+  }, [patch, wizState.scheduledDate, wizState.tier])
+
+  if (orderIds) {
     return (
       <div className="po-page">
-        <SuccessScreen orderId={orderId} state={wizState} products={products} />
+        <SuccessScreen orderIds={orderIds} state={wizState} products={products} />
       </div>
     )
   }
@@ -700,42 +882,47 @@ const OrderPage: React.FC = () => {
   return (
     <div className="po-page">
       <header className="po-header">
-        <h1 className="po-header__title">Place an order</h1>
+        <h1 className="po-header__title">Build a new order</h1>
       </header>
 
       <ProgressBar step={step} />
 
-      {step === 0 && (
+      {productsLoading || tanksLoading ? (
+        <div className="po-spinner" aria-label="Loading order builder" />
+      ) : null}
+
+      {!productsLoading && !tanksLoading && step === 0 && (
         <Step1
-          customerId={customerId}
+          products={products}
+          tanks={tanks}
           state={wizState}
-          onChange={patch}
-          onNext={() => {
-            // Pre-fill the date when moving to step 2
-            const { min } = dateConstraints(wizState.tier)
-            if (!wizState.scheduledDate) patch({ scheduledDate: min })
-            setStep(1)
-          }}
+          onToggleProduct={toggleProduct}
+          onQuantityChange={(productId, quantity) => updateItem(productId, { quantity })}
+          onTankChange={(productId, tankId) => updateItem(productId, { tankId })}
+          onNext={handleNextFromStep1}
         />
       )}
 
-      {step === 1 && (
+      {!productsLoading && !tanksLoading && step === 1 && (
         <Step2
           products={products}
           state={wizState}
           onChange={patch}
+          onQuantityChange={(productId, quantity) => updateItem(productId, { quantity })}
+          onRemoveItem={toggleProduct}
           onBack={() => setStep(0)}
           onNext={() => setStep(2)}
         />
       )}
 
-      {step === 2 && (
+      {!productsLoading && !tanksLoading && step === 2 && (
         <Step3
           products={products}
           state={wizState}
           customerId={customerId}
+          tanks={tanks}
           onBack={() => setStep(1)}
-          onConfirm={(id) => setOrderId(id)}
+          onConfirm={setOrderIds}
         />
       )}
     </div>

@@ -1,6 +1,7 @@
 .layout {
   display: flex;
   min-height: 100dvh;
+  background: var(--color-bg-shell);
 }
 
 .layout__main {
@@ -13,13 +14,24 @@
 
 .layout__content {
   flex: 1;
-  padding: var(--space-6);
+  width: 100%;
+  padding: 28px clamp(20px, 3vw, 40px) 32px;
+  background: #F2F2F3;
+  overflow-y: auto;
 }
 
-/* Mobile padding to clear bottom nav */
+/* Tablet: generous padding (768px–1023px) */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .layout__content {
+    padding: 24px 24px 28px;
+  }
+}
+
+/* Mobile: tight padding (≤767px) */
 @media (max-width: 767px) {
   .layout__content {
-    padding-bottom: calc(60px + var(--space-4));
+    padding: 20px 16px;
+    padding-bottom: calc(60px + 20px);
   }
 }
 

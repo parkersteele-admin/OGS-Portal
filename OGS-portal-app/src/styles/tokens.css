@@ -1,9 +1,9 @@
 :root {
-  /* Brand Colors */
+  /* Brand Colors – orange accent only */
   --color-brand: #E87722;
-  --color-brand-light: #FEF4EC;
-  --color-brand-dark: #7A3A08;
-  --color-brand-border: rgba(232,119,34,0.25);
+  --color-brand-light: #FFF3E8;
+  --color-brand-dark: #B85A16;
+  --color-brand-border: rgba(232, 119, 34, 0.34);
 
   /* Semantic Colors */
   --color-success: #1D9E75;
@@ -11,15 +11,17 @@
   --color-danger: #E24B4A;
   --color-info: #378ADD;
 
-  /* Neutrals */
+  /* Neutrals – monochrome foundation */
   --color-bg: #FFFFFF;
-  --color-bg-2: #F7F7F7;
-  --color-bg-3: #EFEFEF;
-  --color-text: #222222;
-  --color-text-2: #555555;
-  --color-text-3: #888888;
-  --color-border: #E0E0E0;
-  --color-border-2: #C0C0C0;
+  --color-bg-2: #F4F4F5;
+  --color-bg-3: #E9E9EB;
+  --color-bg-shell: #E6E6E8;
+  --color-text: #111111;
+  --color-text-2: #2E2E31;
+  --color-text-3: #66666B;
+  --color-border: #CFCFD3;
+  --color-border-2: #A9A9AE;
+  --color-divider: #DDDDDF;
 
   /* Typography */
   --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
@@ -46,13 +48,14 @@
 
   /* Border Radius */
   --radius-sm: 4px;
-  --radius: 8px;
-  --radius-lg: 12px;
+  --radius: 6px;  /* Reduced from 8px for more refined feel */
+  --radius-lg: 8px;  /* Reduced from 12px, less "pill" style */
 
-  /* Shadows */
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
-  --shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.12);
+  /* Shadows – subtle industrial depth */
+  --shadow-xs: 0 1px 2px rgba(17, 17, 17, 0.06);
+  --shadow-sm: 0 2px 8px rgba(17, 17, 17, 0.08);
+  --shadow: 0 10px 24px rgba(17, 17, 17, 0.12);
+  --shadow-lg: 0 20px 46px rgba(17, 17, 17, 0.16);
 
   /* Transitions */
   --transition-fast: 100ms ease;

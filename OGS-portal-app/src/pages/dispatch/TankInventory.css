@@ -305,7 +305,7 @@
 
 .ti-status-badge--available  { background: #d1fae5; color: #065f46; }
 .ti-status-badge--deployed   { background: #dbeafe; color: #1e40af; }
-.ti-status-badge--returned   { background: #f3f4f6; color: #374151; }
+.ti-status-badge--returned   { background: var(--color-bg-3); color: var(--color-text-2); }
 .ti-status-badge--inspection { background: #fef3c7; color: #92400e; }
 
 .ti-status-badge--lg {
@@ -576,7 +576,7 @@
 .ti-status-menu__item--available:hover  { background: #d1fae5; color: #065f46; }
 .ti-status-menu__item--deployed:hover   { background: #dbeafe; color: #1e40af; }
 .ti-status-menu__item--inspection:hover { background: #fef3c7; color: #92400e; }
-.ti-status-menu__item--returned:hover   { background: #f3f4f6; color: #374151; }
+.ti-status-menu__item--returned:hover   { background: var(--color-bg-3); color: var(--color-text-2); }
 
 /* ── Inline level editor ───────────────────────────────────────────────────── */
 

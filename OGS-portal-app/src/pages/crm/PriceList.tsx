@@ -26,6 +26,27 @@ function fmt(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n)
 }
 
+function fmtPct(n: number) {
+  return `${(n * 100).toFixed(1)}%`
+}
+
+function normalizeMarginInput(value: number): number {
+  if (!Number.isFinite(value)) return 0
+  const normalized = value > 1 ? value / 100 : value
+  return Math.min(Math.max(normalized, 0), 0.95)
+}
+
+function calcMinPrice(cost: number, minMarginPercent: number): number {
+  const safeCost = Number.isFinite(cost) ? Math.max(cost, 0) : 0
+  const safeMargin = Math.min(Math.max(minMarginPercent, 0), 0.95)
+  return parseFloat((safeCost / (1 - safeMargin)).toFixed(2))
+}
+
+function calcMarginPercent(price: number, cost: number): number {
+  if (!Number.isFinite(price) || price <= 0) return 0
+  return (price - cost) / price
+}
+
 function fmtDate(ts: { toDate?: () => Date } | undefined) {
   if (!ts?.toDate) return '—'
   return ts.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -38,14 +59,15 @@ const CATEGORIES: ProductCategory[] = ['CO\u2082 Cylinders', 'Nitrogen', 'Beer G
 interface PriceCellProps {
   value: number
   productId: string
-  field: 'basePrice' | 'rentalPrice'
+  field: 'basePrice' | 'rentalPrice' | 'cost' | 'minMarginPercent'
   changedByUid: string
   onSaved: (id: string, field: string, val: number) => void
+  format?: 'currency' | 'percent'
 }
 
-const PriceCell: React.FC<PriceCellProps> = ({ value, productId, field, changedByUid, onSaved }) => {
+const PriceCell: React.FC<PriceCellProps> = ({ value, productId, field, changedByUid, onSaved, format = 'currency' }) => {
   const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(String(value ?? ''))
+  const [draft, setDraft] = useState(String(format === 'percent' ? (value ?? 0) * 100 : (value ?? '')))
   const [saving, setSaving] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -55,12 +77,17 @@ const PriceCell: React.FC<PriceCellProps> = ({ value, productId, field, changedB
 
   async function save() {
     const num = parseFloat(draft)
-    if (isNaN(num) || num < 0) { setEditing(false); setDraft(String(value ?? '')); return }
-    if (num === value) { setEditing(false); return }
+    if (isNaN(num) || num < 0) {
+      setEditing(false)
+      setDraft(String(format === 'percent' ? (value ?? 0) * 100 : (value ?? '')))
+      return
+    }
+    const normalized = format === 'percent' ? normalizeMarginInput(num) : num
+    if (normalized === value) { setEditing(false); return }
     setSaving(true)
     try {
-      await updateProduct(productId, { [field]: num }, changedByUid)
-      onSaved(productId, field, num)
+      await updateProduct(productId, { [field]: normalized }, changedByUid)
+      onSaved(productId, field, normalized)
     } finally {
       setSaving(false)
       setEditing(false)
@@ -69,7 +96,10 @@ const PriceCell: React.FC<PriceCellProps> = ({ value, productId, field, changedB
 
   function onKey(e: KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter') save()
-    if (e.key === 'Escape') { setEditing(false); setDraft(String(value ?? '')) }
+    if (e.key === 'Escape') {
+      setEditing(false)
+      setDraft(String(format === 'percent' ? (value ?? 0) * 100 : (value ?? '')))
+    }
   }
 
   if (editing) {
@@ -79,7 +109,8 @@ const PriceCell: React.FC<PriceCellProps> = ({ value, productId, field, changedB
         className="pl-price-input"
         type="number"
         min={0}
-        step={0.01}
+        max={format === 'percent' ? 95 : undefined}
+        step={format === 'percent' ? 0.1 : 0.01}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={save}
@@ -93,11 +124,14 @@ const PriceCell: React.FC<PriceCellProps> = ({ value, productId, field, changedB
   return (
     <button
       className="pl-price-cell"
-      onClick={() => { setDraft(String(value ?? '')); setEditing(true) }}
+      onClick={() => {
+        setDraft(String(format === 'percent' ? (value ?? 0) * 100 : (value ?? '')))
+        setEditing(true)
+      }}
       title={`Click to edit ${field}`}
-      aria-label={`${fmt(value ?? 0)}, click to edit`}
+      aria-label={`${format === 'percent' ? fmtPct(value ?? 0) : fmt(value ?? 0)}, click to edit`}
     >
-      {value != null ? fmt(value) : <span className="pl-price-cell--empty">—</span>}
+      {value != null ? (format === 'percent' ? fmtPct(value) : fmt(value)) : <span className="pl-price-cell--empty">—</span>}
       <span className="pl-price-cell__icon" aria-hidden="true">✎</span>
     </button>
   )
@@ -142,6 +176,8 @@ const SlideOver: React.FC<SlideOverProps> = ({ initial, onClose, onSaved }) => {
   const [sizeLabel,    setSizeLabel]    = useState(initial?.sizeLabel ?? '')
   const [unit,         setUnit]         = useState(initial?.unit ?? 'cylinder')
   const [basePrice,    setBasePrice]    = useState(String(initial?.basePrice ?? ''))
+  const [cost,         setCost]         = useState(String(initial?.cost ?? ''))
+  const [minMargin,    setMinMargin]    = useState(String(((initial?.minMarginPercent ?? 0.2) * 100).toFixed(1)))
   const [rentalPrice,  setRentalPrice]  = useState(String(initial?.rentalPrice ?? ''))
   const [isVisible,    setIsVisible]    = useState(initial?.isVisible ?? false)
   const [isFeatured,   setIsFeatured]   = useState(initial?.isFeatured ?? false)
@@ -160,6 +196,17 @@ const SlideOver: React.FC<SlideOverProps> = ({ initial, onClose, onSaved }) => {
     if (!sku.trim()) return setError('SKU is required.')
     if (!name.trim()) return setError('Name is required.')
     if (!basePrice || isNaN(parseFloat(basePrice))) return setError('Base price must be a number.')
+    if (!cost || isNaN(parseFloat(cost))) return setError('Cost is required and must be a number.')
+    if (!minMargin || isNaN(parseFloat(minMargin))) return setError('Minimum margin % is required.')
+
+    const parsedBasePrice = parseFloat(basePrice)
+    const parsedCost = parseFloat(cost)
+    const minMarginPercent = normalizeMarginInput(parseFloat(minMargin))
+    const minPrice = calcMinPrice(parsedCost, minMarginPercent)
+
+    if (parsedBasePrice < minPrice) {
+      return setError(`Base price must be at least ${fmt(minPrice)} for current cost and minimum margin.`)
+    }
 
     const payload = {
       sku: sku.trim().toUpperCase(),
@@ -168,8 +215,10 @@ const SlideOver: React.FC<SlideOverProps> = ({ initial, onClose, onSaved }) => {
       description: description.trim() || undefined,
       sizeLabel: sizeLabel.trim() || undefined,
       unit: unit.trim() || 'cylinder',
-      basePrice: parseFloat(basePrice),
-      pricePerUnit: parseFloat(basePrice),
+      basePrice: parsedBasePrice,
+      pricePerUnit: parsedBasePrice,
+      cost: parsedCost,
+      minMarginPercent,
       rentalPrice: rentalPrice ? parseFloat(rentalPrice) : null,
       isVisible,
       isFeatured,
@@ -236,9 +285,20 @@ const SlideOver: React.FC<SlideOverProps> = ({ initial, onClose, onSaved }) => {
 
           <div className="pl-so-grid">
             <Input label="Base Price ($) *" type="number" min={0} step={0.01} value={basePrice} onChange={(e) => setBasePrice(e.target.value)} placeholder="0.00" />
+            <Input label="Cost ($) *" type="number" min={0} step={0.01} value={cost} onChange={(e) => setCost(e.target.value)} placeholder="0.00" />
+            <Input label="Min Margin (%) *" type="number" min={0} max={95} step={0.1} value={minMargin} onChange={(e) => setMinMargin(e.target.value)} placeholder="20" />
+          </div>
+
+          <div className="pl-so-grid">
             <Input label="Rental Price ($/mo)" type="number" min={0} step={0.01} value={rentalPrice} onChange={(e) => setRentalPrice(e.target.value)} placeholder="0.00" />
             <Input label="Sort Order" type="number" min={0} step={1} value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} placeholder="0" />
           </div>
+
+          {basePrice && cost && minMargin && !isNaN(parseFloat(basePrice)) && !isNaN(parseFloat(cost)) && !isNaN(parseFloat(minMargin)) && (
+            <p className="pl-so-hint">
+              Minimum allowed price: {fmt(calcMinPrice(parseFloat(cost), normalizeMarginInput(parseFloat(minMargin))))}
+            </p>
+          )}
 
           <div className="pl-so-toggles">
             <label className="pl-so-toggle-row">
@@ -287,6 +347,12 @@ const ProductRow: React.FC<RowProps> = ({
   const [togglingVisible,  setTogglingVisible]  = useState(false)
   const [togglingFeatured, setTogglingFeatured] = useState(false)
 
+  const cost = product.cost ?? 0
+  const minMarginPercent = product.minMarginPercent ?? 0.2
+  const minPrice = product.minPrice ?? calcMinPrice(cost, minMarginPercent)
+  const marginAtBase = calcMarginPercent(product.basePrice, cost)
+  const isBelowMin = product.basePrice + 0.0001 < minPrice
+
   async function handleToggleVisible() {
     if (togglingVisible) return
     if (!product.isVisible) {
@@ -325,6 +391,25 @@ const ProductRow: React.FC<RowProps> = ({
       </td>
       <td className="pl-cell pl-cell--price">
         <PriceCell value={product.basePrice} productId={product.id} field="basePrice" changedByUid={uid} onSaved={onPriceSaved} />
+      </td>
+      <td className="pl-cell pl-cell--cost">
+        <PriceCell value={cost} productId={product.id} field="cost" changedByUid={uid} onSaved={onPriceSaved} />
+      </td>
+      <td className="pl-cell pl-cell--margin">
+        <PriceCell
+          value={minMarginPercent}
+          productId={product.id}
+          field="minMarginPercent"
+          changedByUid={uid}
+          onSaved={onPriceSaved}
+          format="percent"
+        />
+      </td>
+      <td className={`pl-cell pl-cell--margin-info${isBelowMin ? ' pl-cell--warn' : ''}`}>
+        <div className="pl-margin-stack">
+          <span>Base margin: {fmtPct(marginAtBase)}</span>
+          <span className="pl-muted">Min price: {fmt(minPrice)}</span>
+        </div>
       </td>
       <td className="pl-cell pl-cell--rental">
         {product.rentalPrice != null
@@ -411,7 +496,16 @@ const PriceList: React.FC = () => {
 
   const optimisticUpdate = useCallback((id: string, field: string, val: number) => {
     setProducts((prev) =>
-      prev.map((p) => p.id === id ? { ...p, [field]: val, pricePerUnit: field === 'basePrice' ? val : p.pricePerUnit } : p),
+      prev.map((p) => {
+        if (p.id !== id) return p
+        const next = { ...p, [field]: val, pricePerUnit: field === 'basePrice' ? val : p.pricePerUnit }
+        const cost = next.cost ?? 0
+        const minMarginPercent = next.minMarginPercent ?? 0.2
+        return {
+          ...next,
+          minPrice: calcMinPrice(cost, minMarginPercent),
+        }
+      }),
     )
   }, [])
 
@@ -445,7 +539,7 @@ const PriceList: React.FC = () => {
       <div className="pl-header">
         <div className="pl-header__left">
           <h1 className="pl-title">Price List</h1>
-          <p className="pl-subtitle">{products.length} products · click any price to edit inline</p>
+          <p className="pl-subtitle">{products.length} products · base price, cost, and min margin enforced inline</p>
         </div>
         <div className="pl-header__actions">
           {isAdmin && (
@@ -500,6 +594,9 @@ const PriceList: React.FC = () => {
                     <th className="pl-th">SKU</th>
                     <th className="pl-th">Product</th>
                     <th className="pl-th">Base Price</th>
+                    <th className="pl-th">Cost</th>
+                    <th className="pl-th">Min Margin %</th>
+                    <th className="pl-th">Margin @ Base</th>
                     <th className="pl-th">Rental/mo</th>
                     <th className="pl-th" title="Customer visible">Visible</th>
                     <th className="pl-th" title="Show Popular badge">Featured</th>

@@ -34,6 +34,10 @@ export interface CreateOrderInput {
   notes?: string
 }
 
+export interface CreateBatchOrderInput extends CreateOrderInput {
+  unitPrice: number
+}
+
 // Upcharge percentages by tier
 const TIER_UPCHARGE: Record<DeliveryTier, number> = {
   standard: 0,
@@ -144,6 +148,38 @@ export async function createOrder(
       updatedAt: serverTimestamp(),
     } as unknown as Omit<Order, 'id'>)
     return ref.id
+  })
+}
+
+export async function createBatchOrders(
+  items: CreateBatchOrderInput[],
+  deliveryFee = 35,
+): Promise<string[]> {
+  return serviceCall(async () => {
+    const orderIds = await Promise.all(
+      items.map(async ({ unitPrice, ...item }, index) => {
+        const pricing = calculateOrderPricing(
+          item.quantity,
+          unitPrice,
+          item.deliveryTier,
+          index === 0 ? deliveryFee : 0,
+        )
+        const payload = Object.fromEntries(
+          Object.entries(item).filter(([, value]) => value !== undefined),
+        )
+        const ref = await addDoc(ordersCol, {
+          ...payload,
+          ...pricing,
+          status: 'pending' as OrderStatus,
+          requestedAt: serverTimestamp(),
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        } as unknown as Omit<Order, 'id'>)
+        return ref.id
+      }),
+    )
+
+    return orderIds
   })
 }
 

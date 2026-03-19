@@ -15,7 +15,7 @@ export interface AuthUser {
 export const ROLE_HOME: Record<UserRole, string> = {
   customer: '/portal/dashboard',
   admin:    '/ops/dashboard',
-  dispatch: '/ops/dashboard',
+  dispatch: '/ops/dispatch',
   driver:   '/driver/schedule',
   sales:    '/crm/customers',
 }

@@ -16,8 +16,9 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ title, items }) => (
   <nav className="sidebar" aria-label="Main navigation">
     <div className="sidebar__logo-bar">
-      <span className="sidebar__logo-mark" aria-hidden="true">⛽</span>
-      <span className="sidebar__logo-text">OGS Portal</span>
+      <span className="sidebar__logo-mark" aria-hidden="true">OGS</span>
+      <span className="sidebar__logo-sep" aria-hidden="true">·</span>
+      <span className="sidebar__logo-text">Portal</span>
     </div>
 
     <p className="sidebar__portal-label">{title}</p>

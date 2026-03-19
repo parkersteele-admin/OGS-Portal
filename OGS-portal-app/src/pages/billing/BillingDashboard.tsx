@@ -115,7 +115,7 @@ const StatCard: React.FC<StatCardProps> = ({ label, value, sub, danger }) => (
 
 // ── Aging card ────────────────────────────────────────────────────────────────
 
-const AGING_ACCENTS = ['green', 'amber', 'orange', 'red'] as const
+const AGING_ACCENTS = ['base', 'base', 'base', 'base'] as const
 
 interface AgingCardProps {
   label:       string
@@ -459,8 +459,8 @@ export const BillingDashboard: React.FC = () => {
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <div className="bd__header">
         <div>
-          <h1 className="bd__title">Billing Dashboard</h1>
-          <p className="bd__subtitle">Invoices, aging, and exports</p>
+          <h1 className="bd__title">Billing</h1>
+          <p className="bd__subtitle">Manage invoice flow, receivables, and follow-up actions from a single operational workspace.</p>
         </div>
       </div>
 
@@ -508,64 +508,73 @@ export const BillingDashboard: React.FC = () => {
           </span>
         </div>
 
-        {/* Filter bar */}
-        <div className="bd__filters">
-          <select
-            className="bd__filter-select"
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value as InvoiceStatus | 'all')}
-            aria-label="Filter by status"
-          >
-            <option value="all">All statuses</option>
-            <option value="draft">Draft</option>
-            <option value="sent">Sent</option>
-            <option value="paid">Paid</option>
-            <option value="overdue">Overdue</option>
-            <option value="void">Void</option>
-          </select>
+        <div className="bd__controls">
+          <div className="bd__controls-left">
+            <select
+              className="bd__filter-select"
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value as InvoiceStatus | 'all')}
+              aria-label="Filter by status"
+            >
+              <option value="all">All statuses</option>
+              <option value="draft">Draft</option>
+              <option value="sent">Sent</option>
+              <option value="paid">Paid</option>
+              <option value="overdue">Overdue</option>
+              <option value="void">Void</option>
+            </select>
+          </div>
 
-          <input
-            type="date"
-            className="bd__filter-date"
-            value={filterDateStart}
-            max={filterDateEnd || undefined}
-            onChange={(e) => setFilterDateStart(e.target.value)}
-            aria-label="Filter from date"
-          />
-          <span className="bd__filter-sep">–</span>
-          <input
-            type="date"
-            className="bd__filter-date"
-            value={filterDateEnd}
-            min={filterDateStart || undefined}
-            onChange={(e) => setFilterDateEnd(e.target.value)}
-            aria-label="Filter to date"
-          />
+          <div className="bd__controls-right">
+            <div className="bd__date-range">
+              <input
+                type="date"
+                className="bd__filter-date"
+                value={filterDateStart}
+                max={filterDateEnd || undefined}
+                onChange={(e) => setFilterDateStart(e.target.value)}
+                aria-label="Filter from date"
+              />
+              <input
+                type="date"
+                className="bd__filter-date"
+                value={filterDateEnd}
+                min={filterDateStart || undefined}
+                onChange={(e) => setFilterDateEnd(e.target.value)}
+                aria-label="Filter to date"
+              />
+            </div>
 
-          <input
-            type="search"
-            className="bd__filter-search"
-            placeholder="Search customer…"
-            value={filterCustomer}
-            onChange={(e) => setFilterCustomer(e.target.value)}
-            aria-label="Search by customer"
-          />
+            <div className="bd__search-wrap">
+              <svg className="bd__search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <input
+                type="search"
+                className="bd__filter-search"
+                placeholder="Search customer"
+                value={filterCustomer}
+                onChange={(e) => setFilterCustomer(e.target.value)}
+                aria-label="Search by customer"
+              />
+            </div>
 
-          {hasActiveFilters && (
-            <button type="button" className="bd__filter-clear" onClick={clearFilters}>
-              Clear all
-            </button>
-          )}
+            {hasActiveFilters && (
+              <button type="button" className="bd__filter-clear" onClick={clearFilters}>
+                Reset
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Table */}
-        {isLoading ? (
-          <div className="bd__skeleton-rows">
-            {[...Array(5)].map((_, i) => <div key={i} className="bd__skeleton-row" />)}
-          </div>
-        ) : filteredInvoices.length === 0 ? (
-          <p className="bd__empty">No invoices match the current filters.</p>
-        ) : (
+        <div className="bd__table-shell">
+          {isLoading ? (
+            <div className="bd__skeleton-rows">
+              {[...Array(5)].map((_, i) => <div key={i} className="bd__skeleton-row" />)}
+            </div>
+          ) : null}
+
           <div className="bd__table-wrap">
             <table className="bd__table">
               <thead>
@@ -581,7 +590,17 @@ export const BillingDashboard: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredInvoices.map((inv) => {
+                {!isLoading && filteredInvoices.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="bd__empty-cell">
+                      <div className="bd__empty-state">
+                        <p className="bd__empty">No invoices match the current filters.</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : null}
+
+                {!isLoading && filteredInvoices.map((inv) => {
                   const cust = customerMap.get(inv.customerId)
                   return (
                     <tr key={inv.id}>
@@ -594,49 +613,49 @@ export const BillingDashboard: React.FC = () => {
                       <td><InvoiceStatusBadge invoice={inv} /></td>
                       <td>
                         <div className="bd__actions">
-                          <button
-                            type="button"
-                            className="bd__action-btn"
+                          <Button
+                            variant="secondary"
+                            size="sm"
                             onClick={() => setViewInvoice(inv)}
                           >
                             View
-                          </button>
+                          </Button>
                           {inv.status === 'draft' && (
-                            <button
-                              type="button"
-                              className="bd__action-btn bd__action-btn--primary"
+                            <Button
+                              variant="primary"
+                              size="sm"
                               onClick={() => sentMutation.mutate(inv.id)}
                               disabled={sentMutation.isPending}
                             >
                               Send
-                            </button>
+                            </Button>
                           )}
-                          <button
-                            type="button"
-                            className="bd__action-btn"
+                          <Button
+                            variant="secondary"
+                            size="sm"
                             onClick={() => handleDownloadPdf(inv.id)}
                             disabled={pdfLoading === inv.id}
                           >
                             {pdfLoading === inv.id ? '…' : 'PDF'}
-                          </button>
+                          </Button>
                           {inv.status !== 'paid' && inv.status !== 'void' && (
-                            <button
-                              type="button"
-                              className="bd__action-btn bd__action-btn--success"
+                            <Button
+                              variant="primary"
+                              size="sm"
                               onClick={() => paidMutation.mutate(inv.id)}
                               disabled={paidMutation.isPending}
                             >
-                              Paid
-                            </button>
+                              Mark paid
+                            </Button>
                           )}
                           {inv.status !== 'void' && inv.status !== 'paid' && (
-                            <button
-                              type="button"
-                              className="bd__action-btn bd__action-btn--danger"
+                            <Button
+                              variant="danger"
+                              size="sm"
                               onClick={() => setVoidTarget(inv)}
                             >
                               Void
-                            </button>
+                            </Button>
                           )}
                         </div>
                       </td>
@@ -646,11 +665,12 @@ export const BillingDashboard: React.FC = () => {
               </tbody>
             </table>
           </div>
-        )}
+        </div>
       </Card>
 
       {/* ── 3. Aging report ──────────────────────────────────────────────── */}
-      <div className="bd__aging-section">
+      <Card className="bd__aging-panel">
+        <div className="bd__aging-section">
         <h2 className="bd__section-title">Accounts Receivable Aging</h2>
         <p className="bd__aging-hint">Click a card to filter the invoice list above.</p>
         <div className="bd__aging-cards">
@@ -666,7 +686,8 @@ export const BillingDashboard: React.FC = () => {
             />
           ))}
         </div>
-      </div>
+        </div>
+      </Card>
 
       {/* ── 4. Export section ────────────────────────────────────────────── */}
       <Card className="bd__export-card">

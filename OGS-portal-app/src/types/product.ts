@@ -27,6 +27,12 @@ export interface Product {
   basePrice: number
   /** @deprecated Use basePrice. Kept so existing order/billing code compiles. */
   pricePerUnit: number
+  /** Internal cost per unit. Never expose in customer-facing views. */
+  cost?: number
+  /** Internal minimum allowed gross margin as decimal (e.g. 0.22 = 22%). */
+  minMarginPercent?: number
+  /** Derived internal floor price based on cost and min margin. */
+  minPrice?: number
   rentalPrice?: number | null
 
   // ── Units ─────────────────────────────────────────────────────
@@ -43,6 +49,15 @@ export interface Product {
   active: boolean
 
   // ── Timestamps ────────────────────────────────────────────────
+  createdAt?: Timestamp
+  updatedAt?: Timestamp
+}
+
+export interface ProductPricingInternal {
+  productId: string
+  cost: number
+  minMarginPercent: number
+  minPrice: number
   createdAt?: Timestamp
   updatedAt?: Timestamp
 }

@@ -1,0 +1,33 @@
+Find the tablet section around line 125-135 and replace:
+
+  .sidebar__logo-bar {
+    padding: var(--space-2) var(--space-1);
+    height: 48px;
+    justify-content: center;
+  }
+
+  .sidebar__logo-text {
+    display: none;
+  }
+
+  .sidebar__logo-mark {
+    width: 28px;
+    height: 28px;
+    font-size: 10px;
+  }
+
+With:
+
+  .sidebar__logo-bar {
+    padding: var(--space-2) var(--space-1);
+    height: 48px;
+    justify-content: center;
+  }
+
+  .sidebar__logo-sep {
+    display: none;
+  }
+
+  .sidebar__logo-text {
+    display: none;
+  }

@@ -480,8 +480,7 @@ const OpsDashboard: React.FC = () => {
       <div className="od-stats">
 
         {/* Pending orders */}
-        <div className="od-stat-card od-stat-card--orders">
-          <div className="od-stat-card__icon">📋</div>
+        <div className="od-stat-card">
           <div className="od-stat-card__body">
             <span className="od-stat-card__value">
               {pendingLoading ? '—' : pendingOrders.length}
@@ -496,8 +495,7 @@ const OpsDashboard: React.FC = () => {
         </div>
 
         {/* Active runs */}
-        <div className="od-stat-card od-stat-card--runs">
-          <div className="od-stat-card__icon">🚛</div>
+        <div className="od-stat-card">
           <div className="od-stat-card__body">
             <span className="od-stat-card__value">
               {runsLoading ? '—' : runIds.length}
@@ -510,8 +508,7 @@ const OpsDashboard: React.FC = () => {
         </div>
 
         {/* Low tanks */}
-        <div className="od-stat-card od-stat-card--tanks">
-          <div className="od-stat-card__icon">⚠️</div>
+        <div className="od-stat-card">
           <div className="od-stat-card__body">
             <span className="od-stat-card__value">{lowTanks.length}</span>
             <span className="od-stat-card__label">Tanks low level</span>
@@ -527,8 +524,7 @@ const OpsDashboard: React.FC = () => {
         </div>
 
         {/* Outstanding invoices */}
-        <div className="od-stat-card od-stat-card--invoices">
-          <div className="od-stat-card__icon">💰</div>
+        <div className="od-stat-card">
           <div className="od-stat-card__body">
             <span className="od-stat-card__value">{fmtCurrency(outstandingTotal)}</span>
             <span className="od-stat-card__label">Outstanding invoices</span>

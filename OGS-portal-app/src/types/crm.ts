@@ -35,6 +35,19 @@ export interface QuoteItem {
   amount: number
 }
 
+/**
+ * Internal-only profitability metrics used by CRM/Admin quote builder.
+ * These fields are never persisted in customer-facing quote payloads.
+ */
+export interface QuoteLineProfitability {
+  cost: number
+  basePrice: number
+  minMarginPercent: number
+  minPrice: number
+  marginPercent: number
+  profit: number
+}
+
 export interface Quote {
   id: string
   quoteNumber: string

@@ -78,7 +78,7 @@ export default function ResetPassword() {
         <div className="auth-brand">
           <div className="auth-brand__bar" aria-hidden="true" />
           <div className="auth-brand__lockup">
-            <span className="auth-brand__name">OGS Portal</span>
+            <span className="auth-brand__name">Ohio Gas Supply</span>
             <span className="auth-brand__tagline">
               Reliable Gas. Local Service. Built for Ohio.
             </span>

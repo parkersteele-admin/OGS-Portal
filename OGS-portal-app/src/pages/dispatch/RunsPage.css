@@ -77,7 +77,7 @@
 
 .rp-stat--active {
   border-color: var(--color-brand);
-  background: var(--color-brand-light, #eff6ff);
+  background: var(--color-brand-light);
 }
 
 .rp-stat__count {

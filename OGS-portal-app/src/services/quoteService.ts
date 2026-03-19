@@ -15,6 +15,7 @@ import {
 import { db } from '../lib/firebase'
 import { quotesCol } from '../lib/firestore'
 import type { Quote, QuoteStatus, QuoteItem } from '../types/crm'
+import { getInternalProductPricingGuards } from './productService'
 import { serviceCall, fromSnap, paginate, type Page, type PageOptions, OgsValidationError } from './base'
 
 export interface QuoteFilters {
@@ -30,6 +31,44 @@ export interface CreateQuoteInput {
   validUntil: Date
   notes?: string
   createdBy: string
+}
+
+function sanitizeQuoteLineItems(lineItems: QuoteItem[]): QuoteItem[] {
+  return lineItems.map((item) => {
+    const quantity = Number.isFinite(item.quantity) ? item.quantity : 0
+    const unitPrice = Number.isFinite(item.unitPrice) ? item.unitPrice : 0
+    const amount = parseFloat((quantity * unitPrice).toFixed(2))
+    return {
+      productId: item.productId,
+      description: item.description,
+      quantity,
+      unitPrice,
+      amount,
+    }
+  })
+}
+
+async function enforceQuoteMinimumMargins(lineItems: QuoteItem[]): Promise<void> {
+  const productIds = lineItems
+    .map((i) => i.productId)
+    .filter((id) => id && id !== 'delivery' && id !== 'rental')
+
+  if (productIds.length === 0) return
+
+  const pricingGuards = await getInternalProductPricingGuards(productIds)
+  const violations: string[] = []
+
+  lineItems.forEach((item) => {
+    const guard = pricingGuards[item.productId]
+    if (!guard) return
+    if (item.unitPrice + 0.0001 < guard.minPrice) {
+      violations.push(`${item.description || item.productId} must be at least $${guard.minPrice.toFixed(2)}`)
+    }
+  })
+
+  if (violations.length > 0) {
+    throw new OgsValidationError(`Minimum margin violation: ${violations.join('; ')}`)
+  }
 }
 
 // ── Pricing ───────────────────────────────────────────────────────────────────
@@ -92,7 +131,10 @@ export async function createQuote(data: CreateQuoteInput, taxRate = 0): Promise<
     if (!data.leadId && !data.customerId) {
       throw new OgsValidationError('Quote must be linked to a lead or a customer')
     }
-    const totals = calculateQuoteTotals(data.lineItems, taxRate)
+    const cleanLineItems = sanitizeQuoteLineItems(data.lineItems)
+    await enforceQuoteMinimumMargins(cleanLineItems)
+
+    const totals = calculateQuoteTotals(cleanLineItems, taxRate)
     const quoteNumber = `QT-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`
     // Strip undefined fields — Firestore rejects them
     const cleanData = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined))
@@ -100,7 +142,7 @@ export async function createQuote(data: CreateQuoteInput, taxRate = 0): Promise<
       quoteNumber,
       ...cleanData,
       ...totals,
-      lineItems: data.lineItems,
+      lineItems: cleanLineItems,
       status: 'draft' as QuoteStatus,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -113,8 +155,14 @@ export async function updateQuote(
   id: string,
   data: Partial<Omit<Quote, 'id' | 'createdAt'>>,
 ): Promise<void> {
+  const nextData = { ...data }
+  if (nextData.lineItems) {
+    nextData.lineItems = sanitizeQuoteLineItems(nextData.lineItems)
+    await enforceQuoteMinimumMargins(nextData.lineItems)
+  }
+
   // Strip undefined fields — Firestore rejects them
-  const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined))
+  const clean = Object.fromEntries(Object.entries(nextData).filter(([, v]) => v !== undefined))
   return serviceCall(() =>
     updateDoc(doc(db, 'quotes', id), { ...clean, updatedAt: serverTimestamp() }),
   )

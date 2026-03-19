@@ -236,7 +236,7 @@
 .tp-scanner__crosshair {
   width: 200px;
   height: 200px;
-  border: 3px solid #E87722;
+  border: 3px solid var(--color-brand);
   border-radius: 12px;
   box-shadow: 0 0 0 4000px rgba(0,0,0,0.4);
   animation: tp-pulse 1.5s ease-in-out infinite;

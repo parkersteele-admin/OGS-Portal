@@ -55,17 +55,16 @@ import './LeadsPipeline.css'
 interface StageConfig {
   key:   LeadStatus
   label: string
-  color: 'neutral' | 'info' | 'brand' | 'warning' | 'success' | 'danger'
-  hex:   string
+  accent?: boolean
 }
 
 const STAGES: StageConfig[] = [
-  { key: 'new',       label: 'New Lead',   color: 'neutral', hex: '#6b7280' },
-  { key: 'contacted', label: 'Contacted',  color: 'info',    hex: '#3b82f6' },
-  { key: 'qualified', label: 'Qualified',  color: 'brand',   hex: '#7c3aed' },
-  { key: 'proposal',  label: 'Quote Sent', color: 'warning', hex: '#f59e0b' },
-  { key: 'won',       label: 'Won',        color: 'success', hex: '#16a34a' },
-  { key: 'lost',      label: 'Lost',       color: 'danger',  hex: '#dc2626' },
+  { key: 'new',       label: 'New Lead' },
+  { key: 'contacted', label: 'Contacted' },
+  { key: 'qualified', label: 'Qualified' },
+  { key: 'proposal',  label: 'Quote Sent', accent: true },
+  { key: 'won',       label: 'Won',        accent: true },
+  { key: 'lost',      label: 'Lost' },
 ]
 
 const STAGE_MAP = Object.fromEntries(STAGES.map(s => [s.key, s])) as Record<LeadStatus, StageConfig>
@@ -88,14 +87,6 @@ const METHOD_LABELS: Record<ContactMethod, string> = {
   'in-person':'In person',
   other:      'Note',
 }
-const METHOD_ICONS: Record<ContactMethod, string> = {
-  call:       '📞',
-  email:      '✉️',
-  text:       '💬',
-  'in-person':'🤝',
-  other:      '📝',
-}
-
 // ── Sort helpers ──────────────────────────────────────────────────────────────
 
 type SortCol = 'company' | 'name' | 'status' | 'source' | 'estimatedValue' | 'updatedAt' | 'createdAt'
@@ -351,10 +342,10 @@ const ActivitySection: React.FC<{ leadId: string }> = ({ leadId }) => {
         <div className="lp-activity__log">
           {logs.map(log => (
             <div key={log.id} className="lp-activity__entry">
-              <span className="lp-activity__icon">{METHOD_ICONS[log.method]}</span>
               <div className="lp-activity__body">
                 <span className="lp-activity__meta">
-                  {METHOD_LABELS[log.method]} · {formatRelative(log.contactedAt)}
+                  <span className="lp-activity__method">{METHOD_LABELS[log.method]}</span>
+                  <span>{formatRelative(log.contactedAt)}</span>
                 </span>
                 <p className="lp-activity__summary">{log.summary}</p>
               </div>
@@ -425,6 +416,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
 
   const stageConfig = STAGE_MAP[lead.status]
   const repName = salesReps.find(r => r.id === lead.assignedTo)?.name
+  const stageBadgeVariant = stageConfig.accent ? 'brand' : 'neutral'
 
   return (
     <aside className="lp-panel" aria-label="Lead detail">
@@ -447,7 +439,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
               <option key={s.key} value={s.key}>{s.label}</option>
             ))}
           </select>
-          <Badge variant={stageConfig.color}>{stageConfig.label}</Badge>
+          <Badge variant={stageBadgeVariant}>{stageConfig.label}</Badge>
         </div>
       </div>
 
@@ -568,11 +560,11 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
             size="sm"
             onClick={() => navigate(`/crm/quotes/new?leadId=${lead.id}`)}
           >
-            📋 Send quote
+            Send quote
           </Button>
         ) : (
           <Button variant="ghost" size="sm" disabled title="Advance to Qualified before quoting">
-            📋 Send quote
+            Send quote
           </Button>
         )}
 
@@ -582,7 +574,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
             size="sm"
             onClick={() => navigate(`/crm/customers/${lead.convertedToCustomerId}`)}
           >
-            → View customer
+            View customer
           </Button>
         ) : (
           <Button
@@ -613,6 +605,7 @@ const LeadCard: React.FC<LeadCardProps> = ({
   lead, salesReps, isSelected, onSelect, onMoveTo, onQuote,
 }) => {
   const rep = salesReps.find(r => r.id === lead.assignedTo)
+  const canQuote = ['qualified', 'proposal', 'won'].includes(lead.status)
 
   const handleDragStart = (e: React.DragEvent) => {
     e.dataTransfer.setData('text/plain', lead.id)
@@ -647,10 +640,9 @@ const LeadCard: React.FC<LeadCardProps> = ({
       </div>
 
       {lead.updatedAt && (
-        <p className="lp-card__activity">{formatRelative(lead.updatedAt)}</p>
+        <p className="lp-card__activity">Last activity {formatRelative(lead.updatedAt)}</p>
       )}
 
-      {/* Stage dropdown */}
       <div className="lp-card__footer" onClick={e => e.stopPropagation()}>
         <select
           className="lp-card__stage-select"
@@ -661,11 +653,11 @@ const LeadCard: React.FC<LeadCardProps> = ({
         </select>
         <button
           className="lp-card__quote-btn"
-          title={['qualified', 'proposal', 'won'].includes(lead.status) ? 'Send quote' : 'Qualify lead first'}
-          disabled={!['qualified', 'proposal', 'won'].includes(lead.status)}
-          onClick={e => { e.stopPropagation(); if (['qualified', 'proposal', 'won'].includes(lead.status)) onQuote(lead) }}
+          title={canQuote ? 'Send quote' : 'Qualify lead first'}
+          disabled={!canQuote}
+          onClick={e => { e.stopPropagation(); if (canQuote) onQuote(lead) }}
         >
-          📋
+          Quote
         </button>
       </div>
     </div>
@@ -697,15 +689,15 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
 
   return (
     <div
-      className={`lp-col${isDragOver ? ' lp-col--drag-over' : ''}`}
+      className={`lp-col lp-col--${stage.key}${stage.accent ? ' lp-col--accent' : ''}${isDragOver ? ' lp-col--drag-over' : ''}`}
       onDragOver={onDragOver}
       onDrop={onDrop}
       onDragLeave={onDragLeave}
     >
-      <div className="lp-col__header" style={{ borderTopColor: stage.hex }}>
+      <div className="lp-col__header">
         <div className="lp-col__header-top">
           <span className="lp-col__label">{stage.label}</span>
-          <span className={`lp-col__count lp-col__count--${stage.color}`}>{leads.length}</span>
+          <span className={`lp-col__count${stage.accent ? ' lp-col__count--accent' : ''}`}>{leads.length}</span>
         </div>
         {totalValue > 0 && (
           <span className="lp-col__value">{formatCurrency(totalValue)}</span>
@@ -714,7 +706,9 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
 
       <div className="lp-col__cards">
         {leads.length === 0 ? (
-          <div className="lp-col__empty">Drop here</div>
+          <div className="lp-col__empty">
+            {isDragOver ? 'Release to move lead' : 'No leads in this stage'}
+          </div>
         ) : (
           leads.map(lead => (
             <LeadCard
@@ -787,7 +781,7 @@ const ListTable: React.FC<ListTableProps> = ({
                 <td className="lp-td lp-td--bold">{lead.company ?? lead.name}</td>
                 <td className="lp-td">{lead.company ? lead.name : '—'}</td>
                 <td className="lp-td">
-                  <Badge variant={stageConfig.color}>{stageConfig.label}</Badge>
+                    <Badge variant={stageConfig.accent ? 'brand' : 'neutral'}>{stageConfig.label}</Badge>
                 </td>
                 <td className="lp-td">{lead.source ?? '—'}</td>
                 <td className="lp-td">{rep?.name ?? '—'}</td>
@@ -808,7 +802,7 @@ const ListTable: React.FC<ListTableProps> = ({
                     title="Send quote"
                     onClick={() => onQuote(lead)}
                   >
-                    📋
+                    Quote
                   </button>
                 </td>
               </tr>
@@ -956,20 +950,23 @@ const LeadsPipeline: React.FC = () => {
       {/* ── Page header ─────────────────────────────────────────────────────── */}
       <header className="lp-header">
         <div className="lp-header__left">
-          <h1 className="lp-header__title">Leads Pipeline</h1>
+          <div>
+            <h1 className="lp-header__title">Leads Pipeline</h1>
+            <p className="lp-header__sub">Manage stage movement, prioritize high-value opportunities, and convert qualified accounts without leaving the board.</p>
+          </div>
           <div className="lp-header__metrics">
-            <span className="lp-metric">
+            <div className="lp-metric">
               <span className="lp-metric__label">Active pipeline</span>
               <span className="lp-metric__value">{formatCurrency(totalPipeline)}</span>
-            </span>
-            <span className="lp-metric">
+            </div>
+            <div className="lp-metric">
               <span className="lp-metric__label">Won</span>
               <span className="lp-metric__value lp-metric__value--won">{formatCurrency(wonValue)}</span>
-            </span>
-            <span className="lp-metric">
+            </div>
+            <div className="lp-metric">
               <span className="lp-metric__label">Total leads</span>
               <span className="lp-metric__value">{leads.length}</span>
-            </span>
+            </div>
           </div>
         </div>
 
@@ -991,19 +988,19 @@ const LeadsPipeline: React.FC = () => {
               onClick={() => setView('kanban')}
               title="Kanban view"
             >
-              ⬛⬛
+              Board
             </button>
             <button
               className={`lp-view-toggle__btn${view === 'list' ? ' lp-view-toggle__btn--active' : ''}`}
               onClick={() => setView('list')}
               title="List view"
             >
-              ≡
+              List
             </button>
           </div>
 
           <Button variant="primary" size="sm" onClick={() => setShowAdd(true)}>
-            + Add lead
+            Add lead
           </Button>
         </div>
       </header>

@@ -13,6 +13,7 @@ import { getDocs, query, orderBy, where } from 'firebase/firestore'
 import { runsCol, usersCol } from '../../lib/firestore'
 import type { Run, RunStatus } from '../../types/run'
 import type { AppUser } from '../../types/user'
+import { Button } from '../../components/ui/Button'
 import './RunsPage.css'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -92,9 +93,9 @@ export default function RunsPage() {
           <h1 className="rp-title">Runs</h1>
           <p className="rp-subtitle">{runs.length} total run{runs.length !== 1 ? 's' : ''}</p>
         </div>
-        <button className="rp-btn-new" onClick={() => navigate('/ops/runs/new')}>
+        <Button variant="primary" onClick={() => navigate('/ops/runs/new')}>
           + New Run
-        </button>
+        </Button>
       </div>
 
       {/* ── Stat pills ───────────────────────────────────────── */}
@@ -172,28 +173,31 @@ export default function RunsPage() {
                     <td>
                       <div className="rp-actions">
                         {(run.status === 'scheduled' || run.status === 'in-progress') && (
-                          <button
-                            className="rp-action-btn rp-action-btn--dispatch"
+                          <Button
+                            variant="primary"
+                            size="sm"
                             onClick={() => navigate(`/ops/dispatch/${run.id}`)}
                           >
                             Dispatch
-                          </button>
+                          </Button>
                         )}
                         {run.status === 'completed' && (
-                          <button
-                            className="rp-action-btn rp-action-btn--summary"
+                          <Button
+                            variant="secondary"
+                            size="sm"
                             onClick={() => navigate(`/ops/runs/${run.id}/summary`)}
                           >
                             Summary
-                          </button>
+                          </Button>
                         )}
                         {run.status === 'scheduled' && (
-                          <button
-                            className="rp-action-btn rp-action-btn--summary"
+                          <Button
+                            variant="secondary"
+                            size="sm"
                             onClick={() => navigate(`/ops/runs/${run.id}/summary`)}
                           >
                             View
-                          </button>
+                          </Button>
                         )}
                       </div>
                     </td>
