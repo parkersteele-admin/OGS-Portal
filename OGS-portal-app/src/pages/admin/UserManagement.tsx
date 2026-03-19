@@ -13,6 +13,7 @@
  */
 
 import React, { useState, useMemo, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getDocs, query, orderBy } from 'firebase/firestore'
 import { usersCol } from '../../lib/firestore'
@@ -20,7 +21,10 @@ import {
   assignUserRole,
   deactivateUser,
   reactivateUser,
+  createAppUser,
 } from '../../services/userService'
+import { useViewAsStore } from '../../store/viewAsStore'
+import { ROLE_HOME } from '../../types/auth'
 import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
 import { CreateUserModal } from '../../components/ui/CreateUserModal'
@@ -40,6 +44,14 @@ const ROLE_LABELS: Record<UserRole, string> = {
   sales:    'Sales',
   customer: 'Customer',
 }
+
+const DEMO_USERS: Array<{ name: string; email: string; role: UserRole }> = [
+  { name: 'Test Admin',    email: 'admin@ogs-demo.test',    role: 'admin'    },
+  { name: 'Test Dispatch', email: 'dispatch@ogs-demo.test', role: 'dispatch' },
+  { name: 'Test Driver',   email: 'driver@ogs-demo.test',   role: 'driver'   },
+  { name: 'Test Sales',    email: 'sales@ogs-demo.test',    role: 'sales'    },
+  { name: 'Test Customer', email: 'customer@ogs-demo.test', role: 'customer' },
+]
 
 // ── Fetch ─────────────────────────────────────────────────────────────────────
 
@@ -84,6 +96,93 @@ const StatCard: React.FC<StatCardProps> = ({ role, count, total }) => (
     )}
   </div>
 )
+
+// ── Seed Demo Users Modal ─────────────────────────────────────────────────────
+
+type SeedStatus = 'idle' | 'running' | 'created' | 'exists' | 'error'
+
+interface SeedResult { role: UserRole; status: SeedStatus; error?: string }
+
+const SeedDemoUsersModal: React.FC<{ onClose: () => void; onDone: () => void }> = ({ onClose, onDone }) => {
+  const [results, setResults] = useState<SeedResult[]>(
+    DEMO_USERS.map((u) => ({ role: u.role, status: 'idle' as SeedStatus })),
+  )
+  const [running, setRunning] = useState(false)
+  const [done,    setDone]    = useState(false)
+
+  async function handleCreate() {
+    setRunning(true)
+    for (let i = 0; i < DEMO_USERS.length; i++) {
+      const demo = DEMO_USERS[i]
+      setResults((prev) => prev.map((r, idx) => idx === i ? { ...r, status: 'running' } : r))
+      try {
+        await createAppUser({ name: demo.name, email: demo.email, role: demo.role })
+        setResults((prev) => prev.map((r, idx) => idx === i ? { ...r, status: 'created' } : r))
+      } catch (err: unknown) {
+        const msg = (err as Error).message ?? ''
+        const isExists = msg.includes('already-exists') || msg.includes('already exists')
+        setResults((prev) => prev.map((r, idx) =>
+          idx === i ? { ...r, status: isExists ? 'exists' : 'error', error: isExists ? undefined : msg } : r,
+        ))
+      }
+    }
+    setRunning(false)
+    setDone(true)
+    onDone()
+  }
+
+  const statusLabel: Record<SeedStatus, string> = {
+    idle:    '—',
+    running: '⟳',
+    created: '✓ Created',
+    exists:  '⊙ Already exists',
+    error:   '✕ Error',
+  }
+
+  return (
+    <Modal open onClose={onClose} title="Create demo accounts" size="md">
+      <div className="um-seed">
+        <p className="um-seed__desc">
+          Creates one test account per role for development and QA.
+          Each new user will receive a password-reset email so they can set their password.
+        </p>
+        <div className="um-seed__list">
+          {DEMO_USERS.map((demo, i) => {
+            const result = results[i]
+            return (
+              <div key={demo.role} className="um-seed__row">
+                <RoleBadge role={demo.role} />
+                <span className="um-seed__name">{demo.name}</span>
+                <span className="um-seed__email">{demo.email}</span>
+                <span className={`um-seed__status um-seed__status--${result.status}`}>
+                  {result.status === 'error'
+                    ? `✕ ${result.error ?? 'Error'}`
+                    : statusLabel[result.status]}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+        <div className="um-form__actions">
+          {!done ? (
+            <>
+              <Button type="button" variant="ghost" onClick={onClose} disabled={running}>
+                Cancel
+              </Button>
+              <Button variant="primary" onClick={handleCreate} loading={running} disabled={running}>
+                Create test accounts
+              </Button>
+            </>
+          ) : (
+            <Button type="button" variant="primary" onClick={onClose}>
+              Done
+            </Button>
+          )}
+        </div>
+      </div>
+    </Modal>
+  )
+}
 
 // ── Edit User Modal ───────────────────────────────────────────────────────────
 
@@ -201,10 +300,13 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onUpdated 
 
 export const UserManagement: React.FC = () => {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  const { setViewAsUser } = useViewAsStore()
 
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all')
   const [createOpen, setCreateOpen] = useState(false)
+  const [seedOpen,   setSeedOpen]   = useState(false)
   const [editUser,   setEditUser]   = useState<AppUser | null>(null)
 
   const usersQuery = useQuery({
@@ -266,9 +368,14 @@ export const UserManagement: React.FC = () => {
             {totalUsers} portal account{totalUsers !== 1 ? 's' : ''}
           </p>
         </div>
-        <Button variant="primary" onClick={() => setCreateOpen(true)}>
-          + Create User
-        </Button>
+        <div className="um__header-actions">
+          <Button variant="ghost" size="sm" onClick={() => setSeedOpen(true)}>
+            Seed test users
+          </Button>
+          <Button variant="primary" onClick={() => setCreateOpen(true)}>
+            + Create User
+          </Button>
+        </div>
       </div>
 
       {/* ── 1. Stat cards ────────────────────────────────────────────── */}
@@ -355,13 +462,23 @@ export const UserManagement: React.FC = () => {
                     <td><StatusDot active={user.active} /></td>
                     <td className="um__cell-date">{lastLoginOf(user)}</td>
                     <td>
-                      <button
-                        type="button"
-                        className="um__action-btn"
-                        onClick={() => setEditUser(user)}
-                      >
-                        Edit
-                      </button>
+                      <div className="um__actions">
+                        <button
+                          type="button"
+                          className="um__action-btn"
+                          onClick={() => setEditUser(user)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="um__action-btn um__action-btn--view-as"
+                          onClick={() => { setViewAsUser(user); navigate(ROLE_HOME[user.role]) }}
+                          title={`View portal as ${user.name}`}
+                        >
+                          View as
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -376,6 +493,13 @@ export const UserManagement: React.FC = () => {
         <CreateUserModal
           onClose={() => setCreateOpen(false)}
           onCreated={handleCreated}
+        />
+      )}
+
+      {seedOpen && (
+        <SeedDemoUsersModal
+          onClose={() => setSeedOpen(false)}
+          onDone={() => queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })}
         />
       )}
 

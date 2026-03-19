@@ -9,6 +9,7 @@ import React, { useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useViewAsStore } from '../../store/viewAsStore'
 import { useAuth } from '../../hooks/useAuth'
+import { ROLE_HOME } from '../../types/auth'
 import './ViewAsBanner.css'
 
 export const ViewAsBanner: React.FC = () => {
@@ -21,9 +22,9 @@ export const ViewAsBanner: React.FC = () => {
 
   const handleExit = useCallback(() => {
     exitViewAs()
-    // Role-preview → return to admin home; user-impersonation → return to customer portal
-    navigate(realUser ? (isRolePreview ? '/portal/dashboard' : '/portal/dashboard') : '/portal/dashboard', { replace: true })
-  }, [exitViewAs, navigate, realUser, isRolePreview])
+    // Return to the real user's home screen
+    navigate(realUser ? ROLE_HOME[realUser.role] : '/login', { replace: true })
+  }, [exitViewAs, navigate, realUser])
 
   if (!isViewingAs || !user) return null
 
