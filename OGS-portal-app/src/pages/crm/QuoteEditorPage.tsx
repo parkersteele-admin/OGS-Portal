@@ -19,6 +19,7 @@ import React, {
   useEffect,
   useCallback,
   useMemo,
+  useRef,
 } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -84,6 +85,61 @@ const STATUS_BADGE: Record<QuoteStatus, { label: string; variant: 'success' | 'w
   expired:  { label: 'Expired',  variant: 'warning'  },
 }
 
+type FlatIconName = 'back' | 'save' | 'preview' | 'send' | 'convert' | 'remove' | 'summary'
+
+const FlatIcon: React.FC<{ name: FlatIconName }> = ({ name }) => {
+  if (name === 'back') {
+    return (
+      <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+        <path d="M12.5 4.5L7 10l5.5 5.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    )
+  }
+  if (name === 'save') {
+    return (
+      <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+        <path d="M4 3.5h9l3 3v10H4z" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        <path d="M7 3.5v5h6v-5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        <path d="M7 14h6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      </svg>
+    )
+  }
+  if (name === 'preview') {
+    return (
+      <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+        <path d="M1.8 10s3-4.8 8.2-4.8S18.2 10 18.2 10 15.2 14.8 10 14.8 1.8 10 1.8 10Z" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        <circle cx="10" cy="10" r="2.3" fill="none" stroke="currentColor" strokeWidth="1.6" />
+      </svg>
+    )
+  }
+  if (name === 'send') {
+    return (
+      <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+        <path d="M2.2 9.6 17.6 2.8l-4.8 14.4-2.6-5-5-.2z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      </svg>
+    )
+  }
+  if (name === 'convert') {
+    return (
+      <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+        <path d="M4 10.5l3.3 3.3L16 5.8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    )
+  }
+  if (name === 'remove') {
+    return (
+      <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+        <path d="M6.2 6.2 13.8 13.8M13.8 6.2 6.2 13.8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    )
+  }
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+      <path d="M10 2.8v14.4M2.8 10h14.4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const EMPTY_ROW = (): DraftLineItem => ({
@@ -120,17 +176,21 @@ function calcMarginPercent(price: number, cost: number): number {
   return (price - cost) / price
 }
 
-function recalcRow(row: DraftLineItem): DraftLineItem {
+function recalcRow(row: DraftLineItem, source: 'margin' | 'unitPrice' | 'other' = 'other'): DraftLineItem {
   const quantity = Number.isFinite(row.quantity) ? Math.max(row.quantity, 0) : 0
   const cost = Number.isFinite(row.cost) ? Math.max(row.cost, 0) : 0
   const minMarginPercent = normalizeMarginInput(row.minMarginPercent)
   const minPrice = calcMinPrice(cost, minMarginPercent)
 
-  const marginPercent = normalizeMarginInput(row.marginPercent)
-  const calculatedUnitPrice = parseFloat((cost / (1 - marginPercent)).toFixed(2))
-  const unitPrice = Number.isFinite(calculatedUnitPrice)
-    ? calculatedUnitPrice
-    : parseFloat((row.unitPrice || 0).toFixed(2))
+  let marginPercent = normalizeMarginInput(row.marginPercent)
+  let unitPrice = Number.isFinite(row.unitPrice) ? parseFloat(Math.max(row.unitPrice, 0).toFixed(2)) : 0
+
+  if (source === 'margin') {
+    const calculatedUnitPrice = parseFloat((cost / (1 - marginPercent)).toFixed(2))
+    unitPrice = Number.isFinite(calculatedUnitPrice) ? calculatedUnitPrice : unitPrice
+  } else {
+    marginPercent = normalizeMarginInput(calcMarginPercent(unitPrice, cost))
+  }
 
   const amount = parseFloat((quantity * unitPrice).toFixed(2))
   const profit = parseFloat(((unitPrice - cost) * quantity).toFixed(2))
@@ -175,24 +235,38 @@ const LineItemRow: React.FC<LineItemRowProps> = ({
   products,
   disabled,
 }) => {
-  const handleNum = (field: 'quantity' | 'marginPercent') => (e: React.ChangeEvent<HTMLInputElement>) =>
+  const [detailsOpen, setDetailsOpen] = useState(false)
+
+  const handleNum = (field: 'quantity' | 'marginPercent' | 'unitPrice') => (e: React.ChangeEvent<HTMLInputElement>) =>
     onChange(row._id, field, parseFloat(e.target.value) || 0)
 
   return (
-    <div className={`qep-row${hasMarginViolation ? ' qep-row--warn' : ''}`}>
-      <span className="qep-row__num">{index + 1}</span>
+    <article className={`qep-item${hasMarginViolation ? ' qep-item--warn' : ''}`}>
+      <div className="qep-item__head">
+        <span className="qep-item__num">Line {index + 1}</span>
+        <button
+          className="qep-item__remove"
+          onClick={() => onRemove(row._id)}
+          disabled={disabled}
+          aria-label="Remove line item"
+          title="Remove line item"
+          type="button"
+        >
+          <span className="qep-icon" aria-hidden="true"><FlatIcon name="remove" /></span>
+        </button>
+      </div>
 
-      <div className="qep-row__product">
+      <div className="qep-item__product">
         <ProductCombobox
           value={row.productId}
           onSelect={(p) => onProductSelect(row._id, p)}
           label=""
-          placeholder="Select product…"
+          placeholder="Select product..."
           products={products}
           disabled={disabled}
         />
         <input
-          className="ui-input qep-row__desc"
+          className="ui-input qep-item__desc"
           placeholder="Description (auto-filled or custom)"
           value={row.description}
           onChange={e => onChange(row._id, 'description', e.target.value)}
@@ -200,56 +274,69 @@ const LineItemRow: React.FC<LineItemRowProps> = ({
         />
       </div>
 
-      <input className="ui-input qep-row__qty" type="number" min="0" step="0.01"
-        placeholder="Qty" value={row.quantity || ''} onChange={handleNum('quantity')} disabled={disabled} />
+      <div className="qep-item__controls">
+        <label className="qep-item__field">
+          <span className="qep-item__label">Qty</span>
+          <input className="ui-input" type="number" min="0" step="0.01"
+            placeholder="0" value={row.quantity || ''} onChange={handleNum('quantity')} disabled={disabled} />
+        </label>
 
-      <span className="qep-row__metric">{formatCurrency(row.cost)}</span>
+        <label className="qep-item__field">
+          <span className="qep-item__label">Margin %</span>
+          <input
+            className="ui-input"
+            type="number"
+            min={0}
+            max={95}
+            step={0.1}
+            placeholder="0"
+            value={parseFloat((row.marginPercent * 100).toFixed(2)) || ''}
+            onChange={handleNum('marginPercent')}
+            disabled={disabled || !row.productId}
+          />
+        </label>
 
-      <span className="qep-row__metric">{formatCurrency(row.basePrice)}</span>
+        <label className="qep-item__field">
+          <span className="qep-item__label">Final price</span>
+          <input
+            className="ui-input"
+            type="number"
+            min={0}
+            step={0.01}
+            placeholder="0.00"
+            value={row.unitPrice || ''}
+            onChange={handleNum('unitPrice')}
+            disabled={disabled || !row.productId}
+          />
+        </label>
 
-      <div className="qep-row__margin-control">
-        <input
-          className="qep-row__margin-slider"
-          type="range"
-          min={Math.round(row.minMarginPercent * 100)}
-          max={Math.max(90, Math.round(row.minMarginPercent * 100) + 40)}
-          step={0.5}
-          value={parseFloat((row.marginPercent * 100).toFixed(2))}
-          onChange={handleNum('marginPercent')}
-          disabled={disabled || !row.productId}
-        />
-        <input
-          className="ui-input qep-row__margin-input"
-          type="number"
-          min={0}
-          max={95}
-          step={0.1}
-          placeholder="Margin %"
-          value={parseFloat((row.marginPercent * 100).toFixed(2)) || ''}
-          onChange={handleNum('marginPercent')}
-          disabled={disabled || !row.productId}
-        />
+        <div className="qep-item__amount-block" role="status" aria-live="polite">
+          <span className="qep-item__label">Amount</span>
+          <strong>{formatCurrency(row.amount)}</strong>
+        </div>
       </div>
 
-      <span className="qep-row__metric">{formatCurrency(row.unitPrice)}</span>
+      <button
+        className="qep-item__details-toggle"
+        onClick={() => setDetailsOpen((v) => !v)}
+        type="button"
+      >
+        {detailsOpen ? 'Hide pricing details' : 'Show pricing details'}
+      </button>
 
-      <span className={`qep-row__metric${row.profit < 0 ? ' qep-row__metric--danger' : ''}`}>{formatCurrency(row.profit)}</span>
-
-      <span className={`qep-row__metric${hasMarginViolation ? ' qep-row__metric--danger' : ''}`}>
-        {(row.marginPercent * 100).toFixed(1)}%
-      </span>
-
-      <span className="qep-row__amount">{formatCurrency(row.amount)}</span>
-
-      {hasMarginViolation && (
-        <span className="qep-row__warning">
-          Min {Math.round(row.minMarginPercent * 1000) / 10}% ({formatCurrency(row.minPrice)})
-        </span>
+      {detailsOpen && (
+        <div className="qep-item__details">
+          <div className="qep-item__metric"><span>Cost</span><strong>{formatCurrency(row.cost)}</strong></div>
+          <div className="qep-item__metric"><span>Base</span><strong>{formatCurrency(row.basePrice)}</strong></div>
+          <div className={`qep-item__metric${row.profit < 0 ? ' qep-item__metric--danger' : ''}`}><span>Profit</span><strong>{formatCurrency(row.profit)}</strong></div>
+          <div className={`qep-item__metric${hasMarginViolation ? ' qep-item__metric--danger' : ''}`}><span>Margin</span><strong>{(row.marginPercent * 100).toFixed(1)}%</strong></div>
+          <div className="qep-item__metric"><span>Min floor</span><strong>{(row.minMarginPercent * 100).toFixed(1)}% ({formatCurrency(row.minPrice)})</strong></div>
+          {hasMarginViolation && (
+            <p className="qep-item__warning">This line is below minimum margin floor.</p>
+          )}
+        </div>
       )}
-
-      <button className="qep-row__remove" onClick={() => onRemove(row._id)} disabled={disabled}
-        aria-label="Remove" title="Remove">✕</button>
-    </div>
+    </article>
   )
 }
 
@@ -359,6 +446,7 @@ const QuoteEditorPage: React.FC = () => {
   const [savedId,        setSavedId]        = useState<string | null>(isNew ? null : quoteId!)
   const [status,         setStatus]         = useState<QuoteStatus>('draft')
   const [error,          setError]          = useState<string | null>(null)
+  const summaryRef = useRef<HTMLDivElement | null>(null)
 
   // Load existing quote into form
   useEffect(() => {
@@ -383,7 +471,7 @@ const QuoteEditorPage: React.FC = () => {
         profit:      0,
         unitPrice:   item.unitPrice,
         amount:      item.amount,
-      })).map(recalcRow))
+      })).map((row) => recalcRow(row, 'unitPrice')))
       setNotes(q.notes ?? '')
       setStatus(q.status)
       if (q.validUntil) {
@@ -435,10 +523,15 @@ const QuoteEditorPage: React.FC = () => {
   const handleRowChange = useCallback((id: string, field: keyof DraftLineItem, value: string | number) => {
     setRows(prev => prev.map(r => {
       if (r._id !== id) return r
-      const nextValue = field === 'marginPercent'
-        ? normalizeMarginInput(Number(value))
-        : value
-      return recalcRow({ ...r, [field]: nextValue })
+      if (field === 'marginPercent') {
+        const nextMargin = normalizeMarginInput(Number(value))
+        return recalcRow({ ...r, marginPercent: nextMargin }, 'margin')
+      }
+      if (field === 'unitPrice') {
+        const nextPrice = Number.isFinite(Number(value)) ? Math.max(Number(value), 0) : 0
+        return recalcRow({ ...r, unitPrice: nextPrice }, 'unitPrice')
+      }
+      return recalcRow({ ...r, [field]: value }, 'other')
     }))
   }, [])
 
@@ -475,7 +568,7 @@ const QuoteEditorPage: React.FC = () => {
         minPrice:    product.minPrice,
         marginPercent,
       }
-      return recalcRow(updated)
+      return recalcRow(updated, 'margin')
     }))
   }, [])
 
@@ -497,7 +590,7 @@ const QuoteEditorPage: React.FC = () => {
         minMarginPercent: product.minMarginPercent,
         minPrice: product.minPrice,
         marginPercent,
-      })
+      }, 'unitPrice')
     }))
   }, [productMap])
 
@@ -619,7 +712,8 @@ const QuoteEditorPage: React.FC = () => {
       <div className="qep-header">
         <div className="qep-header__left">
           <button className="qep-back" onClick={() => navigate('/crm/quotes')} aria-label="Back to quotes">
-            ← Quotes
+            <span className="qep-icon" aria-hidden="true"><FlatIcon name="back" /></span>
+            <span>Quotes</span>
           </button>
           <h1 className="qep-title">
             {isNew ? 'New Quote' : (savedId ? `Quote` : 'Edit Quote')}
@@ -633,22 +727,22 @@ const QuoteEditorPage: React.FC = () => {
             <>
               <Button variant="ghost" size="sm" loading={saveMutation.isPending} disabled={isBusy}
                 onClick={() => saveMutation.mutate()}>
-                💾 Save draft
+                <span className="qep-action-label"><span className="qep-icon" aria-hidden="true"><FlatIcon name="save" /></span>Save draft</span>
               </Button>
               <Button variant="secondary" size="sm" loading={pdfLoading || previewMutation.isPending} disabled={isBusy}
                 onClick={() => previewMutation.mutate()}>
-                👁 Preview PDF
+                <span className="qep-action-label"><span className="qep-icon" aria-hidden="true"><FlatIcon name="preview" /></span>Preview PDF</span>
               </Button>
               <Button variant="primary" size="sm" loading={sendMutation.isPending} disabled={isBusy || status === 'sent'}
                 onClick={() => sendMutation.mutate()}>
-                ✉️ Send
+                <span className="qep-action-label"><span className="qep-icon" aria-hidden="true"><FlatIcon name="send" /></span>Send</span>
               </Button>
             </>
           )}
           {(status === 'sent' || !isReadOnly) && (
             <Button variant="success" size="sm" loading={convertMutation.isPending} disabled={isBusy}
               onClick={() => convertMutation.mutate()}>
-              ✓ Convert to order
+              <span className="qep-action-label"><span className="qep-icon" aria-hidden="true"><FlatIcon name="convert" /></span>Convert to order</span>
             </Button>
           )}
         </div>
@@ -753,30 +847,15 @@ const QuoteEditorPage: React.FC = () => {
                   ))}
                 </div>
               )}
-              <div className="qep-lines-table">
-                <div className="qep-rows-header">
-                  <span />
-                  <span className="qep-col-label">Product / Description</span>
-                  <span className="qep-col-label">Qty</span>
-                  <span className="qep-col-label">Cost</span>
-                  <span className="qep-col-label">Base</span>
-                  <span className="qep-col-label">Margin</span>
-                  <span className="qep-col-label">Final Price</span>
-                  <span className="qep-col-label">Profit</span>
-                  <span className="qep-col-label">Margin %</span>
-                  <span className="qep-col-label qep-col-label--right">Amount</span>
-                  <span />
-                </div>
-                <div className="qep-rows">
-                  {rows.map((row, i) => (
-                    <LineItemRow key={row._id} row={row} index={i}
-                      onChange={handleRowChange} onProductSelect={handleProductSelect}
-                      onRemove={removeRow}
-                      hasMarginViolation={Boolean(row.productId) && row.marginPercent + 0.0001 < row.minMarginPercent}
-                      products={filteredProducts}
-                      disabled={isReadOnly} />
-                  ))}
-                </div>
+              <div className="qep-items" role="list" aria-label="Quote line items">
+                {rows.map((row, i) => (
+                  <LineItemRow key={row._id} row={row} index={i}
+                    onChange={handleRowChange} onProductSelect={handleProductSelect}
+                    onRemove={removeRow}
+                    hasMarginViolation={Boolean(row.productId) && row.marginPercent + 0.0001 < row.minMarginPercent}
+                    products={filteredProducts}
+                    disabled={isReadOnly} />
+                ))}
               </div>
               {!isReadOnly && (
                 <button className="qep-add-row" onClick={addRow}>+ Add line item</button>
@@ -830,7 +909,7 @@ const QuoteEditorPage: React.FC = () => {
           </div>{/* end .qep-main */}
 
           {/* Sidebar summary */}
-          <aside className="qep-sidebar">
+          <aside className="qep-sidebar" ref={summaryRef}>
             <div className="qep-summary">
               <h3 className="qep-summary__title">Summary</h3>
               <div className="qep-summary__rows">
@@ -881,6 +960,21 @@ const QuoteEditorPage: React.FC = () => {
             </div>
           </aside>
         </div>
+      </div>
+
+      <div className="qep-mobile-summarybar">
+        <div className="qep-mobile-summarybar__totals">
+          <span>Total</span>
+          <strong>{formatCurrency(total)}</strong>
+        </div>
+        <button
+          type="button"
+          className="qep-mobile-summarybar__btn"
+          onClick={() => summaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+        >
+          <span className="qep-icon" aria-hidden="true"><FlatIcon name="summary" /></span>
+          <span>Review summary</span>
+        </button>
       </div>
 
       {pdfUrl && <PdfPreviewModal url={pdfUrl} onClose={() => setPdfUrl(null)} />}

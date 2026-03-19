@@ -784,7 +784,7 @@ export const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
               disabled={isBusy}
               onClick={() => saveMutation.mutate()}
             >
-              💾 Save draft
+              Save draft
             </Button>
 
             <Button
@@ -794,7 +794,7 @@ export const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
               disabled={isBusy}
               onClick={() => previewMutation.mutate()}
             >
-              👁 Preview PDF
+              Preview PDF
             </Button>
 
             <Button
@@ -804,7 +804,7 @@ export const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
               disabled={isBusy || status === 'sent'}
               onClick={() => sendMutation.mutate()}
             >
-              ✉️ Send to customer
+              Send to customer
             </Button>
           </>
         )}
@@ -817,7 +817,7 @@ export const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
             disabled={isBusy || status === 'accepted'}
             onClick={() => convertMutation.mutate()}
           >
-            ✓ Convert to order
+            Convert to order
           </Button>
         )}
       </div>
@@ -857,7 +857,7 @@ const QuoteTable: React.FC<QuoteTableProps> = ({
   if (quotes.length === 0) {
     return (
       <div className="qb-empty-state">
-        <p>No quotes yet. Create your first quote →</p>
+        <p>No quotes yet. Create your first quote.</p>
       </div>
     )
   }
