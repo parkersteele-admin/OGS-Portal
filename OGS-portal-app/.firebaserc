@@ -1,7 +1,5 @@
 {
   "projects": {
-    "default": "ogs-portal",
-    "staging": "ogs-portal",
-    "production": "ogs-portal-prod"
+    "default": "ogs-portal"
   }
 }

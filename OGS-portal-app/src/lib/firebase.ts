@@ -6,8 +6,8 @@ import { getFunctions, connectFunctionsEmulator } from 'firebase/functions'
 import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check'
 import { firebase as firebaseConfig, hasFirebaseEnvConfig, isDev, RECAPTCHA_SITE_KEY } from './env'
 
-// In Firebase App Hosting, FIREBASE_WEBAPP_CONFIG is injected during build and
-// the Firebase JS SDK can initialize with no explicit options.
+// Initialize with explicit env config when provided; otherwise rely on
+// runtime-provided Firebase config.
 const app = hasFirebaseEnvConfig ? initializeApp(firebaseConfig) : initializeApp()
 
 export const auth = getAuth(app)
