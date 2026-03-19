@@ -26,6 +26,23 @@ import { runManifestCol } from '../lib/firestore'
 import { useAuth } from './useAuth'
 import type { ManifestItem } from '../types/cylinder'
 import type { Cylinder } from '../types/cylinder'
+import type { Tank } from '../types/tank'
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+/**
+ * Tank QR codes encode a URL: https://ogs-portal.web.app/driver/truck?scan=TANK_ID
+ * Plain cylinderIds are bare strings.
+ * This extracts the actual ID from either format.
+ */
+function extractId(raw: string): string {
+  try {
+    const url = new URL(raw)
+    return url.searchParams.get('scan') ?? raw.trim()
+  } catch {
+    return raw.trim()
+  }
+}
 
 // ── Public types ───────────────────────────────────────────────────────────────
 
@@ -111,9 +128,15 @@ export function useTruckLoad(runId: string | null | undefined): UseTruckLoadResu
 
   // ── handleScan ────────────────────────────────────────────────────────────────
   const handleScan = useCallback(
-    async (cylinderId: string): Promise<ScanResult> => {
+    async (rawValue: string): Promise<ScanResult> => {
       if (!runId || !user) {
         return { status: 'error', message: 'Not authenticated.' }
+      }
+
+      // Tank QR codes encode a URL — extract the bare ID first.
+      const cylinderId = extractId(rawValue)
+      if (!cylinderId) {
+        return { status: 'error', message: 'Could not read QR code value.' }
       }
 
       // ── Case 1: cylinder is in the pre-populated manifest ──────────────────
@@ -136,8 +159,8 @@ export function useTruckLoad(runId: string | null | undefined): UseTruckLoadResu
             { merge: true },
           )
           await setDoc(
-            doc(db, 'cylinders', cylinderId),
-            { status: 'onTruck', currentRunId: runId, lastScannedAt: now, lastScannedBy: user.id },
+            doc(db, 'tanks', cylinderId),
+            { status: 'on_truck', driverId: user.id, loadedAt: now },
             { merge: true },
           )
           return {
@@ -150,19 +173,57 @@ export function useTruckLoad(runId: string | null | undefined): UseTruckLoadResu
         }
       }
 
-      // ── Case 2: cylinder not in manifest — look it up in /cylinders ─────────
-      // This handles the case where the manifest cloud function hasn't run yet,
-      // or the cylinder is a valid physical asset being loaded ad-hoc.
+      // Duplicate ad-hoc scan
       if (adHocScanned.has(cylinderId)) {
-        return { status: 'duplicate', message: `Cylinder ${cylinderId} already scanned.` }
+        return { status: 'duplicate', message: `Already scanned ${cylinderId}.` }
       }
 
       try {
-        const cylSnap = await getDoc(doc(db, 'cylinders', cylinderId))
         const now = serverTimestamp()
 
+        // ── Case 2: look up /tanks first — tank QR codes point here ───────────
+        const tankSnap = await getDoc(doc(db, 'tanks', cylinderId))
+        if (tankSnap.exists()) {
+          const tank = tankSnap.data() as Tank
+          const productName = `${tank.gasType ?? ''} ${tank.sizeLabel ?? ''}`.trim() || 'Tank'
+
+          const autoItem: Omit<ManifestItem, 'scannedAt' | 'scannedBy'> = {
+            cylinderId,
+            productId:    cylinderId,
+            productName,
+            sizeLabel:    tank.sizeLabel  ?? '',
+            customerId:   '',
+            customerName: 'Loaded from inventory',
+            stopSequence: 0,
+            orderType:    'offRoute',
+            required:     true,
+            scanned:      true,
+          }
+
+          await setDoc(
+            doc(db, 'runs', runId, 'manifest', cylinderId),
+            { ...autoItem, scannedAt: now, scannedBy: user.id },
+            { merge: true },
+          )
+          await setDoc(
+            doc(db, 'tanks', cylinderId),
+            { status: 'on_truck', driverId: user.id, loadedAt: now },
+            { merge: true },
+          )
+
+          setAdHocScanned((prev) => new Set([...prev, cylinderId]))
+
+          const label = `${productName} (${tank.serialNumber ?? cylinderId})`
+          return {
+            status: 'success',
+            item: { ...autoItem, scanned: true },
+            message: `✓ ${label} loaded`,
+          }
+        }
+
+        // ── Case 3: fall back to /cylinders ───────────────────────────────────
+        const cylSnap = await getDoc(doc(db, 'cylinders', cylinderId))
         if (cylSnap.exists()) {
-          // Known cylinder — accept it, auto-create manifest entry
           const cyl = cylSnap.data() as Cylinder
 
           const autoItem: Omit<ManifestItem, 'scannedAt' | 'scannedBy'> = {
@@ -171,7 +232,7 @@ export function useTruckLoad(runId: string | null | undefined): UseTruckLoadResu
             productName:  cyl.productName ?? 'Cylinder',
             sizeLabel:    cyl.sizeLabel   ?? '',
             customerId:   '',
-            customerName: 'Unknown — scanned ad-hoc',
+            customerName: 'Loaded from inventory',
             stopSequence: 0,
             orderType:    'offRoute',
             required:     true,
@@ -196,50 +257,32 @@ export function useTruckLoad(runId: string | null | undefined): UseTruckLoadResu
             item: { ...autoItem, scanned: true },
             message: `✓ ${cyl.productName ?? 'Cylinder'} ${cyl.sizeLabel ?? ''} loaded`,
           }
-        } else {
-          // Cylinder not in registry — still accept it (write a minimal record)
-          // so the driver isn't blocked. Flag as unknown.
-          await setDoc(
-            doc(db, 'cylinders', cylinderId),
-            {
-              cylinderId,
-              productId:   '',
-              productName: 'Unknown',
-              sizeLabel:   '',
-              status:      'onTruck',
-              currentRunId: runId,
-              lastScannedAt: now,
-              lastScannedBy: user.id,
-            },
-            { merge: true },
-          )
-          await setDoc(
-            doc(db, 'runs', runId, 'manifest', cylinderId),
-            {
-              cylinderId,
-              productId:    '',
-              productName:  'Unknown cylinder',
-              sizeLabel:    '',
-              customerId:   '',
-              customerName: 'Unknown',
-              stopSequence:  0,
-              orderType:     'offRoute',
-              required:      true,
-              scanned:       true,
-              scannedAt:     now,
-              scannedBy:     user.id,
-              unknownCylinder: true,
-            },
-            { merge: true },
-          )
-
-          setAdHocScanned((prev) => new Set([...prev, cylinderId]))
-
-          return {
-            status: 'success',
-            message: `✓ Cylinder ${cylinderId} loaded (not in registry — dispatch notified)`,
-          }
         }
+
+        // ── Case 4: completely unknown — write minimal record, never block driver ──
+        await setDoc(
+          doc(db, 'tanks', cylinderId),
+          { id: cylinderId, serialNumber: cylinderId, gasType: '', sizeLabel: '', status: 'on_truck', driverId: user.id, loadedAt: now },
+          { merge: true },
+        )
+        await setDoc(
+          doc(db, 'runs', runId, 'manifest', cylinderId),
+          {
+            cylinderId, productId: '', productName: 'Unknown tank', sizeLabel: '',
+            customerId: '', customerName: 'Unknown', stopSequence: 0,
+            orderType: 'offRoute', required: true, scanned: true,
+            scannedAt: now, scannedBy: user.id, unknownCylinder: true,
+          },
+          { merge: true },
+        )
+
+        setAdHocScanned((prev) => new Set([...prev, cylinderId]))
+
+        return {
+          status: 'success',
+          message: `✓ Tank ${cylinderId} loaded (not in registry — contact dispatch)`,
+        }
+
       } catch (err) {
         return { status: 'error', message: err instanceof Error ? err.message : 'Scan failed.' }
       }
