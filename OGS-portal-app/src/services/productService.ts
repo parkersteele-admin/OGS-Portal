@@ -16,7 +16,6 @@ import {
   query,
   where,
   documentId,
-  orderBy,
   writeBatch,
   serverTimestamp,
   onSnapshot,
@@ -155,6 +154,17 @@ async function getPricingMap(): Promise<Map<string, ProductPricingInternal>> {
       pricingMapCacheUntil = Date.now() + PRICING_CACHE_TTL_MS
       return map
     })
+    .catch((err) => {
+      const code = (err as { code?: string })?.code ?? ''
+      if (code === 'permission-denied') {
+        // Allow product reads to proceed when internal pricing is restricted.
+        const empty = new Map<string, ProductPricingInternal>()
+        pricingMapCache = empty
+        pricingMapCacheUntil = Date.now() + PRICING_CACHE_TTL_MS
+        return empty
+      }
+      throw err
+    })
     .finally(() => {
       pricingMapInflight = null
     })
@@ -183,17 +193,24 @@ async function getPricingMapForIds(productIds: string[]): Promise<Map<string, Pr
   if (uniqueIds.length === 0) return map
 
   const chunks = chunkArray(uniqueIds, 10)
-  await Promise.all(chunks.map(async (chunk) => {
-    const snap = await getDocs(query(productPricingCol, where(documentId(), 'in', chunk)))
-    snap.docs.forEach((d) => {
-      const data = d.data() as ProductPricingInternal
-      map.set(d.id, {
-        ...data,
-        productId: d.id,
-        minPrice: computeMinPrice(data.cost, data.minMarginPercent),
+  try {
+    await Promise.all(chunks.map(async (chunk) => {
+      const snap = await getDocs(query(productPricingCol, where(documentId(), 'in', chunk)))
+      snap.docs.forEach((d) => {
+        const data = d.data() as ProductPricingInternal
+        map.set(d.id, {
+          ...data,
+          productId: d.id,
+          minPrice: computeMinPrice(data.cost, data.minMarginPercent),
+        })
       })
-    })
-  }))
+    }))
+  } catch (err) {
+    const code = (err as { code?: string })?.code ?? ''
+    if (code !== 'permission-denied') {
+      throw err
+    }
+  }
 
   return map
 }
@@ -204,14 +221,22 @@ async function getProductAndPricing(productId: string): Promise<{ product: Produ
 
   const product = sanitizePublicProduct({ ...productSnap.data(), id: productSnap.id } as Product, productSnap.id)
 
-  const pricingSnap = await getDoc(doc(db, 'productPricing', productId))
-  const pricing = pricingSnap.exists()
-    ? ({
-      ...pricingSnap.data(),
-      productId,
-      minPrice: computeMinPrice(pricingSnap.data().cost, pricingSnap.data().minMarginPercent),
-    } as ProductPricingInternal)
-    : null
+  let pricing: ProductPricingInternal | null = null
+  try {
+    const pricingSnap = await getDoc(doc(db, 'productPricing', productId))
+    pricing = pricingSnap.exists()
+      ? ({
+        ...pricingSnap.data(),
+        productId,
+        minPrice: computeMinPrice(pricingSnap.data().cost, pricingSnap.data().minMarginPercent),
+      } as ProductPricingInternal)
+      : null
+  } catch (err) {
+    const code = (err as { code?: string })?.code ?? ''
+    if (code !== 'permission-denied') {
+      throw err
+    }
+  }
 
   return { product, pricing }
 }
@@ -223,14 +248,20 @@ export async function getAllProducts(): Promise<Product[]> {
   return serviceCall(async () => {
     const [productSnap, pricingMap] = await Promise.all([
       getDocs(
-        query(productsCol, where('active', '==', true), orderBy('sortOrder'), orderBy('name')),
+        query(productsCol, where('active', '==', true)),
       ),
       getPricingMap(),
     ])
 
-    return productSnap.docs.map((d) => {
+    const products = productSnap.docs.map((d) => {
       const base = sanitizePublicProduct({ ...d.data(), id: d.id } as Product, d.id)
       return mergeInternalPricing(base, pricingMap.get(d.id))
+    })
+
+    // Sort by sortOrder then name (client-side)
+    return products.sort((a, b) => {
+      const orderCmp = (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
+      return orderCmp !== 0 ? orderCmp : a.name.localeCompare(b.name)
     })
   })
 }
@@ -274,11 +305,14 @@ export async function getVisibleProducts(): Promise<Product[]> {
         productsCol,
         where('active', '==', true),
         where('isVisible', '==', true),
-        orderBy('sortOrder'),
-        orderBy('name'),
       ),
     )
-    return snap.docs.map((d) => sanitizePublicProduct({ ...d.data(), id: d.id } as Product, d.id))
+    const products = snap.docs.map((d) => sanitizePublicProduct({ ...d.data(), id: d.id } as Product, d.id))
+    // Sort by sortOrder then name (client-side)
+    return products.sort((a, b) => {
+      const orderCmp = (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
+      return orderCmp !== 0 ? orderCmp : a.name.localeCompare(b.name)
+    })
   })
 }
 
@@ -307,7 +341,7 @@ export async function getProductDropdown(): Promise<ProductDropdownItem[]> {
 
     dropdownInflight = Promise.all([
       getDocs(
-        query(productsCol, where('active', '==', true), orderBy('category'), orderBy('name')),
+        query(productsCol, where('active', '==', true)),
       ),
       getPricingMap(),
     ])
@@ -330,6 +364,12 @@ export async function getProductDropdown(): Promise<ProductDropdownItem[]> {
           }
         })
 
+        // Sort by category then name (client-side)
+        items.sort((a, b) => {
+          const catCmp = a.category.localeCompare(b.category)
+          return catCmp !== 0 ? catCmp : a.name.localeCompare(b.name)
+        })
+
         dropdownCache = items
         dropdownCacheUntil = Date.now() + DROPDOWN_CACHE_TTL_MS
         return items
@@ -350,7 +390,7 @@ export function subscribeToProducts(
   onError?: (err: Error) => void,
 ): Unsubscribe {
   return onSnapshot(
-    query(productsCol, where('active', '==', true), orderBy('sortOrder'), orderBy('name')),
+    query(productsCol, where('active', '==', true)),
     (snap) => {
       void (async () => {
         try {
@@ -358,6 +398,11 @@ export function subscribeToProducts(
           const products = snap.docs.map((d) => {
             const base = sanitizePublicProduct({ ...d.data(), id: d.id } as Product, d.id)
             return mergeInternalPricing(base, pricingMap.get(d.id))
+          })
+          // Sort by sortOrder then name (client-side)
+          products.sort((a, b) => {
+            const orderCmp = (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
+            return orderCmp !== 0 ? orderCmp : a.name.localeCompare(b.name)
           })
           cb(products)
         } catch (err) {

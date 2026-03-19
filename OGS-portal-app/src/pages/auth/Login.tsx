@@ -153,16 +153,17 @@ export default function Login() {
 
   return (
     <div className="auth-wrap">
+      <div className="auth-bg" aria-hidden="true" />
       <div className="auth-card">
 
         {/* ── Brand lockup ── */}
         <div className="auth-brand">
-          <div className="auth-brand__bar" aria-hidden="true" />
+          <div className="auth-brand__accent" aria-hidden="true" />
           <div className="auth-brand__lockup">
-            <span className="auth-brand__name">Ohio Gas Supply</span>
-            <span className="auth-brand__tagline">
+            <h1 className="auth-brand__name">Ohio Gas Supply</h1>
+            <p className="auth-brand__tagline">
               Reliable Gas. Local Service. Built for Ohio.
-            </span>
+            </p>
           </div>
         </div>
 

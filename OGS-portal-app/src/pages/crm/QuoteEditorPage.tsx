@@ -43,9 +43,12 @@ import { getProductDropdown, type ProductDropdownItem } from '../../services/pro
 import type { Quote, QuoteItem, QuoteStatus } from '../../types/crm'
 import type { Customer } from '../../types/customer'
 import type { Lead } from '../../types/crm'
+import type { ProductCategory } from '../../types/product'
 import './QuoteEditorPage.css'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
+
+const PRODUCT_CATEGORIES: ProductCategory[] = ['CO₂ Cylinders', 'Nitrogen', 'Beer Gas', 'Propane', 'Rentals', 'Fees']
 
 interface DraftLineItem {
   _id:         string
@@ -158,6 +161,7 @@ interface LineItemRowProps {
   onProductSelect: (id: string, p: ProductDropdownItem | null) => void
   onRemove:        (id: string) => void
   hasMarginViolation: boolean
+  products?:       ProductDropdownItem[]
   disabled?:       boolean
 }
 
@@ -168,6 +172,7 @@ const LineItemRow: React.FC<LineItemRowProps> = ({
   onProductSelect,
   onRemove,
   hasMarginViolation,
+  products,
   disabled,
 }) => {
   const handleNum = (field: 'quantity' | 'marginPercent') => (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -183,6 +188,7 @@ const LineItemRow: React.FC<LineItemRowProps> = ({
           onSelect={(p) => onProductSelect(row._id, p)}
           label=""
           placeholder="Select product…"
+          products={products}
           disabled={disabled}
         />
         <input
@@ -309,16 +315,21 @@ const QuoteEditorPage: React.FC = () => {
     return () => { mounted = false; unsub() }
   }, [])
 
+  const [productLoadError, setProductLoadError] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState<string | 'All'>('All')
+
   useEffect(() => {
     let mounted = true
     getProductDropdown()
       .then((items) => {
         if (!mounted) return
         setProductMap(Object.fromEntries(items.map((item) => [item.id, item])))
+        setProductLoadError('')
       })
-      .catch(() => {
+      .catch((err) => {
         if (!mounted) return
         setProductMap({})
+        setProductLoadError(err instanceof Error ? err.message : 'Failed to load products')
       })
     return () => { mounted = false }
   }, [])
@@ -489,6 +500,13 @@ const QuoteEditorPage: React.FC = () => {
       })
     }))
   }, [productMap])
+
+  // Compute filtered products based on selected category
+  const filteredProducts = useMemo(() => {
+    const products = Object.values(productMap)
+    if (selectedCategory === 'All') return products
+    return products.filter((p) => p.category === selectedCategory)
+  }, [productMap, selectedCategory])
 
   // ── Build payload ─────────────────────────────────────────────────────────
 
@@ -716,6 +734,25 @@ const QuoteEditorPage: React.FC = () => {
             {/* Line items */}
             <section className="qep-section">
               <h2 className="qep-section__title">Line items</h2>
+              {productLoadError && (
+                <div className="qep-error" style={{ color: 'var(--color-error, #c0392b)', marginBottom: 'var(--space-4)' }}>
+                  Failed to load products: {productLoadError}
+                </div>
+              )}
+              {Object.keys(productMap).length > 0 && (
+                <div className="qep-filter-bar" style={{ marginBottom: 'var(--space-4)', display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                  {(['All', ...PRODUCT_CATEGORIES] as const).map((cat) => (
+                    <button
+                      key={cat}
+                      className={`ui-btn ui-btn--sm${selectedCategory === cat ? ' ui-btn--brand' : ' ui-btn--secondary'}`}
+                      onClick={() => setSelectedCategory(cat)}
+                      type="button"
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="qep-lines-table">
                 <div className="qep-rows-header">
                   <span />
@@ -736,6 +773,7 @@ const QuoteEditorPage: React.FC = () => {
                       onChange={handleRowChange} onProductSelect={handleProductSelect}
                       onRemove={removeRow}
                       hasMarginViolation={Boolean(row.productId) && row.marginPercent + 0.0001 < row.minMarginPercent}
+                      products={filteredProducts}
                       disabled={isReadOnly} />
                   ))}
                 </div>

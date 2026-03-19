@@ -29,6 +29,8 @@ export interface ProductComboboxProps {
   label?: string
   /** Placeholder text */
   placeholder?: string
+  /** Optional filtered product list (if provided, overrides the default fetch) */
+  products?: ProductDropdownItem[]
   disabled?: boolean
   required?: boolean
 }
@@ -38,11 +40,12 @@ export const ProductCombobox: React.FC<ProductComboboxProps> = ({
   onSelect,
   label = 'Product',
   placeholder = 'Search or select a product…',
+  products,
   disabled = false,
   required = false,
 }) => {
-  const [options,      setOptions]      = useState<ProductDropdownItem[]>([])
-  const [loading,      setLoading]      = useState(true)
+  const [options,      setOptions]      = useState<ProductDropdownItem[]>(products ?? [])
+  const [loading,      setLoading]      = useState(!products)
   const [open,         setOpen]         = useState(false)
   const [query,        setQuery]        = useState('')
   const [activeIdx,    setActiveIdx]    = useState(-1)
@@ -50,12 +53,17 @@ export const ProductCombobox: React.FC<ProductComboboxProps> = ({
   const inputRef    = useRef<HTMLInputElement>(null)
   const listRef     = useRef<HTMLUListElement>(null)
 
-  // Load product list once
+  // Load product list once (only if not provided as prop)
   useEffect(() => {
+    if (products) {
+      setOptions(products)
+      setLoading(false)
+      return
+    }
     getProductDropdown()
       .then(setOptions)
       .finally(() => setLoading(false))
-  }, [])
+  }, [products])
 
   // Close on outside click
   useEffect(() => {
