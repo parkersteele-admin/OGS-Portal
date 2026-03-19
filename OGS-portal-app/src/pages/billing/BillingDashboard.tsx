@@ -454,18 +454,18 @@ export const BillingDashboard: React.FC = () => {
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
-    <div className="bd">
+    <div className="bd page-layout">
 
       {/* ── Header ──────────────────────────────────────────────────────── */}
-      <div className="bd__header">
-        <div>
-          <h1 className="bd__title">Billing</h1>
-          <p className="bd__subtitle">Manage invoice flow, receivables, and follow-up actions from a single operational workspace.</p>
+      <div className="page-header">
+        <div className="page-header__title-section">
+          <h1 className="page-header__title">Billing</h1>
+          <p className="page-header__description">Manage invoice flow, receivables, and follow-up actions from a single operational workspace.</p>
         </div>
       </div>
 
       {/* ── 1. Summary stat cards ────────────────────────────────────────── */}
-      <div className="bd__stats">
+      <div className="page-section-grid page-section-grid--4col">
         <StatCard
           label="Revenue This Month"
           value={formatCurrency(stats.revenueThisMonth)}
@@ -497,8 +497,8 @@ export const BillingDashboard: React.FC = () => {
             {agingFilter !== null && (
               <span className="bd__aging-active-label">
                 — {agingBuckets[agingFilter].label}
-                <button type="button" className="bd__aging-clear" onClick={() => setAgingFilter(null)}>
-                  ✕
+                <button type="button" className="bd__aging-clear" onClick={() => setAgingFilter(null)} aria-label="Clear aging filter">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
               </span>
             )}

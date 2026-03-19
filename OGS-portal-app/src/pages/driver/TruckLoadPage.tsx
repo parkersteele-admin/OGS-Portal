@@ -411,7 +411,7 @@ export default function TruckLoadPage() {
       {/* ── All-loaded banner ── */}
       {allScanned && (
         <div className="tl-all-loaded" role="status">
-          <span className="tl-all-loaded__icon" aria-hidden="true">✅</span>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="tl-all-loaded__icon" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
           <div className="tl-all-loaded__text">
             <div className="tl-all-loaded__title">
               {progress.total > 0

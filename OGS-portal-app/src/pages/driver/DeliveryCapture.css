@@ -179,9 +179,10 @@
 }
 
 .dc-body__icon {
-  font-size: 48px;
-  text-align: center;
-  line-height: 1;
+  width: 48px;
+  height: 48px;
+  margin: 0 auto;
+  color: var(--color-brand);
 }
 
 .dc-body__heading {

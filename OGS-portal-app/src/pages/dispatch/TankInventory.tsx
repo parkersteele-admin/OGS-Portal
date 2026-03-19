@@ -135,7 +135,10 @@ function StockCard({ group }: { group: StockGroup }) {
   return (
     <div className={`ti-stock-card ${warn ? 'ti-stock-card--warn' : ''}`}>
       {warn && (
-        <div className="ti-stock-card__warn-badge">⚠ Low Stock</div>
+        <div className="ti-stock-card__warn-badge">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 20h20L12 2zm1 15h-2v2h2v-2zm0-6h-2v6h2v-6z"/></svg>
+          Low Stock
+        </div>
       )}
       <div className="ti-stock-card__gas">{group.gasType}</div>
       <div className="ti-stock-card__size">{group.sizeLabel}</div>
@@ -463,7 +466,9 @@ function CylinderDetailPanel({ tank, customer, onClose, onRefill, onEdit }: Cyli
             <div className="ti-panel__serial">{tank.serialNumber}</div>
             <div className="ti-panel__sub">{tank.gasType} · {tank.sizeLabel}</div>
           </div>
-          <button className="ti-panel__close" onClick={onClose} aria-label="Close">✕</button>
+          <button className="ti-panel__close" onClick={onClose} aria-label="Close">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
         </div>
 
         <div className="ti-panel__body">
@@ -625,10 +630,12 @@ function CylinderDetailPanel({ tank, customer, onClose, onRefill, onEdit }: Cyli
         {/* Footer */}
         <div className="ti-panel__footer">
           <Button variant="ghost" size="sm" onClick={() => setShowQR(true)}>
-            📱 QR Code
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '6px' }}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h7v7h-7z"/></svg>
+            QR Code
           </Button>
           <Button variant="secondary" size="sm" onClick={onEdit}>
-            ✏️ Edit
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '6px' }}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+            Edit
           </Button>
           {tank.status === 'deployed' && (
             <Button variant="secondary" size="sm" onClick={onRefill}>
@@ -718,7 +725,9 @@ function AddCylinderModal({ onClose, onCreated }: AddCylinderModalProps) {
       <div className="ti-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Add cylinder">
         <div className="ti-modal__header">
           <h2 className="ti-modal__title">Add Cylinder</h2>
-          <button className="ti-modal__close" onClick={onClose} aria-label="Close">✕</button>
+          <button className="ti-modal__close" onClick={onClose} aria-label="Close">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
         </div>
         <form className="ti-modal__body" onSubmit={handleSubmit} noValidate>
           {error && <div className="ti-form-error">{error}</div>}
@@ -835,13 +844,18 @@ function TankQRModal({ tank, onClose }: { tank: Tank; onClose: () => void }) {
       <div className="ti-modal ti-modal--qr" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Tank QR code">
         <div className="ti-modal__header">
           <h2 className="ti-modal__title">QR Code — {tank.serialNumber}</h2>
-          <button className="ti-modal__close" onClick={onClose} aria-label="Close">✕</button>
+          <button className="ti-modal__close" onClick={onClose} aria-label="Close">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
         </div>
         <div className="ti-qr-body">
           <QRCodeSVG value={qrValue} size={220} includeMargin />
           <p className="ti-qr-serial">{tank.gasType} · {tank.sizeLabel}</p>
           <p className="ti-qr-hint">Scan with driver app to load / return this tank</p>
-          <Button variant="secondary" size="sm" onClick={() => window.print()}>🖨 Print</Button>
+          <Button variant="secondary" size="sm" onClick={() => window.print()}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '6px' }}><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            Print
+          </Button>
         </div>
       </div>
     </div>
@@ -850,14 +864,42 @@ function TankQRModal({ tank, onClose }: { tank: Tank; onClose: () => void }) {
 
 // ── Tank event timeline ────────────────────────────────────────────────────────
 
-const EVENT_LABELS: Record<string, { icon: string; label: string; color: string }> = {
-  created:                { icon: '🏭', label: 'Added to inventory', color: '#6b7280' },
-  loaded_to_truck:        { icon: '🚛', label: 'Loaded to truck',    color: '#3b82f6' },
-  unloaded_from_truck:    { icon: '📦', label: 'Unloaded from truck', color: '#6b7280' },
-  delivered_to_customer:  { icon: '✅', label: 'Delivered to customer', color: '#22c55e' },
-  empty_returned:         { icon: '🔙', label: 'Empty returned',     color: '#f59e0b' },
-  status_changed:         { icon: '🔄', label: 'Status changed',     color: '#8b5cf6' },
-  inspection_updated:     { icon: '🔍', label: 'Inspection updated', color: '#0ea5e9' },
+const EVENT_LABELS: Record<string, { icon: React.ReactNode; label: string; color: string }> = {
+  created: {
+    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z"/></svg>,
+    label: 'Added to inventory',
+    color: '#6b7280',
+  },
+  loaded_to_truck: {
+    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 17H5l-1-1V9c0-1 .9-2 2-2h12c1.1 0 2 .9 2 2v7l-1 1h-4"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>,
+    label: 'Loaded to truck',
+    color: '#3b82f6',
+  },
+  unloaded_from_truck: {
+    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 7L3 5m0 0v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5"/><path d="M8 9v6M12 9v6M16 9v6"/></svg>,
+    label: 'Unloaded from truck',
+    color: '#6b7280',
+  },
+  delivered_to_customer: {
+    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>,
+    label: 'Delivered to customer',
+    color: '#22c55e',
+  },
+  empty_returned: {
+    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7M12 19l7-7"/></svg>,
+    label: 'Empty returned',
+    color: '#f59e0b',
+  },
+  status_changed: {
+    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>,
+    label: 'Status changed',
+    color: '#8b5cf6',
+  },
+  inspection_updated: {
+    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>,
+    label: 'Inspection updated',
+    color: '#0ea5e9',
+  },
 }
 
 function TankTimeline({ tankId }: { tankId: string }) {
@@ -879,11 +921,11 @@ function TankTimeline({ tankId }: { tankId: string }) {
   return (
     <div className="ti-timeline">
       {events.map((evt, i) => {
-        const cfg = EVENT_LABELS[evt.type] ?? { icon: '•', label: evt.type, color: '#6b7280' }
+        const cfg = EVENT_LABELS[evt.type] ?? { icon: <span style={{ color: '#6b7280' }}>•</span>, label: evt.type, color: '#6b7280' }
         const ts = evt.timestamp?.toDate ? evt.timestamp.toDate() : null
         return (
           <div key={evt.id} className={`ti-timeline__item${i === 0 ? ' ti-timeline__item--first' : ''}`}>
-            <div className="ti-timeline__dot" style={{ background: cfg.color }}>{cfg.icon}</div>
+            <div className="ti-timeline__dot" style={{ background: cfg.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{cfg.icon}</div>
             <div className="ti-timeline__content">
               <div className="ti-timeline__label">{cfg.label}</div>
               {evt.actorName && <div className="ti-timeline__actor">{evt.actorName}</div>}
@@ -966,7 +1008,9 @@ function EditCylinderModal({ tank, onClose, onSaved }: EditCylinderModalProps) {
       <div className="ti-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Edit cylinder">
         <div className="ti-modal__header">
           <h2 className="ti-modal__title">Edit — {tank.serialNumber}</h2>
-          <button className="ti-modal__close" onClick={onClose} aria-label="Close">✕</button>
+          <button className="ti-modal__close" onClick={onClose} aria-label="Close">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
         </div>
         <form className="ti-modal__body" onSubmit={handleSubmit} noValidate>
           {error && <div className="ti-form-error">{error}</div>}

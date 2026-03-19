@@ -45,6 +45,7 @@ import CustomerRecord from './pages/crm/CustomerRecord'
 import LeadsPage from './pages/crm/LeadsPage'
 import QuotesPage from './pages/crm/QuotesPage'
 import QuoteEditorPage from './pages/crm/QuoteEditorPage'
+import SalesDashboardPage from './pages/crm/SalesDashboardPage'
 import CrmBillingPage from './pages/crm/CrmBillingPage'
 import AgingPage from './pages/crm/AgingPage'
 import PriceList from './pages/crm/PriceList'
@@ -157,7 +158,8 @@ export const Router: React.FC = () => (
           </ProtectedRoute>
         }
       >
-        <Route index element={<Navigate to="customers" replace />} />
+        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route path="dashboard" element={<SalesDashboardPage />} />
         <Route path="customers" element={<CustomersPage />} />
         <Route path="customers/:customerId" element={<CustomerRecord />} />
         <Route path="leads" element={<LeadsPage />} />

@@ -220,6 +220,15 @@
   background: transparent;
   color: var(--color-text-3);
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  margin-left: 4px;
+  padding: 0;
+}
+
+.bd__aging-clear svg {
+  width: 14px;
+  height: 14px;
 }
 
 .bd__table-shell {

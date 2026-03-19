@@ -479,7 +479,7 @@ export default function DeliveryCapture() {
           ════════════════════════════════════════════════════════ */}
       {step === 1 && (
         <div className="dc-body">
-          <div className="dc-body__icon">📍</div>
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="dc-body__icon" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
           <h2 className="dc-body__heading">Ready to deliver?</h2>
           <p className="dc-body__sub">
             Tap <strong>I've arrived</strong> to log your arrival time and notify dispatch.

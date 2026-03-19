@@ -306,7 +306,7 @@ const TruckPage: React.FC = () => {
     setConfirmBusy(true)
     try {
       await loadTankToTruck(scannedTank.id, user.id, user.name ?? user.email ?? 'Driver')
-      showToast(`✅ ${scannedTank.serialNumber} loaded to your truck.`, 'success')
+      showToast(`${scannedTank.serialNumber} loaded to your truck.`, 'success')
       setScannedTank(null)
       setScanAction(null)
     } catch (e) {
@@ -327,7 +327,7 @@ const TruckPage: React.FC = () => {
     setConfirmBusy(true)
     try {
       await checkInEmptyTank(scannedTank.id, user.id, user.name ?? user.email ?? 'Driver')
-      showToast(`↩ ${scannedTank.serialNumber} checked in as empty.`, 'success')
+      showToast(`${scannedTank.serialNumber} checked in as empty.`, 'success')
       setScannedTank(null)
       setScanAction(null)
     } catch (e) {
@@ -365,15 +365,21 @@ const TruckPage: React.FC = () => {
       {/* Scan error banner */}
       {scanError && (
         <div className="tp-scan-error">
-          ⚠️ {scanError}
-          <button className="tp-scan-error__dismiss" onClick={() => setScanError('')}>✕</button>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ marginRight: '8px', flexShrink: 0 }}><path d="M12 2L2 20h20L12 2zm1 15h-2v2h2v-2zm0-6h-2v6h2v-6z"/></svg>
+          {scanError}
+          <button className="tp-scan-error__dismiss" onClick={() => setScanError('')}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
         </div>
       )}
 
       {/* Pending returns warning */}
       {hasPendingReturns && (
         <div className="tp-warning">
-          <strong>⚠️ {deployedTanks.length} empty tank{deployedTanks.length > 1 ? 's' : ''} need to be checked in</strong>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '8px' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={{ marginTop: '2px', flexShrink: 0 }}><path d="M12 2L2 20h20L12 2zm1 15h-2v2h2v-2zm0-6h-2v6h2v-6z"/></svg>
+            <strong>{deployedTanks.length} empty tank{deployedTanks.length > 1 ? 's' : ''} need to be checked in</strong>
+          </div>
           <p>You cannot load new tanks until you check in all delivered tanks below.</p>
         </div>
       )}
@@ -382,7 +388,8 @@ const TruckPage: React.FC = () => {
       {deployedTanks.length > 0 && (
         <section className="tp-section">
           <h2 className="tp-section__title tp-section__title--warn">
-            📦 Empties to Return ({deployedTanks.length})
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '6px', display: 'inline' }}><path d="M21 7L3 5m0 0v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5"/><path d="M8 9v6M12 9v6M16 9v6"/></svg>
+            Empties to Return ({deployedTanks.length})
           </h2>
           <div className="tp-tank-list">
             {deployedTanks.map(t => (

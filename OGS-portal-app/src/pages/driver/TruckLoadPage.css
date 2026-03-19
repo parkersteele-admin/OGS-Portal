@@ -119,9 +119,11 @@
 }
 
 .tl-all-loaded__icon {
-  font-size: 48px;
-  line-height: 1;
+  width: 40px;
+  height: 40px;
   flex-shrink: 0;
+  color: var(--color-success);
+  stroke-width: 2;
 }
 
 .tl-all-loaded__text {
