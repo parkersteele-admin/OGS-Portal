@@ -37,6 +37,7 @@ import SchedulePage from './pages/driver/SchedulePage'
 import StopPage from './pages/driver/StopPage'
 import CapturePage from './pages/driver/CapturePage'
 import TruckPage from './pages/driver/TruckPage'
+import TruckLoadPage from './pages/driver/TruckLoadPage'
 
 // CRM
 import CustomersPage from './pages/crm/CustomersPage'
@@ -136,6 +137,15 @@ export const Router: React.FC = () => (
         <Route path="capture/:id" element={<CapturePage />} />
         <Route path="summary/:runId" element={<StopPage />} />
         <Route path="truck" element={<TruckPage />} />
+        {/* Truck load manifest — also accessible to dispatch */}
+        <Route
+          path="load/:runId"
+          element={
+            <ProtectedRoute role={['driver', 'dispatch', 'admin']}>
+              <TruckLoadPage />
+            </ProtectedRoute>
+          }
+        />
       </Route>
 
       {/* CRM Portal */}

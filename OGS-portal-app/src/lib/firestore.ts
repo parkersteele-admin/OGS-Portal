@@ -16,6 +16,7 @@ import type {
   Product,
 } from '../types/models'
 import type { Notification } from '../types/index'
+import type { Cylinder, ManifestItem, CylinderFlag } from '../types/cylinder'
 
 /** Cast a generic collection ref to a typed one. */
 function col<T = DocumentData>(path: string): CollectionReference<T> {
@@ -49,6 +50,17 @@ export const runsCol = col<Run>('runs')
 /** /runs/{runId}/stops */
 export const runStopsCol = (runId: string) =>
   col<RunStop>(`runs/${runId}/stops`)
+
+/** /runs/{runId}/manifest */
+export const runManifestCol = (runId: string) =>
+  col<ManifestItem>(`runs/${runId}/manifest`)
+
+/** /runs/{runId}/flags */
+export const runFlagsCol = (runId: string) =>
+  col<CylinderFlag>(`runs/${runId}/flags`)
+
+// ── Cylinders (physical cylinder registry) ────────────────────────────────────
+export const cylindersCol = col<Cylinder>('cylinders')
 
 // ── Invoices ──────────────────────────────────────────────────────────────────
 export const invoicesCol = col<Invoice>('invoices')

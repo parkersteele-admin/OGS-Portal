@@ -32,7 +32,8 @@ import { useAuth } from '../../hooks/useAuth'
 import { useActiveRun } from '../../hooks/useActiveRun'
 import { getRuns } from '../../services/runService'
 import { openGoogleMapsNavigation } from '../../utils/navigation'
-import type { Run, RunStop } from '../../types/run'
+import { Badge } from '../../components/ui/Badge'
+import type { Run, RunStop, LoadStatus } from '../../types/run'
 import type { Customer } from '../../types/customer'
 import type { Order } from '../../types/order'
 import type { Product } from '../../types/product'
@@ -374,6 +375,7 @@ export default function DaySchedule() {
             {stops.length} stop{stops.length !== 1 ? 's' : ''}
           </span>
           <RunStatusPill run={run} />
+          <LoadStatusBadge loadStatus={run.loadStatus} />
         </div>
       </div>
 
@@ -410,22 +412,41 @@ export default function DaySchedule() {
         </div>
       )}
 
-      {/* ── 3. Stop list ── */}
-      <div className="ds-stop-list">
-        {stops.map((stop) => (
-          <StopCard
-            key={stop.id}
-            stop={stop}
-            isCurrent={currentStop?.id === stop.id}
-            runId={run.id}
-            customer={customers.get(stop.customerId)}
-            order={orders.get(stop.orderId)}
-            product={orders.get(stop.orderId)
-              ? products.get(orders.get(stop.orderId)!.productId)
-              : undefined}
-          />
-        ))}
-      </div>
+      {/* ── Load prompt (shown when truck has not yet been loaded) ── */}
+      {(run.loadStatus === 'pending' || run.loadStatus === 'loading') ? (
+        <div className="ds-load-prompt">
+          <div className="ds-load-prompt__icon" aria-hidden="true">🚚</div>
+          <div className="ds-load-prompt__body">
+            <div className="ds-load-prompt__title">Load your truck before starting your run.</div>
+            <div className="ds-load-prompt__sub">
+              {stops.length} cylinder{stops.length !== 1 ? 's' : ''} needed for today's run.
+            </div>
+          </div>
+          <button
+            className="ds-btn ds-btn--load"
+            onClick={() => navigate(`/driver/load/${run.id}`)}
+          >
+            Load Truck →
+          </button>
+        </div>
+      ) : (
+        /* ── 3. Stop list ── */
+        <div className="ds-stop-list">
+          {stops.map((stop) => (
+            <StopCard
+              key={stop.id}
+              stop={stop}
+              isCurrent={currentStop?.id === stop.id}
+              runId={run.id}
+              customer={customers.get(stop.customerId)}
+              order={orders.get(stop.orderId)}
+              product={orders.get(stop.orderId)
+                ? products.get(orders.get(stop.orderId)!.productId)
+                : undefined}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Sticky submit button at bottom when all stops done */}
       {allDone && (
@@ -462,5 +483,28 @@ function RunStatusPill({ run }: { run: Run }) {
     <span className={`ds-run-pill ${map[run.status] ?? ''}`}>
       {labels[run.status] ?? run.status}
     </span>
+  )
+}
+
+// ── Load status badge helper ───────────────────────────────────────────────────
+
+function LoadStatusBadge({ loadStatus }: { loadStatus?: LoadStatus }) {
+  if (!loadStatus || loadStatus === 'started') return null
+
+  const variantMap: Record<Exclude<LoadStatus, 'started'>, 'neutral' | 'warning' | 'success'> = {
+    pending: 'neutral',
+    loading: 'warning',
+    ready:   'success',
+  }
+  const labelMap: Record<Exclude<LoadStatus, 'started'>, string> = {
+    pending: 'Not loaded',
+    loading: 'Loading…',
+    ready:   'Loaded',
+  }
+
+  return (
+    <Badge variant={variantMap[loadStatus]}>
+      {labelMap[loadStatus]}
+    </Badge>
   )
 }

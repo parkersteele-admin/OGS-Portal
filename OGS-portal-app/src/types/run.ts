@@ -4,6 +4,9 @@ export type RunStatus = 'scheduled' | 'in-progress' | 'completed' | 'cancelled'
 
 export type RunStopStatus = 'pending' | 'arrived' | 'completed' | 'skipped'
 
+/** Tracks where a run is in the pre-departure truck loading process. */
+export type LoadStatus = 'pending' | 'loading' | 'ready' | 'started'
+
 export interface Run {
   id: string
   runNumber: string
@@ -19,6 +22,12 @@ export interface Run {
   notes?: string
   createdAt: Timestamp
   updatedAt: Timestamp
+  /** Truck load manifest checklist status. */
+  loadStatus?: LoadStatus
+  loadStartedAt?: Timestamp
+  loadCompletedAt?: Timestamp
+  /** UID of the driver who completed the truck load. */
+  loadedBy?: string
 }
 
 export interface RunStop {

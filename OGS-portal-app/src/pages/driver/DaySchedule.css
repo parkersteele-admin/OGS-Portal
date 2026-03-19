@@ -619,3 +619,69 @@
 }
 
 .ds-stop-card__addons-item:last-child { border-bottom: none; }
+
+/* ── Load prompt card (shown when truck not yet loaded) ────────────────────── */
+
+.ds-load-prompt {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  background: var(--color-bg);
+  border: 2px solid var(--color-brand);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5) var(--space-6);
+  flex-wrap: wrap;
+  box-shadow: 0 4px 16px rgba(232, 119, 34, 0.18);
+}
+
+.ds-load-prompt__icon {
+  font-size: 44px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.ds-load-prompt__body {
+  flex: 1;
+  min-width: 180px;
+}
+
+.ds-load-prompt__title {
+  font-size: var(--font-size-18);
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1.3;
+}
+
+.ds-load-prompt__sub {
+  font-size: var(--font-size-15);
+  color: var(--color-text-2);
+  margin-top: var(--space-1);
+}
+
+.ds-btn--load {
+  background: var(--color-brand);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-lg);
+  font-family: inherit;
+  font-size: var(--font-size-17);
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 52px;
+  padding: 0 var(--space-7);
+  white-space: nowrap;
+  box-shadow: 0 3px 12px rgba(232, 119, 34, 0.35);
+  transition: background 150ms;
+}
+.ds-btn--load:hover { background: var(--color-brand-dark); }
+
+/* ── Section label (used by stop cards) ───────────────────────────────────── */
+
+.ds-stop-card__section-label {
+  font-size: var(--font-size-12);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-3);
+  margin-top: var(--space-2);
+}

@@ -54,6 +54,8 @@ export { certExpiryCheck }        from './scheduled/certExpiryCheck'
 export { scheduleRecurringOrders } from './scheduleRecurringOrders'
 export { generateInvoicePdf, generateQuotePdf, optimizeRoute, backfillGeocodeCustomers } from './callables'
 export { optimizeOrderRoute }                                     from './maps/optimizeRoute'
+export { generateRunManifest }                                    from './generateRunManifest'
+export { onCylinderFlagged }                                      from './onCylinderFlagged'
 
 export const healthCheck = onRequest((_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
