@@ -275,6 +275,7 @@ export default function TruckLoadPage() {
   const {
     manifest,
     scannedIds,
+    adHocCount,
     progress,
     allScanned,
     loading,
@@ -375,7 +376,11 @@ export default function TruckLoadPage() {
         </div>
         <div className="tl-header__progress" aria-live="polite">
           <span className="tl-progress-counter">
-            {progress.scanned} of {progress.total} scanned
+            {progress.total > 0
+              ? `${progress.scanned} of ${progress.total} scanned`
+              : adHocCount > 0
+              ? `${adHocCount} cylinder${adHocCount !== 1 ? 's' : ''} scanned`
+              : 'Scan cylinders to begin'}
           </span>
         </div>
       </div>
@@ -386,7 +391,9 @@ export default function TruckLoadPage() {
           <span className="tl-all-loaded__icon" aria-hidden="true">✅</span>
           <div className="tl-all-loaded__text">
             <div className="tl-all-loaded__title">
-              All {progress.total} cylinders loaded.
+              {progress.total > 0
+                ? `All ${progress.total} cylinders loaded.`
+                : `${adHocCount} cylinder${adHocCount !== 1 ? 's' : ''} loaded.`}
             </div>
             <div className="tl-all-loaded__sub">Ready to start your run.</div>
           </div>
@@ -457,17 +464,19 @@ export default function TruckLoadPage() {
         </div>
       )}
 
-      {manifest.length === 0 && !loading && (
+      {manifest.length === 0 && !loading && adHocCount === 0 && (
         <div className="tl-empty">
-          <p className="tl-empty__text">No manifest items found for this run.</p>
-          <p className="tl-empty__hint">Manifest is generated automatically when a run is created. Contact dispatch if cylinders are missing.</p>
+          <p className="tl-empty__text">No pre-loaded manifest for this run.</p>
+          <p className="tl-empty__hint">Scan each cylinder's QR code to load it onto the truck. Each scan is recorded automatically. Tap "Start Run" when done.</p>
         </div>
       )}
 
       {/* ── Sticky footer ── */}
       <div className="tl-footer">
         <span className="tl-footer__count">
-          {progress.scanned} / {progress.total} scanned
+          {progress.total > 0
+            ? `${progress.scanned} / ${progress.total} scanned`
+            : `${adHocCount} scanned`}
         </span>
 
         <button

@@ -413,7 +413,10 @@ export default function DaySchedule() {
       )}
 
       {/* ── Load prompt (shown when truck has not yet been loaded) ── */}
-      {(run.loadStatus === 'pending' || run.loadStatus === 'loading') ? (
+      {/* Show for scheduled runs with no loadStatus (legacy/new) OR explicitly pending/loading */}
+      {(run.status === 'scheduled' && !run.loadStatus)
+        || run.loadStatus === 'pending'
+        || run.loadStatus === 'loading' ? (
         <div className="ds-load-prompt">
           <div className="ds-load-prompt__icon" aria-hidden="true">🚚</div>
           <div className="ds-load-prompt__body">
