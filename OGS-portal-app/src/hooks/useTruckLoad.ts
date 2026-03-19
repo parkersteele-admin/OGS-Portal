@@ -310,6 +310,8 @@ export function useTruckLoad(runId: string | null | undefined): UseTruckLoadResu
         loadStatus: 'started',
         loadCompletedAt: serverTimestamp(),
         loadedBy: user.id,
+        status: 'in-progress',
+        startedAt: serverTimestamp(),
       })
       navigate('/driver/schedule')
     } finally {
