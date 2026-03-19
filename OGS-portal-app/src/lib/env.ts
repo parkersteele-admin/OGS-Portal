@@ -20,6 +20,13 @@ export const hasFirebaseEnvConfig = Object.values(firebase).every(Boolean)
 // ── Third-party keys ──────────────────────────────────────────────────────────
 export const STRIPE_PUBLISHABLE_KEY = getEnv('VITE_STRIPE_PUBLISHABLE_KEY')
 export const GOOGLE_MAPS_API_KEY = getEnv('VITE_GOOGLE_MAPS_API_KEY')
+export const GOOGLE_MAPS_MAP_ID = getEnv('VITE_GOOGLE_MAPS_MAP_ID')
+
+// Treat known placeholders as unusable so map components can fail gracefully.
+const GOOGLE_MAPS_PLACEHOLDER_KEYS = new Set(['', 'local-dev-key', 'test-key', 'changeme'])
+export const hasUsableGoogleMapsKey = !GOOGLE_MAPS_PLACEHOLDER_KEYS.has(GOOGLE_MAPS_API_KEY.trim().toLowerCase())
+export const hasGoogleMapsMapId = GOOGLE_MAPS_MAP_ID.trim().length > 0
+
 // Only required in production — firebase.ts reads this directly from import.meta.env
 export const RECAPTCHA_SITE_KEY = getEnv('VITE_RECAPTCHA_SITE_KEY')
 

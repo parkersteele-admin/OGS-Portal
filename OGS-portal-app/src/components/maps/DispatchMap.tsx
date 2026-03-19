@@ -31,7 +31,12 @@ import {
   useAdvancedMarkerRef,
   useMap,
 } from '@vis.gl/react-google-maps'
-import { GOOGLE_MAPS_API_KEY } from '../../lib/env'
+import {
+  GOOGLE_MAPS_API_KEY,
+  GOOGLE_MAPS_MAP_ID,
+  hasUsableGoogleMapsKey,
+  hasGoogleMapsMapId,
+} from '../../lib/env'
 import { useDriverLocation } from '../../hooks/useDriverLocation'
 import { RoutePolyline } from './RoutePolyline'
 import type { RunStop, RunStopStatus } from '../../types/run'
@@ -315,8 +320,6 @@ export function DispatchMap({
 
   const driverPosition = useDriverLocation(stops, customers)
 
-  const mapId = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID as string | undefined
-
   // Determine which stop is "current" — first arrived, otherwise first pending
   const currentStop =
     stops.find((s) => s.status === 'arrived') ??
@@ -326,13 +329,35 @@ export function DispatchMap({
     // Deselect any open popovers — individual markers handle their own state.
   }, [])
 
+  if (!hasUsableGoogleMapsKey) {
+    return (
+      <div
+        style={{
+          width: '100%',
+          height,
+          borderRadius: 8,
+          border: '1px solid #f59e0b',
+          background: '#fffbeb',
+          color: '#92400e',
+          padding: 16,
+          fontSize: 13,
+          lineHeight: 1.5,
+          display: 'flex',
+          alignItems: 'center',
+        }}
+      >
+        Google Maps is not configured. Set a real VITE_GOOGLE_MAPS_API_KEY in .env.local and restart Vite.
+      </div>
+    )
+  }
+
   return (
     <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
       <div style={{ width: '100%', height, borderRadius: 8, overflow: 'hidden' }}>
         <Map
           defaultCenter={center}
           defaultZoom={zoom}
-          mapId={mapId}
+          mapId={hasGoogleMapsMapId ? GOOGLE_MAPS_MAP_ID : undefined}
           disableDefaultUI={false}
           gestureHandling="cooperative"
           onClick={handleMapClick}

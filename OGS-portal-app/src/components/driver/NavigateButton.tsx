@@ -14,7 +14,7 @@
  */
 
 import { useState } from 'react'
-import { GOOGLE_MAPS_API_KEY } from '../../lib/env'
+import { GOOGLE_MAPS_API_KEY, hasUsableGoogleMapsKey } from '../../lib/env'
 import {
   openGoogleMapsNavigation,
   openAppleMapsNavigation,
@@ -51,7 +51,7 @@ export function NavigateButton({
 }: NavigateButtonProps) {
   const hasCoords  = lat != null && lng != null
   const apiKey     = GOOGLE_MAPS_API_KEY
-  const hasApiKey  = Boolean(apiKey)
+  const hasApiKey  = hasUsableGoogleMapsKey
 
   const [imgError, setImgError] = useState(false)
 
