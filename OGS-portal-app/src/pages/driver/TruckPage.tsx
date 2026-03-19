@@ -33,14 +33,18 @@ function extractTankId(raw: string): string | null {
   // Handles both formats:
   //   https://ogs-portal.web.app/driver/truck?scan=TANK_ID
   //   TANK_ID  (plain)
-  try {
-    const url = new URL(raw)
-    const id = url.searchParams.get('scan')
-    return id || null
-  } catch {
-    // Not a URL — treat as plain tank ID
-    return raw.trim() || null
+  //
+  // IMPORTANT: never return the raw URL — Firestore rejects paths with `//`.
+  const cleaned = raw.trim()
+  if (cleaned.includes('://')) {
+    try {
+      const url = new URL(cleaned)
+      return url.searchParams.get('scan') || null
+    } catch {
+      return null  // Unparseable URL — reject
+    }
   }
+  return cleaned || null
 }
 
 function fmtStatus(s: string) {

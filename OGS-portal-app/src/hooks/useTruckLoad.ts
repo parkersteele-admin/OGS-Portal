@@ -34,14 +34,24 @@ import type { Tank } from '../types/tank'
  * Tank QR codes encode a URL: https://ogs-portal.web.app/driver/truck?scan=TANK_ID
  * Plain cylinderIds are bare strings.
  * This extracts the actual ID from either format.
+ *
+ * IMPORTANT: If the raw value is a URL we MUST extract the `scan` param.
+ * Falling back to the raw URL string would pass a path containing `//` to
+ * Firestore's doc() which throws "Invalid segment... Paths must not contain
+ * // in them."
  */
 function extractId(raw: string): string {
-  try {
-    const url = new URL(raw)
-    return url.searchParams.get('scan') ?? raw.trim()
-  } catch {
-    return raw.trim()
+  const cleaned = raw.trim()
+  // If it looks like a URL (has a protocol), extract the scan query param.
+  if (cleaned.includes('://')) {
+    try {
+      const url = new URL(cleaned)
+      return url.searchParams.get('scan') ?? ''
+    } catch {
+      return ''  // Unparseable URL — reject rather than pass raw value to Firestore
+    }
   }
+  return cleaned
 }
 
 // ── Public types ───────────────────────────────────────────────────────────────

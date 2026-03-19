@@ -73,10 +73,16 @@ export function QRScanner({ onScan, onError, isActive, className = '' }: QRScann
 
             // Brief green flash
             setViewfinderState('success')
-            setTimeout(() => setViewfinderState('active'), 200)
+
+            // Stop the RAF loop before firing onScan — one scan at a time.
+            // The parent sets isActive=false after processing to stop the camera.
+            if (rafRef.current !== null) {
+              cancelAnimationFrame(rafRef.current)
+              rafRef.current = null
+            }
 
             onScan(code.data)
-            // Don't return early — keep scanning loop alive
+            return
           }
         }
       }

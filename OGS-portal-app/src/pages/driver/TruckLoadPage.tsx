@@ -84,25 +84,37 @@ interface CylinderRowProps {
   scanned: boolean
   canOverride: boolean
   onOverride: (item: ManifestItem) => void
+  onScanClick: () => void
 }
 
-function CylinderRow({ item, scanned, canOverride, onOverride }: CylinderRowProps) {
+function CylinderRow({ item, scanned, canOverride, onOverride, onScanClick }: CylinderRowProps) {
   return (
-    <div
-      className={`tl-cylinder-row ${scanned ? 'tl-cylinder-row--scanned' : ''}`.trim()}
-      role={canOverride && !scanned ? 'button' : undefined}
-      tabIndex={canOverride && !scanned ? 0 : undefined}
-      onClick={canOverride && !scanned ? () => onOverride(item) : undefined}
-      onKeyDown={canOverride && !scanned ? (e) => { if (e.key === 'Enter' || e.key === ' ') onOverride(item) } : undefined}
-      aria-label={canOverride && !scanned ? `Manual override for ${item.cylinderId}` : undefined}
-    >
+    <div className={`tl-cylinder-row ${scanned ? 'tl-cylinder-row--scanned' : ''}`.trim()}>
       <span className="tl-cylinder-row__check" aria-hidden="true">
         {scanned ? '✓' : '○'}
       </span>
       <span className="tl-cylinder-row__name">
         {item.productName} <span className="tl-cylinder-row__size">{item.sizeLabel}</span>
       </span>
-      <span className="tl-cylinder-row__id">{item.cylinderId}</span>
+      {!scanned && (
+        <button
+          className="tl-cylinder-row__scan-btn"
+          onClick={onScanClick}
+          aria-label={`Scan QR code for ${item.productName} ${item.sizeLabel}`}
+        >
+          📷 Scan
+        </button>
+      )}
+      {canOverride && !scanned && (
+        <button
+          className="tl-btn tl-btn--warn-sm"
+          onClick={() => onOverride(item)}
+          aria-label={`Manual override for ${item.cylinderId}`}
+          title="Override (no scan)"
+        >
+          Override
+        </button>
+      )}
     </div>
   )
 }
@@ -116,9 +128,10 @@ interface StopGroupProps {
   scannedIds: Set<string>
   canOverride: boolean
   onOverride: (item: ManifestItem) => void
+  onScanClick: (cylinderId: string) => void
 }
 
-function StopGroup({ stopSequence, customerName, items, scannedIds, canOverride, onOverride }: StopGroupProps) {
+function StopGroup({ stopSequence, customerName, items, scannedIds, canOverride, onOverride, onScanClick }: StopGroupProps) {
   const scannedCount = items.filter((i) => scannedIds.has(i.cylinderId)).length
   const total = items.length
   const allDone = scannedCount === total
@@ -141,6 +154,7 @@ function StopGroup({ stopSequence, customerName, items, scannedIds, canOverride,
             scanned={scannedIds.has(item.cylinderId)}
             canOverride={canOverride}
             onOverride={onOverride}
+            onScanClick={() => onScanClick(item.cylinderId)}
           />
         ))}
       </div>
@@ -286,7 +300,8 @@ export default function TruckLoadPage() {
   } = useTruckLoad(runId)
 
   // ── UI state ─────────────────────────────────────────────────────────────────
-  const [scannerActive, setScannerActive]     = useState(false)
+  // null = scanner closed; '' = ad-hoc scan; any string = cylinderId being confirmed
+  const [scanTargetId,  setScanTargetId]       = useState<string | null>(null)
   const [lastResult,    setLastResult]         = useState<ScanResult | null>(null)
   const resultKey = useRef(0)
 
@@ -303,16 +318,19 @@ export default function TruckLoadPage() {
   const canOverride = role === 'admin' || role === 'dispatch'
 
   // ── Process incoming scan ────────────────────────────────────────────────────
-  const processScan = useCallback(async (cylinderId: string) => {
-    const result = await handleScan(cylinderId)
+  const processScan = useCallback(async (rawValue: string) => {
+    setScanTargetId(null)  // Close scanner drawer immediately on any scan
+    const result = await handleScan(rawValue)
     resultKey.current += 1
     setLastResult(result)
 
     if (result.status === 'notInManifest') {
-      setNotInManifestId(cylinderId)
+      setNotInManifestId(rawValue)
     } else {
       setNotInManifestId(null)
     }
+  // setScanTargetId is a stable React state setter — safe to omit from deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [handleScan])
 
   // ── Manifest grouped by stop ─────────────────────────────────────────────────
@@ -355,6 +373,11 @@ export default function TruckLoadPage() {
     )
   }
 
+  // Resolved from manifest when a specific item scan is active
+  const scanTargetItem = scanTargetId != null && scanTargetId !== ''
+    ? manifest.find((m) => m.cylinderId === scanTargetId) ?? null
+    : null
+
   return (
     <div className="tl-page">
 
@@ -385,8 +408,8 @@ export default function TruckLoadPage() {
         </div>
       </div>
 
-      {/* ── Scan section  or all-loaded banner ── */}
-      {allScanned ? (
+      {/* ── All-loaded banner ── */}
+      {allScanned && (
         <div className="tl-all-loaded" role="status">
           <span className="tl-all-loaded__icon" aria-hidden="true">✅</span>
           <div className="tl-all-loaded__text">
@@ -398,9 +421,11 @@ export default function TruckLoadPage() {
             <div className="tl-all-loaded__sub">Ready to start your run.</div>
           </div>
         </div>
-      ) : (
-        <div className="tl-scan-section">
-          {/* Scan feedback */}
+      )}
+
+      {/* ── Scan feedback & prompts (shown after scan, before all are done) ── */}
+      {!allScanned && (
+        <>
           {lastResult && (
             <ScanFeedback
               key={resultKey.current}
@@ -427,23 +452,7 @@ export default function TruckLoadPage() {
               </button>
             </div>
           )}
-
-          {/* Scanner */}
-          <div className="tl-scanner-wrap">
-            <QRScanner
-              isActive={scannerActive}
-              onScan={processScan}
-              onError={(err) => console.warn('[TruckLoadPage] scanner error:', err)}
-            />
-          </div>
-
-          <button
-            className={`tl-btn tl-btn--scan ${scannerActive ? 'tl-btn--scan-active' : ''}`.trim()}
-            onClick={() => setScannerActive((v) => !v)}
-          >
-            {scannerActive ? '⏸ Stop scanning' : '📷 Scan cylinder'}
-          </button>
-        </div>
+        </>
       )}
 
       {/* ── Manifest list ── */}
@@ -459,15 +468,41 @@ export default function TruckLoadPage() {
               scannedIds={scannedIds}
               canOverride={canOverride}
               onOverride={setOverrideItem}
+              onScanClick={(id) => { setLastResult(null); setScanTargetId(id) }}
             />
           ))}
+          {/* Allow scanning cylinders not in the manifest */}
+          {!allScanned && (
+            <button
+              className="tl-adhoc-scan-btn"
+              onClick={() => { setLastResult(null); setScanTargetId('') }}
+            >
+              📷 Scan additional cylinder
+            </button>
+          )}
         </div>
       )}
 
-      {manifest.length === 0 && !loading && adHocCount === 0 && (
+      {manifest.length === 0 && !loading && (
         <div className="tl-empty">
-          <p className="tl-empty__text">No pre-loaded manifest for this run.</p>
-          <p className="tl-empty__hint">Scan each cylinder's QR code to load it onto the truck. Each scan is recorded automatically. Tap "Start Run" when done.</p>
+          <p className="tl-empty__text">
+            {adHocCount > 0
+              ? `${adHocCount} cylinder${adHocCount !== 1 ? 's' : ''} loaded`
+              : 'No pre-loaded manifest for this run.'}
+          </p>
+          <p className="tl-empty__hint">
+            {adHocCount > 0
+              ? 'Scan more cylinders or tap "Start Run" when done.'
+              : "Scan each cylinder's QR code to confirm it's loaded. Each scan is recorded automatically."}
+          </p>
+          {!allScanned && (
+            <button
+              className="tl-adhoc-scan-btn"
+              onClick={() => { setLastResult(null); setScanTargetId('') }}
+            >
+              📷 Scan cylinder
+            </button>
+          )}
         </div>
       )}
 
@@ -498,6 +533,48 @@ export default function TruckLoadPage() {
           ⚑ Flag issue
         </button>
       </div>
+
+      {/* ── Scanner drawer ── */}
+      {scanTargetId !== null && (
+        <div className="tl-scan-drawer-backdrop" role="dialog" aria-modal="true" aria-label="Scan cylinder QR code">
+          <div className="tl-scan-drawer">
+            <div className="tl-scan-drawer__header">
+              <div className="tl-scan-drawer__context">
+                {scanTargetItem ? (
+                  <>
+                    <span className="tl-scan-drawer__action">Confirm loaded</span>
+                    <span className="tl-scan-drawer__product">
+                      {scanTargetItem.productName} {scanTargetItem.sizeLabel}
+                    </span>
+                    {scanTargetItem.stopSequence > 0 && (
+                      <span className="tl-scan-drawer__stop">
+                        Stop #{scanTargetItem.stopSequence} · {scanTargetItem.customerName}
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <span className="tl-scan-drawer__action">Scan cylinder QR code</span>
+                )}
+              </div>
+              <button
+                className="tl-scan-drawer__close"
+                onClick={() => setScanTargetId(null)}
+                aria-label="Cancel scan"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="tl-scan-drawer__scanner">
+              <QRScanner
+                isActive={true}
+                onScan={processScan}
+                onError={(err) => console.warn('[TruckLoadPage] scanner error:', err)}
+              />
+            </div>
+            <p className="tl-scan-drawer__hint">Point the rear camera at the QR code</p>
+          </div>
+        </div>
+      )}
 
       {/* ── Override modal ── */}
       {overrideItem && (
