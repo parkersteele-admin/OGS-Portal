@@ -2,6 +2,7 @@
   display: flex;
   min-height: 100dvh;
   background: var(--color-bg-shell);
+  overflow-x: clip;
 }
 
 .layout__main {
@@ -18,20 +19,21 @@
   padding: 28px clamp(20px, 3vw, 40px) 32px;
   background: #F2F2F3;
   overflow-y: auto;
+  overflow-x: clip;
 }
 
 /* Tablet: generous padding (768px–1023px) */
 @media (min-width: 768px) and (max-width: 1023px) {
   .layout__content {
-    padding: 24px 24px 28px;
+    padding: 22px 18px 24px;
   }
 }
 
 /* Mobile: tight padding (≤767px) */
 @media (max-width: 767px) {
   .layout__content {
-    padding: 20px 16px;
-    padding-bottom: calc(60px + 20px);
+    padding: 16px 12px;
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0) + 18px);
   }
 }
 

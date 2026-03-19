@@ -10,6 +10,7 @@
   width: 100%;
   border-collapse: collapse;
   font-size: var(--font-size-13);
+  min-width: 760px;
 }
 
 /* Header */
@@ -257,4 +258,26 @@ tfoot tr td {
   font-size: var(--font-size-16);
   font-weight: 700;
   color: var(--color-text);
+}
+
+@media (max-width: 767px) {
+  .oli-table {
+    min-width: 640px;
+  }
+
+  .oli-td,
+  .oli-th {
+    padding-left: var(--space-2);
+    padding-right: var(--space-2);
+  }
+
+  .oli-qty-input,
+  .oli-price-input {
+    height: var(--touch-target-min, 44px);
+  }
+
+  .oli-remove-btn {
+    width: 32px;
+    height: 32px;
+  }
 }

@@ -74,6 +74,46 @@
   overflow-y: auto;
 }
 
+@media (max-width: 1023px) {
+  .ui-modal-overlay {
+    padding: var(--space-3);
+  }
+
+  .ui-modal--sm,
+  .ui-modal--md,
+  .ui-modal--lg {
+    max-width: min(640px, calc(100vw - 24px));
+  }
+}
+
+@media (max-width: 767px) {
+  .ui-modal-overlay {
+    align-items: flex-end;
+    padding: var(--space-2);
+    padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom, 0));
+  }
+
+  .ui-modal {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    max-height: min(92dvh, 92vh);
+  }
+
+  .ui-modal__header {
+    padding: var(--space-4);
+  }
+
+  .ui-modal__body {
+    padding: var(--space-4);
+  }
+
+  .ui-modal--sm,
+  .ui-modal--md,
+  .ui-modal--lg {
+    max-width: calc(100vw - 12px);
+  }
+}
+
 @keyframes ui-modal-fade {
   from {
     opacity: 0;

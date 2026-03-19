@@ -8,6 +8,8 @@
   gap: var(--space-6);
   padding: var(--space-6);
   max-width: 1100px;
+  min-width: 0;
+  overflow-x: clip;
 }
 
 /* ── Header ───────────────────────────────────────────────────────────────── */
@@ -178,6 +180,7 @@
   width: 100%;
   border-collapse: collapse;
   font-size: var(--font-size-13);
+  min-width: 760px;
 }
 
 .um__table thead th {
@@ -638,4 +641,64 @@
   font-size: var(--font-size-12);
   color: var(--color-danger);
   margin: 0;
+}
+
+@media (max-width: 1023px) {
+  .um {
+    padding: var(--space-5) var(--space-4);
+    gap: var(--space-5);
+  }
+
+  .um__stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .um__filters {
+    align-items: stretch;
+  }
+
+  .um__search,
+  .um__role-filter,
+  .um__filter-clear {
+    min-height: var(--touch-target-min, 44px);
+  }
+}
+
+@media (max-width: 767px) {
+  .um {
+    padding: var(--space-4) var(--space-3);
+    gap: var(--space-4);
+  }
+
+  .um__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .um__filters {
+    flex-direction: column;
+    align-items: stretch;
+    padding: var(--space-3);
+  }
+
+  .um__search,
+  .um__role-filter,
+  .um__filter-clear {
+    width: 100%;
+  }
+
+  .um__result-count {
+    margin-left: 0;
+  }
+
+  .um__table {
+    min-width: 680px;
+  }
+
+  .um-form__actions {
+    flex-direction: column-reverse;
+  }
+
+  .um-form__actions .ui-btn {
+    width: 100%;
+  }
 }

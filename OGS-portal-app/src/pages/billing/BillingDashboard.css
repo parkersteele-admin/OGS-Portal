@@ -5,6 +5,8 @@
   flex-direction: column;
   gap: var(--space-6);
   max-width: 1320px;
+  min-width: 0;
+  overflow-x: clip;
 }
 
 .bd__header {
@@ -235,7 +237,7 @@
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  min-width: 980px;
+  min-width: 900px;
 }
 
 .bd__table thead th {
@@ -645,6 +647,12 @@
 }
 
 @media (max-width: 1023px) {
+  .bd__header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+
   .bd__controls {
     flex-direction: column;
     align-items: stretch;
@@ -659,6 +667,13 @@
   .bd__date-range,
   .bd__search-wrap {
     flex: 1;
+  }
+
+  .bd__controls-left,
+  .bd__controls-right,
+  .bd__date-range {
+    width: 100%;
+    flex-wrap: wrap;
   }
 }
 
@@ -688,7 +703,7 @@
   }
 
   .bd__table {
-    min-width: 820px;
+    min-width: 680px;
   }
 
   .bd__hold-row {

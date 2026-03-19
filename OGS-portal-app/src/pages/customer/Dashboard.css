@@ -2,6 +2,7 @@
 
 .cust-db {
   width: 100%;
+  min-width: 0;
 }
 
 .cust-db__header {
@@ -19,6 +20,27 @@
   line-height: 1.1;
   letter-spacing: -0.02em;
   color: var(--color-text);
+}
+
+@media (max-width: 1023px) {
+  .cust-db__header {
+    align-items: flex-start;
+    flex-direction: column;
+    margin-bottom: var(--space-5);
+  }
+
+  .cust-db__header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .cust-db__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cust-db__grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .cust-db__header-actions {
@@ -436,9 +458,6 @@
     grid-column: 1 / -1;
   }
 
-  .cust-db__grid {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 767px) {
@@ -461,16 +480,12 @@
   }
 
   .cust-db__section {
-    margin-bottom: 20px;
+    margin-bottom: var(--space-5);
   }
 
   .cust-db__stats {
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-  }
-
-  .cust-db__stat:nth-child(3) {
-    grid-column: 1 / -1;
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
   }
 
   .cust-db__stat {
@@ -484,6 +499,18 @@
   .cust-db__grid {
     grid-template-columns: 1fr;
     gap: 12px;
+  }
+
+  .cust-db__inv-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'number amount'
+      'status date';
+    gap: 8px;
+  }
+
+  .cust-db__inv-number {
+    grid-area: number;
   }
 
   .cust-db__level-bar {

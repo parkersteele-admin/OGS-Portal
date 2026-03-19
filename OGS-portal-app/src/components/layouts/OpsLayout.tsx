@@ -2,9 +2,11 @@ import React, { useMemo } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Sidebar } from '../ui/Sidebar'
 import { TopBar } from '../ui/TopBar'
+import { MobileNav } from '../ui/MobileNav'
 import { ViewAsBanner } from '../ui/ViewAsBanner'
 import { useAuth } from '../../hooks/useAuth'
 import type { SidebarItem } from '../ui/Sidebar'
+import type { MobileNavItem } from '../ui/MobileNav'
 import './Layout.css'
 
 const BASE_NAV_ITEMS: SidebarItem[] = [
@@ -15,6 +17,10 @@ const BASE_NAV_ITEMS: SidebarItem[] = [
   { to: '/ops/tanks',     label: 'Tanks',     icon: '⊙' },
   { to: '/ops/inventory', label: 'Inventory', icon: '⊟' },
 ]
+
+const MOBILE_ITEMS: MobileNavItem[] = BASE_NAV_ITEMS.slice(0, 4).map(
+  ({ to, label, icon }) => ({ to, label, icon }),
+)
 
 export const OpsLayout: React.FC = () => {
   const { isAdmin } = useAuth()
@@ -36,6 +42,7 @@ export const OpsLayout: React.FC = () => {
         <main className="layout__content">
           <Outlet />
         </main>
+        <MobileNav items={MOBILE_ITEMS} />
       </div>
     </div>
   )

@@ -63,7 +63,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 34px;
+  min-height: 40px;
   padding: 6px 10px;
   border-radius: var(--radius-sm);
   border: none;
@@ -125,7 +125,7 @@
 /* Tablet: collapse to icon-only sidebar (768px–1023px) */
 @media (min-width: 768px) and (max-width: 1023px) {
   .sidebar {
-    width: 64px;
+    width: 72px;
     padding: 0;
   }
 
@@ -155,7 +155,7 @@
 
   .sidebar__link {
     justify-content: center;
-    min-height: 34px;
+    min-height: 40px;
     padding: 6px;
     gap: 0;
   }

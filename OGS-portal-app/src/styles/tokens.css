@@ -35,6 +35,17 @@
   --font-size-18: 18px;
   --font-size-20: 20px;
   --font-size-24: 24px;
+  --font-size-32: 32px;
+
+  /* Breakpoints */
+  --bp-mobile-max: 767px;
+  --bp-tablet-min: 768px;
+  --bp-tablet-max: 1023px;
+  --bp-desktop-min: 1024px;
+
+  /* Touch + layout */
+  --touch-target-min: 44px;
+  --app-content-max: 1320px;
 
   /* Spacing */
   --space-1: 4px;

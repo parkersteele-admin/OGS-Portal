@@ -9,6 +9,8 @@
   min-height: 100%;
   gap: var(--space-5);
   position: relative;
+  min-width: 0;
+  overflow-x: clip;
 }
 
 .lp-header {
@@ -24,7 +26,7 @@
   flex-direction: column;
   gap: var(--space-4);
   flex: 1;
-  min-width: 320px;
+  min-width: 0;
 }
 
 .lp-header__title {
@@ -172,6 +174,7 @@
   gap: var(--space-4);
   overflow-x: auto;
   padding-bottom: var(--space-3);
+  max-width: 100%;
 }
 
 .lp-board::-webkit-scrollbar {
@@ -395,6 +398,11 @@
   border-radius: 20px;
   background: var(--color-bg);
   box-shadow: var(--shadow);
+  max-width: 100%;
+}
+
+.lp-table {
+  min-width: 760px;
 }
 
 .lp-table {
@@ -762,8 +770,13 @@
 }
 
 @media (max-width: 767px) {
+  .lp-header {
+    gap: var(--space-3);
+  }
+
   .lp-header__right {
     width: 100%;
+    padding: var(--space-2);
   }
 
   .lp-stage-filter,
@@ -786,6 +799,10 @@
 
   .lp-list-wrap {
     border-radius: 16px;
+  }
+
+  .lp-table {
+    min-width: 680px;
   }
 
   .lp-panel-backdrop {

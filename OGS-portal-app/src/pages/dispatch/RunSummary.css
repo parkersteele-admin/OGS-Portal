@@ -10,6 +10,8 @@
   flex-direction: column;
   gap: var(--space-5);
   max-width: 1100px;
+  min-width: 0;
+  overflow-x: clip;
 }
 
 /* ── Loading / error ───────────────────────────────────────────────────────── */
@@ -360,6 +362,7 @@
   width: 100%;
   border-collapse: collapse;
   font-size: var(--font-size-13);
+  min-width: 760px;
 }
 
 .rs-th {
@@ -629,7 +632,7 @@
 
 /* ── Mobile ────────────────────────────────────────────────────────────────── */
 
-@media (max-width: 900px) {
+@media (max-width: 1023px) {
   .rs-kpi--timeline {
     grid-column: span 1;
   }
@@ -641,9 +644,13 @@
   }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 767px) {
   .rs-kpis {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .rs-table {
+    min-width: 640px;
   }
 
   .rs-kpi--timeline {
