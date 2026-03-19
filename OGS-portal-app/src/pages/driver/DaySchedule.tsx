@@ -89,6 +89,10 @@ function StopCard({ stop, isCurrent, runId, customer, order, product }: StopCard
   const isDone    = stop.status === 'completed'
   const isSkipped = stop.status === 'skipped'
   const isPending = stop.status === 'pending'
+  const [addOnsExpanded, setAddOnsExpanded] = useState(false)
+
+  const addOns = order?.addOns ?? []
+  const hasAddOns = addOns.length > 0
 
   let cardClass = 'ds-stop-card'
   if (isCurrent) cardClass += ' ds-stop-card--current'
@@ -126,9 +130,36 @@ function StopCard({ stop, isCurrent, runId, customer, order, product }: StopCard
           </div>
         )}
 
+        {/* Standing order product row */}
+        {product && qtyLabel && (
+          <div className="ds-stop-card__section-label">Standing order</div>
+        )}
         {product && qtyLabel && (
           <div className="ds-stop-card__product">
             {product.name} · {qtyLabel}
+          </div>
+        )}
+
+        {/* Add-ons section — amber strip, always visually separated */}
+        {hasAddOns && (
+          <div className="ds-stop-card__addons">
+            <button
+              type="button"
+              className="ds-stop-card__addons-header"
+              onClick={(e) => { e.stopPropagation(); setAddOnsExpanded((v) => !v) }}
+            >
+              <span className="ds-stop-card__addons-badge">Add-ons +{addOns.length}</span>
+              <span className="ds-stop-card__addons-chevron">{addOnsExpanded ? '▾' : '▸'}</span>
+            </button>
+            {addOnsExpanded && (
+              <div className="ds-stop-card__addons-list">
+                {addOns.map((ao, i) => (
+                  <div key={i} className="ds-stop-card__addons-item">
+                    {ao.qty}× {ao.productName}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

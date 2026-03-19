@@ -17,10 +17,10 @@ import { getDocs, query, where } from 'firebase/firestore'
 import { productsCol, invoicesCol } from '../../lib/firestore'
 import { useAuth } from '../../hooks/useAuth'
 import { useCustomer } from '../../hooks/queries'
-import { getOrders } from '../../services/orderService'
+import { getOrders, getRouteSchedule, addOnToNextDelivery } from '../../services/orderService'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
-import type { Order, OrderStatus, DeliveryTier } from '../../types/order'
+import type { Order, OrderStatus, DeliveryTier, OrderType, RouteSchedule } from '../../types/order'
 import type { Invoice } from '../../types/billing'
 import type { Product } from '../../types/product'
 import type { QueryDocumentSnapshot } from 'firebase/firestore'
@@ -75,6 +75,18 @@ const TIER_VARIANT: Record<DeliveryTier, BadgeVariant> = {
   'same-day': 'danger',
 }
 
+const ORDER_TYPE_LABEL: Record<OrderType, string> = {
+  route:    'Standing',
+  offRoute: 'Will-Call',
+  addOn:    'Add-On',
+}
+
+const ORDER_TYPE_STYLE: Record<OrderType, React.CSSProperties> = {
+  route:    { background: '#f3f4f6', color: '#374151', border: '1px solid #e5e7eb' },
+  offRoute: { background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' },
+  addOn:    { background: '#fff7ed', color: '#E87722', border: '1px solid #fed7aa' },
+}
+
 const TIMELINE_STEPS: OrderStatus[] = [
   'pending', 'scheduled', 'in-transit', 'delivered', 'invoiced', 'paid',
 ]
@@ -88,14 +100,15 @@ function timelineState(current: OrderStatus, step: OrderStatus): 'done' | 'activ
   return 'upcoming'
 }
 
-type StatusFilter = 'all' | 'pending' | 'scheduled' | 'delivered' | 'invoiced'
+type StatusFilter = 'all' | 'pending' | 'scheduled' | 'delivered' | 'invoiced' | 'standing'
 
 const FILTER_PILLS: { value: StatusFilter; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'pending', label: 'Pending' },
+  { value: 'all',       label: 'All' },
+  { value: 'standing',  label: 'Standing' },
+  { value: 'pending',   label: 'Pending' },
   { value: 'scheduled', label: 'Scheduled' },
   { value: 'delivered', label: 'Delivered' },
-  { value: 'invoiced', label: 'Invoiced' },
+  { value: 'invoiced',  label: 'Invoiced' },
 ]
 
 const PAGE_SIZE = 20
@@ -103,8 +116,13 @@ const PAGE_SIZE = 20
 interface DetailPanelProps {
   order: Order
   products: Record<string, string>
+  productList: Product[]
+  customerId: string
   onClose: () => void
   onReorder: (order: Order) => void
+  nextRouteOrderId: string | null
+  routeSchedule: RouteSchedule | null
+  upcomingRouteDate: Date | null
 }
 
 const LinkedInvoiceRow: React.FC<{ order: Order }> = ({ order }) => {
@@ -146,8 +164,19 @@ const LinkedInvoiceRow: React.FC<{ order: Order }> = ({ order }) => {
   )
 }
 
-const DetailPanel: React.FC<DetailPanelProps> = ({ order, products, onClose, onReorder }) => {
+const DetailPanel: React.FC<DetailPanelProps> = ({
+  order, products, productList, onClose, onReorder,
+  nextRouteOrderId, routeSchedule, upcomingRouteDate,
+}) => {
+  const navigate = useNavigate()
+  const { user } = useAuth()
   const panelRef = useRef<HTMLDivElement>(null)
+
+  // Add-on inline drawer state
+  const [showAddOnDrawer, setShowAddOnDrawer] = useState(false)
+  const [addOnItems, setAddOnItems] = useState<{ productId: string; qty: number }[]>([])
+  const [addOnSaving, setAddOnSaving] = useState(false)
+  const [addOnSuccess, setAddOnSuccess] = useState(false)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -155,18 +184,70 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ order, products, onClose, onR
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
 
+  // Visible products (never show Fees)
+  const visibleProducts = useMemo(
+    () => productList.filter((p) => p.category !== 'Fees' && p.active !== false),
+    [productList],
+  )
+
+  function toggleAddOnProduct(productId: string) {
+    setAddOnItems((prev) => {
+      const exists = prev.find((i) => i.productId === productId)
+      return exists ? prev.filter((i) => i.productId !== productId) : [...prev, { productId, qty: 1 }]
+    })
+  }
+
+  function setAddOnQty(productId: string, qty: number) {
+    setAddOnItems((prev) =>
+      prev.map((i) => (i.productId === productId ? { ...i, qty: Math.max(1, qty) } : i)),
+    )
+  }
+
+  async function handleConfirmAddOns() {
+    if (!nextRouteOrderId || addOnItems.length === 0 || !user) return
+    setAddOnSaving(true)
+    try {
+      await addOnToNextDelivery(
+        nextRouteOrderId,
+        addOnItems.map((i) => ({
+          productId: i.productId,
+          productName: visibleProducts.find((p) => p.id === i.productId)?.name ?? i.productId,
+          qty: i.qty,
+          addedBy: user.id,
+        })),
+        user.id,
+      )
+      setAddOnSuccess(true)
+      setAddOnItems([])
+      setTimeout(() => setAddOnSuccess(false), 4000)
+      setShowAddOnDrawer(false)
+    } catch {
+      // error handled inline
+    } finally {
+      setAddOnSaving(false)
+    }
+  }
+
   const productName = products[order.productId] ?? 'Delivery'
   const requestedDate = toDate(order.requestedAt)
   const scheduledDate = toDate(order.scheduledAt)
+  const cadenceLabels: Record<string, string> = {
+    weekly: 'Weekly', biweekly: 'Biweekly', monthly: 'Monthly', custom: 'Custom',
+  }
 
   return (
     <>
       <div className="oh-detail-overlay" onClick={onClose} aria-hidden="true" />
       <div className="oh-detail" ref={panelRef} role="dialog" aria-modal="true" aria-label="Order details">
         <div className="oh-detail__header">
-          <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <span className="oh-detail__id">#{order.id.slice(0, 8).toUpperCase()}</span>
             <Badge variant={STATUS_VARIANT[order.status]}>{STATUS_LABEL[order.status]}</Badge>
+            {order.orderType && (
+              <span className="oh-order-type-pill" style={ORDER_TYPE_STYLE[order.orderType]}>
+                {ORDER_TYPE_LABEL[order.orderType]}
+              </span>
+            )}
           </div>
           <button className="oh-detail__close" onClick={onClose} aria-label="Close">✕</button>
         </div>
@@ -195,6 +276,37 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ order, products, onClose, onR
               })
             )}
           </div>
+
+          {/* ── Standing Order section ── */}
+          {order.orderType === 'route' && routeSchedule && (
+            <div className="oh-detail__section oh-detail__section--standing">
+              <p className="oh-detail__section-title">Your Standing Order</p>
+              <div className="oh-detail__row">
+                <span className="oh-detail__label">Cadence</span>
+                <span className="oh-detail__value">{cadenceLabels[routeSchedule.cadence] ?? routeSchedule.cadence}</span>
+              </div>
+              <div className="oh-detail__row">
+                <span className="oh-detail__label">Next delivery</span>
+                <span className="oh-detail__value">{fmtDate(toDate(routeSchedule.nextDeliveryDate))}</span>
+              </div>
+              <div className="oh-standing-actions">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => navigate('/portal/order', { state: { orderType: 'route', modifyThisOnly: true, orderId: order.id } })}
+                >
+                  Modify this delivery
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigate('/portal/order', { state: { orderType: 'route' } })}
+                >
+                  Change standing order
+                </Button>
+              </div>
+            </div>
+          )}
 
           <div className="oh-detail__section">
             <div className="oh-detail__row">
@@ -232,6 +344,19 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ order, products, onClose, onR
             )}
           </div>
 
+          {/* ── Add-On items on this order ── */}
+          {order.addOns && order.addOns.length > 0 && (
+            <div className="oh-detail__section oh-detail__section--addons">
+              <p className="oh-detail__section-title">Add-Ons on this delivery</p>
+              {order.addOns.map((ao, i) => (
+                <div key={i} className="oh-detail__row">
+                  <span className="oh-detail__label">{ao.productName}</span>
+                  <span className="oh-detail__value">Qty {ao.qty}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="oh-detail__section oh-detail__section--price">
             <div className="oh-detail__row">
               <span className="oh-detail__label">Unit price</span>
@@ -254,6 +379,67 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ order, products, onClose, onR
           </div>
 
           <LinkedInvoiceRow order={order} />
+
+          {/* ── Add to next delivery inline drawer ── */}
+          {nextRouteOrderId && !addOnSuccess && (
+            <div className="oh-addon-section">
+              {!showAddOnDrawer ? (
+                <button className="oh-addon-trigger" onClick={() => setShowAddOnDrawer(true)}>
+                  + Add to next delivery ({fmtDate(upcomingRouteDate)})
+                </button>
+              ) : (
+                <div className="oh-addon-drawer">
+                  <p className="oh-addon-drawer__title">Add items to your {fmtDate(upcomingRouteDate)} delivery</p>
+                  <div className="oh-addon-drawer__list">
+                    {visibleProducts.slice(0, 20).map((p) => {
+                      const item = addOnItems.find((i) => i.productId === p.id)
+                      return (
+                        <div key={p.id} className={`oh-addon-row ${item ? 'oh-addon-row--added' : ''}`}>
+                          <div className="oh-addon-row__info">
+                            <span className="oh-addon-row__name">{p.name}</span>
+                            {p.sizeLabel && <span className="oh-addon-row__meta">{p.sizeLabel}</span>}
+                          </div>
+                          {item && (
+                            <div className="oh-addon-row__qty">
+                              <button type="button" onClick={() => setAddOnQty(p.id, item.qty - 1)} disabled={item.qty <= 1}>−</button>
+                              <span>{item.qty}</span>
+                              <button type="button" onClick={() => setAddOnQty(p.id, item.qty + 1)}>+</button>
+                            </div>
+                          )}
+                          <button
+                            type="button"
+                            className={`oh-addon-row__btn ${item ? 'oh-addon-row__btn--added' : ''}`}
+                            onClick={() => toggleAddOnProduct(p.id)}
+                          >
+                            {item ? '✓ Added' : 'Add'}
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <div className="oh-addon-drawer__footer">
+                    <Button variant="ghost" size="sm" onClick={() => { setShowAddOnDrawer(false); setAddOnItems([]) }}>
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      disabled={addOnItems.length === 0 || addOnSaving}
+                      loading={addOnSaving}
+                      onClick={handleConfirmAddOns}
+                    >
+                      Confirm {addOnItems.length > 0 ? `(${addOnItems.length})` : ''}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          {addOnSuccess && (
+            <div className="oh-addon-success">
+              Added to your {fmtDate(upcomingRouteDate)} delivery.
+            </div>
+          )}
         </div>
 
         <div className="oh-detail__footer">
@@ -300,7 +486,16 @@ const OrderRow: React.FC<OrderRowProps> = ({
       aria-label={`Open order ${order.id.slice(0, 8).toUpperCase()}`}
     >
       <td className="oh-td oh-td--mono">#{order.id.slice(0, 8).toUpperCase()}</td>
-      <td className="oh-td"><Badge variant={STATUS_VARIANT[order.status]}>{STATUS_LABEL[order.status]}</Badge></td>
+      <td className="oh-td">
+        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <Badge variant={STATUS_VARIANT[order.status]}>{STATUS_LABEL[order.status]}</Badge>
+          {order.orderType && (
+            <span className="oh-order-type-pill" style={ORDER_TYPE_STYLE[order.orderType]}>
+              {ORDER_TYPE_LABEL[order.orderType]}
+            </span>
+          )}
+        </div>
+      </td>
       <td className="oh-td">
         <div className="oh-cell-product">
           <span className="oh-cell-product__name">{productName}</span>
@@ -335,6 +530,14 @@ const OrdersPage: React.FC = () => {
   const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
 
+  // Route schedule for the customer
+  const { data: routeSchedule = null } = useQuery<RouteSchedule | null>({
+    queryKey: ['route-schedule', customerId],
+    queryFn:  () => getRouteSchedule(customerId!),
+    enabled:  !!customerId,
+    staleTime: 5 * 60 * 1000,
+  })
+
   const { data: products = [] } = useQuery<Product[]>({
     queryKey: ['products', 'active'],
     queryFn: async () => {
@@ -360,7 +563,10 @@ const OrdersPage: React.FC = () => {
     if (!customerId) return
     const filters = {
       customerId,
-      status: statusFilter === 'all' ? undefined : statusFilter as OrderStatus,
+      // 'standing' filters client-side on orderType; do not pass to server query
+      status: (statusFilter === 'all' || statusFilter === 'standing')
+        ? undefined
+        : statusFilter as OrderStatus,
       scheduledAfter: dateFrom ? new Date(dateFrom) : undefined,
       scheduledBefore: dateTo ? new Date(dateTo) : undefined,
     }
@@ -393,14 +599,19 @@ const OrdersPage: React.FC = () => {
   }, [customerId, cursor, loadingMore, statusFilter, dateFrom, dateTo])
 
   const filteredOrders = useMemo(() => {
-    if (!search.trim()) return allOrders
+    let base = allOrders
+    // Client-side orderType filter for 'standing'
+    if (statusFilter === 'standing') {
+      base = base.filter((o) => o.orderType === 'route')
+    }
+    if (!search.trim()) return base
     const q = search.trim().toLowerCase()
-    return allOrders.filter(
+    return base.filter(
       (order) =>
         order.id.toLowerCase().includes(q) ||
         (productMap[order.productId] ?? '').toLowerCase().includes(q),
     )
-  }, [allOrders, search, productMap])
+  }, [allOrders, search, productMap, statusFilter])
 
   const handleReorder = useCallback((order: Order) => {
     navigate('/portal/order', {
@@ -416,6 +627,17 @@ const OrdersPage: React.FC = () => {
   }, [navigate])
 
   const selectedOrder = allOrders.find((order) => order.id === selectedId) ?? null
+
+  // Find the next upcoming route order to target for add-ons
+  const nextRouteOrder = useMemo(() => {
+    return allOrders
+      .filter((o) => o.orderType === 'route' && o.status !== 'cancelled' && o.status !== 'delivered' && o.status !== 'paid')
+      .sort((a, b) => (toDate(a.scheduledAt ?? a.requestedAt)?.getTime() ?? 0) - (toDate(b.scheduledAt ?? b.requestedAt)?.getTime() ?? 0))[0] ?? null
+  }, [allOrders])
+
+  const upcomingRouteDate = nextRouteOrder
+    ? (toDate(nextRouteOrder.scheduledAt) ?? toDate(nextRouteOrder.requestedAt))
+    : null
 
   return (
     <div className={`oh-page ${selectedOrder ? 'oh-page--panel-open' : ''}`}>
@@ -540,8 +762,13 @@ const OrdersPage: React.FC = () => {
         <DetailPanel
           order={selectedOrder}
           products={productMap}
+          productList={products}
+          customerId={customerId ?? ''}
           onClose={() => setSelectedId(null)}
           onReorder={handleReorder}
+          nextRouteOrderId={nextRouteOrder?.id ?? null}
+          routeSchedule={selectedOrder.orderType === 'route' ? routeSchedule : null}
+          upcomingRouteDate={upcomingRouteDate}
         />
       )}
     </div>

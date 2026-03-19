@@ -21,10 +21,11 @@ import { useAuth } from '../../hooks/useAuth'
 import { useCustomerTanks } from '../../hooks/useCustomerTanks'
 import { usePaymentMethods } from '../../hooks/usePaymentMethods'
 import { useCustomerInvoices, useCustomerOrders } from '../../hooks/queries'
+import { getRouteSchedule } from '../../services/orderService'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import type { Invoice, InvoiceStatus } from '../../types/billing'
-import type { Order, OrderStatus, DeliveryTier } from '../../types/order'
+import type { Order, OrderStatus, DeliveryTier, RouteSchedule } from '../../types/order'
 import type { Tank } from '../../types/tank'
 import type { Product } from '../../types/product'
 import './Dashboard.css'
@@ -156,6 +157,14 @@ const DashboardPage: React.FC = () => {
   // TanStack Query
   const { data: invoicesPage } = useCustomerInvoices(customerId, 4)
   const { data: ordersPage }   = useCustomerOrders(customerId, 3)
+
+  // Route schedule
+  const { data: routeSchedule = null } = useQuery<RouteSchedule | null>({
+    queryKey: ['route-schedule', customerId],
+    queryFn:  () => getRouteSchedule(customerId!),
+    enabled:  !!customerId,
+    staleTime: 5 * 60 * 1000,
+  })
 
   // Product lookup (cached 10 min — products rarely change)
   const { data: products = [] } = useQuery<Product[]>({
@@ -346,6 +355,63 @@ const DashboardPage: React.FC = () => {
               <p className="cust-db__empty">No invoices yet.</p>
             ) : (
               invoices.map((inv) => <InvoiceRow key={inv.id} invoice={inv} />)
+            )}
+          </div>
+        </div>
+
+        {/* Standing order */}
+        <div className="cust-db__card cust-db__card--standing">
+          <div className="cust-db__card-header">
+            <span className="cust-db__card-title">Your Standing Order</span>
+            {routeSchedule && (
+              <button
+                className="cust-db__card-link"
+                onClick={() => navigate('/portal/order', { state: { orderType: 'route' } })}
+              >
+                Edit standing order
+              </button>
+            )}
+          </div>
+          <div className="cust-db__card-body">
+            {!routeSchedule ? (
+              <div className="cust-db__standing-empty">
+                <p className="cust-db__empty">No standing order set up yet.</p>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => navigate('/portal/order', { state: { orderType: 'route' } })}
+                >
+                  Set up a standing order
+                </Button>
+              </div>
+            ) : (
+              <>
+                <div className="cust-db__standing-meta">
+                  <span className="cust-db__standing-cadence">
+                    {({ weekly: 'Weekly', biweekly: 'Biweekly', monthly: 'Monthly', custom: 'Custom' } as Record<string, string>)[routeSchedule.cadence] ?? routeSchedule.cadence}
+                  </span>
+                  {routeSchedule.nextDeliveryDate && (
+                    <span className="cust-db__standing-next">
+                      Next: {toDate(routeSchedule.nextDeliveryDate)?.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </span>
+                  )}
+                </div>
+                {routeSchedule.lineItems?.map((li, i) => (
+                  <div key={i} className="cust-db__standing-item">
+                    <span className="cust-db__standing-item-qty">{li.qty}×</span>
+                    <span className="cust-db__standing-item-id">{li.productId}</span>
+                  </div>
+                ))}
+                <div className="cust-db__standing-actions">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => navigate('/portal/order', { state: { orderType: 'addOn' } })}
+                  >
+                    Add to next delivery
+                  </Button>
+                </div>
+              </>
             )}
           </div>
         </div>

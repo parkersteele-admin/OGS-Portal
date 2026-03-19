@@ -317,3 +317,20 @@
 
 .sp-cta-btn:hover { background: var(--color-brand-dark); }
 .sp-cta-btn:active { transform: scale(0.99); }
+
+/* ── Add-ons card ────────────────────────────────────────────────────────── */
+
+.sp-card--addons {
+  border-color: #f59e0b;
+  background: #fffbeb;
+}
+
+.sp-card__title--addons {
+  color: #92400e;
+  font-size: var(--font-size-11);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-weight: 800;
+  border-left: 3px solid #f59e0b;
+  padding-left: var(--space-2);
+}

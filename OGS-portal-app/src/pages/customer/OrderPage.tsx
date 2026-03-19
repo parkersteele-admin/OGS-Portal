@@ -18,12 +18,15 @@ import {
   createBatchOrders,
   getDeliverySettings,
   generateGroupId,
+  getRouteSchedule,
+  updateRouteSchedule,
+  addOnToNextDelivery,
 } from '../../services/orderService'
 import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
 import type { Product } from '../../types/product'
 import type { Tank } from '../../types/tank'
-import type { DeliveryTier, DeliverySettings } from '../../types/order'
+import type { DeliveryTier, DeliverySettings, RouteSchedule, RouteCadence, OrderType } from '../../types/order'
 import { DEFAULT_DELIVERY_SETTINGS } from '../../types/order'
 import './PlaceOrder.css'
 
@@ -49,6 +52,36 @@ const INITIAL: WizardState = {
 
 const STEPS = ['Build your order', 'Delivery details', 'Review & confirm']
 
+// ── Order type selector ───────────────────────────────────────────────────────
+
+interface OrderTypeSelectorProps {
+  value: OrderType
+  onChange: (type: OrderType) => void
+}
+
+const ORDER_TYPE_OPTIONS: { type: OrderType; label: string; sub: string }[] = [
+  { type: 'offRoute',  label: 'Will-Call / One-Time', sub: 'As-needed, outside your schedule' },
+  { type: 'route',     label: 'Standing Order',        sub: 'Update your recurring schedule' },
+  { type: 'addOn',     label: 'Add to Next Delivery',  sub: 'A la carte items on your next stop' },
+]
+
+const OrderTypeSelector: React.FC<OrderTypeSelectorProps> = ({ value, onChange }) => (
+  <div className="po-order-type-selector">
+    {ORDER_TYPE_OPTIONS.map(({ type, label, sub }) => (
+      <button
+        key={type}
+        type="button"
+        className={`po-order-type-btn ${value === type ? 'po-order-type-btn--active' : ''}`}
+        onClick={() => onChange(type)}
+        aria-pressed={value === type}
+      >
+        <span className="po-order-type-btn__label">{label}</span>
+        <span className="po-order-type-btn__sub">{sub}</span>
+      </button>
+    ))}
+  </div>
+)
+
 function fmtCurrency(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n)
 }
@@ -64,6 +97,11 @@ function fmtDateStr(s: string): string {
   const [y, m, d] = s.split('-').map(Number)
   const date = new Date(y, m - 1, d)
   return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+}
+
+function fmtDate(d: Date | null | undefined): string {
+  if (!d) return '—'
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 function dateConstraints(tier: DeliveryTier): { min: string; max: string } {
@@ -446,6 +484,8 @@ interface Step1Props {
   state: WizardState
   recentProductIds: string[]
   settings: DeliverySettings
+  orderMode: OrderType
+  onOrderModeChange: (mode: OrderType) => void
   onToggleProduct: (productId: string) => void
   onQuantityChange: (productId: string, quantity: number) => void
   onTankChange: (productId: string, tankId: string) => void
@@ -456,6 +496,7 @@ const CATEGORY_ORDER = ['CO₂ Cylinders', 'Nitrogen', 'Beer Gas', 'Propane', 'R
 
 const Step1: React.FC<Step1Props> = ({
   products, tanks, state, recentProductIds, settings,
+  orderMode, onOrderModeChange,
   onToggleProduct, onQuantityChange, onTankChange, onNext,
 }) => {
   const summary = useMemo(
@@ -518,6 +559,9 @@ const Step1: React.FC<Step1Props> = ({
           <p className="po-step__sub">Add products, set quantities, and associate tanks where needed.</p>
         </div>
 
+        {/* Order type selector — always at the top of Step 1 */}
+        <OrderTypeSelector value={orderMode} onChange={onOrderModeChange} />
+
         <div className="po-product-list">
           {recentProducts.length > 0 && (
             <div className="po-list-section">
@@ -574,10 +618,27 @@ const Step1: React.FC<Step1Props> = ({
 
 // ── Step 2: Delivery details ──────────────────────────────────────────────────
 
+interface RouteScheduleForm {
+  cadence: RouteCadence
+  dayOfWeek: number
+  customIntervalDays: number
+}
+
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+const CADENCE_OPTIONS: { value: RouteCadence; label: string }[] = [
+  { value: 'weekly',   label: 'Weekly' },
+  { value: 'biweekly', label: 'Biweekly' },
+  { value: 'monthly',  label: 'Monthly' },
+  { value: 'custom',   label: 'Custom interval' },
+]
+
 interface Step2Props {
   products: Product[]
   state: WizardState
   settings: DeliverySettings
+  orderMode: OrderType
+  routeForm: RouteScheduleForm
+  onRouteFormChange: (patch: Partial<RouteScheduleForm>) => void
   onChange: (patch: Partial<WizardState>) => void
   onQuantityChange: (productId: string, quantity: number) => void
   onRemoveItem: (productId: string) => void
@@ -586,7 +647,8 @@ interface Step2Props {
 }
 
 const Step2: React.FC<Step2Props> = ({
-  products, state, settings, onChange, onQuantityChange, onRemoveItem, onBack, onNext,
+  products, state, settings, orderMode, routeForm, onRouteFormChange,
+  onChange, onQuantityChange, onRemoveItem, onBack, onNext,
 }) => {
   const summary = useMemo(
     () => summarizeOrder(state.items, products, state.tier, settings),
@@ -594,15 +656,113 @@ const Step2: React.FC<Step2Props> = ({
   )
   const { min: dateMin, max: dateMax } = dateConstraints(state.tier)
 
-  const canProceed =
-    summary.lines.length > 0 &&
-    state.scheduledDate >= dateMin &&
-    state.scheduledDate <= dateMax
+  const canProceed = orderMode === 'route'
+    ? summary.lines.length > 0
+    : summary.lines.length > 0 &&
+      state.scheduledDate >= dateMin &&
+      state.scheduledDate <= dateMax
 
   const handleTierSelect = (tier: DeliveryTier) => {
     onChange({ tier, scheduledDate: dateConstraints(tier).min })
   }
 
+  // ── Route cadence path ──────────────────────────────────────────────────────
+  if (orderMode === 'route') {
+    return (
+      <section className="po-builder">
+        <div className="po-builder__main po-builder__main--details">
+          <div className="po-step-heading">
+            <h2 className="po-step__title">Standing order schedule</h2>
+            <p className="po-step__sub">Set the cadence and delivery day for your recurring order.</p>
+          </div>
+
+          <div className="po-section-card">
+            <div className="po-field-group">
+              <label className="po-label">Delivery cadence</label>
+              <div className="po-cadence-grid">
+                {CADENCE_OPTIONS.map(({ value, label }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className={`po-cadence-btn ${routeForm.cadence === value ? 'po-cadence-btn--active' : ''}`}
+                    onClick={() => onRouteFormChange({ cadence: value })}
+                    aria-pressed={routeForm.cadence === value}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {routeForm.cadence === 'custom' && (
+              <div className="po-field-group">
+                <label className="po-label" htmlFor="po-interval">Interval (days)</label>
+                <input
+                  id="po-interval"
+                  type="number"
+                  min={1}
+                  className="po-date-input"
+                  value={routeForm.customIntervalDays}
+                  onChange={(e) => onRouteFormChange({ customIntervalDays: parseInt(e.target.value, 10) || 1 })}
+                />
+              </div>
+            )}
+
+            <div className="po-field-group">
+              <label className="po-label">Preferred delivery day</label>
+              <div className="po-day-grid">
+                {DAY_NAMES.map((day, i) => (
+                  <button
+                    key={day}
+                    type="button"
+                    className={`po-day-btn ${routeForm.dayOfWeek === i ? 'po-day-btn--active' : ''}`}
+                    onClick={() => onRouteFormChange({ dayOfWeek: i })}
+                    aria-pressed={routeForm.dayOfWeek === i}
+                  >
+                    {day.slice(0, 3)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="po-field-group">
+              <label className="po-label" htmlFor="po-notes">
+                Notes <span className="po-optional">(optional)</span>
+              </label>
+              <textarea
+                id="po-notes"
+                className="po-textarea"
+                rows={3}
+                placeholder="Any special instructions for recurring deliveries…"
+                value={state.notes}
+                onChange={(e) => onChange({ notes: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="po-nav po-nav--inline">
+            <Button variant="ghost" size="md" onClick={onBack}>← Back to products</Button>
+          </div>
+        </div>
+
+        <OrderSummaryPanel
+          title="Standing order items"
+          summary={summary}
+          tier={state.tier}
+          settings={settings}
+          emptyLabel="Add at least one product."
+          continueLabel="Review standing order"
+          continueDisabled={!canProceed}
+          onContinue={onNext}
+          editable
+          onQuantityChange={onQuantityChange}
+          onRemove={onRemoveItem}
+        />
+      </section>
+    )
+  }
+
+  // ── Default: will-call / off-route path ─────────────────────────────────────
   return (
     <section className="po-builder">
       <div className="po-builder__main po-builder__main--details">
@@ -687,11 +847,20 @@ interface Step3Props {
   customerId: string
   tanks: Tank[]
   groupId: string
+  orderMode: OrderType
+  routeForm: RouteScheduleForm
+  nextRouteOrderId: string | null
+  nextRouteDate: Date | null
   onBack: () => void
   onConfirm: (groupId: string) => void
 }
 
-const Step3: React.FC<Step3Props> = ({ products, state, settings, customerId, tanks, groupId, onBack, onConfirm }) => {
+const Step3: React.FC<Step3Props> = ({
+  products, state, settings, customerId, tanks, groupId,
+  orderMode, routeForm, nextRouteOrderId, nextRouteDate,
+  onBack, onConfirm,
+}) => {
+  const { user } = useAuth()
   const { data: customer } = useCustomer(customerId)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -703,25 +872,90 @@ const Step3: React.FC<Step3Props> = ({ products, state, settings, customerId, ta
   const tierConfig = settings[state.tier]
   const upPct = tierConfig.upchargePercent
 
+  // Compute next 3 delivery dates for standing order preview
+  const nextDeliveryDates = useMemo(() => {
+    if (orderMode !== 'route') return []
+    const dates: Date[] = []
+    const base = new Date()
+    let intervalDays = 7
+    if (routeForm.cadence === 'biweekly') intervalDays = 14
+    else if (routeForm.cadence === 'monthly') intervalDays = 30
+    else if (routeForm.cadence === 'custom') intervalDays = routeForm.customIntervalDays || 7
+
+    // Find next occurrence of the chosen day of week
+    const d = new Date(base)
+    d.setDate(d.getDate() + 1) // start tomorrow
+    while (d.getDay() !== routeForm.dayOfWeek) {
+      d.setDate(d.getDate() + 1)
+    }
+    for (let i = 0; i < 3; i++) {
+      dates.push(new Date(d))
+      d.setDate(d.getDate() + intervalDays)
+    }
+    return dates
+  }, [orderMode, routeForm])
+
   const handleSubmit = async () => {
     if (!customerId || summary.lines.length === 0) return
     setSubmitting(true)
     setError(null)
     try {
-      await createBatchOrders(
-        summary.lines.map(({ item, product }) => ({
+      if (orderMode === 'route') {
+        // Write to routeSchedule, not /orders
+        const uid = user?.id ?? customerId
+        await updateRouteSchedule(
           customerId,
-          productId: product.id,
-          tankId: item.tankId || undefined,
-          quantity: item.quantity,
-          deliveryTier: state.tier,
-          notes: state.notes || undefined,
-          unitPrice: product.pricePerUnit,
-        })),
-        tierConfig.deliveryFee,
-        groupId,
-      )
-      onConfirm(groupId)
+          {
+            isActive: true,
+            cadence: routeForm.cadence,
+            customIntervalDays: routeForm.cadence === 'custom' ? routeForm.customIntervalDays : undefined,
+            dayOfWeek: routeForm.dayOfWeek,
+            lineItems: summary.lines.map(({ item, product }) => ({
+              productId: product.id,
+              qty: item.quantity,
+              unitPrice: product.pricePerUnit,
+            })),
+            notes: state.notes || '',
+          },
+          uid,
+        )
+        onConfirm(groupId)
+      } else if (orderMode === 'addOn') {
+        // Write add-ons to the next route order
+        if (!nextRouteOrderId || !user) {
+          setError('No upcoming route delivery found to add items to.')
+          setSubmitting(false)
+          return
+        }
+        await addOnToNextDelivery(
+          nextRouteOrderId,
+          summary.lines.map(({ item, product }) => ({
+            productId: product.id,
+            productName: product.name,
+            qty: item.quantity,
+            addedBy: user.id,
+          })),
+          user.id,
+        )
+        onConfirm(groupId)
+      } else {
+        // Will-call / off-route — existing behavior
+        await createBatchOrders(
+          summary.lines.map(({ item, product }) => ({
+            customerId,
+            productId: product.id,
+            tankId: item.tankId || undefined,
+            quantity: item.quantity,
+            deliveryTier: state.tier,
+            notes: state.notes || undefined,
+            unitPrice: product.pricePerUnit,
+          })),
+          tierConfig.deliveryFee,
+          groupId,
+          'offRoute',
+        )
+        onConfirm(groupId)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to place order. Please try again.')
       setSubmitting(false)
@@ -732,6 +966,133 @@ const Step3: React.FC<Step3Props> = ({ products, state, settings, customerId, ta
     ? [customer.address, customer.city, customer.state, customer.zip].filter(Boolean).join(', ')
     : 'Your delivery address'
 
+  // ── Standing order review ───────────────────────────────────────────────────
+  if (orderMode === 'route') {
+    return (
+      <section className="po-builder">
+        <div className="po-builder__main po-builder__main--review">
+          <div className="po-step-heading">
+            <h2 className="po-step__title">Review standing order</h2>
+            <p className="po-step__sub">This will update your recurring schedule for future deliveries.</p>
+          </div>
+
+          <div className="po-review-card po-review-card--warning">
+            <p className="po-review-warning">This will update your standing order. All future deliveries will use these items and cadence.</p>
+          </div>
+
+          <div className="po-review-card">
+            <div className="po-review-section">
+              <p className="po-review-section__label">Items per delivery</p>
+              <div className="po-review-list">
+                {summary.lines.map(({ item, product }) => (
+                  <div key={product.id} className="po-review-list__item">
+                    <div>
+                      <p className="po-review-list__name">{product.name}</p>
+                      <p className="po-review-list__meta">Qty {item.quantity} · {fmtCurrency(product.pricePerUnit)} / {product.unit}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="po-review-divider" />
+            <div className="po-review-row">
+              <span className="po-review-label">Cadence</span>
+              <span className="po-review-value">{CADENCE_OPTIONS.find((c) => c.value === routeForm.cadence)?.label}</span>
+            </div>
+            <div className="po-review-row">
+              <span className="po-review-label">Delivery day</span>
+              <span className="po-review-value">{DAY_NAMES[routeForm.dayOfWeek]}</span>
+            </div>
+            <div className="po-review-row">
+              <span className="po-review-label">Next 3 deliveries</span>
+              <span className="po-review-value" style={{ flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                {nextDeliveryDates.map((d, i) => (
+                  <span key={i}>{fmtDate(d)}</span>
+                ))}
+              </span>
+            </div>
+          </div>
+
+          {error && <div className="po-error" role="alert">{error}</div>}
+
+          <div className="po-nav po-nav--inline">
+            <Button variant="ghost" size="md" onClick={onBack} disabled={submitting}>← Back to schedule</Button>
+          </div>
+        </div>
+
+        <OrderSummaryPanel
+          title="Save standing order"
+          summary={summary}
+          tier={state.tier}
+          settings={settings}
+          emptyLabel="Add items to your standing order."
+          continueLabel="Save standing order"
+          continueDisabled={submitting || summary.lines.length === 0}
+          continueLoading={submitting}
+          onContinue={handleSubmit}
+        />
+      </section>
+    )
+  }
+
+  // ── Add-on review ───────────────────────────────────────────────────────────
+  if (orderMode === 'addOn') {
+    return (
+      <section className="po-builder">
+        <div className="po-builder__main po-builder__main--review">
+          <div className="po-step-heading">
+            <h2 className="po-step__title">Add to next delivery</h2>
+            <p className="po-step__sub">
+              {nextRouteDate
+                ? `These items will be added to your ${fmtDate(nextRouteDate)} delivery.`
+                : 'These items will be added to your next scheduled delivery.'}
+            </p>
+          </div>
+
+          <div className="po-review-card">
+            <div className="po-review-section">
+              <p className="po-review-section__label">Add-on items</p>
+              <div className="po-review-list">
+                {summary.lines.map(({ item, product }) => (
+                  <div key={product.id} className="po-review-list__item">
+                    <div>
+                      <p className="po-review-list__name">{product.name}</p>
+                      <p className="po-review-list__meta">Qty {item.quantity} {product.unit}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {!nextRouteOrderId && (
+            <div className="po-error" role="alert">
+              No upcoming scheduled delivery found. Place a Will-Call order instead.
+            </div>
+          )}
+          {error && <div className="po-error" role="alert">{error}</div>}
+
+          <div className="po-nav po-nav--inline">
+            <Button variant="ghost" size="md" onClick={onBack} disabled={submitting}>← Back to products</Button>
+          </div>
+        </div>
+
+        <OrderSummaryPanel
+          title="Confirm add-ons"
+          summary={summary}
+          tier={state.tier}
+          settings={settings}
+          emptyLabel="Add items to attach to your delivery."
+          continueLabel={nextRouteDate ? `Add to ${fmtDate(nextRouteDate)} delivery` : 'Add to delivery'}
+          continueDisabled={submitting || summary.lines.length === 0 || !nextRouteOrderId}
+          continueLoading={submitting}
+          onContinue={handleSubmit}
+        />
+      </section>
+    )
+  }
+
+  // ── Will-call / off-route review ────────────────────────────────────────────
   return (
     <section className="po-builder">
       <div className="po-builder__main po-builder__main--review">
@@ -893,7 +1254,17 @@ const OrderPage: React.FC = () => {
   const [searchParams] = useSearchParams()
   const customerId = user?.customerId ?? ''
   const preselectedProductId = searchParams.get('productId') ?? ''
-  const reorder = (location.state as { reorder?: ReorderState } | null)?.reorder
+  const locationState = location.state as { reorder?: ReorderState; orderType?: OrderType; modifyThisOnly?: boolean; orderId?: string } | null
+  const reorder = locationState?.reorder
+  // Pre-select order mode from navigation state (e.g. from dashboard "Edit standing order")
+  const preselectedMode = (locationState?.orderType ?? 'offRoute') as OrderType
+
+  const [orderMode, setOrderMode] = useState<OrderType>(reorder ? 'offRoute' : preselectedMode)
+  const [routeForm, setRouteForm] = useState<RouteScheduleForm>({
+    cadence: 'weekly',
+    dayOfWeek: 1,
+    customIntervalDays: 14,
+  })
 
   const [step, setStep] = useState(reorder ? 1 : 0)
   const [wizState, setWizState] = useState<WizardState>(
@@ -921,6 +1292,49 @@ const OrderPage: React.FC = () => {
   useEffect(() => {
     getDeliverySettings().then(setDeliverySettings).catch(() => { /* silently use defaults */ })
   }, [])
+
+  // Load existing routeSchedule to pre-fill standing order form
+  const { data: routeSchedule = null } = useQuery<RouteSchedule | null>({
+    queryKey: ['route-schedule', customerId],
+    queryFn:  () => getRouteSchedule(customerId),
+    enabled:  !!customerId,
+    staleTime: 5 * 60 * 1000,
+  })
+
+  // Pre-fill routeForm from existing schedule when switching to route mode
+  useEffect(() => {
+    if (orderMode === 'route' && routeSchedule) {
+      setRouteForm({
+        cadence: routeSchedule.cadence,
+        dayOfWeek: routeSchedule.dayOfWeek ?? 1,
+        customIntervalDays: routeSchedule.customIntervalDays ?? 14,
+      })
+    }
+  }, [orderMode, routeSchedule])
+
+  // Find next upcoming route order for addOn targeting
+  const { data: nextRouteOrder = null } = useQuery<{ id: string; date: Date | null } | null>({
+    queryKey: ['next-route-order', customerId],
+    queryFn: async () => {
+      if (!customerId) return null
+      const { getOrders } = await import('../../services/orderService')
+      const page = await getOrders({ customerId }, { pageSize: 50 })
+      const upcoming = page.data
+        .filter((o) => o.orderType === 'route' && o.status !== 'cancelled' && o.status !== 'delivered' && o.status !== 'paid')
+        .sort((a, b) => {
+          const da = a.scheduledAt?.toDate?.()?.getTime() ?? a.requestedAt?.toDate?.()?.getTime() ?? 0
+          const db2 = b.scheduledAt?.toDate?.()?.getTime() ?? b.requestedAt?.toDate?.()?.getTime() ?? 0
+          return da - db2
+        })[0]
+      if (!upcoming) return null
+      return {
+        id: upcoming.id,
+        date: upcoming.scheduledAt?.toDate?.() ?? upcoming.requestedAt?.toDate?.() ?? null,
+      }
+    },
+    enabled: !!customerId && orderMode === 'addOn',
+    staleTime: 2 * 60 * 1000,
+  })
 
   // Default scheduled date for reorders
   useEffect(() => {
@@ -998,10 +1412,15 @@ const OrderPage: React.FC = () => {
   }, [])
 
   const handleNextFromStep1 = useCallback(() => {
+    if (orderMode === 'addOn') {
+      // Skip step 1 (delivery details) — go straight to review
+      setStep(2)
+      return
+    }
     const { min } = dateConstraints(wizState.tier)
     if (!wizState.scheduledDate) patch({ scheduledDate: min })
     setStep(1)
-  }, [patch, wizState.scheduledDate, wizState.tier])
+  }, [patch, wizState.scheduledDate, wizState.tier, orderMode])
 
   if (confirmedGroupId) {
     return (
@@ -1035,6 +1454,8 @@ const OrderPage: React.FC = () => {
           state={wizState}
           recentProductIds={recentProductIds}
           settings={deliverySettings}
+          orderMode={orderMode}
+          onOrderModeChange={setOrderMode}
           onToggleProduct={toggleProduct}
           onQuantityChange={(productId, quantity) => updateItem(productId, { quantity })}
           onTankChange={(productId, tankId) => updateItem(productId, { tankId })}
@@ -1047,6 +1468,9 @@ const OrderPage: React.FC = () => {
           products={products}
           state={wizState}
           settings={deliverySettings}
+          orderMode={orderMode}
+          routeForm={routeForm}
+          onRouteFormChange={(p) => setRouteForm((prev) => ({ ...prev, ...p }))}
           onChange={patch}
           onQuantityChange={(productId, quantity) => updateItem(productId, { quantity })}
           onRemoveItem={toggleProduct}
@@ -1063,7 +1487,11 @@ const OrderPage: React.FC = () => {
           customerId={customerId}
           tanks={tanks}
           groupId={groupId}
-          onBack={() => setStep(1)}
+          orderMode={orderMode}
+          routeForm={routeForm}
+          nextRouteOrderId={nextRouteOrder?.id ?? null}
+          nextRouteDate={nextRouteOrder?.date ?? null}
+          onBack={() => setStep(orderMode === 'addOn' ? 0 : 1)}
           onConfirm={setConfirmedGroupId}
         />
       )}

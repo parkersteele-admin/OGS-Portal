@@ -11,7 +11,7 @@
  * details and a "Start delivery" or "View capture" button.
  */
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useParams, useLocation, useNavigate } from 'react-router-dom'
 import { getDoc, doc } from 'firebase/firestore'
 import { db } from '../../lib/firebase'
@@ -186,6 +186,21 @@ function StopDetail() {
           </p>
         )}
       </div>
+
+      {/* ── Add-Ons ───────────────────────────────────────────────────────── */}
+      {order?.addOns && order.addOns.length > 0 && (
+        <div className="sp-card sp-card--addons">
+          <h2 className="sp-card__title sp-card__title--addons">ADD-ONS — bring these in addition to standing order</h2>
+          <div className="sp-detail-grid">
+            {order.addOns.map((ao, i) => (
+              <React.Fragment key={i}>
+                <span className="sp-detail-label">{ao.productName}</span>
+                <span className="sp-detail-value">Qty {ao.qty}</span>
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Site notes ─────────────────────────────────────────────────────── */}
       {customer?.notes && (

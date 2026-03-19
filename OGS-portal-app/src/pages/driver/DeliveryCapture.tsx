@@ -191,6 +191,8 @@ export default function DeliveryCapture() {
 
   // Step 2 — quantity
   const [qtyDelivered, setQtyDelivered] = useState<number>(0)
+  // Add-on quantities: productId → qty
+  const [addOnQtys, setAddOnQtys] = useState<Record<string, number>>({})
 
   // Step 3 — photo
   const photoInputRef  = useRef<HTMLInputElement>(null)
@@ -250,6 +252,15 @@ export default function DeliveryCapture() {
         setProduct(
           pSnap.exists() ? ({ id: pSnap.id, ...pSnap.data() } as Product) : null,
         )
+      }
+
+      // Initialise add-on qty state from order.addOns
+      if (ord?.addOns?.length) {
+        const initial: Record<string, number> = {}
+        for (const ao of ord.addOns) {
+          initial[ao.productId] = ao.qty
+        }
+        setAddOnQtys(initial)
       }
 
       setDataLoading(false)
@@ -346,6 +357,20 @@ export default function DeliveryCapture() {
       if (sigUrl)    updates.signatureUrl = sigUrl
 
       await updateRunStop(runId, stop.id, updates)
+
+      // Write final delivery breakdown to the order doc
+      if (order) {
+        const { updateOrder } = await import('../../services/orderService')
+        const deliveredLineItems = order.productId
+          ? [{ productId: order.productId, qty: qtyDelivered }]
+          : []
+        const deliveredAddOns = order.addOns?.map((ao) => ({
+          productId: ao.productId,
+          qty: addOnQtys[ao.productId] ?? ao.qty,
+        })) ?? []
+        await updateOrder(order.id, { deliveredLineItems, ...(deliveredAddOns.length ? { deliveredAddOns } : {}) })
+      }
+
       await updateStopStatus(runId, stop.id, 'completed')
 
       // Navigate back to schedule after successful delivery
@@ -471,38 +496,81 @@ export default function DeliveryCapture() {
       {step === 2 && (
         <div className="dc-body">
           <h2 className="dc-body__heading">Quantity delivered</h2>
-          <p className="dc-body__sub">Ordered: <strong>{orderedQty} {unitLabel}</strong></p>
 
-          <div className="dc-stepper">
-            <button
-              className="dc-stepper__btn"
-              onClick={() => setQtyDelivered((q) => Math.max(0, +(q - 1).toFixed(2)))}
-              aria-label="Decrease quantity"
-            >
-              −
-            </button>
-            <input
-              className="dc-stepper__input"
-              type="number"
-              min="0"
-              step="0.5"
-              value={qtyDelivered}
-              onChange={(e) => setQtyDelivered(Number(e.target.value))}
-            />
-            <button
-              className="dc-stepper__btn"
-              onClick={() => setQtyDelivered((q) => +(q + 1).toFixed(2))}
-              aria-label="Increase quantity"
-            >
-              +
-            </button>
+          {/* ── Standing order qty ── */}
+          <div className="dc-qty-section">
+            <p className="dc-qty-section__label">Standing order</p>
+            <p className="dc-body__sub">Ordered: <strong>{orderedQty} {unitLabel}</strong></p>
+
+            <div className="dc-stepper">
+              <button
+                className="dc-stepper__btn"
+                onClick={() => setQtyDelivered((q) => Math.max(0, +(q - 1).toFixed(2)))}
+                aria-label="Decrease quantity"
+              >
+                −
+              </button>
+              <input
+                className="dc-stepper__input"
+                type="number"
+                min="0"
+                step="0.5"
+                value={qtyDelivered}
+                onChange={(e) => setQtyDelivered(Number(e.target.value))}
+              />
+              <button
+                className="dc-stepper__btn"
+                onClick={() => setQtyDelivered((q) => +(q + 1).toFixed(2))}
+                aria-label="Increase quantity"
+              >
+                +
+              </button>
+            </div>
+            <span className="dc-stepper__unit">{unitLabel}</span>
+
+            {qtyDelivered !== orderedQty && (
+              <div className="dc-qty-note">
+                ⚠ Different from ordered quantity ({orderedQty} {unitLabel})
+              </div>
+            )}
           </div>
 
-          <span className="dc-stepper__unit">{unitLabel}</span>
-
-          {qtyDelivered !== orderedQty && (
-            <div className="dc-qty-note">
-              ⚠ Different from ordered quantity ({orderedQty} {unitLabel})
+          {/* ── Add-ons qty (only shown when add-ons exist) ── */}
+          {order?.addOns && order.addOns.length > 0 && (
+            <div className="dc-qty-section dc-qty-section--addons">
+              <p className="dc-qty-section__label">ADD-ONS</p>
+              {order.addOns.map((ao) => {
+                const qty = addOnQtys[ao.productId] ?? ao.qty
+                return (
+                  <div key={ao.productId} className="dc-addon-row">
+                    <span className="dc-addon-row__name">{ao.productName}</span>
+                    <div className="dc-stepper dc-stepper--compact">
+                      <button
+                        className="dc-stepper__btn"
+                        onClick={() => setAddOnQtys((prev) => ({ ...prev, [ao.productId]: Math.max(0, (prev[ao.productId] ?? ao.qty) - 1) }))}
+                        aria-label="Decrease"
+                      >−</button>
+                      <input
+                        className="dc-stepper__input"
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={qty}
+                        onChange={(e) => setAddOnQtys((prev) => ({ ...prev, [ao.productId]: Number(e.target.value) }))}
+                      />
+                      <button
+                        className="dc-stepper__btn"
+                        onClick={() => setAddOnQtys((prev) => ({ ...prev, [ao.productId]: (prev[ao.productId] ?? ao.qty) + 1 }))}
+                        aria-label="Increase"
+                      >+</button>
+                    </div>
+                    <span className="dc-addon-row__unit">{unitLabel}</span>
+                  </div>
+                )
+              })}
+              <p className="dc-qty-section__sub">
+                {Object.values(addOnQtys).reduce((s, v) => s + v, 0)} add-on {unitLabel}s
+              </p>
             </div>
           )}
 
@@ -658,6 +726,18 @@ export default function DeliveryCapture() {
                 )}
               </span>
             </div>
+            {order?.addOns && order.addOns.length > 0 && (
+              <div className="dc-summary__row dc-summary__row--addons">
+                <span className="dc-summary__lbl">Add-ons delivered</span>
+                <span className="dc-summary__val">
+                  {order.addOns.map((ao) => (
+                    <span key={ao.productId} className="dc-summary__addon-item">
+                      {addOnQtys[ao.productId] ?? ao.qty}× {ao.productName}
+                    </span>
+                  ))}
+                </span>
+              </div>
+            )}
             <div className="dc-summary__row">
               <span className="dc-summary__lbl">Photo</span>
               <span className="dc-summary__val">

@@ -60,6 +60,21 @@ export const paymentsCol = col<Payment>('payments')
 export const paymentMethodsCol = (customerId: string) =>
   col<PaymentMethod>(`customers/${customerId}/paymentMethods`)
 
+// ── Route Schedules ───────────────────────────────────────────────────────────
+import type { RouteSchedule } from '../types/order'
+
+/** /customers/{customerId}/routeSchedule (single doc) */
+export const routeScheduleRef = (customerId: string) =>
+  doc(db, 'customers', customerId, 'routeSchedule', 'current')
+
+/** /customers/{customerId}/routeSchedule/history (audit log sub-collection) */
+export const routeScheduleHistoryCol = (customerId: string) =>
+  col<import('../types/order').RouteSchedule & { updatedBy: string; updatedAt: import('firebase/firestore').Timestamp }>(
+    `customers/${customerId}/routeScheduleHistory`,
+  )
+
+export type { RouteSchedule }
+
 // ── CRM ───────────────────────────────────────────────────────────────────────
 export const leadsCol = col<Lead>('leads')
 export const quotesCol = col<Quote>('quotes')

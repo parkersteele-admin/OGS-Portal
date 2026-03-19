@@ -14,12 +14,12 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore'
 import { db } from '../lib/firebase'
-import { ordersCol, deliverySettingsRef } from '../lib/firestore'
-import type { Order, OrderStatus, DeliveryTier, DeliveryTierConfig, DeliverySettings } from '../types/order'
+import { ordersCol, deliverySettingsRef, routeScheduleRef, routeScheduleHistoryCol } from '../lib/firestore'
+import type { Order, OrderStatus, DeliveryTier, DeliveryTierConfig, DeliverySettings, RouteSchedule, AddOnItem } from '../types/order'
 import { DEFAULT_DELIVERY_SETTINGS } from '../types/order'
 import { serviceCall, fromSnap, paginate, type Page, type PageOptions, OgsValidationError } from './base'
 
-export type { DeliveryTierConfig, DeliverySettings }
+export type { DeliveryTierConfig, DeliverySettings, RouteSchedule, AddOnItem }
 
 export interface OrderFilters {
   customerId?: string
@@ -70,6 +70,54 @@ export async function updateDeliverySettings(settings: DeliverySettings): Promis
   return serviceCall(() =>
     setDoc(deliverySettingsRef, settings, { merge: true }),
   )
+}
+
+// ── Route Schedule ────────────────────────────────────────────────────────────
+
+/** Fetch the route schedule for a customer, or null if none exists. */
+export async function getRouteSchedule(customerId: string): Promise<RouteSchedule | null> {
+  return serviceCall(async () => {
+    const snap = await getDoc(routeScheduleRef(customerId))
+    if (!snap.exists()) return null
+    return snap.data() as RouteSchedule
+  })
+}
+
+/** Save (or replace) a customer's route schedule and write an audit log entry. */
+export async function updateRouteSchedule(
+  customerId: string,
+  schedule: Partial<RouteSchedule>,
+  updatedBy: string,
+): Promise<void> {
+  return serviceCall(async () => {
+    const now = serverTimestamp()
+    await setDoc(routeScheduleRef(customerId), { ...schedule, updatedBy, updatedAt: now }, { merge: true })
+    // Audit trail
+    await addDoc(routeScheduleHistoryCol(customerId), {
+      ...(schedule as RouteSchedule),
+      updatedBy,
+      updatedAt: now,
+    })
+  })
+}
+
+/**
+ * Add a la carte items to the next upcoming route order for the customer.
+ * Writes addOns onto the order doc and tags each item with who added them.
+ */
+export async function addOnToNextDelivery(
+  orderId: string,
+  items: Omit<AddOnItem, 'addedAt'>[],
+  addedBy: string,
+): Promise<void> {
+  return serviceCall(async () => {
+    const now = serverTimestamp()
+    const addOns: Omit<AddOnItem, 'addedAt'>[] = items.map((item) => ({ ...item, addedBy }))
+    await updateDoc(doc(db, 'orders', orderId), {
+      addOns: addOns.map((a) => ({ ...a, addedAt: now })),
+      updatedAt: now,
+    })
+  })
 }
 
 /** Generate a short human-readable order group ID. */
@@ -192,6 +240,7 @@ export async function createBatchOrders(
   items: CreateBatchOrderInput[],
   deliveryFee = 35,
   groupId?: string,
+  orderType: import('../types/order').OrderType = 'offRoute',
 ): Promise<string[]> {
   return serviceCall(async () => {
     const orderIds = await Promise.all(
@@ -209,6 +258,7 @@ export async function createBatchOrders(
           ...payload,
           ...pricing,
           ...(groupId ? { groupId } : {}),
+          orderType,
           status: 'pending' as OrderStatus,
           requestedAt: serverTimestamp(),
           createdAt: serverTimestamp(),

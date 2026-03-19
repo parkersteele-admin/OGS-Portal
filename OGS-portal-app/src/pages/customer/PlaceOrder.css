@@ -1150,3 +1150,125 @@
     max-width: none;
   }
 }
+
+/* ── Order type selector ─────────────────────────────────────────────────── */
+
+.po-order-type-selector {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.po-order-type-btn {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.po-order-type-btn:hover {
+  border-color: var(--color-text-2);
+}
+
+.po-order-type-btn--active {
+  border-color: var(--color-brand);
+  background: #fff6ef;
+  box-shadow: 0 0 0 1px rgba(232, 119, 34, 0.22);
+}
+
+.po-order-type-btn__label {
+  font-size: var(--font-size-13);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.po-order-type-btn__sub {
+  font-size: 11px;
+  color: var(--color-text-3);
+  line-height: 1.4;
+}
+
+@media (max-width: 600px) {
+  .po-order-type-selector {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Cadence + day pickers ───────────────────────────────────────────────── */
+
+.po-cadence-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.po-cadence-btn {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  cursor: pointer;
+  font-size: var(--font-size-13);
+  font-weight: 500;
+  color: var(--color-text-2);
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.po-cadence-btn--active {
+  border-color: var(--color-brand);
+  background: #fff6ef;
+  color: var(--color-brand-dark);
+  font-weight: 700;
+}
+
+.po-day-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+
+.po-day-btn {
+  padding: var(--space-2) 4px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-2);
+  text-align: center;
+}
+
+.po-day-btn--active {
+  border-color: var(--color-brand);
+  background: var(--color-brand);
+  color: #fff;
+}
+
+/* ── Review card warning variant ────────────────────────────────────────── */
+
+.po-review-card--warning {
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+
+.po-review-warning {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--font-size-13);
+  color: #92400e;
+  font-weight: 500;
+}
+
+@media (max-width: 767px) {
+  .po-cadence-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
