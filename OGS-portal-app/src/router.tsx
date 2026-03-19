@@ -124,7 +124,7 @@ export const Router: React.FC = () => (
       <Route
         path="/driver"
         element={
-          <ProtectedRoute role="driver">
+          <ProtectedRoute role={['driver', 'admin']}>
             <DriverLayout />
           </ProtectedRoute>
         }
