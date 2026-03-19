@@ -21,6 +21,7 @@ import {
   onSnapshot,
   type Unsubscribe,
 } from 'firebase/firestore'
+import { getAuth } from 'firebase/auth'
 import { db } from '../lib/firebase'
 import { productsCol, productPricingCol, auditLogCol } from '../lib/firestore'
 import { serviceCall } from './base'
@@ -78,6 +79,39 @@ function invalidateProductCaches(): void {
   dropdownCache = null
   dropdownCacheUntil = 0
   dropdownInflight = null
+}
+
+async function getCurrentRole(): Promise<string | null> {
+  const auth = getAuth()
+  const currentUser = auth.currentUser
+  if (!currentUser) return null
+
+  try {
+    const token = await currentUser.getIdTokenResult()
+    const role = token.claims.role
+    if (typeof role === 'string' && role) return role
+  } catch {
+    // Fall through to users/{uid} lookup if token claims are stale.
+  }
+
+  try {
+    const userSnap = await getDoc(doc(db, 'users', currentUser.uid))
+    if (userSnap.exists()) {
+      const role = (userSnap.data() as { role?: unknown }).role
+      if (typeof role === 'string' && role) return role
+    }
+  } catch {
+    // Ignore fallback read errors and fail closed below.
+  }
+
+  return null
+}
+
+async function assertAdminCatalogWrite(): Promise<void> {
+  const role = await getCurrentRole()
+  if (role !== 'admin') {
+    throw new Error('Only admins can modify the master product catalog.')
+  }
 }
 
 export function computeMinPrice(cost: number, minMarginPercent: number): number {
@@ -426,6 +460,8 @@ export function subscribeToProducts(
 /** Create a new product. */
 export async function createProduct(data: CreateProductInput): Promise<string> {
   return serviceCall(async () => {
+    await assertAdminCatalogWrite()
+
     const basePrice = parseFloat((data.basePrice ?? 0).toFixed(2))
     const cost = normalizeCost(data.cost, basePrice)
     const minMarginPercent = normalizeMarginPercent(data.minMarginPercent)
@@ -476,6 +512,8 @@ export async function updateProduct(
   changedByUid?: string,
 ): Promise<void> {
   return serviceCall(async () => {
+    await assertAdminCatalogWrite()
+
     const ref = doc(db, 'products', id)
     const pricingRef = doc(db, 'productPricing', id)
 
@@ -553,6 +591,8 @@ export async function updateProduct(
 /** Soft-delete (sets active=false). Admin only. */
 export async function deleteProduct(id: string): Promise<void> {
   return serviceCall(async () => {
+    await assertAdminCatalogWrite()
+
     await updateDoc(doc(db, 'products', id), {
       active: false,
       isVisible: false,
@@ -566,6 +606,8 @@ export async function deleteProduct(id: string): Promise<void> {
 /** Hard-delete. Use with caution. */
 export async function hardDeleteProduct(id: string): Promise<void> {
   return serviceCall(async () => {
+    await assertAdminCatalogWrite()
+
     await deleteDoc(doc(db, 'products', id))
     invalidateProductCaches()
   })
@@ -579,6 +621,8 @@ export async function batchUpdateSortOrder(
   updates: Array<{ id: string; sortOrder: number }>,
 ): Promise<void> {
   return serviceCall(async () => {
+    await assertAdminCatalogWrite()
+
     const batch = writeBatch(db)
     for (const { id, sortOrder } of updates) {
       batch.update(doc(db, 'products', id), { sortOrder, updatedAt: serverTimestamp() })
@@ -596,6 +640,8 @@ export async function toggleProductField(
   field: 'isVisible' | 'isFeatured',
 ): Promise<boolean> {
   return serviceCall(async () => {
+    await assertAdminCatalogWrite()
+
     const ref = doc(db, 'products', id)
     const snap = await getDoc(ref)
     if (!snap.exists()) throw new Error(`Product ${id} not found`)

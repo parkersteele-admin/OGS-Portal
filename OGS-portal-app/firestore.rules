@@ -236,14 +236,15 @@ service cloud.firestore {
     match /products/{productId} {
       allow read:   if isAuthenticated();
       allow create: if isAdmin() && hasNoInternalPricingFields();
-      allow update: if isSales() && hasNoInternalPricingFields();   // admin + sales can edit prices, visibility, etc.
+      allow update: if isAdmin() && hasNoInternalPricingFields();
       allow delete: if isAdmin();
     }
 
 
     // ── Internal product pricing (cost/margin controls) ─────────────────────
     match /productPricing/{productId} {
-      allow read, write: if isSales();
+      allow read: if isSales();
+      allow write: if isAdmin();
     }
 
 

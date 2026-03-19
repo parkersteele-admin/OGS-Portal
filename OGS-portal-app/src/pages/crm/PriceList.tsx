@@ -333,7 +333,7 @@ const SlideOver: React.FC<SlideOverProps> = ({ initial, onClose, onSaved }) => {
 interface RowProps {
   product: Product
   uid: string
-  isAdmin: boolean
+  canManageCatalog: boolean
   onPriceSaved: (id: string, field: string, val: number) => void
   onToggleVisible: (id: string) => void
   onToggleFeatured: (id: string) => void
@@ -342,7 +342,7 @@ interface RowProps {
 }
 
 const ProductRow: React.FC<RowProps> = ({
-  product, uid, isAdmin, onPriceSaved, onToggleVisible, onToggleFeatured, onEdit, onDelete,
+  product, uid, canManageCatalog, onPriceSaved, onToggleVisible, onToggleFeatured, onEdit, onDelete,
 }) => {
   const [togglingVisible,  setTogglingVisible]  = useState(false)
   const [togglingFeatured, setTogglingFeatured] = useState(false)
@@ -354,6 +354,7 @@ const ProductRow: React.FC<RowProps> = ({
   const isBelowMin = product.basePrice + 0.0001 < minPrice
 
   async function handleToggleVisible() {
+    if (!canManageCatalog) return
     if (togglingVisible) return
     if (!product.isVisible) {
       if (!confirm(`Make "${product.name}" visible to customers?`)) return
@@ -369,6 +370,7 @@ const ProductRow: React.FC<RowProps> = ({
   }
 
   async function handleToggleFeatured() {
+    if (!canManageCatalog) return
     if (togglingFeatured) return
     setTogglingFeatured(true)
     try {
@@ -390,56 +392,66 @@ const ProductRow: React.FC<RowProps> = ({
         {product.sizeLabel && <div className="pl-size">{product.sizeLabel}</div>}
       </td>
       <td className="pl-cell pl-cell--price">
-        <PriceCell value={product.basePrice} productId={product.id} field="basePrice" changedByUid={uid} onSaved={onPriceSaved} />
+        {canManageCatalog
+          ? <PriceCell value={product.basePrice} productId={product.id} field="basePrice" changedByUid={uid} onSaved={onPriceSaved} />
+          : <span>{fmt(product.basePrice)}</span>}
       </td>
-      <td className="pl-cell pl-cell--cost">
-        <PriceCell value={cost} productId={product.id} field="cost" changedByUid={uid} onSaved={onPriceSaved} />
-      </td>
-      <td className="pl-cell pl-cell--margin">
-        <PriceCell
-          value={minMarginPercent}
-          productId={product.id}
-          field="minMarginPercent"
-          changedByUid={uid}
-          onSaved={onPriceSaved}
-          format="percent"
-        />
-      </td>
-      <td className={`pl-cell pl-cell--margin-info${isBelowMin ? ' pl-cell--warn' : ''}`}>
-        <div className="pl-margin-stack">
-          <span>Base margin: {fmtPct(marginAtBase)}</span>
-          <span className="pl-muted">Min price: {fmt(minPrice)}</span>
-        </div>
-      </td>
+      {canManageCatalog && (
+        <>
+          <td className="pl-cell pl-cell--cost">
+            <PriceCell value={cost} productId={product.id} field="cost" changedByUid={uid} onSaved={onPriceSaved} />
+          </td>
+          <td className="pl-cell pl-cell--margin">
+            <PriceCell
+              value={minMarginPercent}
+              productId={product.id}
+              field="minMarginPercent"
+              changedByUid={uid}
+              onSaved={onPriceSaved}
+              format="percent"
+            />
+          </td>
+          <td className={`pl-cell pl-cell--margin-info${isBelowMin ? ' pl-cell--warn' : ''}`}>
+            <div className="pl-margin-stack">
+              <span>Base margin: {fmtPct(marginAtBase)}</span>
+              <span className="pl-muted">Min price: {fmt(minPrice)}</span>
+            </div>
+          </td>
+        </>
+      )}
       <td className="pl-cell pl-cell--rental">
-        {product.rentalPrice != null
+        {product.rentalPrice != null && canManageCatalog
           ? <PriceCell value={product.rentalPrice} productId={product.id} field="rentalPrice" changedByUid={uid} onSaved={onPriceSaved} />
-          : <span className="pl-muted">—</span>
+          : <span className="pl-muted">{product.rentalPrice != null ? fmt(product.rentalPrice) : '—'}</span>
         }
       </td>
-      <td className="pl-cell pl-cell--toggle">
-        <Toggle
-          checked={product.isVisible}
-          onChange={handleToggleVisible}
-          label={`${product.isVisible ? 'Hide' : 'Show'} ${product.name}`}
-          disabled={togglingVisible}
-        />
-      </td>
-      <td className="pl-cell pl-cell--toggle">
-        <Toggle
-          checked={product.isFeatured}
-          onChange={handleToggleFeatured}
-          label={`${product.isFeatured ? 'Unfeature' : 'Feature'} ${product.name}`}
-          disabled={togglingFeatured || !product.isVisible}
-        />
-      </td>
+      {canManageCatalog && (
+        <>
+          <td className="pl-cell pl-cell--toggle">
+            <Toggle
+              checked={product.isVisible}
+              onChange={handleToggleVisible}
+              label={`${product.isVisible ? 'Hide' : 'Show'} ${product.name}`}
+              disabled={togglingVisible}
+            />
+          </td>
+          <td className="pl-cell pl-cell--toggle">
+            <Toggle
+              checked={product.isFeatured}
+              onChange={handleToggleFeatured}
+              label={`${product.isFeatured ? 'Unfeature' : 'Feature'} ${product.name}`}
+              disabled={togglingFeatured || !product.isVisible}
+            />
+          </td>
+        </>
+      )}
       <td className="pl-cell pl-cell--updated pl-muted">{fmtDate(product.updatedAt as Parameters<typeof fmtDate>[0])}</td>
-      <td className="pl-cell pl-cell--actions">
-        <button className="pl-action-btn" onClick={() => onEdit(product)} title="Edit product" aria-label={`Edit ${product.name}`}>✎</button>
-        {isAdmin && (
+      {canManageCatalog && (
+        <td className="pl-cell pl-cell--actions">
+          <button className="pl-action-btn" onClick={() => onEdit(product)} title="Edit product" aria-label={`Edit ${product.name}`}>✎</button>
           <button className="pl-action-btn pl-action-btn--danger" onClick={() => onDelete(product)} title="Archive product" aria-label={`Archive ${product.name}`}>✕</button>
-        )}
-      </td>
+        </td>
+      )}
     </tr>
   )
 }
@@ -449,6 +461,7 @@ const ProductRow: React.FC<RowProps> = ({
 const PriceList: React.FC = () => {
   const { user, realUser, isAdmin } = useAuth()
   const uid = realUser?.id ?? user?.id ?? ''
+  const canManageCatalog = isAdmin
 
   const [products,    setProducts]    = useState<Product[]>([])
   const [loading,     setLoading]     = useState(true)
@@ -514,12 +527,14 @@ const PriceList: React.FC = () => {
   }, [])
 
   async function handleDelete(p: Product) {
+    if (!canManageCatalog) return
     if (!confirm(`Archive "${p.name}"? It will be hidden from all views but data is preserved.`)) return
     await deleteProduct(p.id)
     setProducts((prev) => prev.filter((x) => x.id !== p.id))
   }
 
   async function handleSeed() {
+    if (!canManageCatalog) return
     if (!confirm('Load Columbus market starter products? Existing products will not be overwritten.')) return
     setSeeding(true)
     setSeedMsg('')
@@ -539,15 +554,19 @@ const PriceList: React.FC = () => {
       <div className="pl-header">
         <div className="pl-header__left">
           <h1 className="pl-title">Price List</h1>
-          <p className="pl-subtitle">{products.length} products · base price, cost, and min margin enforced inline</p>
+          <p className="pl-subtitle">
+            {canManageCatalog
+              ? `${products.length} products · base price, cost, and min margin enforced inline`
+              : `${products.length} products · read-only pricing reference`}
+          </p>
         </div>
         <div className="pl-header__actions">
-          {isAdmin && (
+          {canManageCatalog && (
             <Button variant="secondary" onClick={handleSeed} disabled={seeding} size="sm">
               {seeding ? 'Seeding…' : 'Load Seed Data'}
             </Button>
           )}
-          <Button onClick={() => setSlideOver('new')} size="sm">+ Add Product</Button>
+          {canManageCatalog && <Button onClick={() => setSlideOver('new')} size="sm">+ Add Product</Button>}
         </div>
       </div>
 
@@ -594,14 +613,14 @@ const PriceList: React.FC = () => {
                     <th className="pl-th">SKU</th>
                     <th className="pl-th">Product</th>
                     <th className="pl-th">Base Price</th>
-                    <th className="pl-th">Cost</th>
-                    <th className="pl-th">Min Margin %</th>
-                    <th className="pl-th">Margin @ Base</th>
+                    {canManageCatalog && <th className="pl-th">Cost</th>}
+                    {canManageCatalog && <th className="pl-th">Min Margin %</th>}
+                    {canManageCatalog && <th className="pl-th">Margin @ Base</th>}
                     <th className="pl-th">Rental/mo</th>
-                    <th className="pl-th" title="Customer visible">Visible</th>
-                    <th className="pl-th" title="Show Popular badge">Featured</th>
+                    {canManageCatalog && <th className="pl-th" title="Customer visible">Visible</th>}
+                    {canManageCatalog && <th className="pl-th" title="Show Popular badge">Featured</th>}
                     <th className="pl-th">Updated</th>
-                    <th className="pl-th" />
+                    {canManageCatalog && <th className="pl-th" />}
                   </tr>
                 </thead>
                 <tbody>
@@ -610,11 +629,11 @@ const PriceList: React.FC = () => {
                       key={p.id}
                       product={p}
                       uid={uid}
-                      isAdmin={isAdmin}
+                      canManageCatalog={canManageCatalog}
                       onPriceSaved={optimisticUpdate}
                       onToggleVisible={(id) => optimisticToggle(id, 'isVisible')}
                       onToggleFeatured={(id) => optimisticToggle(id, 'isFeatured')}
-                      onEdit={(prod) => setSlideOver(prod)}
+                      onEdit={(prod) => canManageCatalog && setSlideOver(prod)}
                       onDelete={handleDelete}
                     />
                   ))}
@@ -626,7 +645,7 @@ const PriceList: React.FC = () => {
       )}
 
       {/* Slide-over */}
-      {slideOver !== null && (
+      {canManageCatalog && slideOver !== null && (
         <SlideOver
           initial={slideOver === 'new' ? null : slideOver}
           onClose={() => setSlideOver(null)}
