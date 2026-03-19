@@ -119,19 +119,21 @@ service cloud.firestore {
     match /tanks/{tankId} {
       allow read:  if isDispatch() || isDriver()
         || (isCustomer() && resource.data.customerId == linkedCustomerId());
-      // Drivers can only update their own on_truck tanks or return deployed tanks
+      // Drivers can update tanks for load check-in, delivery, and return.
       allow update: if isDispatch()
         || (isDriver() && (
-          // Loading available → on_truck (their driverId)
-          (resource.data.status == 'available' && request.resource.data.status == 'on_truck'
+          // Loading any non-deployed tank onto their truck (available, returned, inspection → on_truck)
+          (request.resource.data.status == 'on_truck'
            && request.resource.data.driverId == request.auth.uid)
-          // Delivering on_truck → deployed
+          // Delivering on_truck → deployed (their truck only)
           || (resource.data.status == 'on_truck' && resource.data.driverId == request.auth.uid
               && request.resource.data.status == 'deployed')
           // Checking in deployed → returned
           || (resource.data.status == 'deployed' && request.resource.data.status == 'returned')
         ));
-      allow create, delete: if isDispatch();
+      // Drivers may create new tank docs for unknown tanks scanned during load check-in
+      allow create: if isDispatch() || isDriver();
+      allow delete: if isDispatch();
 
       match /events/{eventId} {
         allow read:  if isDispatch() || isDriver()
@@ -171,6 +173,25 @@ service cloud.firestore {
           || (isDriver()
               && get(/databases/$(database)/documents/runs/$(runId)).data.driverId
                  == request.auth.uid);
+      }
+
+      // Truck load manifest (subcollection written by QR scan check-in)
+      match /manifest/{cylinderId} {
+        allow read:   if isDispatch() || isDriver();
+        allow create: if isDispatch() || isDriver();
+        allow update: if isDispatch()
+          || (isDriver()
+              && get(/databases/$(database)/documents/runs/$(runId)).data.driverId
+                 == request.auth.uid);
+        allow delete: if isDispatch();
+      }
+
+      // Missing-cylinder flags raised by drivers during load check-in
+      match /flags/{flagId} {
+        allow read:   if isDispatch() || isDriver();
+        allow create: if isDispatch() || isDriver();
+        allow update: if isDispatch();
+        allow delete: if isDispatch();
       }
     }
 
@@ -239,6 +260,19 @@ service cloud.firestore {
       allow read, write: if isSales();
     }
 
+
+    // ── Cylinders (physical asset registry) ──────────────────────────────────
+    // Drivers need read access to validate scanned QR codes and write access
+    // to update status during truck load check-in and delivery.
+    match /cylinders/{cylinderId} {
+      allow read:   if isDispatch() || isDriver();
+      allow create: if isDispatch() || isDriver();
+      allow update: if isDispatch()
+        || (isDriver() && onlyUpdatesFields([
+          'status', 'currentRunId', 'lastScannedAt', 'lastScannedBy', 'updatedAt'
+        ]));
+      allow delete: if isDispatch();
+    }
 
     // ── Deny everything else ──────────────────────────────────────────────────
     match /{document=**} {
