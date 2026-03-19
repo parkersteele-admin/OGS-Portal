@@ -22,28 +22,34 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
+          cache-dependency-path: OGS-portal-app/package-lock.json
 
       - name: Cache node_modules
         uses: actions/cache@v4
         with:
-          path: node_modules
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          path: OGS-portal-app/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('OGS-portal-app/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-node-
 
       - name: Install dependencies
+        working-directory: OGS-portal-app
         run: npm ci
 
       - name: Run ESLint
+        working-directory: OGS-portal-app
         run: npm run lint
 
       - name: TypeScript type check
+        working-directory: OGS-portal-app
         run: npm run typecheck || true
 
       - name: Run Vitest unit tests
+        working-directory: OGS-portal-app
         run: npm run test
 
       - name: Build Vite app
+        working-directory: OGS-portal-app
         run: npm run build
 
     env:

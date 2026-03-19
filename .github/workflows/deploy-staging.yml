@@ -17,11 +17,14 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
+          cache-dependency-path: OGS-portal-app/package-lock.json
 
       - name: Install dependencies
+        working-directory: OGS-portal-app
         run: npm ci
 
       - name: Build Vite app (staging)
+        working-directory: OGS-portal-app
         env:
           VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
           VITE_STRIPE_PUBLISHABLE_KEY: ${{ secrets.VITE_STRIPE_PUBLISHABLE_KEY }}
@@ -29,12 +32,14 @@ jobs:
         run: npm run build
 
       - name: Deploy to Firebase Hosting preview channel
+        working-directory: OGS-portal-app
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_STAGING }}
         run: |
           npx firebase-tools hosting:channel:deploy preview --project ogs-portal --token "$FIREBASE_SERVICE_ACCOUNT"
 
       - name: Deploy Firebase Functions (if changed)
+        working-directory: OGS-portal-app
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_STAGING }}
         run: |
