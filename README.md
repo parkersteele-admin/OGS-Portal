@@ -4,6 +4,13 @@
 
 **Stack:** React + Vite, Firebase (Auth, Firestore, Hosting, Functions, Storage)
 
+## Repository And App Roots
+
+- Git root: this folder (`OGS-Portal`)
+- App root: `OGS-portal-app`
+- Run git commands from the git root.
+- Run npm/firebase build and deploy commands from `OGS-portal-app` unless using root GitHub Actions.
+
 ## Setup Instructions
 
 *To be added: step-by-step setup for local, GitHub, and Firebase workflows.*
@@ -11,25 +18,14 @@
 ## Branch Strategy
 
 ```
-main      ← production only (protected, PR + review required)
+main   ← production deploy (app.ohiogassupply.com)
   ↑
-staging   ← pre-production (merges from develop)
-  ↑
-develop   ← active development branch
+dev    ← staging/preview deploy
 ```
 
-## Branch Strategy Diagram
+## Deploy Flow
 
-```
-          ┌─────────────┐
-          │   main      │
-          └─────▲───────┘
-                │
-          ┌─────┴───────┐
-          │  staging    │
-          └─────▲───────┘
-                │
-          ┌─────┴───────┐
-          │  develop    │
-          └─────────────┘
-```
+- GitHub Actions only uses workflows in `.github/workflows` at the git root.
+- `main` triggers production deploy workflow.
+- `dev` triggers staging deploy workflow.
+- Do not duplicate workflow files under `OGS-portal-app/.github/workflows`.

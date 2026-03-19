@@ -4,6 +4,13 @@
 
 Multi-portal web application built with React, TypeScript, Vite, and Firebase.
 
+## Working Directory Rules
+
+- This folder (`OGS-portal-app`) is the app root.
+- The git root is one level above (`OGS-Portal`).
+- Run app commands (`npm run dev`, `npm run build`, `firebase ...`) from this folder.
+- Run git branch/commit/merge commands from the git root folder.
+
 ## Development
 
 ```bash
