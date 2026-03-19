@@ -136,6 +136,14 @@
   background: var(--color-bg-3);
 }
 
+.pc-category__header--static {
+  cursor: default;
+  pointer-events: none;
+}
+.pc-category__header--static:hover {
+  background: var(--color-bg-2);
+}
+
 .pc-category__title {
   font-size: var(--font-size-12);
   font-weight: 700;
@@ -154,6 +162,15 @@
 .pc-category__count {
   font-size: var(--font-size-11);
   color: var(--color-text-3);
+}
+
+.pc-category__count--recent {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  font-weight: 700;
 }
 
 .pc-category__chevron {

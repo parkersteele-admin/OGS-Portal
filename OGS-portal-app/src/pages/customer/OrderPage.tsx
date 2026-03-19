@@ -2,24 +2,29 @@
  * src/pages/customer/OrderPage.tsx
  *
  * Customer portal — multi-item order builder
+ * Step 0: Build your order (list view, recently ordered, no Fees)
+ * Step 1: Delivery details (tier + date + notes)
+ * Step 2: Review & confirm → single grouped order ID
  */
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react'
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { getDocs, query, where } from 'firebase/firestore'
-import { productsCol, customerTanksCol } from '../../lib/firestore'
+import { getDocs, query, where, orderBy, limit } from 'firebase/firestore'
+import { productsCol, customerTanksCol, ordersCol } from '../../lib/firestore'
 import { useAuth } from '../../hooks/useAuth'
 import { useCustomer } from '../../hooks/queries'
 import {
   createBatchOrders,
-  calculateOrderPricing,
+  getDeliverySettings,
+  generateGroupId,
 } from '../../services/orderService'
 import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
 import type { Product } from '../../types/product'
 import type { Tank } from '../../types/tank'
-import type { DeliveryTier } from '../../types/order'
+import type { DeliveryTier, DeliverySettings } from '../../types/order'
+import { DEFAULT_DELIVERY_SETTINGS } from '../../types/order'
 import './PlaceOrder.css'
 
 interface OrderItem {
@@ -42,7 +47,6 @@ const INITIAL: WizardState = {
   notes: '',
 }
 
-const DELIVERY_FEE = 35
 const STEPS = ['Build your order', 'Delivery details', 'Review & confirm']
 
 function fmtCurrency(n: number) {
@@ -104,22 +108,25 @@ interface OrderSummaryData {
   total: number
 }
 
-function summarizeOrder(items: OrderItem[], products: Product[], tier: DeliveryTier): OrderSummaryData {
+function summarizeOrder(
+  items: OrderItem[],
+  products: Product[],
+  tier: DeliveryTier,
+  settings: DeliverySettings,
+): OrderSummaryData {
+  const config = settings[tier]
   const lines = items
     .map((item) => {
-      const product = products.find((entry) => entry.id === item.productId)
+      const product = products.find((p) => p.id === item.productId)
       if (!product) return null
-      const pricing = calculateOrderPricing(item.quantity, product.pricePerUnit, tier, 0)
-      return {
-        item,
-        product,
-        subtotal: pricing.subtotal,
-      }
+      const effectivePrice = product.pricePerUnit * (1 + config.upchargePercent)
+      const subtotal = parseFloat((effectivePrice * item.quantity).toFixed(2))
+      return { item, product, subtotal }
     })
     .filter((line): line is SummaryLine => line !== null)
 
   const subtotal = lines.reduce((sum, line) => sum + line.subtotal, 0)
-  const deliveryFee = lines.length > 0 ? DELIVERY_FEE : 0
+  const deliveryFee = lines.length > 0 ? config.deliveryFee : 0
 
   return {
     lines,
@@ -127,9 +134,11 @@ function summarizeOrder(items: OrderItem[], products: Product[], tier: DeliveryT
     unitsCount: items.reduce((sum, item) => sum + item.quantity, 0),
     subtotal,
     deliveryFee,
-    total: subtotal + deliveryFee,
+    total: parseFloat((subtotal + deliveryFee).toFixed(2)),
   }
 }
+
+// ── Progress bar ──────────────────────────────────────────────────────────────
 
 const ProgressBar: React.FC<{ step: number }> = ({ step }) => (
   <div className="po-progress" role="navigation" aria-label="Order steps">
@@ -146,6 +155,8 @@ const ProgressBar: React.FC<{ step: number }> = ({ step }) => (
     ))}
   </div>
 )
+
+// ── Quantity control ──────────────────────────────────────────────────────────
 
 interface QuantityControlProps {
   value: number
@@ -187,31 +198,50 @@ const QuantityControl: React.FC<QuantityControlProps> = ({ value, unitLabel, onC
   </div>
 )
 
-const TIER_INFO: Record<DeliveryTier, { label: string; hint: string; badge: string | null; badgeVariant: 'warning' | 'danger' | null }> = {
-  standard: {
-    label: 'Standard',
-    hint: 'Scheduled within the next 7 days',
-    badge: null,
-    badgeVariant: null,
-  },
-  'next-day': {
-    label: 'Next day',
-    hint: 'Delivered tomorrow',
-    badge: '+10% upcharge',
-    badgeVariant: 'warning',
-  },
-  'same-day': {
-    label: 'Same day',
-    hint: 'Subject to availability',
-    badge: '+25% upcharge',
-    badgeVariant: 'danger',
-  },
+// ── Tier meta & cards ─────────────────────────────────────────────────────────
+
+const TIER_META: Record<DeliveryTier, { label: string; hint: string }> = {
+  standard:   { label: 'Standard', hint: 'Scheduled within the next 7 days' },
+  'next-day': { label: 'Next day', hint: 'Delivered tomorrow' },
+  'same-day': { label: 'Same day', hint: 'Subject to availability' },
 }
+
+interface TierCardProps {
+  tier: DeliveryTier
+  settings: DeliverySettings
+  selected: boolean
+  onSelect: () => void
+}
+
+const TierCard: React.FC<TierCardProps> = ({ tier, settings, selected, onSelect }) => {
+  const meta = TIER_META[tier]
+  const config = settings[tier]
+  const upPct = config.upchargePercent
+
+  return (
+    <button
+      type="button"
+      className={`po-tier-card ${selected ? 'po-tier-card--selected' : ''}`}
+      onClick={onSelect}
+      aria-pressed={selected}
+    >
+      <div className="po-tier-card__top">
+        <span className="po-tier-card__label">{meta.label}</span>
+        {upPct > 0 && <Badge variant="warning">+{(upPct * 100).toFixed(0)}%</Badge>}
+      </div>
+      <span className="po-tier-card__hint">{meta.hint}</span>
+      <span className="po-tier-card__fee">{fmtCurrency(config.deliveryFee)} delivery fee</span>
+    </button>
+  )
+}
+
+// ── Order summary panel ───────────────────────────────────────────────────────
 
 interface OrderSummaryPanelProps {
   title: string
   summary: OrderSummaryData
   tier: DeliveryTier
+  settings: DeliverySettings
   emptyLabel: string
   continueLabel?: string
   continueDisabled?: boolean
@@ -223,263 +253,305 @@ interface OrderSummaryPanelProps {
 }
 
 const OrderSummaryPanel: React.FC<OrderSummaryPanelProps> = ({
-  title,
-  summary,
-  tier,
-  emptyLabel,
-  continueLabel,
-  continueDisabled,
-  continueLoading = false,
-  onContinue,
-  editable = false,
-  onQuantityChange,
-  onRemove,
-}) => (
-  <aside className="po-summary" aria-label="Order summary">
-    <div className="po-summary__inner">
-      <div className="po-summary__header">
-        <div>
-          <p className="po-summary__eyebrow">Order summary</p>
-          <h3 className="po-summary__title">{title}</h3>
+  title, summary, tier, settings, emptyLabel,
+  continueLabel, continueDisabled, continueLoading = false,
+  onContinue, editable = false, onQuantityChange, onRemove,
+}) => {
+  const config = settings[tier]
+  const upPct = config.upchargePercent
+
+  return (
+    <aside className="po-summary" aria-label="Order summary">
+      <div className="po-summary__inner">
+        <div className="po-summary__header">
+          <div>
+            <p className="po-summary__eyebrow">Order summary</p>
+            <h3 className="po-summary__title">{title}</h3>
+          </div>
+          <Badge variant="neutral">{summary.itemsCount} items</Badge>
         </div>
-        <Badge variant="neutral">{summary.itemsCount} items</Badge>
-      </div>
 
-      {summary.lines.length === 0 ? (
-        <div className="po-summary__empty">{emptyLabel}</div>
-      ) : (
-        <>
-          <div className="po-summary__meta">
-            <span>{summary.unitsCount} total units</span>
-            <span>{TIER_INFO[tier].label} delivery</span>
-          </div>
-
-          <div className="po-summary__list">
-            {summary.lines.map(({ item, product, subtotal }) => (
-              <div key={product.id} className="po-summary__line">
-                <div className="po-summary__line-top">
-                  <div>
-                    <p className="po-summary__line-name">{product.name}</p>
-                    <p className="po-summary__line-price">{fmtCurrency(product.pricePerUnit)} / {product.unit}</p>
-                  </div>
-                  <div className="po-summary__line-total">{fmtCurrency(subtotal)}</div>
-                </div>
-
-                {editable && onQuantityChange ? (
-                  <div className="po-summary__line-controls">
-                    <QuantityControl
-                      value={item.quantity}
-                      unitLabel={product.unit}
-                      compact
-                      onChange={(quantity) => onQuantityChange(product.id, normalizeQuantity(quantity))}
-                    />
-                    {onRemove && (
-                      <button
-                        type="button"
-                        className="po-summary__remove"
-                        onClick={() => onRemove(product.id)}
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="po-summary__line-meta">Qty {item.quantity} {product.unit}</div>
-                )}
+        {summary.lines.length === 0 ? (
+          <div className="po-summary__empty">{emptyLabel}</div>
+        ) : (
+          <>
+            <div className="po-summary__meta">
+              <span>{summary.unitsCount} total units</span>
+              <span>{TIER_META[tier].label} delivery</span>
+            </div>
+            {upPct > 0 && (
+              <div className="po-summary__upcharge-note">
+                +{(upPct * 100).toFixed(0)}% {TIER_META[tier].label.toLowerCase()} upcharge applied
               </div>
-            ))}
-          </div>
-
-          <div className="po-summary__totals">
-            <div className="po-summary__row">
-              <span>Products</span>
-              <span>{fmtCurrency(summary.subtotal)}</span>
+            )}
+            <div className="po-summary__list">
+              {summary.lines.map(({ item, product, subtotal }) => (
+                <div key={product.id} className="po-summary__line">
+                  <div className="po-summary__line-top">
+                    <div>
+                      <p className="po-summary__line-name">{product.name}</p>
+                      <p className="po-summary__line-price">{fmtCurrency(product.pricePerUnit)} / {product.unit}</p>
+                    </div>
+                    <div className="po-summary__line-total">{fmtCurrency(subtotal)}</div>
+                  </div>
+                  {editable && onQuantityChange ? (
+                    <div className="po-summary__line-controls">
+                      <QuantityControl
+                        value={item.quantity}
+                        unitLabel={product.unit}
+                        compact
+                        onChange={(quantity) => onQuantityChange(product.id, normalizeQuantity(quantity))}
+                      />
+                      {onRemove && (
+                        <button type="button" className="po-summary__remove" onClick={() => onRemove(product.id)}>
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="po-summary__line-meta">Qty {item.quantity} {product.unit}</div>
+                  )}
+                </div>
+              ))}
             </div>
-            <div className="po-summary__row">
-              <span>Delivery</span>
-              <span>{fmtCurrency(summary.deliveryFee)}</span>
+            <div className="po-summary__totals">
+              <div className="po-summary__row">
+                <span>Products</span><span>{fmtCurrency(summary.subtotal)}</span>
+              </div>
+              <div className="po-summary__row">
+                <span>Delivery</span><span>{fmtCurrency(summary.deliveryFee)}</span>
+              </div>
+              <div className="po-summary__row po-summary__row--total">
+                <span>Estimated total</span><span>{fmtCurrency(summary.total)}</span>
+              </div>
             </div>
-            <div className="po-summary__row po-summary__row--total">
-              <span>Estimated total</span>
-              <span>{fmtCurrency(summary.total)}</span>
-            </div>
-          </div>
+            {continueLabel && onContinue && (
+              <Button
+                variant="primary" size="lg" className="po-summary__cta"
+                disabled={continueDisabled} loading={continueLoading} onClick={onContinue}
+              >
+                {continueLabel}
+              </Button>
+            )}
+          </>
+        )}
+      </div>
+    </aside>
+  )
+}
 
-          {continueLabel && onContinue && (
-            <Button
-              variant="primary"
-              size="lg"
-              className="po-summary__cta"
-              disabled={continueDisabled}
-              loading={continueLoading}
-              onClick={onContinue}
-            >
-              {continueLabel}
-            </Button>
-          )}
-        </>
-      )}
-    </div>
-  </aside>
-)
+// ── Product list row ──────────────────────────────────────────────────────────
 
-interface ProductCardProps {
+interface ProductListRowProps {
   product: Product
   item?: OrderItem
   matchingTanks: Tank[]
+  isRecent?: boolean
   onToggle: (productId: string) => void
   onQuantityChange: (productId: string, quantity: number) => void
   onTankChange: (productId: string, tankId: string) => void
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({
-  product,
-  item,
-  matchingTanks,
-  onToggle,
-  onQuantityChange,
-  onTankChange,
+const ProductListRow: React.FC<ProductListRowProps> = ({
+  product, item, matchingTanks, isRecent = false,
+  onToggle, onQuantityChange, onTankChange,
 }) => {
-  const isSelected = !!item
+  const isAdded = !!item
 
   return (
-    <article className={`po-product-card ${isSelected ? 'po-product-card--selected' : ''}`}>
-      <div className="po-product-card__top">
-        <div>
-          <p className="po-product-card__eyebrow">{product.category}</p>
-          <h3 className="po-product-card__name">{product.name}</h3>
+    <div className={`po-list-row ${isAdded ? 'po-list-row--added' : ''}`}>
+      <div className="po-list-row__info">
+        <div className="po-list-row__name">
+          {product.name}
+          {product.isFeatured && <span className="po-list-row__badge po-list-row__badge--popular">Popular</span>}
+          {isRecent && !isAdded && <span className="po-list-row__badge po-list-row__badge--recent">Recent</span>}
         </div>
-        <button
-          type="button"
-          className={`po-product-card__action ${isSelected ? 'po-product-card__action--selected' : ''}`}
-          onClick={() => onToggle(product.id)}
-        >
-          {isSelected ? 'Selected' : 'Add item'}
-        </button>
-      </div>
-
-      {product.description && <p className="po-product-card__desc">{product.description}</p>}
-
-      <div className="po-product-card__meta">
-        <span className="po-product-card__price">{fmtCurrency(product.pricePerUnit)}</span>
-        <span className="po-product-card__unit">per {product.unit}</span>
-      </div>
-
-      {isSelected && item && (
-        <div className="po-product-card__builder">
-          <div className="po-product-card__field">
-            <span className="po-product-card__label">Quantity</span>
-            <QuantityControl
-              value={item.quantity}
-              unitLabel={product.unit}
-              onChange={(quantity) => onQuantityChange(product.id, normalizeQuantity(quantity))}
-            />
+        {(product.sku || product.sizeLabel || product.description) && (
+          <div className="po-list-row__meta">
+            {[product.sku, product.sizeLabel, product.description].filter(Boolean).join(' · ')}
           </div>
+        )}
+      </div>
 
-          {matchingTanks.length > 0 && (
-            <div className="po-product-card__field">
-              <span className="po-product-card__label">Tank association</span>
-              <div className="po-tank-select__list">
-                <button
-                  type="button"
-                  className={`po-tank-pill ${!item.tankId ? 'po-tank-pill--selected' : ''}`}
-                  onClick={() => onTankChange(product.id, '')}
-                >
-                  No specific tank
-                </button>
-                {matchingTanks.map((tank) => (
-                  <button
-                    key={tank.id}
-                    type="button"
-                    className={`po-tank-pill ${item.tankId === tank.id ? 'po-tank-pill--selected' : ''}`}
-                    onClick={() => onTankChange(product.id, tank.id)}
-                  >
-                    {tank.serialNumber}
-                    {tank.currentLevelPct !== undefined && (
-                      <span className="po-tank-pill__level"> · {tank.currentLevelPct}%</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+      <div className="po-list-row__price">
+        <span className="po-list-row__price-val">{fmtCurrency(product.pricePerUnit)}</span>
+        <span className="po-list-row__price-unit">/ {product.unit}</span>
+        {product.rentalPrice != null && product.rentalPrice > 0 && (
+          <span className="po-list-row__price-rental">+{fmtCurrency(product.rentalPrice)}/mo</span>
+        )}
+      </div>
+
+      {isAdded && item && (
+        <div className="po-list-row__qty">
+          <QuantityControl
+            value={item.quantity}
+            unitLabel={product.unit}
+            compact
+            onChange={(q) => onQuantityChange(product.id, normalizeQuantity(q))}
+          />
         </div>
       )}
-    </article>
-  )
-}
 
-interface TierCardProps {
-  tier: DeliveryTier
-  selected: boolean
-  onSelect: () => void
-}
-
-const TierCard: React.FC<TierCardProps> = ({ tier, selected, onSelect }) => {
-  const info = TIER_INFO[tier]
-
-  return (
-    <button
-      type="button"
-      className={`po-tier-card ${selected ? 'po-tier-card--selected' : ''}`}
-      onClick={onSelect}
-      aria-pressed={selected}
-    >
-      <div className="po-tier-card__top">
-        <span className="po-tier-card__label">{info.label}</span>
-        {info.badge && <Badge variant={info.badgeVariant ?? 'neutral'}>{info.badge}</Badge>}
+      <div className="po-list-row__action">
+        <button
+          type="button"
+          className={`po-list-row__btn ${isAdded ? 'po-list-row__btn--added' : ''}`}
+          onClick={() => onToggle(product.id)}
+        >
+          {isAdded ? '✓ Added' : 'Add item'}
+        </button>
+        {isAdded && (
+          <button type="button" className="po-list-row__remove" onClick={() => onToggle(product.id)}>
+            Remove
+          </button>
+        )}
       </div>
-      <span className="po-tier-card__hint">{info.hint}</span>
-    </button>
+
+      {isAdded && item && matchingTanks.length > 0 && (
+        <div className="po-list-row__tanks">
+          <span className="po-list-row__tanks-label">Tank:</span>
+          <div className="po-tank-select__list">
+            <button
+              type="button"
+              className={`po-tank-pill ${!item.tankId ? 'po-tank-pill--selected' : ''}`}
+              onClick={() => onTankChange(product.id, '')}
+            >
+              Any tank
+            </button>
+            {matchingTanks.map((tank) => (
+              <button
+                key={tank.id}
+                type="button"
+                className={`po-tank-pill ${item.tankId === tank.id ? 'po-tank-pill--selected' : ''}`}
+                onClick={() => onTankChange(product.id, tank.id)}
+              >
+                {tank.serialNumber}
+                {tank.currentLevelPct !== undefined && (
+                  <span className="po-tank-pill__level"> · {tank.currentLevelPct}%</span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
+
+// ── Step 1: Build order ───────────────────────────────────────────────────────
 
 interface Step1Props {
   products: Product[]
   tanks: Tank[]
   state: WizardState
+  recentProductIds: string[]
+  settings: DeliverySettings
   onToggleProduct: (productId: string) => void
   onQuantityChange: (productId: string, quantity: number) => void
   onTankChange: (productId: string, tankId: string) => void
   onNext: () => void
 }
 
+const CATEGORY_ORDER = ['CO₂ Cylinders', 'Nitrogen', 'Beer Gas', 'Propane', 'Rentals']
+
 const Step1: React.FC<Step1Props> = ({
-  products,
-  tanks,
-  state,
-  onToggleProduct,
-  onQuantityChange,
-  onTankChange,
-  onNext,
+  products, tanks, state, recentProductIds, settings,
+  onToggleProduct, onQuantityChange, onTankChange, onNext,
 }) => {
-  const summary = useMemo(() => summarizeOrder(state.items, products, state.tier), [state.items, products, state.tier])
+  const summary = useMemo(
+    () => summarizeOrder(state.items, products, state.tier, settings),
+    [state.items, products, state.tier, settings],
+  )
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+
+  // Fees category hidden — admin/sales add those directly
+  const visibleProducts = useMemo(() => products.filter((p) => p.category !== 'Fees'), [products])
+
+  const recentProducts = useMemo(() => {
+    const seen = new Set<string>()
+    return recentProductIds
+      .map((id) => visibleProducts.find((p) => p.id === id))
+      .filter((p): p is Product => !!p && !seen.has(p.id) && (seen.add(p.id), true))
+      .slice(0, 6)
+  }, [recentProductIds, visibleProducts])
+
+  const grouped = useMemo(() => {
+    const result: Record<string, Product[]> = {}
+    for (const cat of CATEGORY_ORDER) {
+      const rows = visibleProducts.filter((p) => p.category === cat)
+      if (rows.length) result[cat] = rows
+    }
+    const extraCats = [...new Set(visibleProducts.map((p) => p.category))].filter((c) => !CATEGORY_ORDER.includes(c))
+    for (const cat of extraCats) result[cat] = visibleProducts.filter((p) => p.category === cat)
+    return result
+  }, [visibleProducts])
+
+  const toggleCategory = useCallback((cat: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      next.has(cat) ? next.delete(cat) : next.add(cat)
+      return next
+    })
+  }, [])
+
+  function renderRow(product: Product, forceRecent = false) {
+    const item = state.items.find((i) => i.productId === product.id)
+    return (
+      <ProductListRow
+        key={product.id}
+        product={product}
+        item={item}
+        matchingTanks={matchingTanksForProduct(product, tanks)}
+        isRecent={forceRecent}
+        onToggle={onToggleProduct}
+        onQuantityChange={onQuantityChange}
+        onTankChange={onTankChange}
+      />
+    )
+  }
 
   return (
     <section className="po-builder">
       <div className="po-builder__main">
         <div className="po-step-heading">
           <h2 className="po-step__title">Build your order</h2>
-          <p className="po-step__sub">Add multiple products, set quantities, and associate tanks where needed.</p>
+          <p className="po-step__sub">Add products, set quantities, and associate tanks where needed.</p>
         </div>
 
-        <div className="po-product-grid">
-          {products.map((product) => {
-            const item = state.items.find((entry) => entry.productId === product.id)
-            const matchingTanks = matchingTanksForProduct(product, tanks)
+        <div className="po-product-list">
+          {recentProducts.length > 0 && (
+            <div className="po-list-section">
+              <div className="po-list-section__header">
+                <span className="po-list-section__title">Recently ordered</span>
+                <span className="po-list-section__badge">Quick add</span>
+              </div>
+              <div className="po-list-section__rows">
+                {recentProducts.map((p) => renderRow(p, true))}
+              </div>
+            </div>
+          )}
 
-            return (
-              <ProductCard
-                key={product.id}
-                product={product}
-                item={item}
-                matchingTanks={matchingTanks}
-                onToggle={onToggleProduct}
-                onQuantityChange={onQuantityChange}
-                onTankChange={onTankChange}
-              />
-            )
-          })}
+          {Object.entries(grouped).map(([cat, rows]) => (
+            <div key={cat} className="po-list-section">
+              <button
+                type="button"
+                className="po-list-section__header po-list-section__header--toggle"
+                onClick={() => toggleCategory(cat)}
+                aria-expanded={!collapsed.has(cat)}
+              >
+                <span className="po-list-section__title">{cat}</span>
+                <div className="po-list-section__right">
+                  <span className="po-list-section__count">{rows.length} item{rows.length !== 1 ? 's' : ''}</span>
+                  <span className="po-list-section__chevron">{collapsed.has(cat) ? '▸' : '▾'}</span>
+                </div>
+              </button>
+              {!collapsed.has(cat) && (
+                <div className="po-list-section__rows">
+                  {rows.map((p) => renderRow(p))}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       </div>
 
@@ -487,7 +559,8 @@ const Step1: React.FC<Step1Props> = ({
         title="Current build"
         summary={summary}
         tier={state.tier}
-        emptyLabel="Select at least one product to start building the order."
+        settings={settings}
+        emptyLabel="Add at least one product to start building the order."
         continueLabel="Continue to delivery"
         continueDisabled={summary.lines.length === 0}
         onContinue={onNext}
@@ -499,9 +572,12 @@ const Step1: React.FC<Step1Props> = ({
   )
 }
 
+// ── Step 2: Delivery details ──────────────────────────────────────────────────
+
 interface Step2Props {
   products: Product[]
   state: WizardState
+  settings: DeliverySettings
   onChange: (patch: Partial<WizardState>) => void
   onQuantityChange: (productId: string, quantity: number) => void
   onRemoveItem: (productId: string) => void
@@ -510,15 +586,12 @@ interface Step2Props {
 }
 
 const Step2: React.FC<Step2Props> = ({
-  products,
-  state,
-  onChange,
-  onQuantityChange,
-  onRemoveItem,
-  onBack,
-  onNext,
+  products, state, settings, onChange, onQuantityChange, onRemoveItem, onBack, onNext,
 }) => {
-  const summary = useMemo(() => summarizeOrder(state.items, products, state.tier), [state.items, products, state.tier])
+  const summary = useMemo(
+    () => summarizeOrder(state.items, products, state.tier, settings),
+    [state.items, products, state.tier, settings],
+  )
   const { min: dateMin, max: dateMax } = dateConstraints(state.tier)
 
   const canProceed =
@@ -527,8 +600,7 @@ const Step2: React.FC<Step2Props> = ({
     state.scheduledDate <= dateMax
 
   const handleTierSelect = (tier: DeliveryTier) => {
-    const { min } = dateConstraints(tier)
-    onChange({ tier, scheduledDate: min })
+    onChange({ tier, scheduledDate: dateConstraints(tier).min })
   }
 
   return (
@@ -536,7 +608,7 @@ const Step2: React.FC<Step2Props> = ({
       <div className="po-builder__main po-builder__main--details">
         <div className="po-step-heading">
           <h2 className="po-step__title">Delivery details</h2>
-          <p className="po-step__sub">Set fulfillment speed, requested date, and operational notes for the full order.</p>
+          <p className="po-step__sub">Set fulfillment speed, requested date, and any notes for this order.</p>
         </div>
 
         <div className="po-section-card">
@@ -547,6 +619,7 @@ const Step2: React.FC<Step2Props> = ({
                 <TierCard
                   key={tier}
                   tier={tier}
+                  settings={settings}
                   selected={state.tier === tier}
                   onSelect={() => handleTierSelect(tier)}
                 />
@@ -569,7 +642,9 @@ const Step2: React.FC<Step2Props> = ({
           </div>
 
           <div className="po-field-group">
-            <label className="po-label" htmlFor="po-notes">Order notes <span className="po-optional">(optional)</span></label>
+            <label className="po-label" htmlFor="po-notes">
+              Order notes <span className="po-optional">(optional)</span>
+            </label>
             <textarea
               id="po-notes"
               className="po-textarea"
@@ -590,6 +665,7 @@ const Step2: React.FC<Step2Props> = ({
         title="Ready for review"
         summary={summary}
         tier={state.tier}
+        settings={settings}
         emptyLabel="Your order is empty."
         continueLabel="Review and confirm"
         continueDisabled={!canProceed}
@@ -602,29 +678,37 @@ const Step2: React.FC<Step2Props> = ({
   )
 }
 
+// ── Step 3: Review & confirm ──────────────────────────────────────────────────
+
 interface Step3Props {
   products: Product[]
   state: WizardState
+  settings: DeliverySettings
   customerId: string
   tanks: Tank[]
+  groupId: string
   onBack: () => void
-  onConfirm: (orderIds: string[]) => void
+  onConfirm: (groupId: string) => void
 }
 
-const Step3: React.FC<Step3Props> = ({ products, state, customerId, tanks, onBack, onConfirm }) => {
+const Step3: React.FC<Step3Props> = ({ products, state, settings, customerId, tanks, groupId, onBack, onConfirm }) => {
   const { data: customer } = useCustomer(customerId)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const summary = useMemo(() => summarizeOrder(state.items, products, state.tier), [state.items, products, state.tier])
+  const summary = useMemo(
+    () => summarizeOrder(state.items, products, state.tier, settings),
+    [state.items, products, state.tier, settings],
+  )
+  const tierMeta = TIER_META[state.tier]
+  const tierConfig = settings[state.tier]
+  const upPct = tierConfig.upchargePercent
 
   const handleSubmit = async () => {
     if (!customerId || summary.lines.length === 0) return
-
     setSubmitting(true)
     setError(null)
-
     try {
-      const ids = await createBatchOrders(
+      await createBatchOrders(
         summary.lines.map(({ item, product }) => ({
           customerId,
           productId: product.id,
@@ -634,9 +718,10 @@ const Step3: React.FC<Step3Props> = ({ products, state, customerId, tanks, onBac
           notes: state.notes || undefined,
           unitPrice: product.pricePerUnit,
         })),
-        DELIVERY_FEE,
+        tierConfig.deliveryFee,
+        groupId,
       )
-      onConfirm(ids)
+      onConfirm(groupId)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to place order. Please try again.')
       setSubmitting(false)
@@ -652,7 +737,7 @@ const Step3: React.FC<Step3Props> = ({ products, state, customerId, tanks, onBac
       <div className="po-builder__main po-builder__main--review">
         <div className="po-step-heading">
           <h2 className="po-step__title">Review and confirm</h2>
-          <p className="po-step__sub">Validate the line items and delivery plan before submitting the order set.</p>
+          <p className="po-step__sub">Check the line items and delivery plan before submitting.</p>
         </div>
 
         <div className="po-review-card">
@@ -660,14 +745,17 @@ const Step3: React.FC<Step3Props> = ({ products, state, customerId, tanks, onBac
             <p className="po-review-section__label">Line items</p>
             <div className="po-review-list">
               {summary.lines.map(({ item, product, subtotal }) => {
-                const tank = tanks.find((entry) => entry.id === item.tankId)
-
+                const tank = tanks.find((t) => t.id === item.tankId)
                 return (
                   <div key={product.id} className="po-review-list__item">
                     <div>
                       <p className="po-review-list__name">{product.name}</p>
-                      <p className="po-review-list__meta">{item.quantity} {product.unit} · {fmtCurrency(product.pricePerUnit)} / {product.unit}</p>
-                      {tank && <p className="po-review-list__meta">Tank {tank.serialNumber}</p>}
+                      <p className="po-review-list__meta">
+                        {item.quantity} {product.unit} · {fmtCurrency(product.pricePerUnit)}/{product.unit}
+                        {upPct > 0 && ` (+${(upPct * 100).toFixed(0)}%)`}
+                      </p>
+                      {product.sku && <p className="po-review-list__meta">SKU: {product.sku}</p>}
+                      {tank && <p className="po-review-list__meta">Tank: {tank.serialNumber}</p>}
                     </div>
                     <div className="po-review-list__total">{fmtCurrency(subtotal)}</div>
                   </div>
@@ -681,11 +769,13 @@ const Step3: React.FC<Step3Props> = ({ products, state, customerId, tanks, onBac
           <div className="po-review-row">
             <span className="po-review-label">Delivery tier</span>
             <span className="po-review-value">
-              {TIER_INFO[state.tier].label}
-              {TIER_INFO[state.tier].badge && (
-                <Badge variant={TIER_INFO[state.tier].badgeVariant ?? 'neutral'}>{TIER_INFO[state.tier].badge}</Badge>
-              )}
+              {tierMeta.label}
+              {upPct > 0 && <Badge variant="warning">+{(upPct * 100).toFixed(0)}%</Badge>}
             </span>
+          </div>
+          <div className="po-review-row">
+            <span className="po-review-label">Delivery fee</span>
+            <span className="po-review-value">{fmtCurrency(tierConfig.deliveryFee)}</span>
           </div>
           <div className="po-review-row">
             <span className="po-review-label">Requested date</span>
@@ -701,6 +791,10 @@ const Step3: React.FC<Step3Props> = ({ products, state, customerId, tanks, onBac
               <span className="po-review-value po-review-value--notes">{state.notes}</span>
             </div>
           )}
+          <div className="po-review-row">
+            <span className="po-review-label">Order ref</span>
+            <span className="po-review-value po-review-value--ref">{groupId}</span>
+          </div>
         </div>
 
         {error && <div className="po-error" role="alert">{error}</div>}
@@ -714,6 +808,7 @@ const Step3: React.FC<Step3Props> = ({ products, state, customerId, tanks, onBac
         title="Submit order"
         summary={summary}
         tier={state.tier}
+        settings={settings}
         emptyLabel="Your order is empty."
         continueLabel="Place order"
         continueDisabled={submitting || summary.lines.length === 0}
@@ -724,42 +819,50 @@ const Step3: React.FC<Step3Props> = ({ products, state, customerId, tanks, onBac
   )
 }
 
+// ── Success screen ────────────────────────────────────────────────────────────
+
 interface SuccessProps {
-  orderIds: string[]
+  groupId: string
   state: WizardState
   products: Product[]
+  settings: DeliverySettings
 }
 
-const SuccessScreen: React.FC<SuccessProps> = ({ orderIds, state, products }) => {
+const SuccessScreen: React.FC<SuccessProps> = ({ groupId, state, products, settings }) => {
   const navigate = useNavigate()
-  const productNames = state.items
-    .map((item) => products.find((product) => product.id === item.productId)?.name)
-    .filter((name): name is string => !!name)
+  const summary = useMemo(
+    () => summarizeOrder(state.items, products, state.tier, settings),
+    [state, products, settings],
+  )
 
   return (
     <div className="po-success">
       <div className="po-success__icon" aria-hidden="true">✓</div>
       <h2 className="po-success__title">Order submitted</h2>
       <p className="po-success__sub">
-        {orderIds.length} delivery request{orderIds.length === 1 ? '' : 's'} for {productNames.join(', ')} have been created and sent to scheduling.
+        {summary.itemsCount} product{summary.itemsCount !== 1 ? 's' : ''} queued for scheduling.
       </p>
 
       <div className="po-success__detail">
         <div className="po-success__row">
+          <span>Order reference</span>
+          <span className="po-success__id">{groupId}</span>
+        </div>
+        <div className="po-success__row">
           <span>Items</span>
-          <span>{state.items.length}</span>
+          <span>{summary.itemsCount}</span>
         </div>
         <div className="po-success__row">
           <span>Delivery tier</span>
-          <span>{TIER_INFO[state.tier].label}</span>
+          <span>{TIER_META[state.tier].label}</span>
         </div>
         <div className="po-success__row">
           <span>Requested date</span>
           <span>{fmtDateStr(state.scheduledDate)}</span>
         </div>
-        <div className="po-success__row">
-          <span>Order refs</span>
-          <span className="po-success__id">{orderIds.map((id) => id.slice(0, 8).toUpperCase()).join(', ')}</span>
+        <div className="po-success__row po-success__row--total">
+          <span>Estimated total</span>
+          <span>{fmtCurrency(summary.total)}</span>
         </div>
       </div>
 
@@ -774,6 +877,8 @@ const SuccessScreen: React.FC<SuccessProps> = ({ orderIds, state, products }) =>
     </div>
   )
 }
+
+// ── Main OrderPage ────────────────────────────────────────────────────────────
 
 interface ReorderState {
   productId: string
@@ -800,14 +905,24 @@ const OrderPage: React.FC = () => {
           notes: reorder.notes,
         }
       : preselectedProductId
-        ? {
-            ...INITIAL,
-            items: [{ productId: preselectedProductId, quantity: 1, tankId: '' }],
-          }
+        ? { ...INITIAL, items: [{ productId: preselectedProductId, quantity: 1, tankId: '' }] }
         : INITIAL,
   )
-  const [orderIds, setOrderIds] = useState<string[] | null>(null)
+  const [confirmedGroupId, setConfirmedGroupId] = useState<string | null>(null)
+  const [groupId] = useState(() => generateGroupId())
+  const [deliverySettings, setDeliverySettings] = useState<DeliverySettings>(DEFAULT_DELIVERY_SETTINGS)
 
+  // Scroll to top on step change (mobile: no missing content after advancing)
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [step])
+
+  // Load admin-configurable delivery settings
+  useEffect(() => {
+    getDeliverySettings().then(setDeliverySettings).catch(() => { /* silently use defaults */ })
+  }, [])
+
+  // Default scheduled date for reorders
   useEffect(() => {
     if (reorder && !wizState.scheduledDate) {
       const { min } = dateConstraints(reorder.tier)
@@ -816,10 +931,13 @@ const OrderPage: React.FC = () => {
   }, [reorder, wizState.scheduledDate])
 
   const { data: products = [], isLoading: productsLoading } = useQuery<Product[]>({
-    queryKey: ['products', 'active'],
+    queryKey: ['products', 'visible'],
     queryFn: async () => {
-      const snap = await getDocs(query(productsCol, where('active', '==', true)))
-      return snap.docs.map((docSnap) => ({ ...docSnap.data(), id: docSnap.id } as Product))
+      const snap = await getDocs(
+        query(productsCol, where('active', '==', true), where('isVisible', '==', true)),
+      )
+      const items = snap.docs.map((d) => ({ ...d.data(), id: d.id } as Product))
+      return items.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name))
     },
     staleTime: 10 * 60 * 1000,
   })
@@ -828,7 +946,25 @@ const OrderPage: React.FC = () => {
     queryKey: ['customer-tanks', customerId],
     queryFn: async () => {
       const snap = await getDocs(query(customerTanksCol(customerId), where('status', '==', 'deployed')))
-      return snap.docs.map((docSnap) => ({ ...docSnap.data(), id: docSnap.id } as Tank))
+      return snap.docs.map((d) => ({ ...d.data(), id: d.id } as Tank))
+    },
+    enabled: !!customerId,
+    staleTime: 5 * 60 * 1000,
+  })
+
+  const { data: recentProductIds = [] } = useQuery<string[]>({
+    queryKey: ['recent-product-ids', customerId],
+    queryFn: async () => {
+      const snap = await getDocs(
+        query(ordersCol, where('customerId', '==', customerId), orderBy('requestedAt', 'desc'), limit(20)),
+      )
+      const seen = new Set<string>()
+      const ids: string[] = []
+      for (const d of snap.docs) {
+        const pid = (d.data() as { productId?: string }).productId
+        if (pid && !seen.has(pid)) { seen.add(pid); ids.push(pid) }
+      }
+      return ids
     },
     enabled: !!customerId,
     staleTime: 5 * 60 * 1000,
@@ -853,15 +989,11 @@ const OrderPage: React.FC = () => {
   const updateItem = useCallback((productId: string, patchItem: Partial<OrderItem>) => {
     setWizState((prev) => ({
       ...prev,
-      items: prev.items.map((item) => (
+      items: prev.items.map((item) =>
         item.productId === productId
-          ? {
-              ...item,
-              ...patchItem,
-              quantity: normalizeQuantity(patchItem.quantity ?? item.quantity),
-            }
-          : item
-      )),
+          ? { ...item, ...patchItem, quantity: normalizeQuantity(patchItem.quantity ?? item.quantity) }
+          : item,
+      ),
     }))
   }, [])
 
@@ -871,10 +1003,15 @@ const OrderPage: React.FC = () => {
     setStep(1)
   }, [patch, wizState.scheduledDate, wizState.tier])
 
-  if (orderIds) {
+  if (confirmedGroupId) {
     return (
       <div className="po-page">
-        <SuccessScreen orderIds={orderIds} state={wizState} products={products} />
+        <SuccessScreen
+          groupId={confirmedGroupId}
+          state={wizState}
+          products={products}
+          settings={deliverySettings}
+        />
       </div>
     )
   }
@@ -887,15 +1024,17 @@ const OrderPage: React.FC = () => {
 
       <ProgressBar step={step} />
 
-      {productsLoading || tanksLoading ? (
+      {(productsLoading || tanksLoading) && (
         <div className="po-spinner" aria-label="Loading order builder" />
-      ) : null}
+      )}
 
       {!productsLoading && !tanksLoading && step === 0 && (
         <Step1
           products={products}
           tanks={tanks}
           state={wizState}
+          recentProductIds={recentProductIds}
+          settings={deliverySettings}
           onToggleProduct={toggleProduct}
           onQuantityChange={(productId, quantity) => updateItem(productId, { quantity })}
           onTankChange={(productId, tankId) => updateItem(productId, { tankId })}
@@ -907,6 +1046,7 @@ const OrderPage: React.FC = () => {
         <Step2
           products={products}
           state={wizState}
+          settings={deliverySettings}
           onChange={patch}
           onQuantityChange={(productId, quantity) => updateItem(productId, { quantity })}
           onRemoveItem={toggleProduct}
@@ -919,10 +1059,12 @@ const OrderPage: React.FC = () => {
         <Step3
           products={products}
           state={wizState}
+          settings={deliverySettings}
           customerId={customerId}
           tanks={tanks}
+          groupId={groupId}
           onBack={() => setStep(1)}
-          onConfirm={setOrderIds}
+          onConfirm={setConfirmedGroupId}
         />
       )}
     </div>

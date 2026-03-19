@@ -8,6 +8,7 @@ import './Layout.css'
 
 const NAV_ITEMS: SidebarItem[] = [
   { to: '/admin/users', label: 'Users', icon: '◎' },
+  { to: '/admin/delivery-settings', label: 'Delivery Settings', icon: '⊞' },
 ]
 
 export const AdminLayout: React.FC = () => (

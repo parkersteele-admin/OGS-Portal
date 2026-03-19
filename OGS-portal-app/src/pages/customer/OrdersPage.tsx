@@ -258,7 +258,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ order, products, onClose, onR
 
         <div className="oh-detail__footer">
           <Button variant="secondary" size="sm" onClick={() => onReorder(order)}>
-            Reorder
+            Add to order
           </Button>
         </div>
       </div>
@@ -313,7 +313,7 @@ const OrderRow: React.FC<OrderRowProps> = ({
       <td className="oh-td">{locationLabel}</td>
       <td className="oh-td oh-td--actions" onClick={(e) => e.stopPropagation()}>
         <button className="oh-action-btn" onClick={onClick}>Details</button>
-        <button className="oh-action-btn oh-action-btn--primary" onClick={onReorder}>Reorder</button>
+        <button className="oh-action-btn oh-action-btn--primary" onClick={onReorder}>Add to order</button>
       </td>
     </tr>
   )

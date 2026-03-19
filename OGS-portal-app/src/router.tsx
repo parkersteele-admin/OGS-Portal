@@ -50,6 +50,7 @@ import PriceList from './pages/crm/PriceList'
 import MerchandisingPanel from './pages/crm/MerchandisingPanel'
 import BillingDashboard from './pages/billing/BillingDashboard'
 import UserManagement from './pages/admin/UserManagement'
+import DeliverySettingsPage from './pages/admin/DeliverySettings'
 
 // Customer catalog
 import ProductCatalog from './pages/customer/ProductCatalog'
@@ -170,6 +171,7 @@ export const Router: React.FC = () => (
       >
         <Route index element={<Navigate to="users" replace />} />
         <Route path="users" element={<UserManagement />} />
+        <Route path="delivery-settings" element={<DeliverySettingsPage />} />
       </Route>
 
       {/* 404 fallback */}

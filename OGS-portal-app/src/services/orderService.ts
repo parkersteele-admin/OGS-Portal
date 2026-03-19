@@ -1,6 +1,7 @@
 import {
   doc,
   getDoc,
+  setDoc,
   addDoc,
   updateDoc,
   deleteDoc,
@@ -13,9 +14,12 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore'
 import { db } from '../lib/firebase'
-import { ordersCol } from '../lib/firestore'
-import type { Order, OrderStatus, DeliveryTier } from '../types/order'
+import { ordersCol, deliverySettingsRef } from '../lib/firestore'
+import type { Order, OrderStatus, DeliveryTier, DeliveryTierConfig, DeliverySettings } from '../types/order'
+import { DEFAULT_DELIVERY_SETTINGS } from '../types/order'
 import { serviceCall, fromSnap, paginate, type Page, type PageOptions, OgsValidationError } from './base'
+
+export type { DeliveryTierConfig, DeliverySettings }
 
 export interface OrderFilters {
   customerId?: string
@@ -38,11 +42,44 @@ export interface CreateBatchOrderInput extends CreateOrderInput {
   unitPrice: number
 }
 
-// Upcharge percentages by tier
+// Upcharge percentages by tier (fallback when settings not loaded)
 const TIER_UPCHARGE: Record<DeliveryTier, number> = {
   standard: 0,
   'next-day': 0.1,
   'same-day': 0.25,
+}
+
+// ── Delivery Settings ─────────────────────────────────────────────────────────────────
+
+/** Fetch admin-configurable delivery tier settings from Firestore. */
+export async function getDeliverySettings(): Promise<DeliverySettings> {
+  return serviceCall(async () => {
+    const snap = await getDoc(deliverySettingsRef)
+    if (!snap.exists()) return DEFAULT_DELIVERY_SETTINGS
+    const data = snap.data() as Partial<DeliverySettings>
+    return {
+      standard:   { ...DEFAULT_DELIVERY_SETTINGS.standard,   ...(data.standard   ?? {}) },
+      'next-day': { ...DEFAULT_DELIVERY_SETTINGS['next-day'], ...(data['next-day'] ?? {}) },
+      'same-day': { ...DEFAULT_DELIVERY_SETTINGS['same-day'], ...(data['same-day'] ?? {}) },
+    } as DeliverySettings
+  })
+}
+
+/** Persist delivery settings. Admin only. */
+export async function updateDeliverySettings(settings: DeliverySettings): Promise<void> {
+  return serviceCall(() =>
+    setDoc(deliverySettingsRef, settings, { merge: true }),
+  )
+}
+
+/** Generate a short human-readable order group ID. */
+export function generateGroupId(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  let id = 'ORD-'
+  for (let i = 0; i < 6; i++) {
+    id += chars[Math.floor(Math.random() * chars.length)]
+  }
+  return id
 }
 
 // ── Pricing ───────────────────────────────────────────────────────────────────
@@ -154,6 +191,7 @@ export async function createOrder(
 export async function createBatchOrders(
   items: CreateBatchOrderInput[],
   deliveryFee = 35,
+  groupId?: string,
 ): Promise<string[]> {
   return serviceCall(async () => {
     const orderIds = await Promise.all(
@@ -170,6 +208,7 @@ export async function createBatchOrders(
         const ref = await addDoc(ordersCol, {
           ...payload,
           ...pricing,
+          ...(groupId ? { groupId } : {}),
           status: 'pending' as OrderStatus,
           requestedAt: serverTimestamp(),
           createdAt: serverTimestamp(),

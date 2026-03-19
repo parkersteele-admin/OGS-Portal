@@ -1,4 +1,4 @@
-import { collection } from 'firebase/firestore'
+import { collection, doc } from 'firebase/firestore'
 import type { CollectionReference, DocumentData } from 'firebase/firestore'
 import { db } from './firebase'
 import type {
@@ -80,3 +80,6 @@ export type AuditLogEntry = {
   changedAt: import('firebase/firestore').Timestamp
 }
 export const auditLogCol = col<AuditLogEntry>('auditLog')
+
+// ── Settings ──────────────────────────────────────────────────────────────────
+export const deliverySettingsRef = doc(db, 'settings', 'delivery')

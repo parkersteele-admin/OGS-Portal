@@ -8,7 +8,11 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { getDocs, query, where, orderBy, limit } from 'firebase/firestore'
 import { getVisibleProducts } from '../../services/productService'
+import { ordersCol } from '../../lib/firestore'
+import { useAuth } from '../../hooks/useAuth'
 import type { Product, ProductCategory } from '../../types/product'
 import './ProductCatalog.css'
 
@@ -48,9 +52,9 @@ const ProductRow: React.FC<ProductRowProps> = ({ product, onOrder }) => (
     <button
       className="pc-row__btn"
       onClick={() => onOrder(product.id)}
-      aria-label={`Order ${product.name}`}
+      aria-label={`Add ${product.name} to order`}
     >
-      Order
+      Add item
     </button>
   </div>
 )
@@ -100,6 +104,8 @@ const CategorySection: React.FC<CategorySectionProps> = ({
 
 const ProductCatalog: React.FC = () => {
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const customerId = user?.customerId ?? ''
   const [products,  setProducts]  = useState<Product[]>([])
   const [loading,   setLoading]   = useState(true)
   const [error,     setError]     = useState('')
@@ -114,6 +120,25 @@ const ProductCatalog: React.FC = () => {
       .finally(() => setLoading(false))
   }, [])
 
+  // Fetch recent product IDs from customer orders
+  const { data: recentProductIds = [] } = useQuery<string[]>({
+    queryKey: ['recent-product-ids', customerId],
+    queryFn: async () => {
+      const snap = await getDocs(
+        query(ordersCol, where('customerId', '==', customerId), orderBy('requestedAt', 'desc'), limit(20)),
+      )
+      const seen = new Set<string>()
+      const ids: string[] = []
+      for (const d of snap.docs) {
+        const pid = (d.data() as { productId?: string }).productId
+        if (pid && !seen.has(pid)) { seen.add(pid); ids.push(pid) }
+      }
+      return ids
+    },
+    enabled: !!customerId,
+    staleTime: 5 * 60 * 1000,
+  })
+
   const handleOrder = useCallback((productId: string) => {
     navigate(`/portal/order?productId=${productId}`)
   }, [navigate])
@@ -127,7 +152,10 @@ const ProductCatalog: React.FC = () => {
     })
   }, [])
 
-  const filtered = products.filter((p) => {
+  // Filter Fees — those are admin/sales only
+  const visibleProducts = products.filter((p) => p.category !== 'Fees')
+
+  const filtered = visibleProducts.filter((p) => {
     if (!search) return true
     const q = search.toLowerCase()
     return (
@@ -137,8 +165,13 @@ const ProductCatalog: React.FC = () => {
     )
   })
 
+  const recentProducts = recentProductIds
+    .map((id) => filtered.find((p) => p.id === id))
+    .filter((p): p is Product => !!p)
+    .slice(0, 6)
+
   // Group by category, preserve sort order
-  const categoryOrder: ProductCategory[] = ['CO\u2082 Cylinders', 'Nitrogen', 'Beer Gas', 'Rentals', 'Fees']
+  const categoryOrder: ProductCategory[] = ['CO\u2082 Cylinders', 'Nitrogen', 'Beer Gas', 'Rentals']
   const grouped = categoryOrder.reduce<Record<string, Product[]>>((acc, cat) => {
     const rows = filtered.filter((p) => p.category === cat)
     if (rows.length) acc[cat] = rows
@@ -157,7 +190,7 @@ const ProductCatalog: React.FC = () => {
       <div className="pc-header">
         <div>
           <h1 className="pc-header__title">Product Catalog</h1>
-          <p className="pc-header__sub">Select a product to place an order</p>
+          <p className="pc-header__sub">Browse products and add items to your order</p>
         </div>
         <div className="pc-search">
           <svg className="pc-search__icon" width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -185,15 +218,30 @@ const ProductCatalog: React.FC = () => {
         </div>
       ) : (
         <div className="pc-content">
-          {/* Column headers */}
           <div className="pc-list-header" aria-hidden="true">
             <span>Product</span>
             <span>Unit Price</span>
             <span />
           </div>
 
-          {/* All categories */}
           <div className="pc-categories">
+            {/* Recently ordered section */}
+            {recentProducts.length > 0 && !search && (
+              <section className="pc-category" aria-label="Recently ordered">
+                <div className="pc-category__header pc-category__header--static">
+                  <h2 className="pc-category__title">Recently ordered</h2>
+                  <div className="pc-category__meta">
+                    <span className="pc-category__count pc-category__count--recent">Quick add</span>
+                  </div>
+                </div>
+                <div className="pc-category__list" role="rowgroup">
+                  {recentProducts.map((p) => (
+                    <ProductRow key={p.id} product={p} onOrder={handleOrder} />
+                  ))}
+                </div>
+              </section>
+            )}
+
             {Object.entries(grouped).map(([cat, rows]) => (
               <CategorySection
                 key={cat}
