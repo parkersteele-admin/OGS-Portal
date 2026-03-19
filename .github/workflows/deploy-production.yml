@@ -28,29 +28,52 @@ jobs:
         env:
           VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
           VITE_STRIPE_PUBLISHABLE_KEY: ${{ secrets.VITE_STRIPE_PUBLISHABLE_KEY }}
-          VITE_GOOGLE_MAPS_KEY: ${{ secrets.VITE_GOOGLE_MAPS_KEY }}
+          VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_KEY }}
         run: npm run build
+
+      - name: Prepare Firebase auth (production)
+        env:
+          FIREBASE_AUTH_SECRET: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PRODUCTION }}
+        run: |
+          if [ -z "$FIREBASE_AUTH_SECRET" ]; then
+            echo "Missing FIREBASE_SERVICE_ACCOUNT_PRODUCTION secret" >&2
+            exit 1
+          fi
+
+          if [[ "$FIREBASE_AUTH_SECRET" == \{* ]]; then
+            echo "$FIREBASE_AUTH_SECRET" > "$RUNNER_TEMP/firebase-service-account.json"
+            echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-service-account.json" >> "$GITHUB_ENV"
+            echo "FIREBASE_CLI_TOKEN=" >> "$GITHUB_ENV"
+          else
+            echo "FIREBASE_CLI_TOKEN=$FIREBASE_AUTH_SECRET" >> "$GITHUB_ENV"
+          fi
 
       - name: Deploy to Firebase Hosting live channel
         working-directory: OGS-portal-app
-        env:
-          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PRODUCTION }}
         run: |
-          npx firebase-tools deploy --only hosting --project ogs-portal --token "$FIREBASE_SERVICE_ACCOUNT"
+          if [ -n "$FIREBASE_CLI_TOKEN" ]; then
+            npx firebase-tools deploy --only hosting --project ogs-portal --token "$FIREBASE_CLI_TOKEN"
+          else
+            npx firebase-tools deploy --only hosting --project ogs-portal
+          fi
 
       - name: Deploy Firebase Functions
         working-directory: OGS-portal-app
-        env:
-          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PRODUCTION }}
         run: |
-          npx firebase-tools deploy --only functions --project ogs-portal --token "$FIREBASE_SERVICE_ACCOUNT"
+          if [ -n "$FIREBASE_CLI_TOKEN" ]; then
+            npx firebase-tools deploy --only functions --project ogs-portal --token "$FIREBASE_CLI_TOKEN"
+          else
+            npx firebase-tools deploy --only functions --project ogs-portal
+          fi
 
       - name: Deploy Firestore security rules
         working-directory: OGS-portal-app
-        env:
-          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PRODUCTION }}
         run: |
-          npx firebase-tools deploy --only firestore:rules --project ogs-portal --token "$FIREBASE_SERVICE_ACCOUNT"
+          if [ -n "$FIREBASE_CLI_TOKEN" ]; then
+            npx firebase-tools deploy --only firestore:rules --project ogs-portal --token "$FIREBASE_CLI_TOKEN"
+          else
+            npx firebase-tools deploy --only firestore:rules --project ogs-portal
+          fi
 
       - name: Notify on success/failure
         uses: actions/github-script@v7
