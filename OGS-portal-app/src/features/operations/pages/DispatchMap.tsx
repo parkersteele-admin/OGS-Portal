@@ -10,7 +10,7 @@
  * runId resolution:  URL param  →  location.state.runId  →  run selector UI
  */
 
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import {
   onSnapshot,
@@ -609,6 +609,21 @@ export default function DispatchMapPage() {
     }
   }
 
+  // Called by RoutePolyline when Directions API resolves addresses to lat/lng.
+  // Merges resolved coords into customers state so stop markers can render.
+  const handlePositionsResolved = useCallback(
+    (positions: Record<string, { lat: number; lng: number }>) => {
+      setCustomers((prev) => {
+        const updated = { ...prev }
+        Object.entries(positions).forEach(([id, coords]) => {
+          if (updated[id]) updated[id] = { ...updated[id], ...coords }
+        })
+        return updated
+      })
+    },
+    [],
+  )
+
   const completedCount = stops.filter(
     (s) => s.status === 'completed' || s.status === 'skipped',
   ).length
@@ -747,6 +762,7 @@ export default function DispatchMapPage() {
               driverName={driver?.name ?? 'Driver'}
               cameraTarget={cameraTarget}
               height="100%"
+              onPositionsResolved={handlePositionsResolved}
             />
           </div>
         </div>

@@ -306,9 +306,10 @@ interface MapContentProps {
   cameraTarget?: LatLngLiteral | null
   currentStop:  RunStop | undefined
   driverPosition: LatLngLiteral | null
+  onPositionsResolved?: (positions: Record<string, LatLngLiteral>) => void
 }
 
-function MapContent({ stops, customers, driverName, cameraTarget, currentStop, driverPosition }: MapContentProps) {
+function MapContent({ stops, customers, driverName, cameraTarget, currentStop, driverPosition, onPositionsResolved }: MapContentProps) {
   const isLoaded = useApiIsLoaded()
   const map = useMap()
   if (!isLoaded || !map) return null
@@ -316,7 +317,7 @@ function MapContent({ stops, customers, driverName, cameraTarget, currentStop, d
   return (
     <>
       <CameraPan target={cameraTarget} />
-      <RoutePolyline stops={stops} customers={customers} />
+      <RoutePolyline stops={stops} customers={customers} onPositionsResolved={onPositionsResolved} />
       {driverPosition && (
         <TruckMarker
           lat={driverPosition.lat}
@@ -352,6 +353,8 @@ export interface DispatchMapProps {
   height?:      string
   /** If set, smoothly pans the map to this location. */
   cameraTarget?: LatLngLiteral | null
+  /** Called when Directions API resolves coordinates for address-only stops. */
+  onPositionsResolved?: (positions: Record<string, LatLngLiteral>) => void
 }
 
 export function DispatchMap({
@@ -362,6 +365,7 @@ export function DispatchMap({
   zoom   = DEFAULT_ZOOM,
   height = '100%',
   cameraTarget,
+  onPositionsResolved,
 }: DispatchMapProps) {
   injectStyles()
 
@@ -417,6 +421,7 @@ export function DispatchMap({
             cameraTarget={cameraTarget}
             currentStop={currentStop}
             driverPosition={driverPosition}
+            onPositionsResolved={onPositionsResolved}
           />
         </Map>
       </div>
