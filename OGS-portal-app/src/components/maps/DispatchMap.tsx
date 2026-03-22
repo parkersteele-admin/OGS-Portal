@@ -30,6 +30,7 @@ import {
   InfoWindow,
   useAdvancedMarkerRef,
   useMap,
+  useApiIsLoaded,
 } from '@vis.gl/react-google-maps'
 import {
   GOOGLE_MAPS_API_KEY,
@@ -295,6 +296,47 @@ function CameraPan({ target }: { target: LatLngLiteral | null | undefined }) {
   return null
 }
 
+// ── MapContent — only rendered once the Maps JS API is loaded ────────────────
+// useAdvancedMarkerRef / AdvancedMarker call .getRootNode() during mount;
+// if the API is not yet loaded that object is undefined and throws.
+interface MapContentProps {
+  stops:        RunStop[]
+  customers:    Record<string, Customer>
+  driverName:   string
+  cameraTarget?: LatLngLiteral | null
+  currentStop:  RunStop | undefined
+  driverPosition: LatLngLiteral | null
+}
+
+function MapContent({ stops, customers, driverName, cameraTarget, currentStop, driverPosition }: MapContentProps) {
+  const isLoaded = useApiIsLoaded()
+  if (!isLoaded) return null
+
+  return (
+    <>
+      <CameraPan target={cameraTarget} />
+      <RoutePolyline stops={stops} customers={customers} />
+      {driverPosition && (
+        <TruckMarker
+          lat={driverPosition.lat}
+          lng={driverPosition.lng}
+          driverName={driverName}
+        />
+      )}
+      {[...stops]
+        .sort((a, b) => a.order - b.order)
+        .map((stop) => (
+          <StopMarker
+            key={stop.id}
+            stop={stop}
+            customer={customers[stop.customerId]}
+            isCurrent={stop.id === currentStop?.id}
+          />
+        ))}
+    </>
+  )
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export interface DispatchMapProps {
@@ -367,32 +409,14 @@ export function DispatchMap({
           onClick={handleMapClick}
           reuseMaps
         >
-          {/* Camera controller — pans map when a stop is clicked in the sidebar */}
-          <CameraPan target={cameraTarget} />
-
-          {/* Route line */}
-          <RoutePolyline stops={stops} customers={customers} />
-
-          {/* Truck position */}
-          {driverPosition && (
-            <TruckMarker
-              lat={driverPosition.lat}
-              lng={driverPosition.lng}
-              driverName={driverName}
-            />
-          )}
-
-          {/* Stop markers */}
-          {[...stops]
-            .sort((a, b) => a.order - b.order)
-            .map((stop) => (
-              <StopMarker
-                key={stop.id}
-                stop={stop}
-                customer={customers[stop.customerId]}
-                isCurrent={stop.id === currentStop?.id}
-              />
-            ))}
+          <MapContent
+            stops={stops}
+            customers={customers}
+            driverName={driverName}
+            cameraTarget={cameraTarget}
+            currentStop={currentStop}
+            driverPosition={driverPosition}
+          />
         </Map>
       </div>
     </APIProvider>
