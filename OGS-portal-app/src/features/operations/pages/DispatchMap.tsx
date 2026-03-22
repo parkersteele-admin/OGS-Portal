@@ -38,6 +38,36 @@ import './DispatchMap.css'
 
 type LatLng = { lat: number; lng: number }
 
+// ── Client-side geocoding fallback ────────────────────────────────────────────
+// When a customer document is missing lat/lng (e.g. the Cloud Function hasn't
+// geocoded it yet), we attempt a best-effort geocode via the REST API so the
+// stop still appears on the map.  Results are applied to local state only —
+// Firestore is not modified.
+
+const GMAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined
+
+async function geocodeFallback(c: Customer): Promise<LatLng | null> {
+  if (!GMAPS_KEY) return null
+  const addr = [c.address, c.city, c.state, c.zip].filter(Boolean).join(', ')
+  if (!addr.trim()) return null
+  try {
+    const url =
+      `https://maps.googleapis.com/maps/api/geocode/json` +
+      `?address=${encodeURIComponent(addr)}&key=${GMAPS_KEY}`
+    const res  = await fetch(url)
+    const json = await res.json() as {
+      status: string
+      results: Array<{ geometry: { location: { lat: number; lng: number } } }>
+    }
+    if (json.status === 'OK' && json.results[0]) {
+      return json.results[0].geometry.location
+    }
+  } catch {
+    // silently fail — the stop will simply not show on the map
+  }
+  return null
+}
+
 interface FeedEvent {
   id: string
   time: Date
@@ -481,7 +511,8 @@ export default function DispatchMapPage() {
     })
   }, [run?.driverId])
 
-  // Accumulate customer docs as new stop customerIds appear
+  // Accumulate customer docs as new stop customerIds appear, then geocode any
+  // that are missing lat/lng so they always show on the map.
   useEffect(() => {
     const ids = [...new Set(stops.map((s) => s.customerId))]
     const missing = ids.filter((id) => !loadedCustomerIds.current.has(id))
@@ -495,12 +526,32 @@ export default function DispatchMapPage() {
             : null,
         ),
       ),
-    ).then((docs) => {
+    ).then(async (docs) => {
       const map: Record<string, Customer> = {}
-      docs.forEach((c) => {
-        if (c) map[c.id] = c
-      })
+      docs.forEach((c) => { if (c) map[c.id] = c })
       setCustomers((prev) => ({ ...prev, ...map }))
+
+      // Geocode any customers that came back without coordinates
+      const needsGeocode = docs.filter((c): c is Customer => !!c && !c.lat && !c.lng)
+      if (!needsGeocode.length) return
+
+      const results = await Promise.allSettled(
+        needsGeocode.map(async (c) => ({ id: c.id, coords: await geocodeFallback(c) }))
+      )
+      const geocoded: Record<string, LatLng> = {}
+      results.forEach((r) => {
+        if (r.status === 'fulfilled' && r.value.coords) {
+          geocoded[r.value.id] = r.value.coords
+        }
+      })
+      if (!Object.keys(geocoded).length) return
+      setCustomers((prev) => {
+        const updated = { ...prev }
+        Object.entries(geocoded).forEach(([id, coords]) => {
+          if (updated[id]) updated[id] = { ...updated[id], ...coords }
+        })
+        return updated
+      })
     })
   }, [stops])
 
