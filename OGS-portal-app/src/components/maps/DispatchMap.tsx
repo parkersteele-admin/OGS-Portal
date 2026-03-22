@@ -310,7 +310,8 @@ interface MapContentProps {
 
 function MapContent({ stops, customers, driverName, cameraTarget, currentStop, driverPosition }: MapContentProps) {
   const isLoaded = useApiIsLoaded()
-  if (!isLoaded) return null
+  const map = useMap()
+  if (!isLoaded || !map) return null
 
   return (
     <>
