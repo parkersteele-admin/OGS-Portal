@@ -1,95 +1,113 @@
 /**
  * src/components/maps/RoutePolyline.tsx
  *
- * Draws the delivery route on the DispatchMap.
+ * Fetches a real driving route via the Google Maps Directions API and draws
+ * it on the DispatchMap.
  *
- * Segments are rendered as two overlapping polylines per segment:
- *  - Completed segments: solid green (#22c55e)
- *  - Remaining segments: dashed gray (#9ca3af)
+ * - Completed legs: solid green (#22c55e)
+ * - Remaining legs: solid brand orange (#E87722)
  *
- * Coordinates come from Customer.lat / Customer.lng.  Stops without a
- * geocoded customer are silently skipped — the line simply jumps over them.
- *
- * Updates in real-time because DispatchMap re-renders whenever the stops
- * or customers props change (driven by Firestore onSnapshot in the parent).
+ * Uses suppressPolylines + per-leg Polylines so each leg can be coloured
+ * independently.  Coordinates come from Customer.lat / Customer.lng.
  */
 
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useMap, useMapsLibrary } from '@vis.gl/react-google-maps'
-import { useEffect } from 'react'
 import type { RunStop } from '../../types/run'
 import type { Customer } from '../../types/customer'
 
 interface RoutePolylineProps {
-  stops: RunStop[]
+  stops:     RunStop[]
   customers: Record<string, Customer>
 }
 
-// Colours
+const COLOR_BRAND     = '#E87722'
 const COLOR_COMPLETED = '#22c55e'
-const COLOR_REMAINING = '#9ca3af'
 
 export function RoutePolyline({ stops, customers }: RoutePolylineProps) {
-  const map          = useMap()
-  const mapsCore     = useMapsLibrary('maps')
+  const map       = useMap()
+  const routesLib = useMapsLibrary('routes')
+  const mapsLib   = useMapsLibrary('maps')
 
-  // Build an ordered array of { latLng, completed } per stop.
-  const segments = useMemo(() => {
-    const sorted = [...stops].sort((a, b) => a.order - b.order)
-    return sorted
+  // Ordered waypoints enriched with completion status
+  const waypoints = useMemo(() => {
+    return [...stops]
+      .sort((a, b) => a.order - b.order)
       .map((stop) => {
-        const customer = customers[stop.customerId]
-        if (!customer?.lat || !customer?.lng) return null
-        return {
-          lat:       customer.lat,
-          lng:       customer.lng,
-          completed: stop.status === 'completed',
-        }
+        const c = customers[stop.customerId]
+        if (!c?.lat || !c?.lng) return null
+        return { lat: c.lat, lng: c.lng, completed: stop.status === 'completed' }
       })
       .filter(Boolean) as Array<{ lat: number; lng: number; completed: boolean }>
   }, [stops, customers])
 
   useEffect(() => {
-    if (!map || !mapsCore || segments.length < 2) return
+    if (!map || !routesLib || !mapsLib || waypoints.length < 2) return
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const polylines: any[] = []
+    let cancelled = false
 
-    for (let i = 0; i < segments.length - 1; i++) {
-      const from = segments[i]
-      const to   = segments[i + 1]
-      // A segment is "completed" when the starting stop is completed.
-      const done = from.completed
+    // Renderer just handles the Directions response; we draw our own polylines.
+    const renderer = new routesLib.DirectionsRenderer({
+      map,
+      suppressMarkers:   true,
+      suppressPolylines: true,   // we colour each leg ourselves
+    })
 
-      const line = new mapsCore.Polyline({
-        path:          [from, to],
-        map,
-        strokeColor:   done ? COLOR_COMPLETED : COLOR_REMAINING,
-        strokeOpacity: done ? 1   : 0,            // hide the stroke for dashed segments
-        strokeWeight:  3,
-        icons: done ? [] : [
-          {
-            icon: {
-              path:         'M 0,-1 0,1',          // vertical dash
-              strokeOpacity: 1,
-              strokeColor:  COLOR_REMAINING,
-              scale:         3,
-            },
-            offset: '0',
-            repeat: '16px',
-          },
-        ],
-        zIndex: done ? 2 : 1,
-      })
+    const svc = new routesLib.DirectionsService()
+    svc.route(
+      {
+        origin:      { lat: waypoints[0].lat, lng: waypoints[0].lng },
+        destination: { lat: waypoints[waypoints.length - 1].lat, lng: waypoints[waypoints.length - 1].lng },
+        waypoints:   waypoints.slice(1, -1).map((loc) => ({
+          location: { lat: loc.lat, lng: loc.lng },
+          stopover: true,
+        })),
+        travelMode:        routesLib.TravelMode.DRIVING,
+        optimizeWaypoints: false,
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (result: any, status: any) => {
+        if (cancelled || status !== 'OK' || !result) return
 
-      polylines.push(line)
-    }
+        renderer.setDirections(result)
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const legs: any[] = result.routes[0]?.legs ?? []
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const polylines: any[] = []
+
+        legs.forEach((leg: any, legIndex: number) => {
+          // A leg is "done" when the *origin* waypoint is completed
+          const done = waypoints[legIndex]?.completed ?? false
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const path = leg.steps.flatMap((step: any) => step.path ?? [])
+
+          const line = new mapsLib.Polyline({
+            path,
+            map,
+            strokeColor:   done ? COLOR_COMPLETED : COLOR_BRAND,
+            strokeWeight:  5,
+            strokeOpacity: 0.85,
+            zIndex:        done ? 1 : 2,
+          })
+
+          polylines.push(line)
+        })
+
+        // Store for cleanup
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ;(renderer as any)._ogsPolylines = polylines
+      }
+    )
 
     return () => {
-      polylines.forEach((p) => p.setMap(null))
+      cancelled = true
+      renderer.setMap(null)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;((renderer as any)._ogsPolylines ?? []).forEach((p: any) => p.setMap(null))
     }
-  }, [map, mapsCore, segments])
+  }, [map, routesLib, mapsLib, waypoints])
 
-  // This component renders nothing — it works entirely via the Maps SDK effect.
   return null
 }
