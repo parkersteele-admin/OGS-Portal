@@ -35,16 +35,16 @@ import './AgingPage.css'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-type AgingBucket = 'current' | '1-30' | '31-60' | '61-90' | '90+'
+type AgingBucket = 'current' | '1-30' | '31-60' | '61-90' | '90plus'
 
-const BUCKETS: AgingBucket[] = ['current', '1-30', '31-60', '61-90', '90+']
+const BUCKETS: AgingBucket[] = ['current', '1-30', '31-60', '61-90', '90plus']
 
 const BUCKET_LABELS: Record<AgingBucket, string> = {
   current:  'Current',
   '1-30':   '1–30 Days',
   '31-60':  '31–60 Days',
   '61-90':  '61–90 Days',
-  '90+':    '90+ Days',
+  '90plus': '90+ Days',
 }
 
 const BUCKET_COLORS: Record<AgingBucket, string> = {
@@ -52,7 +52,7 @@ const BUCKET_COLORS: Record<AgingBucket, string> = {
   '1-30':   '#f59e0b',
   '31-60':  '#ef4444',
   '61-90':  '#dc2626',
-  '90+':    '#991b1b',
+  '90plus': '#991b1b',
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -86,7 +86,7 @@ function getBucket(daysOverdue: number): AgingBucket {
   if (daysOverdue <= 30) return '1-30'
   if (daysOverdue <= 60) return '31-60'
   if (daysOverdue <= 90) return '61-90'
-  return '90+'
+  return '90plus'
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
@@ -147,8 +147,8 @@ export default function AgingPage() {
       current: { count: 0, total: 0 },
       '1-30':  { count: 0, total: 0 },
       '31-60': { count: 0, total: 0 },
-      '61-90': { count: 0, total: 0 },
-      '90+':   { count: 0, total: 0 },
+      '61-90':  { count: 0, total: 0 },
+      '90plus': { count: 0, total: 0 },
     }
     enriched.forEach((inv) => {
       stats[inv.bucket].count++

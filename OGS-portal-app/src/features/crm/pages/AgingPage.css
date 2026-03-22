@@ -252,7 +252,7 @@
 .ag-row--1-30  { border-left: 3px solid #f59e0b; }
 .ag-row--31-60 { border-left: 3px solid #ef4444; }
 .ag-row--61-90 { border-left: 3px solid #dc2626; }
-.ag-row--90\\+  { border-left: 3px solid #991b1b; }
+.ag-row--90plus { border-left: 3px solid #991b1b; }
 
 .ag-inv-num {
   font-weight: 600;
@@ -272,7 +272,7 @@
 .ag-overdue--1-30  { background: #fef3c7; color: #92400e; }
 .ag-overdue--31-60 { background: #fee2e2; color: #991b1b; }
 .ag-overdue--61-90 { background: #fecaca; color: #7f1d1d; }
-.ag-overdue--90\+  { background: #fca5a5; color: #450a0a; }
+.ag-overdue--90plus { background: #fca5a5; color: #450a0a; }
 
 .ag-current {
   font-size: var(--font-size-12);

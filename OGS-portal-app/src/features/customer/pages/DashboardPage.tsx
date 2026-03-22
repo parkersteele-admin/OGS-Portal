@@ -74,6 +74,7 @@ function orderStatusVariant(status: OrderStatus): BadgeVariant {
     invoiced:     'info',
     paid:         'success',
     cancelled:    'danger',
+    archived:     'neutral',
   }
   return map[status] ?? 'neutral'
 }

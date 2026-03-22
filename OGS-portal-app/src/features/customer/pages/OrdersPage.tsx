@@ -50,6 +50,7 @@ const STATUS_VARIANT: Record<OrderStatus, BadgeVariant> = {
   invoiced: 'info',
   paid: 'success',
   cancelled: 'danger',
+  archived: 'neutral',
 }
 
 const STATUS_LABEL: Record<OrderStatus, string> = {
@@ -61,6 +62,7 @@ const STATUS_LABEL: Record<OrderStatus, string> = {
   invoiced: 'Invoiced',
   paid: 'Paid',
   cancelled: 'Cancelled',
+  archived: 'Archived',
 }
 
 const TIER_LABEL: Record<DeliveryTier, string> = {
