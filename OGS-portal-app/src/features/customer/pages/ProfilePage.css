@@ -1,0 +1,215 @@
+/* src/features/customer/pages/ProfilePage.css */
+
+.pp {
+  max-width: 680px;
+  padding: 24px 24px 48px;
+}
+
+/* ── Loading / empty ──────────────────────────────────────────── */
+.pp-loading,
+.pp-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 24px;
+  color: var(--color-text-muted, #6b7280);
+}
+
+.pp-spinner {
+  display: inline-block;
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--color-border, #e5e7eb);
+  border-top-color: var(--color-brand, #E87722);
+  border-radius: 50%;
+  animation: pp-spin 0.7s linear infinite;
+}
+
+@keyframes pp-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Toast ────────────────────────────────────────────────────── */
+.pp-toast {
+  position: fixed;
+  top: 20px;
+  right: 24px;
+  z-index: 9999;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  animation: pp-fadein 0.2s ease;
+}
+
+.pp-toast--success {
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+  color: #166534;
+}
+
+.pp-toast--error {
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  color: #991b1b;
+}
+
+@keyframes pp-fadein {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Header ───────────────────────────────────────────────────── */
+.pp-header {
+  margin-bottom: 32px;
+}
+
+.pp-header__title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-text, #111827);
+  margin: 0 0 4px;
+}
+
+.pp-header__sub {
+  font-size: 14px;
+  color: var(--color-text-muted, #6b7280);
+  margin: 0;
+}
+
+/* ── Sections ─────────────────────────────────────────────────── */
+.pp-section {
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 10px;
+  padding: 20px 24px;
+  margin-bottom: 20px;
+}
+
+.pp-section__title {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted, #6b7280);
+  margin: 0 0 16px;
+}
+
+/* ── Rows ─────────────────────────────────────────────────────── */
+.pp-row {
+  margin-bottom: 14px;
+}
+
+.pp-row:last-child {
+  margin-bottom: 0;
+}
+
+.pp-row--2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.pp-row--3 {
+  display: grid;
+  grid-template-columns: 1fr 72px 100px;
+  gap: 14px;
+}
+
+/* ── Fields ───────────────────────────────────────────────────── */
+.pp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.pp-field__label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text, #374151);
+}
+
+.pp-field__optional {
+  font-weight: 400;
+  color: var(--color-text-muted, #9ca3af);
+}
+
+.pp-field__input {
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: 7px;
+  background: var(--color-bg, #fff);
+  color: var(--color-text, #111827);
+  transition: border-color 0.15s, box-shadow 0.15s;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.pp-field__input:focus {
+  outline: none;
+  border-color: var(--color-brand, #E87722);
+  box-shadow: 0 0 0 3px rgba(232, 119, 34, 0.12);
+}
+
+.pp-field__textarea {
+  resize: vertical;
+  min-height: 72px;
+  font-family: inherit;
+  line-height: 1.5;
+}
+
+/* ── Actions ──────────────────────────────────────────────────── */
+.pp-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.pp-btn {
+  padding: 9px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  border: none;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.pp-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pp-btn--primary {
+  background: var(--color-brand, #E87722);
+  color: #fff;
+}
+
+.pp-btn--primary:not(:disabled):hover {
+  background: #d06a1a;
+}
+
+.pp-btn--ghost {
+  background: transparent;
+  color: var(--color-text-muted, #6b7280);
+  border: 1px solid var(--color-border, #d1d5db);
+}
+
+.pp-btn--ghost:not(:disabled):hover {
+  background: var(--color-bg-muted, #f9fafb);
+}
+
+/* ── Responsive ───────────────────────────────────────────────── */
+@media (max-width: 520px) {
+  .pp {
+    padding: 16px 16px 48px;
+  }
+
+  .pp-row--2,
+  .pp-row--3 {
+    grid-template-columns: 1fr;
+  }
+}

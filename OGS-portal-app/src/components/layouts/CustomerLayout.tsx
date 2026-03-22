@@ -53,6 +53,12 @@ const IC_PRODUCTS = (
     <path d="M8 1.5v13M2 5l6 3 6-3" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
   </svg>
 )
+const IC_PROFILE = (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+    <circle cx="8" cy="5.5" r="2.75" stroke="currentColor" strokeWidth="1.5"/>
+    <path d="M2.5 13.5c0-2.485 2.462-4.5 5.5-4.5s5.5 2.015 5.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+  </svg>
+)
 
 const NAV_ITEMS: SidebarItem[] = [
   { to: '/portal/dashboard', label: 'Dashboard', icon: IC_DASHBOARD },
@@ -62,6 +68,7 @@ const NAV_ITEMS: SidebarItem[] = [
   { to: '/portal/autopay',   label: 'Autopay',    icon: IC_AUTOPAY },
   { to: '/portal/tanks',     label: 'My Tanks',   icon: IC_TANKS },
   { to: '/portal/catalog',   label: 'Products',   icon: IC_PRODUCTS },
+  { to: '/portal/profile',   label: 'My Profile',  icon: IC_PROFILE },
 ]
 
 const MOBILE_ITEMS: MobileNavItem[] = NAV_ITEMS.slice(0, 4).map(
