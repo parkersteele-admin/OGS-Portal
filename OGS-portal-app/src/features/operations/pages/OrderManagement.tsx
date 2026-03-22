@@ -31,6 +31,8 @@ import {
   transitionOrderStatus,
   calculateOrderPricing,
   canTransition,
+  archiveOrder,
+  deleteOrder,
 } from '../../../services/orderService'
 import { subscribeToCustomers } from '../../../services/customerService'
 import { Button } from '../../../components/ui/Button'
@@ -52,6 +54,7 @@ const STATUS_LABELS: Record<OrderStatus, string> = {
   invoiced:   'Invoiced',
   paid:       'Paid',
   cancelled:  'Cancelled',
+  archived:   'Archived',
 }
 
 const TIER_LABELS: Record<DeliveryTier, string> = {
@@ -917,6 +920,9 @@ export default function OrderManagement() {
       )
     }
 
+    // Hide archived orders unless explicitly filtered to archived
+    if (statusFilter === 'all') result = result.filter((o) => o.status !== 'archived')
+
     if (search.trim()) {
       const lc = search.toLowerCase()
       result = result.filter(
@@ -930,25 +936,25 @@ export default function OrderManagement() {
   }, [allOrders, search, statusFilter, tierFilter, dateFrom, dateTo, rushOnly, customerMap])
 
   // ── Bulk select ───────────────────────────────────────────────────────────────
-  const pendingFiltered = filtered.filter((o) => o.status === 'pending')
-  const allPendingSelected =
-    pendingFiltered.length > 0 &&
-    pendingFiltered.every((o) => selected.has(o.id))
+  const selectableFiltered = filtered.filter((o) => o.status !== 'archived')
+  const allSelectableSelected =
+    selectableFiltered.length > 0 &&
+    selectableFiltered.every((o) => selected.has(o.id))
 
   function toggleAll() {
     setSelected((prev) => {
       const next = new Set(prev)
-      if (allPendingSelected) {
-        pendingFiltered.forEach((o) => next.delete(o.id))
+      if (allSelectableSelected) {
+        selectableFiltered.forEach((o) => next.delete(o.id))
       } else {
-        pendingFiltered.forEach((o) => next.add(o.id))
+        selectableFiltered.forEach((o) => next.add(o.id))
       }
       return next
     })
   }
 
   function toggleRow(id: string, status: OrderStatus) {
-    if (status !== 'pending') return
+    if (status === 'archived') return
     setSelected((prev) => {
       const next = new Set(prev)
       if (next.has(id)) { next.delete(id) } else { next.add(id) }
@@ -974,6 +980,32 @@ export default function OrderManagement() {
     })
   }
 
+  // ── Bulk archive ──────────────────────────────────────────────────────────────
+  async function handleBulkArchive() {
+    if (!selected.size) return
+    const count = selected.size
+    if (!confirm(`Archive ${count} order${count !== 1 ? 's' : ''}? They will be hidden from the default view.`)) return
+    try {
+      await Promise.all([...selected].map((id) => archiveOrder(id)))
+      setSelected(new Set())
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to archive orders.')
+    }
+  }
+
+  // ── Bulk delete ───────────────────────────────────────────────────────────────
+  async function handleBulkDelete() {
+    if (!selected.size) return
+    const count = selected.size
+    if (!confirm(`Permanently delete ${count} order${count !== 1 ? 's' : ''}? This cannot be undone.`)) return
+    try {
+      await Promise.all([...selected].map((id) => deleteOrder(id)))
+      setSelected(new Set())
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to delete orders.')
+    }
+  }
+
   const selectedCount = selected.size
 
   return (
@@ -989,6 +1021,22 @@ export default function OrderManagement() {
           )}
         </div>
         <div className="om-page-header__actions">
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={selectedCount === 0}
+            onClick={handleBulkArchive}
+          >
+            Archive{selectedCount > 0 ? ` (${selectedCount})` : ''}
+          </Button>
+          <Button
+            variant="danger"
+            size="sm"
+            disabled={selectedCount === 0}
+            onClick={handleBulkDelete}
+          >
+            Delete{selectedCount > 0 ? ` (${selectedCount})` : ''}
+          </Button>
           {selectedCount > 0 && (
             <Button variant="secondary" size="sm" onClick={handleBuildRun}>
               Add {selectedCount} to Run →
@@ -1111,11 +1159,11 @@ export default function OrderManagement() {
                 <th className="om-table__th om-table__th--check">
                   <input
                     type="checkbox"
-                    checked={allPendingSelected}
+                    checked={allSelectableSelected}
                     onChange={toggleAll}
-                    title="Select all pending"
-                    aria-label="Select all pending orders"
-                    disabled={pendingFiltered.length === 0}
+                    title="Select all"
+                    aria-label="Select all orders"
+                    disabled={selectableFiltered.length === 0}
                   />
                 </th>
                 <th className="om-table__th">Order #</th>
@@ -1132,7 +1180,7 @@ export default function OrderManagement() {
               {filtered.map((order) => {
                 const rush = isRush(order)
                 const isCancelled = order.status === 'cancelled'
-                const canSel = order.status === 'pending'
+                const canSel = order.status !== 'archived'
                 const cust = customerMap[order.customerId]
                 const prod = productMap[order.productId]
                 const isSelected = selected.has(order.id)

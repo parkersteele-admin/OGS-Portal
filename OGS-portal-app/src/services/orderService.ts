@@ -156,14 +156,15 @@ export function calculateOrderPricing(
 // ── Valid status transitions ──────────────────────────────────────────────────
 
 const VALID_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  pending:    ['scheduled', 'cancelled'],
-  scheduled:  ['assigned',  'pending', 'cancelled'],
-  assigned:   ['in-transit','scheduled'],
-  'in-transit': ['delivered'],
-  delivered:  ['invoiced'],
-  invoiced:   ['paid'],
-  paid:       [],
-  cancelled:  [],
+  pending:      ['scheduled', 'cancelled', 'archived'],
+  scheduled:    ['assigned',  'pending', 'cancelled', 'archived'],
+  assigned:     ['in-transit','scheduled', 'archived'],
+  'in-transit': ['delivered', 'archived'],
+  delivered:    ['invoiced', 'archived'],
+  invoiced:     ['paid', 'archived'],
+  paid:         ['archived'],
+  cancelled:    ['archived'],
+  archived:     [],
 }
 
 export function canTransition(from: OrderStatus, to: OrderStatus): boolean {
@@ -297,6 +298,16 @@ export async function transitionOrderStatus(
       updatedAt: serverTimestamp(),
     })
   })
+}
+
+export async function archiveOrder(id: string): Promise<void> {
+  return serviceCall(() =>
+    updateDoc(doc(db, 'orders', id), {
+      status: 'archived' as OrderStatus,
+      archivedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }),
+  )
 }
 
 export async function deleteOrder(id: string): Promise<void> {

@@ -52,6 +52,7 @@ export type OrderStatus =
   | 'invoiced'
   | 'paid'
   | 'cancelled'
+  | 'archived'
 
 /** Per-tier pricing configuration (admin-configurable). */
 export interface DeliveryTierConfig {

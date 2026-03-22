@@ -1,0 +1,271 @@
+/* ── Page layout ─────────────────────────────────────────────────────────────── */
+
+.inv-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  width: 100%;
+  max-width: var(--app-content-max);
+  margin: 0 auto;
+  padding: 0 var(--space-4);
+}
+
+@media (max-width: 1023px) {
+  .inv-page { padding: 0 var(--space-3); gap: var(--space-4); }
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────────── */
+
+.inv-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.inv-header__title {
+  margin: 0;
+  font-size: var(--font-size-3);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.inv-header__meta {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--font-size-13);
+  color: var(--color-text-3);
+}
+
+.inv-header__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* ── Section titles ──────────────────────────────────────────────────────────── */
+
+.inv-section-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.inv-section-title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-size-6);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.inv-section-header .inv-section-title {
+  margin-bottom: 0;
+}
+
+.inv-section-sub {
+  font-size: var(--font-size-13);
+  color: var(--color-text-3);
+}
+
+/* ── Status cards ────────────────────────────────────────────────────────────── */
+
+.inv-status-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--space-3);
+}
+
+@media (max-width: 1023px) {
+  .inv-status-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (max-width: 600px) {
+  .inv-status-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+.inv-status-card {
+  padding: var(--space-4) var(--space-3) var(--space-3);
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-border);
+  border-top: 3px solid var(--status-color, var(--color-brand));
+  border-radius: var(--radius);
+  text-align: center;
+  cursor: pointer;
+  transition: box-shadow 0.15s, transform 0.1s;
+}
+
+.inv-status-card:hover {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+  transform: translateY(-1px);
+}
+
+.inv-status-card__count {
+  font-size: var(--font-size-2);
+  font-weight: 700;
+  color: var(--status-color, var(--color-brand));
+  line-height: 1;
+  margin-bottom: var(--space-1);
+}
+
+.inv-status-card__label {
+  font-size: var(--font-size-13);
+  font-weight: 600;
+  color: var(--color-text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ── Gas type grid ───────────────────────────────────────────────────────────── */
+
+.inv-low-stock-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  background: #fee2e2;
+  color: #991b1b;
+  border-radius: 99px;
+  font-size: var(--font-size-12);
+  font-weight: 600;
+}
+
+.inv-gas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-3);
+}
+
+.inv-gas-card {
+  padding: var(--space-4) var(--space-3);
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+.inv-gas-card--low {
+  border-color: #ef4444;
+  background: #fff5f5;
+}
+
+.inv-gas-card__count {
+  font-size: var(--font-size-2);
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1;
+  margin-bottom: var(--space-1);
+}
+
+.inv-gas-card__label {
+  font-size: var(--font-size-13);
+  color: var(--color-text-2);
+  font-weight: 500;
+}
+
+.inv-gas-card__alert {
+  margin-top: var(--space-1);
+  font-size: var(--font-size-12);
+  color: #ef4444;
+  font-weight: 600;
+}
+
+/* ── Inspection table ────────────────────────────────────────────────────────── */
+
+.inv-inspection-table-wrap {
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.inv-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.inv-th {
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  font-size: var(--font-size-12);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-3);
+  background: var(--color-bg-3);
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.inv-th--actions { width: 60px; }
+
+.inv-td {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-size-13);
+  color: var(--color-text);
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+
+.inv-td--serial {
+  font-family: var(--font-mono, monospace);
+  font-weight: 600;
+  font-size: var(--font-size-12);
+}
+
+.inv-td--date { color: var(--color-text-2); white-space: nowrap; }
+
+.inv-row:last-child .inv-td { border-bottom: none; }
+.inv-row:hover .inv-td { background: var(--color-bg-3); }
+
+.inv-row--overdue  { border-left: 3px solid #ef4444; }
+.inv-row--due-soon { border-left: 3px solid #f59e0b; }
+
+/* Status pills */
+.inv-status-pill {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 99px;
+  font-size: var(--font-size-12);
+  font-weight: 500;
+}
+
+.inv-status-pill--available   { background: #d1fae5; color: #065f46; }
+.inv-status-pill--on_truck    { background: #fef3c7; color: #92400e; }
+.inv-status-pill--deployed    { background: #dbeafe; color: #1e40af; }
+.inv-status-pill--returned    { background: #ede9fe; color: #5b21b6; }
+.inv-status-pill--inspection  { background: #fee2e2; color: #991b1b; }
+
+.inv-overdue-label  { color: #ef4444; font-weight: 600; }
+.inv-due-soon-label { color: #d97706; font-weight: 500; }
+
+/* Link button */
+.inv-link-btn {
+  background: none;
+  border: none;
+  color: var(--color-brand);
+  font-size: var(--font-size-13);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.inv-link-btn:hover { color: var(--color-brand-dark); }
+
+/* ── Empty states ────────────────────────────────────────────────────────────── */
+
+.inv-empty {
+  padding: var(--space-5) var(--space-4);
+  text-align: center;
+  color: var(--color-text-3);
+  font-size: var(--font-size-13);
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.inv-empty--success {
+  color: #065f46;
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
