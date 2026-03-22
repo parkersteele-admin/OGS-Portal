@@ -1,6 +1,6 @@
 import type { Timestamp } from 'firebase/firestore'
 
-export type RunStatus = 'scheduled' | 'in-progress' | 'completed' | 'cancelled'
+export type RunStatus = 'scheduled' | 'in-progress' | 'completed' | 'cancelled' | 'archived'
 
 export type RunStopStatus = 'pending' | 'arrived' | 'completed' | 'skipped'
 

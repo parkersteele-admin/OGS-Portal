@@ -112,6 +112,16 @@ export async function updateRun(
   )
 }
 
+export async function archiveRun(id: string): Promise<void> {
+  return serviceCall(() =>
+    updateDoc(doc(db, 'runs', id), {
+      status: 'archived' as RunStatus,
+      archivedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }),
+  )
+}
+
 export async function deleteRun(id: string): Promise<void> {
   return serviceCall(async () => {
     const stops = await getRunStops(id)

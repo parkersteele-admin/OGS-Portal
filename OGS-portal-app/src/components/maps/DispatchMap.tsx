@@ -189,9 +189,12 @@ function StopMarker({ stop, customer, isCurrent }: StopMarkerProps) {
 
   let bgColor    = COLOR_PENDING
   const glyphColor = COLOR_WHITE
+  // glyphNode is used only inside the custom React div (current-stop pulse).
+  // pinGlyph must be string | Element | URL — never a React node.
   let glyphNode: React.ReactNode = (
     <span style={{ fontWeight: 700, fontSize: 11 }}>{stop.order}</span>
   )
+  let pinGlyph: string = String(stop.order)
 
   if (isCompleted) {
     bgColor = COLOR_COMPLETED
@@ -200,6 +203,7 @@ function StopMarker({ stop, customer, isCurrent }: StopMarkerProps) {
         <path d="M5 13l4 4L19 7" stroke={COLOR_WHITE} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
       </svg>
     )
+    pinGlyph = '✓'
   } else if (isCurrent) {
     bgColor = COLOR_BRAND
   }
@@ -239,7 +243,7 @@ function StopMarker({ stop, customer, isCurrent }: StopMarkerProps) {
             background={bgColor}
             borderColor={glyphColor}
             glyphColor={glyphColor}
-            glyph={glyphNode as unknown as HTMLElement}
+            glyph={pinGlyph}
             scale={isCurrent ? 1.2 : 1}
           />
         )}
