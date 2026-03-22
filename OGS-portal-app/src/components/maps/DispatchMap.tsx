@@ -31,6 +31,7 @@ import {
   useAdvancedMarkerRef,
   useMap,
   useApiIsLoaded,
+  useMapsLibrary,
 } from '@vis.gl/react-google-maps'
 import {
   GOOGLE_MAPS_API_KEY,
@@ -299,6 +300,55 @@ function CameraPan({ target }: { target: LatLngLiteral | null | undefined }) {
 // ── MapContent — only rendered once the Maps JS API is loaded ────────────────
 // useAdvancedMarkerRef / AdvancedMarker call .getRootNode() during mount;
 // if the API is not yet loaded that object is undefined and throws.
+
+// CustomerGeocoder: resolves lat/lng for customers missing coordinates using the
+// Maps JS API Geocoder (same session as the loaded map — no separate API key
+// restrictions to worry about beyond the Maps JS API itself).
+function CustomerGeocoder({
+  customers,
+  onResolved,
+}: {
+  customers: Record<string, Customer>
+  onResolved: (positions: Record<string, LatLngLiteral>) => void
+}) {
+  const geocodingLib = useMapsLibrary('geocoding')
+
+  useEffect(() => {
+    if (!geocodingLib) return
+
+    const needsGeocode = Object.values(customers).filter(
+      (c) => c && !c.lat && !c.lng && (c.address || c.formattedAddress),
+    )
+    if (!needsGeocode.length) return
+
+    const geocoder = new geocodingLib.Geocoder()
+    const results: Record<string, LatLngLiteral> = {}
+    let pending = needsGeocode.length
+
+    needsGeocode.forEach((c) => {
+      const addr = (c.formattedAddress || [
+        c.address, c.city, c.state, c.zip,
+      ].filter(Boolean).join(', ')).trim()
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      geocoder.geocode({ address: addr }, (gResults: any, status: any) => {
+        pending -= 1
+        if (status === 'OK' && gResults && gResults[0]) {
+          const loc = gResults[0].geometry.location
+          results[c.id] = { lat: loc.lat(), lng: loc.lng() }
+        }
+        if (pending === 0 && Object.keys(results).length > 0) {
+          onResolved(results)
+        }
+      })
+    })
+  // Only re-run when the set of customer IDs with missing coords changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [geocodingLib, Object.keys(customers).join(',')])
+
+  return null
+}
+
 interface MapContentProps {
   stops:        RunStop[]
   customers:    Record<string, Customer>
@@ -317,6 +367,9 @@ function MapContent({ stops, customers, driverName, cameraTarget, currentStop, d
   return (
     <>
       <CameraPan target={cameraTarget} />
+      {onPositionsResolved && (
+        <CustomerGeocoder customers={customers} onResolved={onPositionsResolved} />
+      )}
       <RoutePolyline stops={stops} customers={customers} onPositionsResolved={onPositionsResolved} />
       {driverPosition && (
         <TruckMarker
