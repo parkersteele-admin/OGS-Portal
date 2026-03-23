@@ -446,6 +446,7 @@ const QuoteEditorPage: React.FC = () => {
   const [savedId,        setSavedId]        = useState<string | null>(isNew ? null : quoteId!)
   const [status,         setStatus]         = useState<QuoteStatus>('draft')
   const [error,          setError]          = useState<string | null>(null)
+  const [sendToast,      setSendToast]      = useState<string | null>(null)
   const summaryRef = useRef<HTMLDivElement | null>(null)
 
   // Load existing quote into form
@@ -677,6 +678,12 @@ const QuoteEditorPage: React.FC = () => {
       setStatus('sent')
       queryClient.invalidateQueries({ queryKey: ['quotes'] })
     },
+    onSuccess: () => {
+      const selectedOpt = recipients.find(r => r.id === recipientId)
+      const name = selectedOpt?.label ?? 'the customer'
+      setSendToast(`Quote sent to ${name}. They'll receive an email with the PDF shortly.`)
+      setTimeout(() => setSendToast(null), 6000)
+    },
     onError: (e: Error) => setError(e.message),
   })
 
@@ -749,6 +756,8 @@ const QuoteEditorPage: React.FC = () => {
       </div>
 
       {error && <div className="qep-error" role="alert">{error}</div>}
+
+      {sendToast && <div className="qep-toast" role="status">{sendToast}</div>}
 
       {marginViolations.length > 0 && (
         <div className="qep-error qep-error--warn" role="alert">

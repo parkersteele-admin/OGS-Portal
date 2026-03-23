@@ -354,6 +354,7 @@ export const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
   const [savedId,        setSavedId]        = useState<string | null>(editQuote?.id ?? null)
   const [status,         setStatus]         = useState<QuoteStatus>(editQuote?.status ?? 'draft')
   const [error,          setError]          = useState<string | null>(null)
+  const [toast,          setToast]          = useState<string | null>(null)
 
   // Pre-fill from edit quote
   useEffect(() => {
@@ -533,10 +534,17 @@ export const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
       setError(null)
       let id = savedId
       if (!id) id = await saveMutation.mutateAsync()
-      await generateQuotePdf(id!) // ensures PDF exists
+      // Set status to 'sent' FIRST so the Cloud Function sees it when it checks
+      // whether to email the PDF to the recipient.
       await sendQuote(id!)
+      await generateQuotePdf(id!) // generates PDF + emails because status is now 'sent'
       setStatus('sent')
       queryClient.invalidateQueries({ queryKey: ['quotes'] })
+    },
+    onSuccess: () => {
+      const name = recipient?.label ?? 'the customer'
+      setToast(`Quote sent to ${name}. They'll receive an email with the PDF shortly.`)
+      setTimeout(() => setToast(null), 6000)
     },
     onError: (e: Error) => setError(e.message),
   })
@@ -589,6 +597,10 @@ export const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
 
         {error && (
           <div className="qb-error" role="alert">{error}</div>
+        )}
+
+        {toast && (
+          <div className="qb-toast" role="status">{toast}</div>
         )}
 
         {/* Recipient */}

@@ -589,6 +589,21 @@
   color: #be123c;
 }
 
+.qb-toast {
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.85rem;
+  color: #166534;
+  animation: qb-fadein 0.2s ease;
+}
+
+@keyframes qb-fadein {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* ── Modal form ────────────────────────────────────────────────────────────── */
 
 .qb-modal-form {
