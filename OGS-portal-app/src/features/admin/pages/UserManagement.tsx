@@ -15,7 +15,7 @@
 import React, { useState, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getDocs, query, orderBy } from 'firebase/firestore'
+import { getDocs } from 'firebase/firestore'
 import { usersCol, customersCol } from '../../../lib/firestore'
 import {
   assignUserRole,
@@ -70,8 +70,20 @@ const DEMO_USERS: Array<{ name: string; email: string; role: UserRole }> = [
 // ── Fetch ─────────────────────────────────────────────────────────────────────
 
 async function fetchAllUsers(): Promise<AppUser[]> {
-  const snap = await getDocs(query(usersCol, orderBy('name')))
-  return snap.docs.map((d) => ({ ...d.data(), id: d.id }) as AppUser)
+  // Do NOT use orderBy here — Firestore silently excludes docs that lack the
+  // ordered field (e.g. web-signup users only write firstName/lastName, not name).
+  // Sort client-side and synthesize 'name' from firstName+lastName when missing.
+  const snap = await getDocs(usersCol)
+  const users = snap.docs.map((d) => {
+    const data = d.data() as unknown as Record<string, unknown>
+    const name =
+      (data['name'] as string | undefined) ??
+      [`${data['firstName'] ?? ''}`, `${data['lastName'] ?? ''}`].join(' ').trim() ??
+      (data['email'] as string | undefined) ??
+      d.id
+    return { ...data, name, id: d.id } as AppUser
+  })
+  return users.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''))
 }
 
 async function fetchAllCompanies(): Promise<CompanyOption[]> {
@@ -643,7 +655,7 @@ export const UserManagement: React.FC = () => {
                     <tr key={user.id} className={!user.active ? 'um__row--inactive' : ''}>
                       <td className="um__cell-name">
                         <span className="um__avatar" aria-hidden="true">
-                          {user.name.charAt(0).toUpperCase()}
+                          {(user.name || user.email || '?').charAt(0).toUpperCase()}
                         </span>
                         <span className="um__cell-name-text">
                           {user.name}
