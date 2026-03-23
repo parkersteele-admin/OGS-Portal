@@ -42,7 +42,9 @@ interface CompanyOption { id: string; name: string }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const ALL_ROLES: UserRole[] = ['admin', 'dispatch', 'driver', 'sales', 'customer']
+const OGS_ROLES: UserRole[]      = ['admin', 'dispatch', 'driver', 'sales']
+const CUSTOMER_ROLES: UserRole[] = ['owner', 'manager', 'billing', 'delivery', 'viewer', 'customer']
+const ALL_ROLES: UserRole[]      = [...OGS_ROLES, ...CUSTOMER_ROLES]
 
 const ROLE_LABELS: Record<UserRole, string> = {
   admin:    'Admin',
@@ -73,11 +75,16 @@ async function fetchAllUsers(): Promise<AppUser[]> {
 }
 
 async function fetchAllCompanies(): Promise<CompanyOption[]> {
-  const snap = await getDocs(query(customersCol, orderBy('companyName')))
-  return snap.docs.map((d) => {
+  // Do NOT use orderBy here — Firestore excludes docs that lack the ordered
+  //  field entirely. Sort in JS instead so all customer records are returned.
+  const snap = await getDocs(customersCol)
+  const companies = snap.docs.map((d) => {
     const data = d.data() as unknown as Record<string, unknown>
-    return { id: d.id, name: (data.companyName ?? d.id) as string }
+    // Handle both Company shape (companyName) and legacy Customer shape (name)
+    const name = (data.companyName ?? data.name ?? d.id) as string
+    return { id: d.id, name }
   })
+  return companies.sort((a, b) => a.name.localeCompare(b.name))
 }
 
 // ── Role badge ────────────────────────────────────────────────────────────────
@@ -533,10 +540,21 @@ export const UserManagement: React.FC = () => {
       </div>
 
       {/* ── 1. Stat cards ──────────────────────────────────────────────── */}
-      <div className="um__stats">
-        {ALL_ROLES.map((r) => (
-          <StatCard key={r} role={r} count={stats[r]} total={totalUsers} />
-        ))}
+      <div className="um__stats-group">
+        <p className="um__stats-label">OGS Staff</p>
+        <div className="um__stats">
+          {OGS_ROLES.map((r) => (
+            <StatCard key={r} role={r} count={stats[r]} total={totalUsers} />
+          ))}
+        </div>
+      </div>
+      <div className="um__stats-group">
+        <p className="um__stats-label">Customer Accounts</p>
+        <div className="um__stats">
+          {CUSTOMER_ROLES.map((r) => (
+            <StatCard key={r} role={r} count={stats[r]} total={totalUsers} />
+          ))}
+        </div>
       </div>
 
       {/* ── 2. Filter bar ──────────────────────────────────────────────── */}
@@ -556,9 +574,16 @@ export const UserManagement: React.FC = () => {
           aria-label="Filter by role"
         >
           <option value="all">All roles</option>
-          {ALL_ROLES.map((r) => (
-            <option key={r} value={r}>{ROLE_LABELS[r]}</option>
-          ))}
+          <optgroup label="OGS Staff">
+            {OGS_ROLES.map((r) => (
+              <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+            ))}
+          </optgroup>
+          <optgroup label="Customer Accounts">
+            {CUSTOMER_ROLES.map((r) => (
+              <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+            ))}
+          </optgroup>
         </select>
         <select
           className="um__role-filter"
