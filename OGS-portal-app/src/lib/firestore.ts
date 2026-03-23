@@ -91,6 +91,9 @@ export type { RouteSchedule }
 export const leadsCol = col<Lead>('leads')
 export const quotesCol = col<Quote>('quotes')
 
+// ── Sales Pipeline (leads 1:1 with customers/{companyId}) ─────────────────────
+export const pipelineLeadsCol = col<import('../types/pipeline').PipelineLead>('leads')
+
 // ── Products ──────────────────────────────────────────────────────────────────
 export const productsCol = col<Product>('products')
 export const productPricingCol = col<import('../types/product').ProductPricingInternal>('productPricing')

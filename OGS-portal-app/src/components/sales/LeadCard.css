@@ -1,0 +1,123 @@
+/* LeadCard.css */
+
+.lc-card {
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 8px;
+  padding: 12px;
+  cursor: grab;
+  transition: box-shadow 0.15s, transform 0.1s;
+  user-select: none;
+}
+
+.lc-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.lc-card--dragging { box-shadow: 0 8px 24px rgba(0,0,0,0.18); cursor: grabbing; }
+
+.lc-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.lc-card__name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0;
+  line-height: 1.3;
+  color: var(--color-text, #1a202c);
+}
+
+.lc-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+/* Business type badges */
+.lc-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #4a5568;
+  text-transform: capitalize;
+}
+.lc-badge--brewery    { background: #ebf8ff; color: #2b6cb0; }
+.lc-badge--restaurant { background: #f0fff4; color: #276749; }
+.lc-badge--medical    { background: #fff5f5; color: #c53030; }
+.lc-badge--industrial { background: #fffaf0; color: #c05621; }
+.lc-badge--residential { background: #faf5ff; color: #6b46c1; }
+
+/* Time in stage */
+.lc-age {
+  font-size: 0.68rem;
+  color: #718096;
+  background: #f7fafc;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.lc-age--warn     { background: #fffbeb; color: #b7791f; }
+.lc-age--critical { background: #fff5f5; color: #c53030; }
+
+/* Estimated value */
+.lc-card__value { margin-bottom: 8px; }
+.lc-emv {
+  font-size: 0.8rem;
+  color: #2d3748;
+  font-weight: 500;
+}
+.lc-emv--empty { color: #a0aec0; }
+
+/* Footer */
+.lc-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+/* Rep avatar */
+.lc-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #e87722;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.lc-avatar--unassigned {
+  background: #e2e8f0;
+  color: #e87722;
+}
+
+/* Follow-up */
+.lc-followup {
+  font-size: 0.7rem;
+  color: #718096;
+}
+.lc-followup--overdue {
+  color: #c53030;
+  font-weight: 600;
+}
+
+/* Priority dot */
+.lc-priority {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.lc-priority--high   { background: #e87722; }
+.lc-priority--normal { border: 2px solid #cbd5e0; background: transparent; }
+.lc-priority--low    { background: #cbd5e0; }

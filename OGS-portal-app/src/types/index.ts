@@ -18,6 +18,24 @@ export type {
 } from './billing'
 export type { Lead, LeadStatus, Quote, QuoteItem, QuoteStatus, ContactLog } from './crm'
 export type { AppFile } from './file'
+export type {
+  PipelineLead,
+  PipelineStage,
+  LeadPriority,
+  LeadSource,
+  ActivityEntry,
+  ActivityType,
+  StageHistoryEntry,
+  LossReason,
+  PipelineFilters,
+} from './pipeline'
+export {
+  BOARD_STAGES,
+  STAGE_LABELS,
+  STAGE_ORDER,
+  LOSS_REASON_LABELS,
+  DEFAULT_FILTERS,
+} from './pipeline'
 
 export type NotificationType =
   | 'rush_order'

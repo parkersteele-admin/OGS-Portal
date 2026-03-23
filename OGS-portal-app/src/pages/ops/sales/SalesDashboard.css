@@ -1,0 +1,74 @@
+/* SalesDashboard.css */
+
+.sdash-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.sdash-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px 12px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+}
+
+.sdash-title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #1a202c;
+  margin: 0;
+}
+
+.sdash-view-toggle {
+  padding: 7px 16px;
+  border-radius: 7px;
+  border: 1px solid #e2e8f0;
+  background: #f7fafc;
+  color: #4a5568;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.sdash-view-toggle:hover { background: #edf2f7; }
+
+.sdash-loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sdash-layout {
+  display: flex;
+  gap: 20px;
+  flex: 1;
+  overflow: hidden;
+  padding: 16px 24px;
+  align-items: flex-start;
+}
+
+.sdash-board-pane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+@media (max-width: 1024px) {
+  .sdash-layout {
+    flex-direction: column;
+    overflow: auto;
+    height: auto;
+  }
+  .sdash-board-pane {
+    height: auto;
+    overflow: visible;
+  }
+}

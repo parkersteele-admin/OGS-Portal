@@ -1,0 +1,47 @@
+/* LostLeads.css */
+
+.ll-page { padding: 24px; }
+.ll-header { margin-bottom: 16px; }
+.ll-title { font-size: 1.3rem; font-weight: 700; margin: 0 0 4px; color: #1a202c; }
+.ll-subtitle { font-size: 0.875rem; color: #718096; margin: 0; }
+.ll-loading { display: flex; align-items: center; justify-content: center; padding: 48px; }
+.ll-empty { color: #a0aec0; font-size: 0.875rem; padding: 32px 0; }
+
+.ll-breakdown {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.ll-reason-chip {
+  font-size: 0.78rem;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: #fff5f5;
+  color: #c53030;
+  border: 1px solid #fed7d7;
+}
+
+.ll-table-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid #e2e8f0; }
+.ll-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+.ll-table th {
+  padding: 11px 14px;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #718096;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: #f7fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+.ll-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #f7fafc;
+  color: #2d3748;
+  vertical-align: middle;
+}
+.ll-table tr:last-child td { border-bottom: none; }
+.ll-table tr:hover td { background: #fafafa; }
+.ll-td--name { font-weight: 600; color: #1a202c; }
+.ll-reason { font-size: 0.82rem; color: #c53030; }

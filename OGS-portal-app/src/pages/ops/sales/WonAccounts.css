@@ -1,0 +1,35 @@
+/* WonAccounts.css */
+
+.wa-page { padding: 24px; }
+.wa-header { margin-bottom: 20px; }
+.wa-title { font-size: 1.3rem; font-weight: 700; margin: 0 0 4px; color: #1a202c; }
+.wa-subtitle { font-size: 0.875rem; color: #718096; margin: 0; }
+.wa-loading { display: flex; align-items: center; justify-content: center; padding: 48px; }
+.wa-empty { color: #a0aec0; font-size: 0.875rem; padding: 32px 0; }
+.wa-table-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid #e2e8f0; }
+.wa-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+.wa-table th {
+  padding: 11px 14px;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #718096;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: #f7fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+.wa-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #f7fafc;
+  color: #2d3748;
+  vertical-align: middle;
+}
+.wa-table tr:last-child td { border-bottom: none; }
+.wa-table tr:hover td { background: #fafafa; }
+.wa-td--name { font-weight: 600; color: #1a202c; }
+.wa-badge { font-size: 0.72rem; font-weight: 600; padding: 2px 9px; border-radius: 999px; }
+.wa-badge--won { background: #f0fff4; color: #276749; }
+.wa-unassigned { color: #a0aec0; font-style: italic; }
+.wa-link { font-size: 0.82rem; color: #e87722; text-decoration: none; font-weight: 500; }
+.wa-link:hover { text-decoration: underline; }

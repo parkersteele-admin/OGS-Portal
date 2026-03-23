@@ -349,6 +349,19 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+
+    // ── Sales Pipeline Leads ──────────────────────────────────────────────────
+    // leads/{companyId} — 1:1 with customers/{companyId}, sales workflow state
+    match /leads/{companyId} {
+      allow read: if request.auth.token.role == 'admin'
+        || request.auth.token.role == 'sales'
+        || request.auth.token.role == 'dispatch';
+      // Sales reps and admins write leads; Cloud Functions also write via admin SDK (bypasses rules)
+      allow write: if request.auth.token.role == 'admin'
+        || request.auth.token.role == 'sales';
+    }
+
+
     // ── Deny everything else ──────────────────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;

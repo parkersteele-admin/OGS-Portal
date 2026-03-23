@@ -67,6 +67,14 @@ import { OnboardingLayout } from '../../components/layouts/OnboardingLayout'
 import CustomerListPage   from '../../pages/ops/CustomerList'
 import CustomerDetailPage from '../../pages/ops/CustomerDetail'
 
+// Sales Pipeline
+import { SalesLayout } from '../../components/layouts/SalesLayout'
+import SalesDashboard   from '../../pages/ops/sales/SalesDashboard'
+import PipelineList     from '../../pages/ops/sales/PipelineList'
+import WonAccounts      from '../../pages/ops/sales/WonAccounts'
+import LostLeads        from '../../pages/ops/sales/LostLeads'
+import SalesPerformance from '../../pages/ops/sales/SalesPerformance'
+
 const RootRedirect: React.FC = () => {
   const { user, loading, role } = useAuth()
 
@@ -141,6 +149,23 @@ export const AppRouter: React.FC = () => (
         <Route path="billing" element={<BillingDashboard />} />
         <Route path="customers" element={<CustomerListPage />} />
         <Route path="customers/:companyId" element={<CustomerDetailPage />} />
+      </Route>
+
+      {/* Sales Pipeline — admin + sales */}
+      <Route
+        path="/ops/sales"
+        element={
+          <ProtectedRoute role={['admin', 'sales']}>
+            <SalesLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route path="dashboard"   element={<SalesDashboard />} />
+        <Route path="pipeline"    element={<PipelineList />} />
+        <Route path="won"         element={<WonAccounts />} />
+        <Route path="lost"        element={<LostLeads />} />
+        <Route path="performance" element={<SalesPerformance />} />
       </Route>
 
       <Route

@@ -74,6 +74,22 @@ export {
 export { onCreditApplicationSubmitted } from './triggers/onCreditApplicationSubmitted'
 export { onQuoteRequested }             from './triggers/onQuoteRequested'
 
+// Sales Pipeline triggers + callables + scheduled
+export { onCustomerCreated }            from './triggers/onCustomerCreated'
+export { onCustomerUpdatedPipeline }    from './triggers/onCustomerUpdatedPipeline'
+export {
+  calculateLeadValue,
+  logLeadActivity,
+  advanceLeadStage,
+  markLeadWon,
+  markLeadLost,
+  assignLead,
+  scheduleFollowUp,
+}                                       from './pipeline'
+export { checkStaleLeads }              from './scheduled/checkStaleLeads'
+export { sendFollowUpReminders }        from './scheduled/sendFollowUpReminders'
+export { alertUnassignedLead }          from './scheduled/alertUnassignedLead'
+
 export const healthCheck = onRequest((_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
