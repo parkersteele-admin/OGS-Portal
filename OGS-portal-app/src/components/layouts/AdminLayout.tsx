@@ -10,30 +10,30 @@ import './Layout.css'
 
 const NAV_ITEMS: SidebarItem[] = [
   // ── CRM ───────────────────────────────────────────────────────────────
-  { to: '/crm/dashboard',     label: 'CRM Dashboard',  icon: '◎', sectionLabel: 'CRM' },
-  { to: '/crm/customers',     label: 'Customers',      icon: '◇' },
-  { to: '/crm/leads',         label: 'Leads',          icon: '▷' },
-  { to: '/crm/quotes',        label: 'Quotes',         icon: '◈' },
-  { to: '/crm/billing',       label: 'Billing',        icon: '$' },
-  { to: '/crm/aging',         label: 'Aging',          icon: '↓' },
-  { to: '/crm/price-list',    label: 'Price List',     icon: '⊟' },
+  { to: '/admin/crm/dashboard',     label: 'CRM Dashboard',  icon: '◎', sectionLabel: 'CRM' },
+  { to: '/admin/crm/customers',     label: 'Customers',      icon: '◇' },
+  { to: '/admin/crm/leads',         label: 'Leads',          icon: '▷' },
+  { to: '/admin/crm/quotes',        label: 'Quotes',         icon: '◈' },
+  { to: '/admin/crm/billing',       label: 'Billing',        icon: '$' },
+  { to: '/admin/crm/aging',         label: 'Aging',          icon: '↓' },
+  { to: '/admin/crm/price-list',    label: 'Price List',     icon: '⊟' },
   // ── Operations ────────────────────────────────────────────────────────
-  { to: '/ops/dashboard',     label: 'Ops Dashboard',  icon: '⊞', sectionLabel: 'Operations' },
-  { to: '/ops/orders',        label: 'Orders',         icon: '≡' },
-  { to: '/ops/runs',          label: 'Runs',           icon: '↗' },
-  { to: '/ops/dispatch',      label: 'Dispatch',       icon: '⊕' },
-  { to: '/ops/tanks',         label: 'Tanks',          icon: '⊙' },
-  { to: '/ops/inventory',     label: 'Inventory',      icon: '⊟' },
+  { to: '/admin/ops/dashboard',     label: 'Ops Dashboard',  icon: '⊞', sectionLabel: 'Operations' },
+  { to: '/admin/ops/orders',        label: 'Orders',         icon: '≡' },
+  { to: '/admin/ops/runs',          label: 'Runs',           icon: '↗' },
+  { to: '/admin/ops/dispatch',      label: 'Dispatch',       icon: '⊕' },
+  { to: '/admin/ops/tanks',         label: 'Tanks',          icon: '⊙' },
+  { to: '/admin/ops/inventory',     label: 'Inventory',      icon: '⊟' },
   // ── Admin ─────────────────────────────────────────────────────────────
   { to: '/admin/users',             label: 'User Management',    icon: '◎', sectionLabel: 'Admin' },
   { to: '/admin/delivery-settings', label: 'Delivery Settings',  icon: '⊞' },
 ]
 
 const MOBILE_ITEMS: MobileNavItem[] = [
-  { to: '/crm/customers',     label: 'Customers',   icon: '◇' },
-  { to: '/ops/dashboard',     label: 'Operations',  icon: '⊞' },
-  { to: '/ops/dispatch',      label: 'Dispatch',    icon: '⊕' },
-  { to: '/admin/users',       label: 'Users',       icon: '◎' },
+  { to: '/admin/crm/customers',     label: 'Customers',   icon: '◇' },
+  { to: '/admin/ops/dashboard',     label: 'Operations',  icon: '⊞' },
+  { to: '/admin/ops/dispatch',      label: 'Dispatch',    icon: '⊕' },
+  { to: '/admin/users',             label: 'Users',       icon: '◎' },
 ]
 
 export const AdminLayout: React.FC = () => (

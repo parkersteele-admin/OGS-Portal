@@ -203,6 +203,35 @@ export const AppRouter: React.FC = () => (
         <Route index element={<Navigate to="users" replace />} />
         <Route path="users" element={<UserManagement />} />
         <Route path="delivery-settings" element={<DeliverySettingsPage />} />
+
+        {/* CRM pages inside AdminLayout */}
+        <Route path="crm" element={<Navigate to="dashboard" replace />} />
+        <Route path="crm/dashboard"                    element={<SalesDashboardPage />} />
+        <Route path="crm/customers"                    element={<CustomersPage />} />
+        <Route path="crm/customers/:customerId"        element={<CustomerRecord />} />
+        <Route path="crm/leads"                        element={<LeadsPage />} />
+        <Route path="crm/quotes"                       element={<QuotesPage />} />
+        <Route path="crm/quotes/new"                   element={<QuoteEditorPage />} />
+        <Route path="crm/quotes/:quoteId"              element={<QuoteEditorPage />} />
+        <Route path="crm/billing"                      element={<CrmBillingPage />} />
+        <Route path="crm/aging"                        element={<AgingPage />} />
+        <Route path="crm/price-list"                   element={<PriceList />} />
+        <Route path="crm/merchandising"                element={<MerchandisingPanel />} />
+
+        {/* Ops pages inside AdminLayout */}
+        <Route path="ops" element={<Navigate to="dashboard" replace />} />
+        <Route path="ops/dashboard"                    element={<OpsDashboardPage />} />
+        <Route path="ops/orders"                       element={<OpsOrdersPage />} />
+        <Route path="ops/runs"                         element={<RunsPage />} />
+        <Route path="ops/runs/new"                     element={<RunBuilder />} />
+        <Route path="ops/runs/:runId/summary"          element={<RunSummaryPage />} />
+        <Route path="ops/dispatch"                     element={<DispatchPage />} />
+        <Route path="ops/dispatch/:runId"              element={<DispatchPage />} />
+        <Route path="ops/tanks"                        element={<OpsTanksPage />} />
+        <Route path="ops/inventory"                    element={<InventoryPage />} />
+        <Route path="ops/billing"                      element={<BillingDashboard />} />
+        <Route path="ops/customers"                    element={<CustomerListPage />} />
+        <Route path="ops/customers/:companyId"         element={<CustomerDetailPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
