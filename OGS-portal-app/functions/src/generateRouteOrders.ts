@@ -5,8 +5,8 @@
  * Generates the next order doc for every active route schedule.
  */
 
-import * as functions from 'firebase-functions'
-import * as admin from 'firebase-admin'
+import { onSchedule } from 'firebase-functions/v2/scheduler'
+import { logger } from 'firebase-functions/v2'
 
 // TODO: query all active routeSchedules where nextDeliveryDate <= tomorrow
 // TODO: for each, create an order doc with orderType: 'route'
@@ -16,10 +16,10 @@ import * as admin from 'firebase-admin'
 // TODO: update nextDeliveryDate on the schedule doc (cadence + dayOfWeek logic)
 // TODO: if customIntervalDays is set, advance by that many days instead
 
-export const generateRouteOrders = functions.pubsub
-  .schedule('0 6 * * *')
-  .timeZone('America/New_York')
-  .onRun(async (_context) => {
+export const generateRouteOrders = onSchedule(
+  { schedule: '0 6 * * *', timeZone: 'America/New_York' },
+  async (_event) => {
     // TODO: implement
-    functions.logger.info('generateRouteOrders: stub — not yet implemented')
-  })
+    logger.info('generateRouteOrders: stub — not yet implemented')
+  },
+)

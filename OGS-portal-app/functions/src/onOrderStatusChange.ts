@@ -5,8 +5,8 @@
  * Handles status-based side effects for offRoute and addOn orders.
  */
 
-import * as functions from 'firebase-functions'
-import * as admin from 'firebase-admin'
+import { onDocumentUpdated } from 'firebase-functions/v2/firestore'
+import { logger } from 'firebase-functions/v2'
 
 // TODO: when status changes to 'pending' and orderType === 'offRoute':
 //   - notify dispatch (create a notification doc at /notifications)
@@ -19,21 +19,19 @@ import * as admin from 'firebase-admin'
 
 // TODO: gate: only act when status field actually changed (compare before/after)
 
-export const onOrderStatusChange = functions.firestore
-  .document('orders/{orderId}')
-  .onUpdate(async (change, context) => {
-    const before = change.before.data()
-    const after = change.after.data()
+export const onOrderStatusChange = onDocumentUpdated('orders/{orderId}', async (event) => {
+  const before = event.data?.before.data()
+  const after  = event.data?.after.data()
 
-    if (before.status === after.status) return null // nothing changed
+  if (!before || !after) return
+  if (before.status === after.status) return // nothing changed
 
-    functions.logger.info('onOrderStatusChange: stub — not yet implemented', {
-      orderId: context.params.orderId,
-      from: before.status,
-      to: after.status,
-      orderType: after.orderType,
-    })
-
-    // TODO: implement side effects here
-    return null
+  logger.info('onOrderStatusChange: stub — not yet implemented', {
+    orderId: event.params.orderId,
+    from: before.status,
+    to: after.status,
+    orderType: after.orderType,
   })
+
+  // TODO: implement side effects here
+})
