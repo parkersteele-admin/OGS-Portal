@@ -102,3 +102,83 @@ export const adminCreateUser = onCall(async (request) => {
 
   return { uid }
 })
+
+/**
+ * adminDeleteUser — Admin-only callable that fully removes a user:
+ *   1. Deletes the Firebase Auth account
+ *   2. Deletes the Firestore /users/{uid} document
+ *
+ * Input:  { uid: string }
+ * Output: { success: true }
+ */
+export const adminDeleteUser = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'You must be signed in.')
+  }
+  if (request.auth.token.role !== 'admin') {
+    throw new HttpsError('permission-denied', 'Only admins can delete users.')
+  }
+
+  const data = request.data as Record<string, unknown>
+  const uid  = data.uid as string | undefined
+  if (!uid || typeof uid !== 'string') {
+    throw new HttpsError('invalid-argument', 'uid is required.')
+  }
+  // Prevent self-deletion
+  if (uid === request.auth.uid) {
+    throw new HttpsError('failed-precondition', 'You cannot delete your own account.')
+  }
+
+  try {
+    await adminAuth.deleteUser(uid)
+  } catch (err: unknown) {
+    const msg = (err as { message?: string }).message ?? String(err)
+    // If user-not-found in Auth, still clean up Firestore
+    if (!msg.includes('user-not-found')) {
+      console.error('[adminDeleteUser] Auth deleteUser error:', err)
+      throw new HttpsError('internal', `Failed to delete Auth user: ${msg}`)
+    }
+  }
+
+  await db.collection('users').doc(uid).delete()
+
+  return { success: true }
+})
+
+/**
+ * adminUpdateUserCompany — Admin-only callable to assign a user to a company.
+ * Updates both the Firestore doc and the Auth custom claims.
+ *
+ * Input:  { uid: string; companyId: string | null }
+ * Output: { success: true }
+ */
+export const adminUpdateUserCompany = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'You must be signed in.')
+  }
+  if (request.auth.token.role !== 'admin') {
+    throw new HttpsError('permission-denied', 'Only admins can update user companies.')
+  }
+
+  const data      = request.data as Record<string, unknown>
+  const uid       = data.uid       as string | undefined
+  const companyId = data.companyId as string | null | undefined
+
+  if (!uid || typeof uid !== 'string') {
+    throw new HttpsError('invalid-argument', 'uid is required.')
+  }
+
+  // Update custom claims to keep companyId in sync
+  const existingRecord = await adminAuth.getUser(uid)
+  const currentClaims  = existingRecord.customClaims ?? {}
+  await adminAuth.setCustomUserClaims(uid, { ...currentClaims, companyId: companyId ?? null })
+
+  // Update Firestore
+  await db.collection('users').doc(uid).update({
+    companyId:  companyId ?? null,
+    customerId: companyId ?? null, // keep legacy field in sync
+    updatedAt:  FieldValue.serverTimestamp(),
+  })
+
+  return { success: true }
+})

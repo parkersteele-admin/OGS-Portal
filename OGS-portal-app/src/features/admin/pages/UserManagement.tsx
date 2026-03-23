@@ -6,22 +6,25 @@
  *
  * Sections:
  *  1. Stat cards — total count per role
- *  2. Filter bar — search + role filter
- *  3. User table — Name | Email | Role | Status | Last Login | Actions
+ *  2. Filter bar — search + role + company filter
+ *  3. User table — Name | Email | Role | Company | Status | Last Login | Actions
  *  4. Create User modal — CF adminCreateUser + sendPasswordResetEmail
- *  5. Edit User modal  — change role (CF) + activate/deactivate (Firestore)
+ *  5. Edit User modal  — change role (CF) + company (CF) + activate/deactivate
  */
 
 import React, { useState, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getDocs, query, orderBy } from 'firebase/firestore'
-import { usersCol } from '../../../lib/firestore'
+import { usersCol, customersCol } from '../../../lib/firestore'
 import {
   assignUserRole,
   deactivateUser,
   reactivateUser,
   createAppUser,
+  hardDeleteUser,
+  sendPasswordReset,
+  updateUserCompany,
 } from '../../../services/userService'
 import { useViewAsStore } from '../../../store/viewAsStore'
 import { ROLE_HOME } from '../../../types/auth'
@@ -32,6 +35,10 @@ import { formatDate } from '../../../utils/format'
 import type { AppUser } from '../../../types/user'
 import type { UserRole } from '../../../types/user'
 import './UserManagement.css'
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface CompanyOption { id: string; name: string }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -63,6 +70,14 @@ const DEMO_USERS: Array<{ name: string; email: string; role: UserRole }> = [
 async function fetchAllUsers(): Promise<AppUser[]> {
   const snap = await getDocs(query(usersCol, orderBy('name')))
   return snap.docs.map((d) => ({ ...d.data(), id: d.id }) as AppUser)
+}
+
+async function fetchAllCompanies(): Promise<CompanyOption[]> {
+  const snap = await getDocs(query(customersCol, orderBy('companyName')))
+  return snap.docs.map((d) => {
+    const data = d.data() as unknown as Record<string, unknown>
+    return { id: d.id, name: (data.companyName ?? d.id) as string }
+  })
 }
 
 // ── Role badge ────────────────────────────────────────────────────────────────
@@ -193,15 +208,18 @@ const SeedDemoUsersModal: React.FC<{ onClose: () => void; onDone: () => void }> 
 
 interface EditUserModalProps {
   user:      AppUser
+  companies: CompanyOption[]
   onClose:   () => void
   onUpdated: () => void
 }
 
-const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onUpdated }) => {
-  const [role,  setRole]  = useState<UserRole>(user.role)
-  const [error, setError] = useState('')
+const EditUserModal: React.FC<EditUserModalProps> = ({ user, companies, onClose, onUpdated }) => {
+  const [role,      setRole]      = useState<UserRole>(user.role)
+  const [companyId, setCompanyId] = useState<string>(user.companyId ?? user.customerId ?? '')
+  const [error,     setError]     = useState('')
 
-  const roleChanged = role !== user.role
+  const roleChanged    = role !== user.role
+  const companyChanged = companyId !== (user.companyId ?? user.customerId ?? '')
 
   const roleMutation = useMutation({
     mutationFn: () => assignUserRole(user.id, role),
@@ -209,10 +227,22 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onUpdated 
     onError:    (err: Error) => setError(err.message || 'Failed to update role.'),
   })
 
+  const companyMutation = useMutation({
+    mutationFn: () => updateUserCompany(user.id, companyId || null),
+    onSuccess:  () => { onUpdated() },
+    onError:    (err: Error) => setError(err.message || 'Failed to update company.'),
+  })
+
   const toggleMutation = useMutation({
     mutationFn: () => (user.active ? deactivateUser(user.id) : reactivateUser(user.id)),
     onSuccess:  () => { onUpdated() },
     onError:    (err: Error) => setError(err.message || 'Failed to update status.'),
+  })
+
+  const resetMutation = useMutation({
+    mutationFn: () => sendPasswordReset(user.email),
+    onSuccess:  () => setError('Password reset email sent.'),
+    onError:    (err: Error) => setError(err.message || 'Failed to send reset email.'),
   })
 
   return (
@@ -259,13 +289,52 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onUpdated 
           </p>
         </section>
 
-        {/* Linked customer record */}
-        {user.customerId && (
-          <section className="um-edit__section">
-            <p className="um-edit__section-label">Linked Customer Record</p>
-            <p className="um-edit__customer-id">{user.customerId}</p>
-          </section>
-        )}
+        {/* Company assignment */}
+        <section className="um-edit__section">
+          <p className="um-edit__section-label">Company Assignment</p>
+          <div className="um-edit__role-row">
+            <select
+              className="um-select"
+              value={companyId}
+              onChange={(e) => setCompanyId(e.target.value)}
+            >
+              <option value="">— No company —</option>
+              {companies.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => companyMutation.mutate()}
+              disabled={!companyChanged}
+              loading={companyMutation.isPending}
+            >
+              Save
+            </Button>
+          </div>
+          <p className="um-edit__hint">
+            Links user to a customer record and syncs the Auth custom claim.
+          </p>
+        </section>
+
+        {/* Password reset */}
+        <section className="um-edit__section">
+          <p className="um-edit__section-label">Password Reset</p>
+          <div className="um-edit__status-row">
+            <p className="um-edit__hint" style={{ margin: 0 }}>
+              Send a password-reset link to <strong>{user.email}</strong>
+            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => resetMutation.mutate()}
+              loading={resetMutation.isPending}
+            >
+              Send Reset Email
+            </Button>
+          </div>
+        </section>
 
         {/* Activate / Deactivate */}
         <section className="um-edit__section">
@@ -301,6 +370,49 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onUpdated 
   )
 }
 
+// ── Delete Confirm Modal ──────────────────────────────────────────────────────
+
+interface DeleteConfirmModalProps {
+  user:      AppUser
+  onClose:   () => void
+  onDeleted: () => void
+}
+
+const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({ user, onClose, onDeleted }) => {
+  const [error, setError] = useState('')
+
+  const deleteMutation = useMutation({
+    mutationFn: () => hardDeleteUser(user.id),
+    onSuccess:  () => { onDeleted() },
+    onError:    (err: Error) => setError(err.message || 'Failed to delete user.'),
+  })
+
+  return (
+    <Modal open onClose={onClose} title="Delete User" size="sm">
+      <div className="um-edit">
+        <p style={{ marginBottom: '1rem' }}>
+          Permanently delete <strong>{user.name}</strong> ({user.email})?
+          This removes their Firebase Auth account and all portal access.
+          This action cannot be undone.
+        </p>
+        {error && <p className="um-form__error" role="alert">{error}</p>}
+        <div className="um-form__actions">
+          <Button type="button" variant="ghost" onClick={onClose} disabled={deleteMutation.isPending}>
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            onClick={() => deleteMutation.mutate()}
+            loading={deleteMutation.isPending}
+          >
+            Delete permanently
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export const UserManagement: React.FC = () => {
@@ -308,11 +420,13 @@ export const UserManagement: React.FC = () => {
   const navigate = useNavigate()
   const { setViewAsUser } = useViewAsStore()
 
-  const [searchTerm, setSearchTerm] = useState('')
-  const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all')
-  const [createOpen, setCreateOpen] = useState(false)
-  const [seedOpen,   setSeedOpen]   = useState(false)
-  const [editUser,   setEditUser]   = useState<AppUser | null>(null)
+  const [searchTerm,     setSearchTerm]     = useState('')
+  const [roleFilter,     setRoleFilter]     = useState<UserRole | 'all'>('all')
+  const [companyFilter,  setCompanyFilter]  = useState<string>('all')
+  const [createOpen,     setCreateOpen]     = useState(false)
+  const [seedOpen,       setSeedOpen]       = useState(false)
+  const [editUser,       setEditUser]       = useState<AppUser | null>(null)
+  const [deleteTarget,   setDeleteTarget]   = useState<AppUser | null>(null)
 
   const usersQuery = useQuery({
     queryKey:  ['admin', 'users'],
@@ -320,11 +434,25 @@ export const UserManagement: React.FC = () => {
     staleTime: 60 * 1000,
   })
 
-  const users     = usersQuery.data  ?? []
+  const companiesQuery = useQuery({
+    queryKey:  ['admin', 'companies'],
+    queryFn:   fetchAllCompanies,
+    staleTime: 5 * 60 * 1000,
+  })
+
+  const users     = usersQuery.data     ?? []
+  const companies: CompanyOption[] = companiesQuery.data ?? []
   const isLoading = usersQuery.isPending
   const hasError  = usersQuery.isError
 
-  // ── Stats ────────────────────────────────────────────────────────────────
+  // Build a quick lookup: companyId → companyName
+  const companyMap = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const c of companies) map[c.id] = c.name
+    return map
+  }, [companies])
+
+  // ── Stats ──────────────────────────────────────────────────────────────────
   const stats = useMemo(() => {
     const counts: Record<UserRole, number> = { admin: 0, dispatch: 0, driver: 0, sales: 0, customer: 0, owner: 0, manager: 0, billing: 0, delivery: 0, viewer: 0 }
     for (const u of users) {
@@ -335,17 +463,33 @@ export const UserManagement: React.FC = () => {
 
   const totalUsers = users.length
 
-  // ── Filtered table ────────────────────────────────────────────────────────
+  // ── Filtered table ─────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
     return users.filter((u) => {
       if (roleFilter !== 'all' && u.role !== roleFilter) return false
+      if (companyFilter !== 'all') {
+        const uid = u.companyId ?? u.customerId ?? ''
+        if (companyFilter === '__none__') {
+          if (uid) return false
+        } else {
+          if (uid !== companyFilter) return false
+        }
+      }
       if (searchTerm) {
         const lower = searchTerm.toLowerCase()
         if (!u.name.toLowerCase().includes(lower) && !u.email.toLowerCase().includes(lower)) return false
       }
       return true
     })
-  }, [users, roleFilter, searchTerm])
+  }, [users, roleFilter, companyFilter, searchTerm])
+
+  // Derive companies that actually have users (for the filter dropdown)
+  const companiesWithUsers = useMemo(() => {
+    const ids = new Set(users.map((u) => u.companyId ?? u.customerId ?? '').filter(Boolean))
+    return companies.filter((c: CompanyOption) => ids.has(c.id))
+  }, [users, companies])
+
+  const hasFilters = searchTerm || roleFilter !== 'all' || companyFilter !== 'all'
 
   const handleCreated = useCallback(() => {
     setCreateOpen(false)
@@ -357,6 +501,11 @@ export const UserManagement: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
   }, [queryClient])
 
+  const handleDeleted = useCallback(() => {
+    setDeleteTarget(null)
+    queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
+  }, [queryClient])
+
   const lastLoginOf = (user: AppUser): string => {
     const ext = user as AppUser & { lastLoginAt?: { toDate(): Date } }
     return ext.lastLoginAt ? formatDate(ext.lastLoginAt) : '—'
@@ -365,7 +514,7 @@ export const UserManagement: React.FC = () => {
   return (
     <div className="um">
 
-      {/* ── Header ──────────────────────────────────────────────────── */}
+      {/* ── Header ────────────────────────────────────────────────────── */}
       <div className="um__header">
         <div>
           <h1 className="um__title">User Management</h1>
@@ -383,14 +532,14 @@ export const UserManagement: React.FC = () => {
         </div>
       </div>
 
-      {/* ── 1. Stat cards ────────────────────────────────────────────── */}
+      {/* ── 1. Stat cards ──────────────────────────────────────────────── */}
       <div className="um__stats">
         {ALL_ROLES.map((r) => (
           <StatCard key={r} role={r} count={stats[r]} total={totalUsers} />
         ))}
       </div>
 
-      {/* ── 2. Filter bar ────────────────────────────────────────────── */}
+      {/* ── 2. Filter bar ──────────────────────────────────────────────── */}
       <div className="um__filters">
         <input
           type="search"
@@ -411,21 +560,33 @@ export const UserManagement: React.FC = () => {
             <option key={r} value={r}>{ROLE_LABELS[r]}</option>
           ))}
         </select>
+        <select
+          className="um__role-filter"
+          value={companyFilter}
+          onChange={(e) => setCompanyFilter(e.target.value)}
+          aria-label="Filter by company"
+        >
+          <option value="all">All companies</option>
+          <option value="__none__">No company</option>
+          {companiesWithUsers.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
         <span className="um__result-count">
           {filtered.length} user{filtered.length !== 1 ? 's' : ''}
         </span>
-        {(searchTerm || roleFilter !== 'all') && (
+        {hasFilters && (
           <button
             type="button"
             className="um__filter-clear"
-            onClick={() => { setSearchTerm(''); setRoleFilter('all') }}
+            onClick={() => { setSearchTerm(''); setRoleFilter('all'); setCompanyFilter('all') }}
           >
             Clear
           </button>
         )}
       </div>
 
-      {/* ── 3. User table ────────────────────────────────────────────── */}
+      {/* ── 3. User table ──────────────────────────────────────────────── */}
       <div className="um__table-card">
         {hasError ? (
           <p className="um__empty" role="alert">Failed to load users. Please refresh.</p>
@@ -443,57 +604,68 @@ export const UserManagement: React.FC = () => {
                   <th>Name</th>
                   <th>Email</th>
                   <th>Role</th>
+                  <th>Company</th>
                   <th>Status</th>
                   <th>Last Login</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((user) => (
-                  <tr key={user.id} className={!user.active ? 'um__row--inactive' : ''}>
-                    <td className="um__cell-name">
-                      <span className="um__avatar" aria-hidden="true">
-                        {user.name.charAt(0).toUpperCase()}
-                      </span>
-                      <span className="um__cell-name-text">
-                        {user.name}
-                        {user.customerId && (
-                          <span className="um__linked-icon" title="Linked to customer record">⊙</span>
-                        )}
-                      </span>
-                    </td>
-                    <td className="um__cell-email">{user.email}</td>
-                    <td><RoleBadge role={user.role} /></td>
-                    <td><StatusDot active={user.active} /></td>
-                    <td className="um__cell-date">{lastLoginOf(user)}</td>
-                    <td>
-                      <div className="um__actions">
-                        <button
-                          type="button"
-                          className="um__action-btn"
-                          onClick={() => setEditUser(user)}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          className="um__action-btn um__action-btn--view-as"
-                          onClick={() => { setViewAsUser(user); navigate(ROLE_HOME[user.role]) }}
-                          title={`View portal as ${user.name}`}
-                        >
-                          View as
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {filtered.map((user) => {
+                  const cid         = user.companyId ?? user.customerId ?? ''
+                  const companyName = cid ? (companyMap[cid] ?? cid) : '—'
+                  return (
+                    <tr key={user.id} className={!user.active ? 'um__row--inactive' : ''}>
+                      <td className="um__cell-name">
+                        <span className="um__avatar" aria-hidden="true">
+                          {user.name.charAt(0).toUpperCase()}
+                        </span>
+                        <span className="um__cell-name-text">
+                          {user.name}
+                        </span>
+                      </td>
+                      <td className="um__cell-email">{user.email}</td>
+                      <td><RoleBadge role={user.role} /></td>
+                      <td className="um__cell-company">{companyName}</td>
+                      <td><StatusDot active={user.active} /></td>
+                      <td className="um__cell-date">{lastLoginOf(user)}</td>
+                      <td>
+                        <div className="um__actions">
+                          <button
+                            type="button"
+                            className="um__action-btn"
+                            onClick={() => setEditUser(user)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="um__action-btn um__action-btn--view-as"
+                            onClick={() => { setViewAsUser(user); navigate(ROLE_HOME[user.role]) }}
+                            title={`View portal as ${user.name}`}
+                          >
+                            View as
+                          </button>
+                          <button
+                            type="button"
+                            className="um__action-btn um__action-btn--danger"
+                            onClick={() => setDeleteTarget(user)}
+                            title={`Delete ${user.name}`}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
         )}
       </div>
 
-      {/* ── Modals ───────────────────────────────────────────────────── */}
+      {/* ── Modals ──────────────────────────────────────────────────────── */}
       {createOpen && (
         <CreateUserModal
           onClose={() => setCreateOpen(false)}
@@ -511,8 +683,17 @@ export const UserManagement: React.FC = () => {
       {editUser && (
         <EditUserModal
           user={editUser}
+          companies={companies}
           onClose={() => setEditUser(null)}
           onUpdated={handleUpdated}
+        />
+      )}
+
+      {deleteTarget && (
+        <DeleteConfirmModal
+          user={deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+          onDeleted={handleDeleted}
         />
       )}
 

@@ -311,6 +311,26 @@
   border-color: rgba(59, 130, 246, 0.5);
 }
 
+.um__action-btn--danger {
+  border-color: rgba(239, 68, 68, 0.3);
+  color: var(--color-danger);
+  background: rgba(239, 68, 68, 0.06);
+}
+
+.um__action-btn--danger:hover {
+  background: rgba(239, 68, 68, 0.14);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+.um__cell-company {
+  font-size: var(--font-size-13);
+  color: var(--color-text-2);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Empty / error / skeleton */
 
 .um__empty {

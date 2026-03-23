@@ -85,6 +85,41 @@ export async function deleteUser(id: string): Promise<void> {
   return serviceCall(() => deleteDoc(doc(db, 'users', id)))
 }
 
+/** Hard-deletes a user from both Firebase Auth and Firestore via Cloud Function. */
+export async function hardDeleteUser(uid: string): Promise<void> {
+  return serviceCall(async () => {
+    const { httpsCallable } = await import('firebase/functions')
+    const { functions }     = await import('../lib/firebase')
+    const fn = httpsCallable<{ uid: string }, { success: boolean }>(
+      functions,
+      'adminDeleteUser',
+    )
+    await fn({ uid })
+  })
+}
+
+/** Sends a password-reset email to the given address via Firebase Auth client SDK. */
+export async function sendPasswordReset(email: string): Promise<void> {
+  return serviceCall(async () => {
+    const { sendPasswordResetEmail } = await import('firebase/auth')
+    const { auth }                   = await import('../lib/firebase')
+    await sendPasswordResetEmail(auth, email)
+  })
+}
+
+/** Updates a user's company assignment in both Auth custom claims and Firestore. */
+export async function updateUserCompany(uid: string, companyId: string | null): Promise<void> {
+  return serviceCall(async () => {
+    const { httpsCallable } = await import('firebase/functions')
+    const { functions }     = await import('../lib/firebase')
+    const fn = httpsCallable<{ uid: string; companyId: string | null }, { success: boolean }>(
+      functions,
+      'adminUpdateUserCompany',
+    )
+    await fn({ uid, companyId })
+  })
+}
+
 // ── Admin: create user ────────────────────────────────────────────────────────
 // Calls the adminCreateUser Cloud Function which uses the Admin SDK to:
 //   1. Create the Firebase Auth user
