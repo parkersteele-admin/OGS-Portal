@@ -218,11 +218,18 @@ export default function Login() {
           </Button>
         </form>
 
-        {/* ── Forgot password ── */}
+        {/* ── Footer links ── */}
         <div className="lgn-footer">
           <Link to="/reset-password" className="lgn-link">
             Forgot password?
           </Link>
+          <div className="lgn-footer__divider" aria-hidden="true" />
+          <p className="lgn-footer__signup-text">
+            New customer?&nbsp;
+            <Link to="/signup" className="lgn-link lgn-link--signup">
+              Create an account
+            </Link>
+          </p>
         </div>
 
       </div>

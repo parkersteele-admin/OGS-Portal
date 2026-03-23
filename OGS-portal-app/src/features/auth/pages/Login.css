@@ -214,6 +214,22 @@
 .lgn-footer {
   text-align: center;
   margin-top: var(--space-5, 20px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.lgn-footer__divider {
+  width: 40px;
+  height: 1px;
+  background: var(--color-divider, #e5e7eb);
+}
+
+.lgn-footer__signup-text {
+  font-size: 13px;
+  color: var(--color-text-muted, #6b7280);
+  margin: 0;
 }
 
 .lgn-link {
@@ -227,6 +243,10 @@
 .lgn-link:hover {
   color: #e6890f;
   text-decoration: underline;
+}
+
+.lgn-link--signup {
+  font-weight: 600;
 }
 
 /* ── Reset password page ─────────────────────────────────────────────────– */
