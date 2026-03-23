@@ -103,7 +103,7 @@ export const Step2DeliverySetup: React.FC<Props> = ({
       if (existing) clearTimeout(existing)
       const t = setTimeout(async () => {
         try {
-          await saveLocation(companyId, {
+          const savedId = await saveLocation(companyId, {
             nickname: loc.nickname,
             address: loc.address,
             accessNotes: loc.accessNotes,
@@ -113,6 +113,15 @@ export const Step2DeliverySetup: React.FC<Props> = ({
             cylinderStorage: loc.cylinderStorage,
             currentProvider: loc.currentProvider,
           }, loc.savedId)
+          // If this was a new location (no savedId yet), store the generated id
+          // so subsequent auto-saves update the same doc instead of creating duplicates.
+          if (!loc.savedId) {
+            setLocs((prev) =>
+              prev.map((l) =>
+                l.localId === loc.localId ? { ...l, savedId } : l,
+              ),
+            )
+          }
         } catch {
           // Silent auto-save failure
         }
@@ -191,6 +200,9 @@ export const Step2DeliverySetup: React.FC<Props> = ({
 
   const handleNext = async () => {
     if (!validate()) return
+    // Cancel any pending auto-saves to avoid racing with the submit below
+    saveTimeouts.current.forEach((t) => clearTimeout(t))
+    saveTimeouts.current.clear()
     setSubmitting(true)
     try {
       await Promise.all(
