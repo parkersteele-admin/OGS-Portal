@@ -40,6 +40,7 @@ import {
 import { useCustomerTanks } from '../../../hooks/useCustomerTanks'
 import { useAuth } from '../../../hooks/useAuth'
 import { updateCustomer } from '../../../services/customerService'
+import { getUsersByCompany, assignUserRole, deactivateUser, reactivateUser, sendPasswordReset } from '../../../services/userService'
 import { getInvoices, createInvoice } from '../../../services/invoiceService'
 import { getProductDropdown, type ProductDropdownItem } from '../../../services/productService'
 import { getFilesForEntity, uploadFile, deleteFile } from '../../../services/fileService'
@@ -53,6 +54,8 @@ import { Input } from '../../../components/ui/Input'
 import type { Customer, CustomerStatus } from '../../../types/customer'
 import type { ContactLog, ContactMethod } from '../../../types/crm'
 import type { AppFile } from '../../../types/file'
+import type { AppUser } from '../../../types/user'
+import type { UserRole } from '../../../types/user'
 import './CustomerRecord.css'
 
 // ── Extended types for CRM-specific Firestore fields ─────────────────────────
@@ -70,13 +73,14 @@ interface ContactLogWithFollowUp extends ContactLog {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-type TabKey = 'overview' | 'history' | 'notes' | 'documents'
+type TabKey = 'overview' | 'history' | 'notes' | 'documents' | 'access'
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'overview',  label: 'Overview' },
   { key: 'history',   label: 'Contact History' },
   { key: 'notes',     label: 'Account Notes' },
   { key: 'documents', label: 'Documents' },
+  { key: 'access',    label: 'User Access' },
 ]
 
 const STATUS_BADGE: Record<CustomerStatus, { label: string; variant: 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'brand' }> = {
@@ -118,6 +122,41 @@ const ORDER_BADGE: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'n
   invoiced:   'neutral',
   paid:       'success',
   cancelled:  'danger',
+}
+
+// ── Role meta ─────────────────────────────────────────────────────────────────
+
+const CUSTOMER_ROLES: UserRole[] = ['owner', 'manager', 'billing', 'delivery', 'viewer']
+
+const ROLE_LABELS: Record<UserRole, string> = {
+  admin:    'Admin',
+  dispatch: 'Dispatch',
+  driver:   'Driver',
+  sales:    'Sales',
+  customer: 'Customer',
+  owner:    'Owner',
+  manager:  'Manager',
+  billing:  'Billing',
+  delivery: 'Delivery',
+  viewer:   'Viewer',
+}
+
+const ROLE_DESCRIPTIONS: Partial<Record<UserRole, string>> = {
+  owner:    'Full account control — can manage users, place orders, view invoices',
+  manager:  'Can place orders and view all account activity',
+  billing:  'Can view and pay invoices; no ordering access',
+  delivery: 'Can view delivery schedules and tank levels',
+  viewer:   'Read-only access to account info',
+  customer: 'Legacy access level — consider upgrading to a specific role',
+}
+
+const ROLE_BADGE_CLASS: Partial<Record<UserRole, string>> = {
+  owner:    'cr-access-role--owner',
+  manager:  'cr-access-role--manager',
+  billing:  'cr-access-role--billing',
+  delivery: 'cr-access-role--delivery',
+  viewer:   'cr-access-role--viewer',
+  customer: 'cr-access-role--customer',
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -565,6 +604,199 @@ const LogInteractionModal: React.FC<LogInteractionModalProps> = ({ onClose, onSu
   )
 }
 
+// ── UserAccessTab ─────────────────────────────────────────────────────────────
+
+interface UserAccessTabProps {
+  companyId: string
+  users:     AppUser[]
+  loading:   boolean
+  onRefresh: () => void
+}
+
+const UserAccessTab: React.FC<UserAccessTabProps> = ({ users, loading, onRefresh }) => {
+  const [editingId,  setEditingId]  = useState<string | null>(null)
+  const [pendingRole, setPendingRole] = useState<UserRole>('viewer')
+  const [saving,     setSaving]     = useState(false)
+  const [flash,      setFlash]      = useState<{ id: string; msg: string } | null>(null)
+
+  const showFlash = (id: string, msg: string) => {
+    setFlash({ id, msg })
+    setTimeout(() => setFlash(null), 3000)
+  }
+
+  const handleEditRole = (user: AppUser) => {
+    setEditingId(user.id)
+    setPendingRole(user.role as UserRole)
+  }
+
+  const handleSaveRole = async (user: AppUser) => {
+    setSaving(true)
+    try {
+      await assignUserRole(user.id, pendingRole)
+      setEditingId(null)
+      onRefresh()
+      showFlash(user.id, 'Role updated')
+    } catch (err: unknown) {
+      showFlash(user.id, err instanceof Error ? err.message : 'Failed to update role')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleToggleActive = async (user: AppUser) => {
+    setSaving(true)
+    try {
+      if (user.active) {
+        await deactivateUser(user.id)
+        showFlash(user.id, 'User deactivated')
+      } else {
+        await reactivateUser(user.id)
+        showFlash(user.id, 'User reactivated')
+      }
+      onRefresh()
+    } catch (err: unknown) {
+      showFlash(user.id, err instanceof Error ? err.message : 'Failed to update status')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handlePasswordReset = async (user: AppUser) => {
+    try {
+      await sendPasswordReset(user.email)
+      showFlash(user.id, 'Password reset email sent')
+    } catch (err: unknown) {
+      showFlash(user.id, err instanceof Error ? err.message : 'Failed to send reset email')
+    }
+  }
+
+  if (loading) {
+    return <div className="cr-skeleton cr-skeleton--list" />
+  }
+
+  return (
+    <div className="cr-access">
+      <div className="cr-access__legend">
+        {CUSTOMER_ROLES.map(r => (
+          <div key={r} className="cr-access__legend-item">
+            <span className={`cr-access-role cr-access-role--sm ${ROLE_BADGE_CLASS[r] ?? ''}`}>
+              {ROLE_LABELS[r]}
+            </span>
+            <span className="cr-access__legend-desc">{ROLE_DESCRIPTIONS[r]}</span>
+          </div>
+        ))}
+      </div>
+
+      {users.length === 0 ? (
+        <Card>
+          <CardBody>
+            <p className="cr-empty">No portal users linked to this account yet.</p>
+          </CardBody>
+        </Card>
+      ) : (
+        <div className="cr-access__cards">
+          {users.map(user => {
+            const isEditing = editingId === user.id
+            const flashMsg  = flash?.id === user.id ? flash.msg : null
+            return (
+              <div
+                key={user.id}
+                className={`cr-access-card${!user.active ? ' cr-access-card--inactive' : ''}`}
+              >
+                <div className="cr-access-card__avatar">
+                  {(user.name || user.email || '?').charAt(0).toUpperCase()}
+                </div>
+
+                <div className="cr-access-card__body">
+                  <div className="cr-access-card__name-row">
+                    <span className="cr-access-card__name">{user.name || '—'}</span>
+                    {!user.active && (
+                      <span className="cr-access-card__inactive-tag">Inactive</span>
+                    )}
+                    {flashMsg && (
+                      <span className="cr-access-card__flash">{flashMsg}</span>
+                    )}
+                  </div>
+                  <span className="cr-access-card__email">{user.email}</span>
+
+                  <div className="cr-access-card__role-row">
+                    {isEditing ? (
+                      <>
+                        <select
+                          className="ui-input cr-access-card__role-select"
+                          value={pendingRole}
+                          onChange={e => setPendingRole(e.target.value as UserRole)}
+                          disabled={saving}
+                        >
+                          {CUSTOMER_ROLES.map(r => (
+                            <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                          ))}
+                        </select>
+                        <button
+                          className="cr-access-card__action cr-access-card__action--primary"
+                          onClick={() => void handleSaveRole(user)}
+                          disabled={saving}
+                        >
+                          {saving ? 'Saving…' : 'Save'}
+                        </button>
+                        <button
+                          className="cr-access-card__action"
+                          onClick={() => setEditingId(null)}
+                          disabled={saving}
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <span className={`cr-access-role ${ROLE_BADGE_CLASS[user.role as UserRole] ?? 'cr-access-role--viewer'}`}>
+                          {ROLE_LABELS[user.role as UserRole] ?? user.role}
+                        </span>
+                        {ROLE_DESCRIPTIONS[user.role as UserRole] && (
+                          <span className="cr-access-card__role-desc">
+                            {ROLE_DESCRIPTIONS[user.role as UserRole]}
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {!isEditing && (
+                  <div className="cr-access-card__actions">
+                    <button
+                      className="cr-access-card__action"
+                      onClick={() => handleEditRole(user)}
+                      title="Change role"
+                    >
+                      Change role
+                    </button>
+                    <button
+                      className="cr-access-card__action"
+                      onClick={() => void handlePasswordReset(user)}
+                      title="Send password reset email"
+                    >
+                      Reset password
+                    </button>
+                    <button
+                      className={`cr-access-card__action${user.active ? ' cr-access-card__action--warn' : ' cr-access-card__action--primary'}`}
+                      onClick={() => void handleToggleActive(user)}
+                      disabled={saving}
+                      title={user.active ? 'Deactivate this user' : 'Reactivate this user'}
+                    >
+                      {user.active ? 'Deactivate' : 'Reactivate'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 
 const CustomerRecord: React.FC = () => {
@@ -667,6 +899,14 @@ const CustomerRecord: React.FC = () => {
     queryFn: () => getFilesForEntity('customer', customerId!),
     enabled: !!customerId && activeTab === 'documents',
     staleTime: 60_000,
+  })
+
+  // Company users (fetched when access tab active)
+  const { data: companyUsers = [], isLoading: usersLoading, refetch: refetchUsers } = useQuery({
+    queryKey: ['users', 'company', customerId],
+    queryFn: () => getUsersByCompany(customerId!),
+    enabled: !!customerId && activeTab === 'access',
+    staleTime: 30_000,
   })
 
   // ── Mutations ────────────────────────────────────────────────────────────────
@@ -1344,6 +1584,18 @@ const CustomerRecord: React.FC = () => {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Tab: User Access ─────────────────────────────────────────────── */}
+      {activeTab === 'access' && (
+        <div className="cr-tab-panel" role="tabpanel">
+          <UserAccessTab
+            companyId={customerId!}
+            users={companyUsers}
+            loading={usersLoading}
+            onRefresh={() => void refetchUsers()}
+          />
         </div>
       )}
 

@@ -35,6 +35,38 @@ export async function getUsersByRole(role: UserRole): Promise<AppUser[]> {
   })
 }
 
+/**
+ * Fetches all users belonging to a company (either via `companyId` or the
+ * legacy `customerId` field). Sorts by name client-side to avoid composite
+ * index requirements and the silent-exclusion problem with orderBy.
+ */
+export async function getUsersByCompany(companyId: string): Promise<AppUser[]> {
+  return serviceCall(async () => {
+    const [byCompanyId, byCustomerId] = await Promise.all([
+      getDocs(query(usersCol, where('companyId',  '==', companyId))),
+      getDocs(query(usersCol, where('customerId', '==', companyId))),
+    ])
+    const seen = new Set<string>()
+    const users: AppUser[] = []
+    for (const snap of [byCompanyId, byCustomerId]) {
+      for (const d of snap.docs) {
+        if (!seen.has(d.id)) {
+          seen.add(d.id)
+          const data = d.data() as unknown as Record<string, unknown>
+          const fullName = [`${data['firstName'] ?? ''}`, `${data['lastName'] ?? ''}`].join(' ').trim()
+          const name =
+            (data['name'] as string | undefined) ||
+            fullName ||
+            (data['email'] as string | undefined) ||
+            d.id
+          users.push({ ...data, name, id: d.id } as AppUser)
+        }
+      }
+    }
+    return users.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''))
+  })
+}
+
 export function subscribeToUser(id: string, callback: (user: AppUser | null) => void): Unsubscribe {
   return onSnapshot(doc(db, 'users', id), (snap) => {
     callback(snap.exists() ? ({ id: snap.id, ...snap.data() } as AppUser) : null)
@@ -54,7 +86,11 @@ export async function updateUserProfile(id: string, data: ProfileUpdateInput): P
 /** Role changes must go through a Cloud Function that also updates custom claims. */
 export async function assignUserRole(userId: string, role: UserRole): Promise<void> {
   return serviceCall(async () => {
-    if (!['admin', 'dispatch', 'driver', 'sales', 'customer'].includes(role)) {
+    const ALL_ROLES: UserRole[] = [
+      'admin', 'dispatch', 'driver', 'sales',
+      'customer', 'owner', 'manager', 'billing', 'delivery', 'viewer',
+    ]
+    if (!ALL_ROLES.includes(role)) {
       throw new OgsValidationError(`Invalid role: ${role}`)
     }
     const { httpsCallable } = await import('firebase/functions')

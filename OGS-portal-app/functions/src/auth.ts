@@ -12,7 +12,14 @@ import { onDocumentCreated, onDocumentUpdated } from 'firebase-functions/v2/fire
 import { onCall, HttpsError } from 'firebase-functions/v2/https'
 import { db, adminAuth, FieldValue } from './admin'
 
-const VALID_ROLES = ['admin', 'dispatch', 'driver', 'sales', 'customer'] as const
+const VALID_ROLES = [
+  // OGS internal
+  'admin', 'dispatch', 'driver', 'sales',
+  // Customer (legacy single-role)
+  'customer',
+  // Customer sub-roles
+  'owner', 'manager', 'billing', 'delivery', 'viewer',
+] as const
 type UserRole = typeof VALID_ROLES[number]
 
 // ── Firestore triggers ────────────────────────────────────────────────────────
