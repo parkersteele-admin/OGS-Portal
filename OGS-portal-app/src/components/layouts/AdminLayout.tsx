@@ -9,6 +9,8 @@ import type { MobileNavItem } from '../ui/MobileNav'
 import './Layout.css'
 
 const NAV_ITEMS: SidebarItem[] = [
+  // ── Overview ──────────────────────────────────────────────────────────
+  { to: '/admin/dashboard',         label: 'Dashboard',      icon: '⊞', sectionLabel: 'Overview' },
   // ── CRM ───────────────────────────────────────────────────────────────
   { to: '/admin/crm/dashboard',     label: 'CRM Dashboard',  icon: '◎', sectionLabel: 'CRM' },
   { to: '/admin/crm/customers',     label: 'Customers',      icon: '◇' },
@@ -30,6 +32,7 @@ const NAV_ITEMS: SidebarItem[] = [
 ]
 
 const MOBILE_ITEMS: MobileNavItem[] = [
+  { to: '/admin/dashboard',         label: 'Dashboard',   icon: '⊞' },
   { to: '/admin/crm/customers',     label: 'Customers',   icon: '◇' },
   { to: '/admin/ops/dashboard',     label: 'Operations',  icon: '⊞' },
   { to: '/admin/ops/dispatch',      label: 'Dispatch',    icon: '⊕' },

@@ -49,7 +49,7 @@ import {
   TruckPage,
 } from '../../features/driver'
 import { LoginPage, ResetPasswordPage } from '../../features/auth'
-import { DeliverySettingsPage, UserManagement } from '../../features/admin'
+import { AdminDashboard, DeliverySettingsPage, UserManagement } from '../../features/admin'
 
 import BillingDashboard from '../../pages/billing/BillingDashboard'
 
@@ -200,7 +200,8 @@ export const AppRouter: React.FC = () => (
           </ProtectedRoute>
         }
       >
-        <Route index element={<Navigate to="users" replace />} />
+        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route path="dashboard" element={<AdminDashboard />} />
         <Route path="users" element={<UserManagement />} />
         <Route path="delivery-settings" element={<DeliverySettingsPage />} />
 
