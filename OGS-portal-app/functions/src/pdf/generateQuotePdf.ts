@@ -50,20 +50,24 @@ export async function generateQuotePdf(quoteId: string): Promise<string> {
   const storagePath = `ogs-portal/quotes/${quoteId}.pdf`
   const fileRef     = storage.bucket().file(storagePath)
 
+  // Store the PDF with a stable Firebase Storage download token.
+  // Using a download token avoids the signBlob IAM permission required by getSignedUrl().
+  const downloadToken = crypto.randomUUID()
   await fileRef.save(pdfBuffer, {
     contentType: 'application/pdf',
-    metadata:    { cacheControl: 'private, max-age=0', metadata: { quoteId } },
+    metadata:    { cacheControl: 'private, max-age=0', metadata: { quoteId, firebaseStorageDownloadTokens: downloadToken } },
   })
 
-  const expires     = Date.now() + 7 * 24 * 60 * 60 * 1000
-  const [signedUrl] = await fileRef.getSignedUrl({ action: 'read', expires })
+  const bucket      = storage.bucket().name
+  const encodedPath = encodeURIComponent(storagePath)
+  const downloadUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodedPath}?alt=media&token=${downloadToken}`
 
   await quoteSnap.ref.update({
-    pdfUrl:    signedUrl,
+    pdfUrl:    downloadUrl,
     updatedAt: FieldValue.serverTimestamp(),
   })
 
-  return signedUrl
+  return downloadUrl
 }
 
 // ── PDF builder ───────────────────────────────────────────────────────────────

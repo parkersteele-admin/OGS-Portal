@@ -57,25 +57,28 @@ export async function generateInvoicePdf(invoiceId: string): Promise<string> {
   const storagePath = `ogs-portal/invoices/${customerId ?? '_unknown'}/${invoiceId}.pdf`
   const fileRef     = storage.bucket().file(storagePath)
 
+  // Store the PDF with a stable Firebase Storage download token.
+  // Using a download token avoids the signBlob IAM permission required by getSignedUrl().
+  const downloadToken = crypto.randomUUID()
   await fileRef.save(pdfBuffer, {
     contentType: 'application/pdf',
     metadata: {
       cacheControl: 'private, max-age=0',
-      metadata: { invoiceId, customerId: customerId ?? '' },
+      metadata: { invoiceId, customerId: customerId ?? '', firebaseStorageDownloadTokens: downloadToken },
     },
   })
 
-  // ── Sign URL (7 days) ──────────────────────────────────────────────────────
-  const expires     = Date.now() + 7 * 24 * 60 * 60 * 1000
-  const [signedUrl] = await fileRef.getSignedUrl({ action: 'read', expires })
+  const bucket      = storage.bucket().name
+  const encodedPath = encodeURIComponent(storagePath)
+  const downloadUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodedPath}?alt=media&token=${downloadToken}`
 
   // ── Persist to Firestore ───────────────────────────────────────────────────
   await invoiceSnap.ref.update({
-    pdfUrl:    signedUrl,
+    pdfUrl:    downloadUrl,
     updatedAt: FieldValue.serverTimestamp(),
   })
 
-  return signedUrl
+  return downloadUrl
 }
 
 // ── PDF builder ───────────────────────────────────────────────────────────────
