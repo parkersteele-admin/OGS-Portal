@@ -25,5 +25,5 @@ export const ROLE_HOME: Record<UserRole, string> = {
   admin:    '/ops/dashboard',
   dispatch: '/ops/dispatch',
   driver:   '/driver/schedule',
-  sales:    '/ops/sales/dashboard',
+  sales:    '/crm/customers',
 }

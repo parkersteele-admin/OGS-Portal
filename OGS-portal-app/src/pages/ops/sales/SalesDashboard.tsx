@@ -48,8 +48,8 @@ const SalesDashboard: React.FC = () => {
   // Filters
   const [filters, setFilters] = useState<PipelineFilters>(DEFAULT_FILTERS)
 
-  // View mode navigation (list view lives on /ops/sales/pipeline)
-  const goToList = () => navigate('/ops/sales/pipeline')
+  // View mode navigation (list view lives on /crm/pipeline-list)
+  const goToList = () => navigate('/crm/pipeline-list')
 
   // Sales reps
   const repsQuery = useQuery({

@@ -181,7 +181,7 @@ const PipelineList: React.FC = () => {
       <header className="pl-header">
         <h1 className="pl-title">Pipeline — List View</h1>
         <div className="pl-header-actions">
-          <button className="pl-btn pl-btn--outline" onClick={() => navigate('/ops/sales/dashboard')}>
+          <button className="pl-btn pl-btn--outline" onClick={() => navigate('/crm/pipeline')}>
             Board View ◈
           </button>
           <button className="pl-btn pl-btn--outline" onClick={exportCSV}>
