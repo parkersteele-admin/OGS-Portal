@@ -19,6 +19,8 @@ import {
 import { doc, collection, setDoc, serverTimestamp } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { auth, db, functions } from '../../lib/firebase'
+import { refreshCurrentUser } from '../../lib/auth'
+import { useAuthStore } from '../../store/authStore'
 import { normalizeCompanyName, extractDomain } from '../../utils/companyName'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
@@ -260,7 +262,15 @@ const SignUp: React.FC = () => {
       >(functions, 'setCompanyClaim')
       await setClaimFn({ uid: firebaseUser.uid, companyId, role: 'owner' })
 
-      // 5. Redirect to onboarding wizard
+      // 5. Force token refresh (activates new custom claim for Firestore rules)
+      //    and re-hydrate the auth store with the freshly-written user doc so
+      //    ProtectedRoute sees role:'owner' before we navigate.
+      const refreshedUser = await refreshCurrentUser()
+      if (refreshedUser) {
+        useAuthStore.getState().setUser(refreshedUser)
+      }
+
+      // 6. Redirect to onboarding wizard
       navigate('/portal/onboarding', { replace: true })
     } catch (err) {
       setFormError(
