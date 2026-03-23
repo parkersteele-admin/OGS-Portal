@@ -6,6 +6,8 @@ export interface SidebarItem {
   label: string
   to: string
   icon: React.ReactNode
+  /** If set, renders a section heading above this item. */
+  sectionLabel?: string
 }
 
 interface SidebarProps {
@@ -24,18 +26,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ title, items }) => (
     <p className="sidebar__portal-label">{title}</p>
 
     <ul className="sidebar__nav" role="list">
-      {items.map(({ label, to, icon }) => (
-        <li key={to}>
-          <NavLink
-            to={to}
-            className={({ isActive }) =>
-              `sidebar__link${isActive ? ' sidebar__link--active' : ''}`
-            }
-          >
-            <span className="sidebar__icon" aria-hidden="true">{icon}</span>
-            <span className="sidebar__label">{label}</span>
-          </NavLink>
-        </li>
+      {items.map(({ label, to, icon, sectionLabel }) => (
+        <React.Fragment key={to}>
+          {sectionLabel && (
+            <li className="sidebar__section-label" aria-hidden="true">
+              {sectionLabel}
+            </li>
+          )}
+          <li>
+            <NavLink
+              to={to}
+              className={({ isActive }) =>
+                `sidebar__link${isActive ? ' sidebar__link--active' : ''}`
+              }
+            >
+              <span className="sidebar__icon" aria-hidden="true">{icon}</span>
+              <span className="sidebar__label">{label}</span>
+            </NavLink>
+          </li>
+        </React.Fragment>
       ))}
     </ul>
   </nav>
