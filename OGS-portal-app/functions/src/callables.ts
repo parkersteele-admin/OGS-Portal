@@ -167,7 +167,7 @@ export const generateQuotePdf = onCall(
       ${validUntil ? `<tr style="background:#f5f5f5"><td style="padding:8px 12px;font-weight:bold">Valid Until</td><td style="padding:8px 12px">${validUntil}</td></tr>` : ''}
     </table>
     ${validLine}
-    <a href="${url}" style="display:inline-block;background:#E87722;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:15px">View &amp; Download Quote PDF</a>
+    <a href="${url}" clicktracking="off" style="display:inline-block;background:#E87722;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:15px">View &amp; Download Quote PDF</a>
     <p style="margin:24px 0 8px;font-size:13px;color:#666">
       To accept this quote, reply to this email or call us at <strong>1-800-OGS-FUEL</strong>.
     </p>
