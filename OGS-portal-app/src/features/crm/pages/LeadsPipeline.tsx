@@ -32,6 +32,8 @@ import {
   type Timestamp,
 } from 'firebase/firestore'
 import { db } from '../../../lib/firebase'
+import { functions } from '../../../lib/firebase'
+import { httpsCallable } from 'firebase/functions'
 import {
   subscribeToLeads,
   createLead,
@@ -832,6 +834,23 @@ const LeadsPipeline: React.FC = () => {
   const [sortCol,       setSortCol]       = useState<SortCol>('updatedAt')
   const [sortDir,       setSortDir]       = useState<'asc' | 'desc'>('desc')
   const [stageFilter,   setStageFilter]   = useState<LeadStatus | 'all'>('all')
+  const [backfilling,   setBackfilling]   = useState(false)
+  const [backfillMsg,   setBackfillMsg]   = useState<string | null>(null)
+
+  const handleBackfill = useCallback(async () => {
+    setBackfilling(true)
+    setBackfillMsg(null)
+    try {
+      const fn = httpsCallable<void, { created: number; skipped: number }>(functions, 'backfillMissingLeads')
+      const { data } = await fn()
+      setBackfillMsg(`Done — ${data.created} lead(s) created, ${data.skipped} already existed.`)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      setBackfillMsg(`Error: ${msg}`)
+    } finally {
+      setBackfilling(false)
+    }
+  }, [])
 
   // Real-time leads subscription
   useEffect(() => {
@@ -1005,8 +1024,25 @@ const LeadsPipeline: React.FC = () => {
           <Button variant="primary" size="sm" onClick={() => setShowAdd(true)}>
             Add lead
           </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleBackfill}
+            disabled={backfilling}
+            title="Create lead docs for any customers missing one (safe to re-run)"
+          >
+            {backfilling ? 'Importing…' : 'Import missing'}
+          </Button>
         </div>
       </header>
+
+      {/* ── Backfill result banner ───────────────────────────────────────────── */}
+      {backfillMsg && (
+        <div className="lp-banner" role="status">
+          <span>{backfillMsg}</span>
+          <button className="lp-banner__dismiss" onClick={() => setBackfillMsg(null)}>✕</button>
+        </div>
+      )}
 
       {/* ── Loading state ────────────────────────────────────────────────────── */}
       {leadsLoading && (

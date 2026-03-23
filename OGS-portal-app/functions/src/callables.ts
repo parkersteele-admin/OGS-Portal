@@ -6,7 +6,7 @@
  */
 
 import { onCall, HttpsError } from 'firebase-functions/v2/https'
-import { db } from './admin'
+import { db, FieldValue } from './admin'
 import { GOOGLE_MAPS_KEY, SENDGRID_API_KEY, requireSecret } from './config'
 import { performGeocode } from './triggers/geocodeCustomer'
 import { generateInvoicePdf as generatePdf } from './pdf/generateInvoicePdf'
@@ -335,4 +335,60 @@ export const backfillGeocodeCustomers = onCall(
   },
 )
 
+
+// ── backfillMissingLeads ───────────────────────────────────────────────────────
+
+/**
+ * One-time admin callable: creates a leads/{companyId} doc for every customer
+ * that lacks one (e.g. accounts that signed up before the trigger was fixed).
+ *
+ * Safe to call multiple times — skips customers that already have a lead doc.
+ *
+ * Access: admin only
+ * Output: { created: number, skipped: number }
+ */
+export const backfillMissingLeads = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
+  if (request.auth.token.role !== 'admin') throw new HttpsError('permission-denied', 'Admin only.')
+
+  const customersSnap = await db.collection('customers').get()
+  let created = 0
+  let skipped = 0
+
+  for (const doc of customersSnap.docs) {
+    const leadRef  = db.collection('leads').doc(doc.id)
+    const leadSnap = await leadRef.get()
+    if (leadSnap.exists) {
+      skipped++
+      continue
+    }
+
+    const data        = doc.data() as Record<string, unknown>
+    const companyName = (data['companyName'] as string | null) ?? (data['name'] as string | null) ?? 'Unknown'
+    const contactName = (data['billingContactName'] as string | null) ?? companyName
+    const email       = (data['billingEmail'] as string | null) ?? ''
+    const phone       = (data['phone'] as string | null) ?? ''
+    const now         = FieldValue.serverTimestamp()
+
+    await leadRef.set({
+      name:           contactName,
+      email,
+      phone,
+      company:        companyName,
+      status:         'pending_setup',
+      source:         'Website',
+      isWebSignup:    true,
+      companyId:      doc.id,
+      assignedTo:     null,
+      estimatedValue: null,
+      notes:          '',
+      createdAt:      now,
+      updatedAt:      now,
+    })
+    created++
+  }
+
+  console.log(`backfillMissingLeads: created=${created} skipped=${skipped}`)
+  return { created, skipped }
+})
 

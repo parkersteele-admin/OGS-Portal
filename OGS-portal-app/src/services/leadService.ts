@@ -69,11 +69,20 @@ export function subscribeToLeads(
   filters: LeadFilters = {},
   callback: (leads: Lead[]) => void,
 ): Unsubscribe {
-  const constraints: QueryConstraint[] = [orderBy('createdAt', 'desc')]
+  // Do NOT use orderBy here — it silently excludes docs that lack the field
+  // (e.g. leads for customers that signed up before the trigger was fixed).
+  // Sort client-side instead so every doc is always returned.
+  const constraints: QueryConstraint[] = []
   if (filters.status)     constraints.push(where('status', '==', filters.status))
   if (filters.assignedTo) constraints.push(where('assignedTo', '==', filters.assignedTo))
   return onSnapshot(query(leadsCol, ...constraints), (snap) => {
-    callback(snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Lead))
+    const leads = snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Lead)
+    leads.sort((a, b) => {
+      const at = a.createdAt?.toMillis?.() ?? 0
+      const bt = b.createdAt?.toMillis?.() ?? 0
+      return bt - at
+    })
+    callback(leads)
   })
 }
 
