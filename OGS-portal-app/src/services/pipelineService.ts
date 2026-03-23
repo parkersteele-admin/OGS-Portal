@@ -89,16 +89,19 @@ export async function getLostLeads(): Promise<PipelineLead[]> {
 
 /** Today's overdue follow-ups (nextFollowUpAt < now, not won/lost) */
 export async function getOverdueFollowUps(): Promise<PipelineLead[]> {
+  // Firestore forbids two inequality filters on different fields.
+  // Fetch by date range only, then filter terminal stages in memory.
   return serviceCall(async () => {
     const snap = await getDocs(
       query(
         pipelineLeadsCol,
         where('nextFollowUpAt', '<', Timestamp.now()),
-        where('stage', 'not-in', ['won', 'lost']),
         orderBy('nextFollowUpAt', 'asc'),
       ),
     )
-    return snap.docs.map(toId)
+    return snap.docs
+      .map(toId)
+      .filter((l) => l.stage !== 'won' && l.stage !== 'lost')
   })
 }
 

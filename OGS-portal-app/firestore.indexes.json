@@ -375,6 +375,36 @@
       ]
     },
 
+    // ── pipeline leads (new stage-based service) ───────────────────────────────
+
+    // getLeadsByStage / getWonLeads / getLostLeads: where(stage) + orderBy(updatedAt DESC)
+    {
+      "collectionGroup": "leads",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "stage",     "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" }
+      ]
+    },
+    // getStalledLeads: where(stage) + orderBy(updatedAt ASC)
+    {
+      "collectionGroup": "leads",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "stage",     "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "ASCENDING" }
+      ]
+    },
+    // getNewSignupsToday: where(source) + where(createdAt >=) + orderBy(createdAt DESC)
+    {
+      "collectionGroup": "leads",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "source",    "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+
     // ── files ─────────────────────────────────────────────────────────────────
 
     // getFiles: where(entityType) + where(entityId) + orderBy(createdAt DESC)
