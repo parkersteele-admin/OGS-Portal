@@ -806,6 +806,17 @@ const CustomerRecord: React.FC = () => {
     )
   }, [customer, customerId, queryClient])
 
+  const handleTogglePricing = useCallback(() => {
+    if (!customer) return
+    const cr = customer as CustomerRecord
+    updateDoc(doc(db, 'customers', customerId!), {
+      pricingUnlocked: !(cr as unknown as { pricingUnlocked?: boolean }).pricingUnlocked,
+      updatedAt: serverTimestamp(),
+    }).then(() =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.customers.detail(customerId!) }),
+    )
+  }, [customer, customerId, queryClient])
+
   // ── Render guards ─────────────────────────────────────────────────────────────
 
   if (customerLoading) {
@@ -855,6 +866,11 @@ const CustomerRecord: React.FC = () => {
 
           <div className="cr-header__badges">
             <Badge variant={statusCfg.variant}>{statusCfg.label}</Badge>
+            {!(cr as unknown as { pricingUnlocked?: boolean }).pricingUnlocked && (
+              <span className="cr-flag cr-flag--locked" title="Pricing not yet unlocked for this account">
+                🔒 Pricing Locked
+              </span>
+            )}
             {cr.isPriority && (
               <span className="cr-flag cr-flag--priority" title="Priority account">
                 ⭐ Priority
@@ -876,6 +892,16 @@ const CustomerRecord: React.FC = () => {
             title={cr.isPriority ? 'Remove priority' : 'Mark as priority'}
           >
             {cr.isPriority ? '★ Priority' : '☆ Priority'}
+          </Button>
+          <Button
+            variant={(cr as unknown as { pricingUnlocked?: boolean }).pricingUnlocked ? 'success' : 'ghost'}
+            size="sm"
+            onClick={handleTogglePricing}
+            title={(cr as unknown as { pricingUnlocked?: boolean }).pricingUnlocked
+              ? 'Pricing is unlocked — click to lock'
+              : 'Pricing is locked — click to unlock for this company'}
+          >
+            {(cr as unknown as { pricingUnlocked?: boolean }).pricingUnlocked ? '🔓 Pricing' : '🔒 Pricing'}
           </Button>
           <Button variant="secondary" size="sm" onClick={() => setShowEdit(true)}>
             Edit

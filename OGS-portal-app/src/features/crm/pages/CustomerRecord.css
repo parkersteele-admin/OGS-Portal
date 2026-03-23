@@ -130,6 +130,12 @@
   border: 1px solid #fda4af;
 }
 
+.cr-flag--locked {
+  background: #f5f5f5;
+  color: #6b7280;
+  border: 1px solid #d1d5db;
+}
+
 /* ── Contact card ──────────────────────────────────────────────────────────── */
 
 .cr-contact-grid {

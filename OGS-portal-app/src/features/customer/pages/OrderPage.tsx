@@ -14,6 +14,7 @@ import { getDocs, query, where, orderBy, limit } from 'firebase/firestore'
 import { productsCol, customerTanksCol, ordersCol } from '../../../lib/firestore'
 import { useAuth } from '../../../hooks/useAuth'
 import { useCustomer } from '../../../hooks/queries'
+import { usePricingAccess } from '../../../hooks/usePricingAccess'
 import {
   createBatchOrders,
   getDeliverySettings,
@@ -1253,6 +1254,7 @@ const OrderPage: React.FC = () => {
   const location = useLocation()
   const [searchParams] = useSearchParams()
   const customerId = user?.customerId ?? ''
+  const { pricingUnlocked, isLoading: pricingLoading } = usePricingAccess()
   const preselectedProductId = searchParams.get('productId') ?? ''
   const locationState = location.state as { reorder?: ReorderState; orderType?: OrderType; modifyThisOnly?: boolean; orderId?: string } | null
   const reorder = locationState?.reorder
@@ -1431,6 +1433,34 @@ const OrderPage: React.FC = () => {
           products={products}
           settings={deliverySettings}
         />
+      </div>
+    )
+  }
+
+  // Pricing gate — block until OGS sends first quote
+  if (!pricingLoading && !pricingUnlocked) {
+    return (
+      <div className="po-page">
+        <div className="po-pricing-gate">
+          <div className="po-pricing-gate__icon" aria-hidden="true">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+              <rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <circle cx="12" cy="16" r="1.5" fill="currentColor"/>
+            </svg>
+          </div>
+          <h2 className="po-pricing-gate__title">Ordering not yet available</h2>
+          <p className="po-pricing-gate__body">
+            Your account pricing hasn't been set up yet. Once our team sends you
+            a quote, ordering will be unlocked automatically.
+          </p>
+          <p className="po-pricing-gate__body">
+            Questions?{' '}
+            <a href="mailto:sales@ohiogassupply.com" className="po-pricing-gate__link">
+              Contact our sales team
+            </a>
+          </p>
+        </div>
       </div>
     )
   }

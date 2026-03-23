@@ -13,8 +13,35 @@ import { getDocs, query, where, orderBy, limit } from 'firebase/firestore'
 import { getVisibleProducts } from '../../../services/productService'
 import { ordersCol } from '../../../lib/firestore'
 import { useAuth } from '../../../hooks/useAuth'
+import { usePricingAccess } from '../../../hooks/usePricingAccess'
 import type { Product, ProductCategory } from '../../../types/product'
 import './ProductCatalog.css'
+
+// ── Pricing gate ─────────────────────────────────────────────────────────────
+
+const PricingGate: React.FC = () => (
+  <div className="pc-gate">
+    <div className="pc-gate__icon" aria-hidden="true">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+        <rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+        <circle cx="12" cy="16" r="1.5" fill="currentColor"/>
+      </svg>
+    </div>
+    <h2 className="pc-gate__title">Pricing not yet available</h2>
+    <p className="pc-gate__body">
+      Your account pricing is being customized by our team. You'll receive an
+      email once your first quote is ready — at that point product pricing and
+      ordering will be unlocked.
+    </p>
+    <p className="pc-gate__body">
+      Questions? Contact us at{' '}
+      <a href="mailto:sales@ohiogassupply.com" className="pc-gate__link">sales@ohiogassupply.com</a>{' '}
+      or call{' '}
+      <a href="tel:+1-800-555-0100" className="pc-gate__link">(800) 555-0100</a>.
+    </p>
+  </div>
+)
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -106,6 +133,7 @@ const ProductCatalog: React.FC = () => {
   const navigate = useNavigate()
   const { user } = useAuth()
   const customerId = user?.customerId ?? ''
+  const { pricingUnlocked, isLoading: pricingLoading } = usePricingAccess()
   const [products,  setProducts]  = useState<Product[]>([])
   const [loading,   setLoading]   = useState(true)
   const [error,     setError]     = useState('')
@@ -186,6 +214,10 @@ const ProductCatalog: React.FC = () => {
 
   return (
     <div className="pc-page">
+      {/* Pricing gate — shown until OGS sends first quote */}
+      {!pricingLoading && !pricingUnlocked && <PricingGate />}
+
+      {pricingUnlocked && (<>
       {/* Page header */}
       <div className="pc-header">
         <div>
@@ -255,6 +287,7 @@ const ProductCatalog: React.FC = () => {
           </div>
         </div>
       )}
+      </>)}
     </div>
   )
 }

@@ -73,6 +73,7 @@ export {
 // Onboarding triggers
 export { onCreditApplicationSubmitted } from './triggers/onCreditApplicationSubmitted'
 export { onQuoteRequested }             from './triggers/onQuoteRequested'
+export { onQuoteSent }                  from './triggers/onQuoteSent'
 
 // Sales Pipeline triggers + callables + scheduled
 export { onCustomerCreated }            from './triggers/onCustomerCreated'

@@ -93,6 +93,12 @@ export interface Company {
   pwaInstallPrompted: boolean
   /** Set when this company is merged into another. */
   mergedInto?: string
+  /**
+   * Controls whether this company's portal users can see product pricing and
+   * place orders. Defaults to false for new web signups — set to true by
+   * CRM/admin after the first quote is sent or manually unlocked.
+   */
+  pricingUnlocked?: boolean
 }
 
 // ── Location (customers/{companyId}/locations/{locationId}) ──────────────────

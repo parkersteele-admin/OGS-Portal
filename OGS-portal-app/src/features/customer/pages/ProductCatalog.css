@@ -322,3 +322,45 @@
     min-height: var(--touch-target-min, 44px);
   }
 }
+
+/* ── Pricing gate ──────────────────────────────────────────────────────────── */
+
+.pc-gate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--space-16) var(--space-6);
+  gap: var(--space-4);
+  min-height: 60vh;
+}
+
+.pc-gate__icon {
+  color: var(--color-text-3);
+  margin-bottom: var(--space-2);
+}
+
+.pc-gate__title {
+  font-size: var(--font-size-20);
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.pc-gate__body {
+  font-size: var(--font-size-14);
+  color: var(--color-text-2);
+  max-width: 480px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.pc-gate__link {
+  color: var(--color-brand);
+  text-decoration: none;
+}
+
+.pc-gate__link:hover {
+  text-decoration: underline;
+}
