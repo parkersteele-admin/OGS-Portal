@@ -57,6 +57,23 @@ export { optimizeOrderRoute }                                     from './maps/o
 export { generateRunManifest }                                    from './generateRunManifest'
 export { onCylinderFlagged }                                      from './onCylinderFlagged'
 
+// Onboarding callables
+export {
+  checkForExistingCompany,
+  setCompanyClaim,
+  revokeCompanyClaim,
+  requestToJoinCompany,
+  approveJoinRequest,
+  denyJoinRequest,
+  inviteTeamMember,
+  acceptInvite,
+  adminAssignUser,
+} from './onboarding'
+
+// Onboarding triggers
+export { onCreditApplicationSubmitted } from './triggers/onCreditApplicationSubmitted'
+export { onQuoteRequested }             from './triggers/onQuoteRequested'
+
 export const healthCheck = onRequest((_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })

@@ -56,6 +56,17 @@ import BillingDashboard from '../../pages/billing/BillingDashboard'
 // New Order module
 import NewOrderPage from '../../modules/orders/new/NewOrderPage'
 
+// Onboarding
+import SignUp from '../../pages/public/SignUp'
+import OnboardingPage from '../../pages/portal/Onboarding'
+import AcceptInvitePage from '../../pages/portal/AcceptInvite'
+import TeamSettingsPage from '../../pages/portal/TeamSettings'
+import { OnboardingLayout } from '../../components/layouts/OnboardingLayout'
+
+// Ops customer views
+import CustomerListPage   from '../../pages/ops/CustomerList'
+import CustomerDetailPage from '../../pages/ops/CustomerDetail'
+
 const RootRedirect: React.FC = () => {
   const { user, loading, role } = useAuth()
 
@@ -73,11 +84,25 @@ export const AppRouter: React.FC = () => (
 
       <Route path="/login" element={<LoginPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/signup" element={<SignUp />} />
+      <Route path="/accept-invite" element={<AcceptInvitePage />} />
+
+      {/* Onboarding wizard — minimal layout, no sidebar */}
+      <Route
+        path="/portal/onboarding"
+        element={
+          <ProtectedRoute role={['owner', 'manager', 'billing', 'delivery', 'viewer', 'customer', 'admin']}>
+            <OnboardingLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<OnboardingPage />} />
+      </Route>
 
       <Route
         path="/portal"
         element={
-          <ProtectedRoute role={['customer', 'admin']}>
+          <ProtectedRoute role={['customer', 'owner', 'manager', 'billing', 'delivery', 'viewer', 'admin']}>
             <CustomerLayout />
           </ProtectedRoute>
         }
@@ -92,6 +117,7 @@ export const AppRouter: React.FC = () => (
         <Route path="tanks" element={<TankLevelsPage />} />
         <Route path="catalog" element={<ProductCatalog />} />
         <Route path="profile" element={<ProfilePage />} />
+        <Route path="settings/team" element={<TeamSettingsPage />} />
       </Route>
 
       <Route
@@ -113,6 +139,8 @@ export const AppRouter: React.FC = () => (
         <Route path="tanks" element={<OpsTanksPage />} />
         <Route path="inventory" element={<InventoryPage />} />
         <Route path="billing" element={<BillingDashboard />} />
+        <Route path="customers" element={<CustomerListPage />} />
+        <Route path="customers/:companyId" element={<CustomerDetailPage />} />
       </Route>
 
       <Route

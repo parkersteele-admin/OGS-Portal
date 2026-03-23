@@ -13,7 +13,15 @@ export interface AuthUser {
 
 /** Default landing path for each role after sign-in */
 export const ROLE_HOME: Record<UserRole, string> = {
+  // Legacy customer role
   customer: '/portal/dashboard',
+  // Customer sub-roles (onboarding)
+  owner:    '/portal/dashboard',
+  manager:  '/portal/dashboard',
+  billing:  '/portal/dashboard',
+  delivery: '/portal/dashboard',
+  viewer:   '/portal/dashboard',
+  // OGS internal roles
   admin:    '/ops/dashboard',
   dispatch: '/ops/dispatch',
   driver:   '/driver/schedule',

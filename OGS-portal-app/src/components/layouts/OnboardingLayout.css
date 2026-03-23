@@ -1,0 +1,43 @@
+/* src/components/layouts/OnboardingLayout.css */
+
+.ob-layout {
+  min-height: 100dvh;
+  background: #f9fafb;
+  display: flex;
+  flex-direction: column;
+}
+
+.ob-layout__header {
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0 1.5rem;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.ob-layout__logo {
+  display: block;
+  width: 120px;
+  height: 32px;
+  background: url('/logo.svg') no-repeat left center / contain;
+  /* Fallback text branding if logo file is absent */
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: 1.1rem;
+  color: #E87722;
+}
+
+.ob-layout__main {
+  flex: 1;
+  padding: 1.5rem 1rem 3rem;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+@media (min-width: 640px) {
+  .ob-layout__main {
+    padding: 2.5rem 1.5rem 4rem;
+  }
+}

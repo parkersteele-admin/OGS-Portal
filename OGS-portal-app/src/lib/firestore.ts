@@ -110,3 +110,33 @@ export const auditLogCol = col<AuditLogEntry>('auditLog')
 
 // ── Settings ──────────────────────────────────────────────────────────────────
 export const deliverySettingsRef = doc(db, 'settings', 'delivery')
+
+// ── Onboarding / Company ──────────────────────────────────────────────────────
+import type {
+  Company,
+  DeliveryLocation,
+  CreditApplication,
+  QuoteRequest,
+  TeamInvite,
+  JoinRequest,
+} from '../types/company'
+
+/** /customers/{companyId}/locations */
+export const companyLocationsCol = (companyId: string) =>
+  col<DeliveryLocation>(`customers/${companyId}/locations`)
+
+/** /creditApplications/{companyId} */
+export const creditApplicationsCol = col<CreditApplication>('creditApplications')
+
+/** /quoteRequests/{quoteId} */
+export const quoteRequestsCol = col<QuoteRequest>('quoteRequests')
+
+/** /invites/{inviteId} */
+export const invitesCol = col<TeamInvite>('invites')
+
+/** /joinRequests/{requestId} */
+export const joinRequestsCol = col<JoinRequest>('joinRequests')
+
+// Re-export customersCol typed as Company for onboarding use
+export { customersCol as companiesCol }
+export type { Company }

@@ -1,0 +1,331 @@
+/**
+ * src/pages/ops/CustomerDetail.css
+ */
+
+.ops-cust-detail {
+  padding: 24px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.ops-cust-detail__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #6b7280;
+  font-size: 0.875rem;
+  text-decoration: none;
+  margin-bottom: 20px;
+  transition: color 0.15s;
+}
+.ops-cust-detail__back:hover { color: #E87722; }
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+
+.ops-cust-detail__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.ops-cust-detail__title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111;
+  margin: 0 0 4px;
+}
+
+.ops-cust-detail__meta {
+  font-size: 0.875rem;
+  color: #6b7280;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ops-cust-detail__status-select {
+  padding: 6px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  background: #fff;
+  cursor: pointer;
+}
+
+/* ── Tabs ────────────────────────────────────────────────────────────────── */
+
+.ops-cust-detail__tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid #e5e7eb;
+  margin-bottom: 24px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.ops-cust-detail__tab {
+  padding: 10px 18px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #6b7280;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.ops-cust-detail__tab:hover { color: #111; }
+
+.ops-cust-detail__tab--active {
+  color: #E87722;
+  border-bottom-color: #E87722;
+  font-weight: 600;
+}
+
+/* ── Tab panels ──────────────────────────────────────────────────────────── */
+
+.ops-cust-detail__panel {
+  animation: fadeIn 0.15s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Info grid ───────────────────────────────────────────────────────────── */
+
+.ops-cust-detail__info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.ops-cust-detail__info-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 16px 20px;
+}
+
+.ops-cust-detail__info-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+
+.ops-cust-detail__info-value {
+  font-size: 0.9375rem;
+  color: #111;
+  word-break: break-word;
+}
+
+/* ── Team table ──────────────────────────────────────────────────────────── */
+
+.ops-cust-detail__team-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.ops-cust-detail__team-table th {
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 600;
+  color: #6b7280;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.ops-cust-detail__team-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.ops-cust-detail__team-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* ── Admin assign form ───────────────────────────────────────────────────── */
+
+.ops-cust-detail__assign-form {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 24px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.ops-cust-detail__assign-form label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #374151;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ops-cust-detail__assign-form input,
+.ops-cust-detail__assign-form select {
+  padding: 8px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  background: #fff;
+  width: 200px;
+}
+
+/* ── Locations list ──────────────────────────────────────────────────────── */
+
+.ops-cust-detail__location-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-bottom: 12px;
+}
+
+.ops-cust-detail__location-name {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.ops-cust-detail__location-detail {
+  font-size: 0.8125rem;
+  color: #6b7280;
+  margin: 2px 0;
+}
+
+/* ── Usage table ─────────────────────────────────────────────────────────── */
+
+.ops-cust-detail__usage-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.ops-cust-detail__usage-table th,
+.ops-cust-detail__usage-table td {
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.ops-cust-detail__usage-table th {
+  background: #f9fafb;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+/* ── Documents tab ───────────────────────────────────────────────────────── */
+
+.ops-cust-detail__doc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ops-cust-detail__doc-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 14px 18px;
+}
+
+.ops-cust-detail__doc-name {
+  font-weight: 500;
+  font-size: 0.9375rem;
+}
+
+.ops-cust-detail__doc-link {
+  color: #E87722;
+  font-size: 0.875rem;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.ops-cust-detail__doc-link:hover {
+  text-decoration: underline;
+}
+
+.ops-cust-detail__doc-missing {
+  color: #9ca3af;
+  font-size: 0.875rem;
+  font-style: italic;
+}
+
+/* ── Quotes ──────────────────────────────────────────────────────────────── */
+
+.ops-cust-detail__quote-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.ops-cust-detail__quote-status {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  background: #fef9c3;
+  color: #854d0e;
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+
+.ops-cust-detail__empty {
+  text-align: center;
+  padding: 40px 24px;
+  color: #9ca3af;
+  font-size: 0.9375rem;
+}
+
+/* ── Danger / remove button ──────────────────────────────────────────────── */
+
+.ops-cust-detail__remove-btn {
+  background: none;
+  border: none;
+  color: #ef4444;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+.ops-cust-detail__remove-btn:hover {
+  background: #fee2e2;
+}

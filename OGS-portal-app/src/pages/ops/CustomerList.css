@@ -1,0 +1,173 @@
+/**
+ * src/pages/ops/CustomerList.css
+ */
+
+.ops-cust-list {
+  padding: 24px;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+.ops-cust-list__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.ops-cust-list__title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111;
+  margin: 0;
+}
+
+/* ── Filters ─────────────────────────────────────────────────────────────── */
+
+.ops-cust-list__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.ops-cust-list__filter-input {
+  flex: 1 1 200px;
+  min-width: 160px;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  background: #fff;
+  color: #111;
+}
+
+.ops-cust-list__filter-input:focus {
+  outline: 2px solid #E87722;
+  outline-offset: 1px;
+  border-color: transparent;
+}
+
+/* ── Table ───────────────────────────────────────────────────────────────── */
+
+.ops-cust-list__table-wrap {
+  overflow-x: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.ops-cust-list__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.ops-cust-list__table th {
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 600;
+  color: #6b7280;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  white-space: nowrap;
+}
+
+.ops-cust-list__table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #f3f4f6;
+  vertical-align: middle;
+}
+
+.ops-cust-list__table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.ops-cust-list__table tbody tr:hover td {
+  background: #fafaf9;
+}
+
+.ops-cust-list__link {
+  color: #E87722;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.ops-cust-list__link:hover {
+  text-decoration: underline;
+}
+
+/* ── Setup Step Badge ────────────────────────────────────────────────────── */
+
+.ops-cust-list__setup-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8125rem;
+}
+
+.ops-cust-list__setup-badge__bar-track {
+  width: 80px;
+  height: 6px;
+  background: #e5e7eb;
+  border-radius: 3px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.ops-cust-list__setup-badge__bar-fill {
+  height: 100%;
+  background: #E87722;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.ops-cust-list__setup-badge__label {
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+.ops-cust-list__setup-badge--done .ops-cust-list__setup-badge__label {
+  color: #16a34a;
+  font-weight: 600;
+}
+
+.ops-cust-list__tddd-warn {
+  color: #d97706;
+  font-size: 0.75rem;
+  margin-left: 4px;
+}
+
+/* ── Status badge ────────────────────────────────────────────────────────── */
+
+.ops-cust-list__status {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.ops-cust-list__status--active        { background: #dcfce7; color: #166534; }
+.ops-cust-list__status--pending_quote { background: #fef9c3; color: #854d0e; }
+.ops-cust-list__status--onboarding    { background: #dbeafe; color: #1e40af; }
+.ops-cust-list__status--inactive      { background: #f3f4f6; color: #6b7280; }
+.ops-cust-list__status--suspended     { background: #fee2e2; color: #991b1b; }
+
+/* ── Empty / loading states ─────────────────────────────────────────────── */
+
+.ops-cust-list__empty {
+  text-align: center;
+  padding: 48px 24px;
+  color: #9ca3af;
+  font-size: 0.9375rem;
+}
+
+.ops-cust-list__loading {
+  text-align: center;
+  padding: 48px 24px;
+  color: #6b7280;
+}

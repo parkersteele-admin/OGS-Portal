@@ -13,17 +13,19 @@
  */
 
 import React, { useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { collection, getDocs } from 'firebase/firestore'
 import { db } from '../../../lib/firebase'
 import { useAuth } from '../../../hooks/useAuth'
+import { useOnboarding } from '../../../hooks/useOnboarding'
 import { useCustomerTanks } from '../../../hooks/useCustomerTanks'
 import { usePaymentMethods } from '../../../hooks/usePaymentMethods'
 import { useCustomerInvoices, useCustomerOrders } from '../../../hooks/queries'
 import { getRouteSchedule } from '../../../services/orderService'
 import { Badge } from '../../../components/ui/Badge'
 import { Button } from '../../../components/ui/Button'
+import { STEP_LABELS } from '../../../components/onboarding/OnboardingStepper'
 import type { Invoice, InvoiceStatus } from '../../../types/billing'
 import type { Order, OrderStatus, DeliveryTier, RouteSchedule } from '../../../types/order'
 import type { Tank } from '../../../types/tank'
@@ -151,6 +153,11 @@ const DashboardPage: React.FC = () => {
   const { user }   = useAuth()
   const customerId = user?.customerId ?? null
 
+  // Onboarding state
+  const { setupComplete, setupStep, companyId, loading: obLoading } = useOnboarding()
+  const hasCompany          = !!companyId
+  const isPendingJoinRequest = !hasCompany && !!user && !obLoading
+
   // Real-time subscriptions
   const { tanks, hasLowLevel } = useCustomerTanks(customerId)
   const { defaultMethod }      = usePaymentMethods(customerId ?? undefined)
@@ -220,6 +227,53 @@ const DashboardPage: React.FC = () => {
 
   return (
     <div className="cust-db">
+
+      {/* ── Pending join request holding screen ──────────────────────────── */}
+      {isPendingJoinRequest && (
+        <div className="cust-db__join-pending">
+          <div className="cust-db__join-pending__icon" aria-hidden="true">⏳</div>
+          <h2 className="cust-db__join-pending__title">Access request pending</h2>
+          <p className="cust-db__join-pending__body">
+            The account owner has been notified. You'll receive an email once your
+            request is approved.
+          </p>
+        </div>
+      )}
+
+      {/* ── Incomplete setup banner ───────────────────────────────────────── */}
+      {hasCompany && !setupComplete && !obLoading && (
+        <div className="cust-db__setup-banner">
+          <div className="cust-db__setup-banner__content">
+            <p className="cust-db__setup-banner__msg">
+              <strong>Your account setup is incomplete.</strong>&nbsp;
+              Complete setup to view pricing and place orders.
+            </p>
+            <Link to="/portal/onboarding" className="cust-db__setup-banner__cta">
+              Continue Setup →
+            </Link>
+          </div>
+          <ol className="cust-db__setup-steps">
+            {STEP_LABELS.map((label, i) => {
+              const stepNum = i + 1
+              const done    = stepNum <= (setupStep ?? 0)
+              const next    = stepNum === (setupStep ?? 0) + 1
+              return (
+                <li
+                  key={stepNum}
+                  className={[
+                    'cust-db__setup-step',
+                    done ? 'cust-db__setup-step--done' : '',
+                    next ? 'cust-db__setup-step--next' : '',
+                  ].join(' ').trim()}
+                >
+                  <span className="cust-db__setup-step__num">{done ? '✓' : stepNum}</span>
+                  <span className="cust-db__setup-step__label">{label}</span>
+                </li>
+              )
+            })}
+          </ol>
+        </div>
+      )}
 
       {/* ── Page header ───────────────────────────────────────────────────── */}
       <header className="cust-db__header">
