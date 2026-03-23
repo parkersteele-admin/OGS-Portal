@@ -39,11 +39,12 @@ async function advanceStage(
   if (!isForward(currentStage, newStage)) return  // only advance, never regress
 
   const now    = FieldValue.serverTimestamp()
+  const nowDate = new Date()
   const history = Array.isArray(currentLead.stageHistory) ? currentLead.stageHistory : []
   const updated = history.map((e: Record<string, unknown>) =>
-    e.exitedAt === null ? { ...e, exitedAt: now } : e,
+    e.exitedAt === null ? { ...e, exitedAt: nowDate } : e,
   )
-  updated.push({ stage: newStage, enteredAt: now, exitedAt: null, actor: 'system', note: null })
+  updated.push({ stage: newStage, enteredAt: nowDate, exitedAt: null, actor: 'system', note: null })
 
   await db.collection('leads').doc(companyId).update({
     stage: newStage,

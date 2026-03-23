@@ -23,6 +23,9 @@ export const onCustomerCreated = onDocumentCreated(
     const companyName  = (data.companyName  as string) ?? 'Unknown'
     const businessType = (data.businessType as string | null) ?? null
     const now = FieldValue.serverTimestamp()
+    // serverTimestamp() cannot be nested inside an array in the Admin SDK;
+    // use a real Date for enteredAt inside stageHistory.
+    const nowDate = new Date()
 
     // Create the pipeline lead doc
     await db.collection('leads').doc(companyId).set({
@@ -37,7 +40,7 @@ export const onCustomerCreated = onDocumentCreated(
       source: 'online_signup',
       notes: [],
       stageHistory: [
-        { stage: 'new_signup', enteredAt: now, exitedAt: null, actor: 'system', note: null },
+        { stage: 'new_signup', enteredAt: nowDate, exitedAt: null, actor: 'system', note: null },
       ],
       nextFollowUpAt: null,
       tags: [],

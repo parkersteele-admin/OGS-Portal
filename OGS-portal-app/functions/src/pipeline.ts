@@ -83,7 +83,7 @@ export const logLeadActivity = onCall(async (request) => {
     type,
     body: body.trim(),
     createdBy: request.auth!.uid,
-    createdAt: FieldValue.serverTimestamp(),
+    createdAt: new Date(),
   }
 
   await db.collection('leads').doc(companyId).update({
@@ -117,14 +117,17 @@ export const advanceLeadStage = onCall(async (request) => {
   }
 
   // Validate direction (can go backward for manual corrections, but log it)
+  // FieldValue.serverTimestamp() cannot be used inside arrays;
+  // use a real Date for values that go into stageHistory or arrayUnion entries.
   const now = FieldValue.serverTimestamp()
+  const nowDate = new Date()
   const history = Array.isArray(lead.stageHistory) ? [...lead.stageHistory] : []
   const updated = history.map((e: Record<string, unknown>) =>
-    e.exitedAt === null ? { ...e, exitedAt: now } : e,
+    e.exitedAt === null ? { ...e, exitedAt: nowDate } : e,
   )
   updated.push({
     stage,
-    enteredAt: now,
+    enteredAt: nowDate,
     exitedAt: null,
     actor: request.auth!.uid,
     note: note ?? null,
@@ -135,7 +138,7 @@ export const advanceLeadStage = onCall(async (request) => {
     type: 'stage_change',
     body: `Stage changed from "${currentStage}" to "${stage}"${note ? `: ${note}` : ''}`,
     createdBy: request.auth!.uid,
-    createdAt: now,
+    createdAt: nowDate,
   }
 
   await db.collection('leads').doc(companyId).update({
@@ -159,18 +162,19 @@ export const markLeadWon = onCall(async (request) => {
   if (lead.stage === 'won') return { stage: 'won' }
 
   const now = FieldValue.serverTimestamp()
+  const nowDate = new Date()
   const history = Array.isArray(lead.stageHistory) ? [...lead.stageHistory] : []
   const updated = history.map((e: Record<string, unknown>) =>
-    e.exitedAt === null ? { ...e, exitedAt: now } : e,
+    e.exitedAt === null ? { ...e, exitedAt: nowDate } : e,
   )
-  updated.push({ stage: 'won', enteredAt: now, exitedAt: null, actor: request.auth!.uid, note: note ?? null })
+  updated.push({ stage: 'won', enteredAt: nowDate, exitedAt: null, actor: request.auth!.uid, note: note ?? null })
 
   const activityEntry = {
     id: uuid(),
     type: 'stage_change',
     body: `Lead marked as Won${note ? `: ${note}` : ''}`,
     createdBy: request.auth!.uid,
-    createdAt: now,
+    createdAt: nowDate,
   }
 
   await db.collection('leads').doc(companyId).update({
@@ -206,18 +210,19 @@ export const markLeadLost = onCall(
     if (lead.stage === 'lost') return { stage: 'lost' }
 
     const now = FieldValue.serverTimestamp()
+    const nowDate = new Date()
     const history = Array.isArray(lead.stageHistory) ? [...lead.stageHistory] : []
     const updated = history.map((e: Record<string, unknown>) =>
-      e.exitedAt === null ? { ...e, exitedAt: now } : e,
+      e.exitedAt === null ? { ...e, exitedAt: nowDate } : e,
     )
-    updated.push({ stage: 'lost', enteredAt: now, exitedAt: null, actor: request.auth!.uid, note: note ?? null })
+    updated.push({ stage: 'lost', enteredAt: nowDate, exitedAt: null, actor: request.auth!.uid, note: note ?? null })
 
     const activityEntry = {
       id: uuid(),
       type: 'stage_change',
       body: `Lead marked as Lost — Reason: ${lostReason}${note ? ` — ${note}` : ''}`,
       createdBy: request.auth!.uid,
-      createdAt: now,
+      createdAt: nowDate,
     }
 
     await db.collection('leads').doc(companyId).update({

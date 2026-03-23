@@ -38,6 +38,7 @@ export const checkStaleLeads = onSchedule(
     }
 
     const now = FieldValue.serverTimestamp()
+    const nowDate = new Date()
 
     const results = await Promise.allSettled(
       staleSnap.docs.map(async (leadDoc) => {
@@ -46,11 +47,11 @@ export const checkStaleLeads = onSchedule(
         // Build updated stageHistory
         const history = Array.isArray(lead.stageHistory) ? [...lead.stageHistory] : []
         const updated = history.map((e: Record<string, unknown>) =>
-          e.exitedAt === null ? { ...e, exitedAt: now } : e,
+          e.exitedAt === null ? { ...e, exitedAt: nowDate } : e,
         )
         updated.push({
           stage: 'stalled',
-          enteredAt: now,
+          enteredAt: nowDate,
           exitedAt: null,
           actor: 'system',
           note: `Auto-stalled: no activity for ${STALE_THRESHOLD_DAYS} days`,
@@ -61,7 +62,7 @@ export const checkStaleLeads = onSchedule(
           type: 'system',
           body: `Lead auto-stalled: no activity for ${STALE_THRESHOLD_DAYS} days at Quote Sent stage`,
           createdBy: 'system',
-          createdAt: now,
+          createdAt: nowDate,
         }
 
         await leadDoc.ref.update({
