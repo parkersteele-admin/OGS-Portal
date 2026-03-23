@@ -59,12 +59,13 @@ interface StageConfig {
 }
 
 const STAGES: StageConfig[] = [
-  { key: 'new',       label: 'New Lead' },
-  { key: 'contacted', label: 'Contacted' },
-  { key: 'qualified', label: 'Qualified' },
-  { key: 'proposal',  label: 'Quote Sent', accent: true },
-  { key: 'won',       label: 'Won',        accent: true },
-  { key: 'lost',      label: 'Lost' },
+  { key: 'pending_setup', label: 'Pending Setup' },
+  { key: 'new',           label: 'New Lead' },
+  { key: 'contacted',     label: 'Contacted' },
+  { key: 'qualified',     label: 'Qualified' },
+  { key: 'proposal',      label: 'Quote Sent', accent: true },
+  { key: 'won',           label: 'Won',        accent: true },
+  { key: 'lost',          label: 'Lost' },
 ]
 
 const STAGE_MAP = Object.fromEntries(STAGES.map(s => [s.key, s])) as Record<LeadStatus, StageConfig>
@@ -635,7 +636,8 @@ const LeadCard: React.FC<LeadCardProps> = ({
       )}
 
       <div className="lp-card__meta">
-        {lead.source && <span className="lp-card__tag">{lead.source}</span>}
+        {lead.isWebSignup && <span className="lp-card__tag lp-card__tag--web">Website</span>}
+        {lead.source && !lead.isWebSignup && <span className="lp-card__tag">{lead.source}</span>}
         {rep && <span className="lp-card__tag lp-card__tag--rep">{rep.name}</span>}
       </div>
 
@@ -782,8 +784,9 @@ const ListTable: React.FC<ListTableProps> = ({
                 <td className="lp-td">{lead.company ? lead.name : '—'}</td>
                 <td className="lp-td">
                     <Badge variant={stageConfig.accent ? 'brand' : 'neutral'}>{stageConfig.label}</Badge>
+                    {lead.isWebSignup && <Badge variant="info">Website</Badge>}
                 </td>
-                <td className="lp-td">{lead.source ?? '—'}</td>
+                <td className="lp-td">{lead.isWebSignup ? 'Website' : (lead.source ?? '—')}</td>
                 <td className="lp-td">{rep?.name ?? '—'}</td>
                 <td className="lp-td lp-td--right">
                   {lead.estimatedValue !== undefined ? formatCurrency(lead.estimatedValue) : '—'}

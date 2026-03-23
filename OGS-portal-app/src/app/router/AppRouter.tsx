@@ -67,12 +67,7 @@ import { OnboardingLayout } from '../../components/layouts/OnboardingLayout'
 import CustomerListPage   from '../../pages/ops/CustomerList'
 import CustomerDetailPage from '../../pages/ops/CustomerDetail'
 
-// Sales Pipeline
-import PipelineBoardPage from '../../pages/ops/sales/SalesDashboard'
-import PipelineListPage  from '../../pages/ops/sales/PipelineList'
-import WonAccounts       from '../../pages/ops/sales/WonAccounts'
-import LostLeads         from '../../pages/ops/sales/LostLeads'
-import SalesPerformance  from '../../pages/ops/sales/SalesPerformance'
+
 
 const RootRedirect: React.FC = () => {
   const { user, loading, role } = useAuth()
@@ -188,11 +183,6 @@ export const AppRouter: React.FC = () => (
         <Route path="customers" element={<CustomersPage />} />
         <Route path="customers/:customerId" element={<CustomerRecord />} />
         <Route path="leads" element={<LeadsPage />} />
-        <Route path="pipeline" element={<PipelineBoardPage />} />
-        <Route path="pipeline-list" element={<PipelineListPage />} />
-        <Route path="won" element={<WonAccounts />} />
-        <Route path="lost" element={<LostLeads />} />
-        <Route path="performance" element={<SalesPerformance />} />
         <Route path="quotes" element={<QuotesPage />} />
         <Route path="quotes/new" element={<QuoteEditorPage />} />
         <Route path="quotes/:quoteId" element={<QuoteEditorPage />} />

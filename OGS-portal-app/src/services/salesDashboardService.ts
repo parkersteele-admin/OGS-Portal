@@ -104,10 +104,11 @@ export interface SalesDashboardData {
   dataNotes: Array<{ title: string; explanation: string }>
 }
 
-const LEAD_STAGE_ORDER: LeadStatus[] = ['new', 'contacted', 'qualified', 'proposal', 'won', 'lost']
-const OPEN_PIPELINE_STAGES: LeadStatus[] = ['new', 'contacted', 'qualified', 'proposal']
+const LEAD_STAGE_ORDER: LeadStatus[] = ['pending_setup', 'new', 'contacted', 'qualified', 'proposal', 'won', 'lost']
+const OPEN_PIPELINE_STAGES: LeadStatus[] = ['pending_setup', 'new', 'contacted', 'qualified', 'proposal']
 
 const LEAD_STAGE_LABELS: Record<LeadStatus, string> = {
+  pending_setup: 'Pending Setup',
   new: 'New',
   contacted: 'Contacted',
   qualified: 'Qualified',

@@ -1,7 +1,7 @@
 import type { Timestamp } from 'firebase/firestore'
 
 // ── Leads ─────────────────────────────────────────────────────────────────────
-export type LeadStatus = 'new' | 'contacted' | 'qualified' | 'proposal' | 'won' | 'lost'
+export type LeadStatus = 'pending_setup' | 'new' | 'contacted' | 'qualified' | 'proposal' | 'won' | 'lost'
 
 export interface Lead {
   id: string
@@ -15,11 +15,15 @@ export interface Lead {
   zip?: string
   status: LeadStatus
   source?: string
+  /** True when this lead was created automatically from a website signup. */
+  isWebSignup?: boolean
   /** UID of the sales rep assigned to this lead. */
   assignedTo?: string
   estimatedValue?: number
   notes?: string
   convertedToCustomerId?: string
+  /** companyId of the linked customer doc, set for web signups. */
+  companyId?: string
   createdAt: Timestamp
   updatedAt: Timestamp
 }

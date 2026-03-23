@@ -21,48 +21,44 @@ export const onCustomerCreated = onDocumentCreated(
 
     const { companyId } = event.params
     const companyName  = (data.companyName  as string) ?? 'Unknown'
-    const businessType = (data.businessType as string | null) ?? null
+    const contactName  = (data.billingContactName as string | null) ?? companyName
+    const email        = (data.billingEmail as string | null) ?? ''
+    const phone        = (data.phone as string | null) ?? ''
     const now = FieldValue.serverTimestamp()
-    // serverTimestamp() cannot be nested inside an array in the Admin SDK;
-    // use a real Date for enteredAt inside stageHistory.
-    const nowDate = new Date()
 
-    // Create the pipeline lead doc
+    // Write a Lead-shaped doc so new signups flow directly into /crm/leads.
+    // status='pending_setup' renders in its own Kanban column.
+    // isWebSignup=true shows the "Website" badge on the card.
     await db.collection('leads').doc(companyId).set({
+      name:           contactName,
+      email,
+      phone,
+      company:        companyName,
+      status:         'pending_setup',
+      source:         'Website',
+      isWebSignup:    true,
       companyId,
-      companyName,
-      businessType,
-      stage: 'new_signup',
-      assignedTo: null,
-      assignedAt: null,
-      priority: 'normal',
-      estimatedMonthlyValue: 0,
-      source: 'online_signup',
-      notes: [],
-      stageHistory: [
-        { stage: 'new_signup', enteredAt: nowDate, exitedAt: null, actor: 'system', note: null },
-      ],
-      nextFollowUpAt: null,
-      tags: [],
-      lostReason: null,
-      createdAt: now,
-      updatedAt: now,
+      assignedTo:     null,
+      estimatedValue: null,
+      notes:          '',
+      createdAt:      now,
+      updatedAt:      now,
     })
 
     // Notify sales inbox
     try {
       await sendEmail({
         to: SALES_INBOX,
-        subject: `New OGS Portal signup: ${companyName}${businessType ? ` (${businessType})` : ''}`,
+        subject: `New website signup: ${companyName}`,
         html: `
-          <p>A new customer has signed up via the OGS Portal.</p>
+          <p>A new customer has signed up via the OGS Portal and is in <strong>Pending Setup</strong>.</p>
           <ul>
             <li><strong>Company:</strong> ${companyName}</li>
-            ${businessType ? `<li><strong>Type:</strong> ${businessType}</li>` : ''}
-            <li><strong>Email:</strong> ${data.billingEmail ?? '—'}</li>
-            <li><strong>Phone:</strong> ${data.phone ?? '—'}</li>
+            <li><strong>Contact:</strong> ${contactName}</li>
+            <li><strong>Email:</strong> ${email || '—'}</li>
+            <li><strong>Phone:</strong> ${phone || '—'}</li>
           </ul>
-          <p><a href="https://app.ohiogassupply.com/ops/sales/dashboard">View Pipeline →</a></p>
+          <p><a href="https://app.ohiogassupply.com/crm/leads">View in CRM Leads →</a></p>
         `,
       })
     } catch (err) {

@@ -349,6 +349,12 @@
   color: var(--color-brand-dark);
 }
 
+.lp-card__tag--web {
+  border-color: #c3e0ff;
+  background: #e8f4ff;
+  color: #1a6bb5;
+}
+
 .lp-card__activity {
   margin: 0;
   font-size: 12px;
