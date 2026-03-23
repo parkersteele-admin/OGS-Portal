@@ -417,7 +417,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
     }
   }
 
-  const stageConfig = STAGE_MAP[lead.status]
+  const stageConfig = STAGE_MAP[lead.status] ?? { key: lead.status, label: lead.status, accent: false }
   const repName = salesReps.find(r => r.id === lead.assignedTo)?.name
   const stageBadgeVariant = stageConfig.accent ? 'brand' : 'neutral'
 
@@ -774,7 +774,7 @@ const ListTable: React.FC<ListTableProps> = ({
             </tr>
           )}
           {leads.map(lead => {
-            const stageConfig = STAGE_MAP[lead.status]
+            const stageConfig = STAGE_MAP[lead.status] ?? { key: lead.status, label: lead.status, accent: false }
             const rep = salesReps.find(r => r.id === lead.assignedTo)
             return (
               <tr
