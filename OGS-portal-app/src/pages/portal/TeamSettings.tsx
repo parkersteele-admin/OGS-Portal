@@ -7,7 +7,7 @@
  * - Show current team members with remove action
  */
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect } from 'react'
 import { httpsCallable } from 'firebase/functions'
 import { functions } from '../../lib/firebase'
 import {

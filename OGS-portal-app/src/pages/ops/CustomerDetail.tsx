@@ -8,7 +8,7 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, Navigate } from 'react-router-dom'
 import { httpsCallable } from 'firebase/functions'
-import { functions, db, storage } from '../../lib/firebase'
+import { functions, storage } from '../../lib/firebase'
 import { ref, getDownloadURL } from 'firebase/storage'
 import {
   getCompany,

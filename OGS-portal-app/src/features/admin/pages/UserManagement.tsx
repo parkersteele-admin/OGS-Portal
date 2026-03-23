@@ -43,6 +43,11 @@ const ROLE_LABELS: Record<UserRole, string> = {
   driver:   'Driver',
   sales:    'Sales',
   customer: 'Customer',
+  owner:    'Owner',
+  manager:  'Manager',
+  billing:  'Billing',
+  delivery: 'Delivery',
+  viewer:   'Viewer',
 }
 
 const DEMO_USERS: Array<{ name: string; email: string; role: UserRole }> = [
@@ -321,7 +326,7 @@ export const UserManagement: React.FC = () => {
 
   // ── Stats ────────────────────────────────────────────────────────────────
   const stats = useMemo(() => {
-    const counts: Record<UserRole, number> = { admin: 0, dispatch: 0, driver: 0, sales: 0, customer: 0 }
+    const counts: Record<UserRole, number> = { admin: 0, dispatch: 0, driver: 0, sales: 0, customer: 0, owner: 0, manager: 0, billing: 0, delivery: 0, viewer: 0 }
     for (const u of users) {
       if (u.role in counts) counts[u.role]++
     }

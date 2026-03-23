@@ -30,6 +30,11 @@ const ROLE_LABELS: Record<UserRole, string> = {
   driver:   'Driver',
   sales:    'Sales',
   customer: 'Customer',
+  owner:    'Owner',
+  manager:  'Manager',
+  billing:  'Billing',
+  delivery: 'Delivery',
+  viewer:   'Viewer',
 }
 
 // ── Customer typeahead ────────────────────────────────────────────────────────

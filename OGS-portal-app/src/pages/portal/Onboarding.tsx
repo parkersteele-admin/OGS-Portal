@@ -26,7 +26,7 @@ import '../../components/onboarding/Onboarding.css'
 
 const OnboardingPage: React.FC = () => {
   const { user } = useAuth()
-  const { company, setupStep, setupComplete, companyId, loading } = useOnboarding()
+  const { company, setupComplete, companyId, loading } = useOnboarding()
 
   // Active step — starts at max(1, setupStep)
   const [activeStep, setActiveStep] = useState<number>(1)

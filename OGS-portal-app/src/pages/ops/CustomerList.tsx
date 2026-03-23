@@ -93,7 +93,7 @@ const CustomerListPage: React.FC = () => {
       (snap) => {
         setCompanies(
           snap.docs.map(
-            (d) => ({ companyId: d.id, ...(d.data() as Omit<Company, 'companyId'>) }),
+            (d) => ({ companyId: d.id, ...(d.data() as unknown as Omit<Company, 'companyId'>) }),
           ),
         )
         setLoading(false)

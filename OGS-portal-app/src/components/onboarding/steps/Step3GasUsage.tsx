@@ -8,7 +8,7 @@
 
 import React, { useState, useRef, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getDocs, query, where } from 'firebase/firestore'
+import { getDocs } from 'firebase/firestore'
 import { productsCol } from '../../../lib/firestore'
 import { updateCompany, advanceSetupStep } from '../../../services/onboardingService'
 import { Button } from '../../ui/Button'
@@ -75,7 +75,7 @@ export const Step3GasUsage: React.FC<Props> = ({ company, onNext, onBack }) => {
     queryKey: ['products-onboarding'],
     queryFn: async () => {
       const snap = await getDocs(productsCol)
-      return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Product))
+      return snap.docs.map((d) => ({ ...d.data(), id: d.id } as Product))
     },
     staleTime: 10 * 60 * 1000,
   })
@@ -84,7 +84,7 @@ export const Step3GasUsage: React.FC<Props> = ({ company, onNext, onBack }) => {
   const productsByCategory = React.useMemo(() => {
     const map: Record<string, Product[]> = {}
     products.forEach((p) => {
-      const cat = (p as Product & { category?: string }).category ?? p.type
+      const cat = p.category
       if (cat) {
         if (!map[cat]) map[cat] = []
         map[cat].push(p)

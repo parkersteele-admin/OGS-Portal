@@ -21,9 +21,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import {
-  companiesCol,
   companyLocationsCol,
-  creditApplicationsCol,
   quoteRequestsCol,
   invitesCol,
   joinRequestsCol,
@@ -149,8 +147,9 @@ export async function createQuoteRequest(
 ): Promise<string> {
   return serviceCall(async () => {
     const ref = await addDoc(quoteRequestsCol, {
+      id: '',
       ...data,
-      status: 'pending',
+      status: 'pending' as const,
       createdAt: serverTimestamp(),
     })
     return ref.id

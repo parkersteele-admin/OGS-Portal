@@ -38,10 +38,11 @@ export const Step5Review: React.FC<Props> = ({ company, locations, onEditStep })
 
       // 2. Create quote request snapshot
       await addDoc(quoteRequestsCol, {
+        id: '',
         companyId: company.companyId,
-        usageProfile: company.usageProfile,
+        usageProfile: company.usageProfile ?? [],
         locations,
-        status: 'pending',
+        status: 'pending' as const,
         createdAt: serverTimestamp(),
       })
 

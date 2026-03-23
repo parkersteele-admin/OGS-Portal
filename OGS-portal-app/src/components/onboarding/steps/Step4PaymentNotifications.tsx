@@ -6,7 +6,7 @@
  * billing email override, and notification preferences.
  */
 
-import React, { useState, useRef } from 'react'
+import React, { useState } from 'react'
 import { Elements } from '@stripe/react-stripe-js'
 import { loadStripe } from '@stripe/stripe-js'
 import { STRIPE_PUBLISHABLE_KEY } from '../../../lib/env'
