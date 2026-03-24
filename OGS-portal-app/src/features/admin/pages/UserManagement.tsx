@@ -4,19 +4,22 @@
  * Admin-only user management page at /admin/users.
  * Protected by ProtectedRoute role="admin" in the router.
  *
+ * Shows OGS staff only (admin, dispatch, driver, sales).
+ * Customer user access is managed from each customer's profile page.
+ *
  * Sections:
- *  1. Stat cards — total count per role
- *  2. Filter bar — search + role + company filter
- *  3. User table — Name | Email | Role | Company | Status | Last Login | Actions
+ *  1. Stat cards — count per OGS role
+ *  2. Filter bar — search + role filter
+ *  3. User table — Name | Email | Role | Status | Last Login | Actions
  *  4. Create User modal — CF adminCreateUser + sendPasswordResetEmail
- *  5. Edit User modal  — change role (CF) + company (CF) + activate/deactivate
+ *  5. Edit User modal  — change role (CF) + activate/deactivate
  */
 
 import React, { useState, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getDocs } from 'firebase/firestore'
-import { usersCol, customersCol } from '../../../lib/firestore'
+import { usersCol } from '../../../lib/firestore'
 import {
   assignUserRole,
   deactivateUser,
@@ -24,7 +27,6 @@ import {
   createAppUser,
   hardDeleteUser,
   sendPasswordReset,
-  updateUserCompany,
 } from '../../../services/userService'
 import { useViewAsStore } from '../../../store/viewAsStore'
 import { ROLE_HOME } from '../../../types/auth'
@@ -36,15 +38,9 @@ import type { AppUser } from '../../../types/user'
 import type { UserRole } from '../../../types/user'
 import './UserManagement.css'
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-interface CompanyOption { id: string; name: string }
-
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const OGS_ROLES: UserRole[]      = ['admin', 'dispatch', 'driver', 'sales']
-const CUSTOMER_ROLES: UserRole[] = ['owner', 'manager', 'billing', 'delivery', 'viewer', 'customer']
-const ALL_ROLES: UserRole[]      = [...OGS_ROLES, ...CUSTOMER_ROLES]
+const OGS_ROLES: UserRole[] = ['admin', 'dispatch', 'driver', 'sales']
 
 const ROLE_LABELS: Record<UserRole, string> = {
   admin:    'Admin',
@@ -73,30 +69,21 @@ async function fetchAllUsers(): Promise<AppUser[]> {
   // Do NOT use orderBy here — Firestore silently excludes docs that lack the
   // ordered field (e.g. web-signup users only write firstName/lastName, not name).
   // Sort client-side and synthesize 'name' from firstName+lastName when missing.
+  // Only return OGS staff — customer users are managed from the customer profile.
   const snap = await getDocs(usersCol)
-  const users = snap.docs.map((d) => {
-    const data = d.data() as unknown as Record<string, unknown>
-    const name =
-      (data['name'] as string | undefined) ??
-      [`${data['firstName'] ?? ''}`, `${data['lastName'] ?? ''}`].join(' ').trim() ??
-      (data['email'] as string | undefined) ??
-      d.id
-    return { ...data, name, id: d.id } as AppUser
-  })
+  const OGS_ROLE_SET = new Set<string>(OGS_ROLES)
+  const users = snap.docs
+    .map((d) => {
+      const data = d.data() as unknown as Record<string, unknown>
+      const name =
+        (data['name'] as string | undefined) ??
+        [`${data['firstName'] ?? ''}`, `${data['lastName'] ?? ''}`].join(' ').trim() ??
+        (data['email'] as string | undefined) ??
+        d.id
+      return { ...data, name, id: d.id } as AppUser
+    })
+    .filter((u) => OGS_ROLE_SET.has(u.role))
   return users.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''))
-}
-
-async function fetchAllCompanies(): Promise<CompanyOption[]> {
-  // Do NOT use orderBy here — Firestore excludes docs that lack the ordered
-  //  field entirely. Sort in JS instead so all customer records are returned.
-  const snap = await getDocs(customersCol)
-  const companies = snap.docs.map((d) => {
-    const data = d.data() as unknown as Record<string, unknown>
-    // Handle both Company shape (companyName) and legacy Customer shape (name)
-    const name = (data.companyName ?? data.name ?? d.id) as string
-    return { id: d.id, name }
-  })
-  return companies.sort((a, b) => a.name.localeCompare(b.name))
 }
 
 // ── Role badge ────────────────────────────────────────────────────────────────
@@ -227,29 +214,20 @@ const SeedDemoUsersModal: React.FC<{ onClose: () => void; onDone: () => void }> 
 
 interface EditUserModalProps {
   user:      AppUser
-  companies: CompanyOption[]
   onClose:   () => void
   onUpdated: () => void
 }
 
-const EditUserModal: React.FC<EditUserModalProps> = ({ user, companies, onClose, onUpdated }) => {
+const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onUpdated }) => {
   const [role,      setRole]      = useState<UserRole>(user.role)
-  const [companyId, setCompanyId] = useState<string>(user.companyId ?? user.customerId ?? '')
   const [error,     setError]     = useState('')
 
   const roleChanged    = role !== user.role
-  const companyChanged = companyId !== (user.companyId ?? user.customerId ?? '')
 
   const roleMutation = useMutation({
     mutationFn: () => assignUserRole(user.id, role),
     onSuccess:  () => { onUpdated() },
     onError:    (err: Error) => setError(err.message || 'Failed to update role.'),
-  })
-
-  const companyMutation = useMutation({
-    mutationFn: () => updateUserCompany(user.id, companyId || null),
-    onSuccess:  () => { onUpdated() },
-    onError:    (err: Error) => setError(err.message || 'Failed to update company.'),
   })
 
   const toggleMutation = useMutation({
@@ -289,7 +267,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, companies, onClose,
               value={role}
               onChange={(e) => setRole(e.target.value as UserRole)}
             >
-              {ALL_ROLES.map((r) => (
+              {OGS_ROLES.map((r) => (
                 <option key={r} value={r}>{ROLE_LABELS[r]}</option>
               ))}
             </select>
@@ -305,35 +283,6 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, companies, onClose,
           </div>
           <p className="um-edit__hint">
             Role changes update Firebase Auth custom claims via Cloud Function.
-          </p>
-        </section>
-
-        {/* Company assignment */}
-        <section className="um-edit__section">
-          <p className="um-edit__section-label">Company Assignment</p>
-          <div className="um-edit__role-row">
-            <select
-              className="um-select"
-              value={companyId}
-              onChange={(e) => setCompanyId(e.target.value)}
-            >
-              <option value="">— No company —</option>
-              {companies.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => companyMutation.mutate()}
-              disabled={!companyChanged}
-              loading={companyMutation.isPending}
-            >
-              Save
-            </Button>
-          </div>
-          <p className="um-edit__hint">
-            Links user to a customer record and syncs the Auth custom claim.
           </p>
         </section>
 
@@ -441,7 +390,6 @@ export const UserManagement: React.FC = () => {
 
   const [searchTerm,     setSearchTerm]     = useState('')
   const [roleFilter,     setRoleFilter]     = useState<UserRole | 'all'>('all')
-  const [companyFilter,  setCompanyFilter]  = useState<string>('all')
   const [createOpen,     setCreateOpen]     = useState(false)
   const [seedOpen,       setSeedOpen]       = useState(false)
   const [editUser,       setEditUser]       = useState<AppUser | null>(null)
@@ -453,23 +401,9 @@ export const UserManagement: React.FC = () => {
     staleTime: 60 * 1000,
   })
 
-  const companiesQuery = useQuery({
-    queryKey:  ['admin', 'companies'],
-    queryFn:   fetchAllCompanies,
-    staleTime: 5 * 60 * 1000,
-  })
-
-  const users     = usersQuery.data     ?? []
-  const companies: CompanyOption[] = companiesQuery.data ?? []
+  const users     = usersQuery.data ?? []
   const isLoading = usersQuery.isPending
   const hasError  = usersQuery.isError
-
-  // Build a quick lookup: companyId → companyName
-  const companyMap = useMemo(() => {
-    const map: Record<string, string> = {}
-    for (const c of companies) map[c.id] = c.name
-    return map
-  }, [companies])
 
   // ── Stats ──────────────────────────────────────────────────────────────────
   const stats = useMemo(() => {
@@ -486,29 +420,15 @@ export const UserManagement: React.FC = () => {
   const filtered = useMemo(() => {
     return users.filter((u) => {
       if (roleFilter !== 'all' && u.role !== roleFilter) return false
-      if (companyFilter !== 'all') {
-        const uid = u.companyId ?? u.customerId ?? ''
-        if (companyFilter === '__none__') {
-          if (uid) return false
-        } else {
-          if (uid !== companyFilter) return false
-        }
-      }
       if (searchTerm) {
         const lower = searchTerm.toLowerCase()
         if (!u.name.toLowerCase().includes(lower) && !u.email.toLowerCase().includes(lower)) return false
       }
       return true
     })
-  }, [users, roleFilter, companyFilter, searchTerm])
+  }, [users, roleFilter, searchTerm])
 
-  // Derive companies that actually have users (for the filter dropdown)
-  const companiesWithUsers = useMemo(() => {
-    const ids = new Set(users.map((u) => u.companyId ?? u.customerId ?? '').filter(Boolean))
-    return companies.filter((c: CompanyOption) => ids.has(c.id))
-  }, [users, companies])
-
-  const hasFilters = searchTerm || roleFilter !== 'all' || companyFilter !== 'all'
+  const hasFilters = searchTerm || roleFilter !== 'all'
 
   const handleCreated = useCallback(() => {
     setCreateOpen(false)
@@ -560,14 +480,7 @@ export const UserManagement: React.FC = () => {
           ))}
         </div>
       </div>
-      <div className="um__stats-group">
-        <p className="um__stats-label">Customer Accounts</p>
-        <div className="um__stats">
-          {CUSTOMER_ROLES.map((r) => (
-            <StatCard key={r} role={r} count={stats[r]} total={totalUsers} />
-          ))}
-        </div>
-      </div>
+
 
       {/* ── 2. Filter bar ──────────────────────────────────────────────── */}
       <div className="um__filters">
@@ -586,27 +499,8 @@ export const UserManagement: React.FC = () => {
           aria-label="Filter by role"
         >
           <option value="all">All roles</option>
-          <optgroup label="OGS Staff">
-            {OGS_ROLES.map((r) => (
-              <option key={r} value={r}>{ROLE_LABELS[r]}</option>
-            ))}
-          </optgroup>
-          <optgroup label="Customer Accounts">
-            {CUSTOMER_ROLES.map((r) => (
-              <option key={r} value={r}>{ROLE_LABELS[r]}</option>
-            ))}
-          </optgroup>
-        </select>
-        <select
-          className="um__role-filter"
-          value={companyFilter}
-          onChange={(e) => setCompanyFilter(e.target.value)}
-          aria-label="Filter by company"
-        >
-          <option value="all">All companies</option>
-          <option value="__none__">No company</option>
-          {companiesWithUsers.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
+          {OGS_ROLES.map((r) => (
+            <option key={r} value={r}>{ROLE_LABELS[r]}</option>
           ))}
         </select>
         <span className="um__result-count">
@@ -616,7 +510,7 @@ export const UserManagement: React.FC = () => {
           <button
             type="button"
             className="um__filter-clear"
-            onClick={() => { setSearchTerm(''); setRoleFilter('all'); setCompanyFilter('all') }}
+            onClick={() => { setSearchTerm(''); setRoleFilter('all') }}
           >
             Clear
           </button>
@@ -641,7 +535,6 @@ export const UserManagement: React.FC = () => {
                   <th>Name</th>
                   <th>Email</th>
                   <th>Role</th>
-                  <th>Company</th>
                   <th>Status</th>
                   <th>Last Login</th>
                   <th>Actions</th>
@@ -649,8 +542,6 @@ export const UserManagement: React.FC = () => {
               </thead>
               <tbody>
                 {filtered.map((user) => {
-                  const cid         = user.companyId ?? user.customerId ?? ''
-                  const companyName = cid ? (companyMap[cid] ?? cid) : '—'
                   return (
                     <tr key={user.id} className={!user.active ? 'um__row--inactive' : ''}>
                       <td className="um__cell-name">
@@ -663,7 +554,6 @@ export const UserManagement: React.FC = () => {
                       </td>
                       <td className="um__cell-email">{user.email}</td>
                       <td><RoleBadge role={user.role} /></td>
-                      <td className="um__cell-company">{companyName}</td>
                       <td><StatusDot active={user.active} /></td>
                       <td className="um__cell-date">{lastLoginOf(user)}</td>
                       <td>
@@ -707,6 +597,7 @@ export const UserManagement: React.FC = () => {
         <CreateUserModal
           onClose={() => setCreateOpen(false)}
           onCreated={handleCreated}
+          allowedRoles={OGS_ROLES}
         />
       )}
 
@@ -720,7 +611,6 @@ export const UserManagement: React.FC = () => {
       {editUser && (
         <EditUserModal
           user={editUser}
-          companies={companies}
           onClose={() => setEditUser(null)}
           onUpdated={handleUpdated}
         />

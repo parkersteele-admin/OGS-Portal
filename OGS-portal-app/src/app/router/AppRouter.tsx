@@ -125,7 +125,7 @@ export const AppRouter: React.FC = () => (
       <Route
         path="/ops"
         element={
-          <ProtectedRoute role={['admin', 'dispatch']}>
+          <ProtectedRoute role={['admin', 'dispatch', 'sales', 'driver']}>
             <OpsLayout />
           </ProtectedRoute>
         }

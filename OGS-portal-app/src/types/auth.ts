@@ -22,7 +22,7 @@ export const ROLE_HOME: Record<UserRole, string> = {
   delivery: '/portal/dashboard',
   viewer:   '/portal/dashboard',
   // OGS internal roles
-  admin:    '/admin/users',
+  admin:    '/admin/dashboard',
   dispatch: '/ops/dispatch',
   driver:   '/driver/schedule',
   sales:    '/crm/customers',

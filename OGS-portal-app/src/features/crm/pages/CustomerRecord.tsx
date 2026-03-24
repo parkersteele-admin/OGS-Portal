@@ -51,6 +51,7 @@ import { Badge } from '../../../components/ui/Badge'
 import { Button } from '../../../components/ui/Button'
 import { Modal } from '../../../components/ui/Modal'
 import { Input } from '../../../components/ui/Input'
+import { CreateUserModal } from '../../../components/ui/CreateUserModal'
 import type { Customer, CustomerStatus } from '../../../types/customer'
 import type { ContactLog, ContactMethod } from '../../../types/crm'
 import type { AppFile } from '../../../types/file'
@@ -608,16 +609,18 @@ const LogInteractionModal: React.FC<LogInteractionModalProps> = ({ onClose, onSu
 
 interface UserAccessTabProps {
   companyId: string
+  customer:  Customer
   users:     AppUser[]
   loading:   boolean
   onRefresh: () => void
 }
 
-const UserAccessTab: React.FC<UserAccessTabProps> = ({ users, loading, onRefresh }) => {
-  const [editingId,  setEditingId]  = useState<string | null>(null)
+const UserAccessTab: React.FC<UserAccessTabProps> = ({ customer, users, loading, onRefresh }) => {
+  const [editingId,   setEditingId]   = useState<string | null>(null)
   const [pendingRole, setPendingRole] = useState<UserRole>('viewer')
-  const [saving,     setSaving]     = useState(false)
-  const [flash,      setFlash]      = useState<{ id: string; msg: string } | null>(null)
+  const [saving,      setSaving]      = useState(false)
+  const [flash,       setFlash]       = useState<{ id: string; msg: string } | null>(null)
+  const [addingUser,  setAddingUser]  = useState(false)
 
   const showFlash = (id: string, msg: string) => {
     setFlash({ id, msg })
@@ -676,6 +679,14 @@ const UserAccessTab: React.FC<UserAccessTabProps> = ({ users, loading, onRefresh
 
   return (
     <div className="cr-access">
+      {/* ── Header row ─────────────────────────────────────────────────── */}
+      <div className="cr-access__header">
+        <p className="cr-access__header-title">Portal Users</p>
+        <Button variant="primary" size="sm" onClick={() => setAddingUser(true)}>
+          + Add User
+        </Button>
+      </div>
+
       <div className="cr-access__legend">
         {CUSTOMER_ROLES.map(r => (
           <div key={r} className="cr-access__legend-item">
@@ -690,7 +701,7 @@ const UserAccessTab: React.FC<UserAccessTabProps> = ({ users, loading, onRefresh
       {users.length === 0 ? (
         <Card>
           <CardBody>
-            <p className="cr-empty">No portal users linked to this account yet.</p>
+            <p className="cr-empty">No portal users linked to this account yet. Use "+ Add User" to grant access.</p>
           </CardBody>
         </Card>
       ) : (
@@ -792,6 +803,16 @@ const UserAccessTab: React.FC<UserAccessTabProps> = ({ users, loading, onRefresh
             )
           })}
         </div>
+      )}
+
+      {/* Add user modal */}
+      {addingUser && (
+        <CreateUserModal
+          allowedRoles={CUSTOMER_ROLES}
+          preselectedCustomer={customer}
+          onClose={() => setAddingUser(false)}
+          onCreated={() => { setAddingUser(false); onRefresh() }}
+        />
       )}
     </div>
   )
@@ -1592,6 +1613,7 @@ const CustomerRecord: React.FC = () => {
         <div className="cr-tab-panel" role="tabpanel">
           <UserAccessTab
             companyId={customerId!}
+            customer={customer as Customer}
             users={companyUsers}
             loading={usersLoading}
             onRefresh={() => void refetchUsers()}

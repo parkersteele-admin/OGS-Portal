@@ -64,8 +64,8 @@ const CustomerDetailPage: React.FC = () => {
 
   if (!companyId) return <Navigate to="/ops/customers" replace />
 
-  // Permission guard
-  if (role !== 'admin' && role !== 'dispatch') {
+  // Permission guard — all OGS staff can view customer details
+  if (role !== 'admin' && role !== 'dispatch' && role !== 'driver' && role !== 'sales') {
     return <Navigate to="/ops/dashboard" replace />
   }
 
@@ -239,12 +239,11 @@ const CustomerDetailPage: React.FC = () => {
         {/* ── Team ─────────────────────────────────────────────────────── */}
         {tab === 'team' && (
           <div>
-            {/* Add user form (admin only) */}
-            {role === 'admin' && (
-              <form
-                className="ops-cust-detail__add-user"
-                onSubmit={(e) => void handleAddUser(e)}
-              >
+            {/* Add user form — visible to all OGS staff */}
+            <form
+              className="ops-cust-detail__add-user"
+              onSubmit={(e) => void handleAddUser(e)}
+            >
                 <h3 className="ob-step__sub-heading">Add / Assign User</h3>
                 <div className="ob-step__row">
                   <Input
@@ -273,8 +272,7 @@ const CustomerDetailPage: React.FC = () => {
                 <Button type="submit" variant="primary" size="sm" loading={addingUser}>
                   Assign User
                 </Button>
-              </form>
-            )}
+            </form>
 
             <div className="team-settings__table" style={{ marginTop: '1.5rem' }}>
               <div className="team-settings__table-head">

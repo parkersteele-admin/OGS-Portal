@@ -878,3 +878,220 @@
   .cr-table              { font-size: 0.8rem; }
   .cr-file-row__actions  { flex-direction: column; gap: var(--space-1); }
 }
+
+/* ── User Access tab ────────────────────────────────────────────────────────── */
+
+.cr-access {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.cr-access__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.cr-access__header-title {
+  font-size: var(--font-size-15);
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.cr-access__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-2);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
+
+.cr-access__legend-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.cr-access__legend-desc {
+  font-size: var(--font-size-11);
+  color: var(--color-text-3);
+}
+
+.cr-access__cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* ── User access card ─────────────────────────────────────────────────────── */
+
+.cr-access-card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-border);
+  transition: border-color 0.15s;
+}
+
+.cr-access-card:hover {
+  border-color: var(--color-border-strong, var(--color-brand));
+}
+
+.cr-access-card--inactive {
+  opacity: 0.6;
+}
+
+.cr-access-card__avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--color-brand);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-14);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.cr-access-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1;
+  min-width: 0;
+}
+
+.cr-access-card__name-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.cr-access-card__name {
+  font-size: var(--font-size-14);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.cr-access-card__inactive-tag {
+  font-size: var(--font-size-11);
+  font-weight: 600;
+  background: var(--color-danger-tint, rgba(239,68,68,.12));
+  color: var(--color-danger);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+}
+
+.cr-access-card__flash {
+  font-size: var(--font-size-11);
+  color: var(--color-success);
+  font-weight: 600;
+}
+
+.cr-access-card__email {
+  font-size: var(--font-size-12);
+  color: var(--color-text-3);
+}
+
+.cr-access-card__role-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-top: var(--space-1);
+}
+
+.cr-access-card__role-select {
+  max-width: 160px;
+  font-size: var(--font-size-12);
+}
+
+.cr-access-card__role-desc {
+  font-size: var(--font-size-11);
+  color: var(--color-text-3);
+}
+
+.cr-access-card__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+
+.cr-access-card__action {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  font-size: var(--font-size-11);
+  font-weight: 600;
+  color: var(--color-text-2);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  white-space: nowrap;
+}
+
+.cr-access-card__action:hover:not(:disabled) {
+  background: var(--color-bg-3, var(--color-bg-2));
+  color: var(--color-text);
+}
+
+.cr-access-card__action--primary {
+  border-color: var(--color-brand);
+  color: var(--color-brand);
+}
+
+.cr-access-card__action--primary:hover:not(:disabled) {
+  background: var(--color-brand);
+  color: #fff;
+}
+
+.cr-access-card__action--warn {
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+}
+
+.cr-access-card__action--warn:hover:not(:disabled) {
+  background: var(--color-warning);
+  color: #fff;
+}
+
+.cr-access-card__action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Role badge (used in access legend + cards) ───────────────────────────── */
+
+.cr-access-role {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-11);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cr-access-role--sm {
+  font-size: 10px;
+  padding: 2px 6px;
+}
+
+.cr-access-role--owner    { background: rgba(16,185,129,.12); color: #059669; }
+.cr-access-role--manager  { background: rgba(6,182,212,.12);  color: #0891b2; }
+.cr-access-role--billing  { background: rgba(139,92,246,.12); color: #7c3aed; }
+.cr-access-role--delivery { background: rgba(59,130,246,.12); color: #2563eb; }
+.cr-access-role--viewer   { background: var(--color-bg-3, var(--color-bg-2)); color: var(--color-text-3); border: 1px solid var(--color-border); }
+.cr-access-role--customer { background: var(--color-bg-3, var(--color-bg-2)); color: var(--color-text-3); border: 1px solid var(--color-border); }

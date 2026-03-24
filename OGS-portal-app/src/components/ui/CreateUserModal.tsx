@@ -138,15 +138,25 @@ const CustomerSearch: React.FC<CustomerSearchProps> = ({ selected, onSelect }) =
 // ── CreateUserModal ───────────────────────────────────────────────────────────
 
 export interface CreateUserModalProps {
-  onClose:   () => void
-  onCreated: () => void
+  onClose:             () => void
+  onCreated:           () => void
+  /** Restrict the role dropdown to these roles only. Defaults to all roles. */
+  allowedRoles?:       UserRole[]
+  /** Pre-link the new user to this customer record (hides the company search). */
+  preselectedCustomer?: Customer
 }
 
-export const CreateUserModal: React.FC<CreateUserModalProps> = ({ onClose, onCreated }) => {
+export const CreateUserModal: React.FC<CreateUserModalProps> = ({
+  onClose,
+  onCreated,
+  allowedRoles,
+  preselectedCustomer,
+}) => {
+  const roles = allowedRoles ?? ALL_ROLES
   const [name,     setName]     = useState('')
   const [email,    setEmail]    = useState('')
-  const [role,     setRole]     = useState<UserRole>('driver')
-  const [customer, setCustomer] = useState<Customer | null>(null)
+  const [role,     setRole]     = useState<UserRole>(roles[0] ?? 'driver')
+  const [customer, setCustomer] = useState<Customer | null>(preselectedCustomer ?? null)
   const [error,    setError]    = useState('')
   const [success,  setSuccess]  = useState(false)
 
@@ -226,10 +236,10 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ onClose, onCre
               value={role}
               onChange={(e) => {
                 setRole(e.target.value as UserRole)
-                if (e.target.value !== 'customer') setCustomer(null)
+                if (e.target.value !== 'customer') setCustomer(preselectedCustomer ?? null)
               }}
             >
-              {ALL_ROLES.map((r) => (
+              {roles.map((r) => (
                 <option key={r} value={r}>{ROLE_LABELS[r]}</option>
               ))}
             </select>
@@ -242,8 +252,16 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({ onClose, onCre
             </div>
           </div>
 
-          {role === 'customer' && (
+          {role === 'customer' && !preselectedCustomer && (
             <CustomerSearch selected={customer} onSelect={setCustomer} />
+          )}
+          {role === 'customer' && preselectedCustomer && (
+            <div className="cum-customer-chip">
+              <div className="cum-customer-chip__info">
+                <span className="cum-customer-chip__name">{preselectedCustomer.name}</span>
+                <span className="cum-customer-chip__email">{preselectedCustomer.email}</span>
+              </div>
+            </div>
           )}
 
           <p className="cum-form__hint">
