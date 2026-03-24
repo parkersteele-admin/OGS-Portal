@@ -17,7 +17,7 @@
  */
 
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import {
   onSnapshot,
   query,
@@ -1202,6 +1202,8 @@ function CreateRefillModal({ tank, customer, onClose, onCreated }: CreateRefillM
 
 export default function TankInventory() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const opsBase  = location.pathname.startsWith('/admin') ? '/admin/ops' : '/ops'
   const [allTanks, setAllTanks] = useState<Tank[]>([])
   const [customerMap, setCustomerMap] = useState<Record<string, Customer>>({})
   const [loading, setLoading] = useState(true)
@@ -1610,7 +1612,7 @@ export default function TankInventory() {
           tank={refillTank}
           customer={customerMap[refillTank.customerId]}
           onClose={() => setRefillTank(null)}
-          onCreated={() => navigate('/ops/orders')}
+          onCreated={() => navigate(`${opsBase}/orders`)}
         />
       )}
     </div>

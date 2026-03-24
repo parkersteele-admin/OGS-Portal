@@ -12,7 +12,7 @@
  */
 
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import {
   onSnapshot,
   query,
@@ -130,6 +130,8 @@ function OrderDetailPanel({
   onReschedule,
 }: OrderDetailPanelProps) {
   const navigate = useNavigate()
+  const location = useLocation()
+  const opsBase  = location.pathname.startsWith('/admin') ? '/admin/ops' : '/ops'
   const [invoice, setInvoice] = useState<Invoice | null>(null)
   const [runStopInfo, setRunStopInfo] = useState<{
     runNumber: string
@@ -294,7 +296,7 @@ function OrderDetailPanel({
                   <button
                     className="om-panel__link"
                     onClick={() =>
-                      navigate(`/ops/dispatch`, {
+                      navigate(`${opsBase}/dispatch`, {
                         state: { runId: runStopInfo.runNumber },
                       })
                     }
@@ -793,6 +795,8 @@ function RescheduleModal({ order, onClose, onSaved }: RescheduleModalProps) {
 
 export default function OrderManagement() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const opsBase  = location.pathname.startsWith('/admin') ? '/admin/ops' : '/ops'
 
   // ── Data ──────────────────────────────────────────────────────────────────────
   const [allOrders, setAllOrders] = useState<Order[]>([])
@@ -975,7 +979,7 @@ export default function OrderManagement() {
 
   // ── Build run from selection ───────────────────────────────────────────────────
   function handleBuildRun() {
-    navigate('/ops/runs/new', {
+    navigate(`${opsBase}/runs/new`, {
       state: { selectedOrderIds: [...selected] },
     })
   }

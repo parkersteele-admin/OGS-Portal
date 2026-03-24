@@ -476,6 +476,7 @@ export default function DispatchMapPage() {
   const params = useParams<{ runId?: string }>()
   const location = useLocation()
   const navigate = useNavigate()
+  const opsBase = location.pathname.startsWith('/admin') ? '/admin/ops' : '/ops'
 
   // runId priority: URL param → location state → null (show selector)
   const [runId, setRunId] = useState<string | null>(
@@ -596,7 +597,7 @@ export default function DispatchMapPage() {
       const hasPending = stops.some((s) => s.status === 'pending' || s.status === 'arrived')
       const newStatus: RunStatus = hasPending ? 'cancelled' : 'completed'
       await updateRun(runId, { status: newStatus })
-      navigate('/ops/dashboard')
+      navigate(`${opsBase}/dashboard`)
     } catch {
       setEndingRun(false)
     }
@@ -636,7 +637,7 @@ export default function DispatchMapPage() {
           <span className="dm-topbar__title">Dispatch</span>
         </div>
         <div className="dm-body">
-          <RunSelector onSelect={(id) => navigate(`/ops/dispatch/${id}`, { replace: true })} />
+          <RunSelector onSelect={(id) => navigate(`${opsBase}/dispatch/${id}`, { replace: true })} />
         </div>
       </div>
     )
@@ -650,7 +651,7 @@ export default function DispatchMapPage() {
         <div className="dm-topbar__left">
           <button
             className="dm-topbar__back"
-            onClick={() => navigate('/ops/dashboard')}
+            onClick={() => navigate(`${opsBase}/dashboard`)}
             aria-label="Back to ops dashboard"
           >
             ← Ops
@@ -664,7 +665,7 @@ export default function DispatchMapPage() {
           {rushNotifs.length > 0 && (
             <button
               className="dm-rush-badge"
-              onClick={() => navigate('/ops/orders')}
+              onClick={() => navigate(`${opsBase}/orders`)}
               title="New rush orders pending"
             >
               <span className="dm-rush-badge__dot" />

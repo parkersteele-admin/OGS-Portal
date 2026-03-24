@@ -10,7 +10,7 @@
  */
 
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import {
   onSnapshot,
   query,
@@ -264,6 +264,8 @@ interface ActiveRunCardProps {
 const ActiveRunCard: React.FC<ActiveRunCardProps> = ({ runId, driverNames }) => {
   const { run, stops } = useActiveRun(runId)
   const navigate = useNavigate()
+  const location = useLocation()
+  const opsBase  = location.pathname.startsWith('/admin') ? '/admin/ops' : '/ops'
 
   if (!run) return null
 
@@ -309,7 +311,7 @@ const ActiveRunCard: React.FC<ActiveRunCardProps> = ({ runId, driverNames }) => 
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => navigate('/ops/dispatch', { state: { runId } })}
+          onClick={() => navigate(`${opsBase}/dispatch`, { state: { runId } })}
         >
           View on map
         </Button>
@@ -328,6 +330,8 @@ interface PendingOrdersTableProps {
 
 const PendingOrdersTable: React.FC<PendingOrdersTableProps> = ({ orders, loading, customerNames }) => {
   const navigate = useNavigate()
+  const location = useLocation()
+  const opsBase  = location.pathname.startsWith('/admin') ? '/admin/ops' : '/ops'
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
   const sorted = [...orders].sort((a, b) => {
@@ -354,7 +358,7 @@ const PendingOrdersTable: React.FC<PendingOrdersTableProps> = ({ orders, loading
 
   const buildRun = () => {
     const ids = Array.from(selected)
-    navigate('/ops/runs/new', { state: { selectedOrderIds: ids } })
+    navigate(`${opsBase}/runs/new`, { state: { selectedOrderIds: ids } })
   }
 
   if (loading) {
@@ -421,7 +425,7 @@ const PendingOrdersTable: React.FC<PendingOrdersTableProps> = ({ orders, loading
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => navigate('/ops/runs/new', { state: { selectedOrderIds: [order.id] } })}
+                    onClick={() => navigate(`${opsBase}/runs/new`, { state: { selectedOrderIds: [order.id] } })}
                   >
                     Build run
                   </Button>
@@ -439,6 +443,8 @@ const PendingOrdersTable: React.FC<PendingOrdersTableProps> = ({ orders, loading
 
 const OpsDashboard: React.FC = () => {
   const navigate = useNavigate()
+  const location = useLocation()
+  const opsBase  = location.pathname.startsWith('/admin') ? '/admin/ops' : '/ops'
 
   // Stat data
   const { orders: pendingOrders, loading: pendingLoading } = usePendingOrders()
@@ -464,10 +470,10 @@ const OpsDashboard: React.FC = () => {
       <div className="od-topbar">
         <h1 className="od-topbar__title">Operations Dashboard</h1>
         <div className="od-topbar__actions">
-          <Button size="sm" onClick={() => navigate('/ops/orders', { state: { openNew: true } })}>
+          <Button size="sm" onClick={() => navigate(`${opsBase}/orders`, { state: { openNew: true } })}>
             + New order
           </Button>
-          <Button size="sm" variant="secondary" onClick={() => navigate('/ops/runs/new')}>
+          <Button size="sm" variant="secondary" onClick={() => navigate(`${opsBase}/runs/new`)}>
             + New run
           </Button>
           <Button size="sm" variant="secondary" onClick={() => navigate('/crm/customers', { state: { openNew: true } })}>
@@ -515,7 +521,7 @@ const OpsDashboard: React.FC = () => {
             {lowTanks.length > 0 && (
               <button
                 className="od-stat-card__link"
-                onClick={() => navigate('/ops/tanks')}
+                onClick={() => navigate(`${opsBase}/tanks`)}
               >
                 needs attention
               </button>
@@ -541,7 +547,7 @@ const OpsDashboard: React.FC = () => {
           <section className="od-section">
             <div className="od-section__header">
               <h2 className="od-section__title">Active runs</h2>
-              <Button size="sm" variant="ghost" onClick={() => navigate('/ops/runs')}>
+              <Button size="sm" variant="ghost" onClick={() => navigate(`${opsBase}/runs`)}>
                 View all
               </Button>
             </div>
@@ -565,7 +571,7 @@ const OpsDashboard: React.FC = () => {
           <section className="od-section">
             <div className="od-section__header">
               <h2 className="od-section__title">Pending orders pool</h2>
-              <Button size="sm" variant="ghost" onClick={() => navigate('/ops/orders')}>
+              <Button size="sm" variant="ghost" onClick={() => navigate(`${opsBase}/orders`)}>
                 View all
               </Button>
             </div>
@@ -615,7 +621,7 @@ const OpsDashboard: React.FC = () => {
                     </div>
                     <button
                       className="od-alert-item__action"
-                      onClick={() => navigate('/ops/billing')}
+                      onClick={() => navigate(`${opsBase}/billing`)}
                     >
                       Review
                     </button>

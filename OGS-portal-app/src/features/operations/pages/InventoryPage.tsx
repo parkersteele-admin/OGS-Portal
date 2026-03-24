@@ -12,7 +12,7 @@
  */
 
 import { useState, useEffect, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { onSnapshot, query, orderBy } from 'firebase/firestore'
 import { tanksCol } from '../../../lib/firestore'
 import { getTanksDueForInspection } from '../../../services/tankService'
@@ -55,6 +55,8 @@ function capitalize(s: string) {
 
 export default function InventoryPage() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const opsBase  = location.pathname.startsWith('/admin') ? '/admin/ops' : '/ops'
   const [tanks, setTanks] = useState<Tank[]>([])
   const [inspectionDue, setInspectionDue] = useState<Tank[]>([])
   const [loading, setLoading] = useState(true)
@@ -113,7 +115,7 @@ export default function InventoryPage() {
           )}
         </div>
         <div className="inv-header__actions">
-          <Button size="sm" onClick={() => navigate('/ops/tanks')}>
+          <Button size="sm" onClick={() => navigate(`${opsBase}/tanks`)}>
             Manage Cylinders
           </Button>
         </div>
@@ -128,7 +130,7 @@ export default function InventoryPage() {
               key={status}
               className="inv-status-card"
               style={{ '--status-color': STATUS_COLORS[status] } as React.CSSProperties}
-              onClick={() => navigate('/ops/tanks', { state: { filterStatus: status } })}
+              onClick={() => navigate(`${opsBase}/tanks`, { state: { filterStatus: status } })}
             >
               <div className="inv-status-card__count">
                 {loading ? '—' : statusCounts[status]}
@@ -223,7 +225,7 @@ export default function InventoryPage() {
                       <td className="inv-td">
                         <button
                           className="inv-link-btn"
-                          onClick={() => navigate('/ops/tanks', { state: { highlightId: tank.id } })}
+                          onClick={() => navigate(`${opsBase}/tanks`, { state: { highlightId: tank.id } })}
                         >
                           View
                         </button>

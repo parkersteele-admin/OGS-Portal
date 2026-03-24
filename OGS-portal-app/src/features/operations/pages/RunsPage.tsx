@@ -7,7 +7,7 @@
  */
 
 import React, { useState, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getDocs, query, orderBy, where } from 'firebase/firestore'
 import { runsCol, usersCol } from '../../../lib/firestore'
@@ -56,6 +56,8 @@ const StatusBadge: React.FC<{ status: RunStatus }> = ({ status }) => (
 
 export default function RunsPage() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const opsBase  = location.pathname.startsWith('/admin') ? '/admin/ops' : '/ops'
 
   const [statusFilter, setStatusFilter] = useState<RunStatus | 'all'>('all')
   const [search,       setSearch]       = useState('')
@@ -167,7 +169,7 @@ export default function RunsPage() {
           >
             Delete{selectedCount > 0 ? ` (${selectedCount})` : ''}
           </Button>
-          <Button variant="primary" onClick={() => navigate('/ops/runs/new')}>
+          <Button variant="primary" onClick={() => navigate(`${opsBase}/runs/new`)}>
             + New Run
           </Button>
         </div>
@@ -273,7 +275,7 @@ export default function RunsPage() {
                             <Button
                               variant="primary"
                               size="sm"
-                              onClick={() => navigate(`/ops/dispatch/${run.id}`)}
+                              onClick={() => navigate(`${opsBase}/dispatch/${run.id}`)}
                             >
                               Dispatch
                             </Button>
@@ -282,7 +284,7 @@ export default function RunsPage() {
                             <Button
                               variant="secondary"
                               size="sm"
-                              onClick={() => navigate(`/ops/runs/${run.id}/summary`)}
+                              onClick={() => navigate(`${opsBase}/runs/${run.id}/summary`)}
                             >
                               Summary
                             </Button>
@@ -291,7 +293,7 @@ export default function RunsPage() {
                             <Button
                               variant="secondary"
                               size="sm"
-                              onClick={() => navigate(`/ops/runs/${run.id}/summary`)}
+                              onClick={() => navigate(`${opsBase}/runs/${run.id}/summary`)}
                             >
                               View
                             </Button>

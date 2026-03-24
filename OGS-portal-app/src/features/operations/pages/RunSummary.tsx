@@ -15,7 +15,7 @@
  */
 
 import { useState, useEffect, useMemo } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import {
   getDoc,
   getDocs,
@@ -142,6 +142,8 @@ function downloadCsv(
 export default function RunSummary() {
   const { runId }  = useParams<{ runId: string }>()
   const navigate   = useNavigate()
+  const location   = useLocation()
+  const opsBase    = location.pathname.startsWith('/admin') ? '/admin/ops' : '/ops'
   const { isDispatch } = useAuth()
 
   const [run,        setRun]        = useState<Run | null>(null)
@@ -336,7 +338,7 @@ export default function RunSummary() {
     return (
       <div className="rs-page">
         <div className="rs-error">{error ?? 'Run not found.'}</div>
-        <button className="rs-back-link" onClick={() => navigate('/ops/dashboard')}>
+        <button className="rs-back-link" onClick={() => navigate(`${opsBase}/dashboard`)}>
           ← Back to Ops Dashboard
         </button>
       </div>
@@ -674,7 +676,7 @@ export default function RunSummary() {
       {/* ── 7. Actions ── */}
       <div className="rs-actions">
         <div className="rs-actions__left">
-          <button className="rs-back-link" onClick={() => navigate('/ops/dashboard')}>
+          <button className="rs-back-link" onClick={() => navigate(`${opsBase}/dashboard`)}>
             ← Back to Ops Dashboard
           </button>
         </div>
