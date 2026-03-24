@@ -28,8 +28,7 @@ const NAV_ITEMS: SidebarItem[] = [
   { to: '/admin/ops/inventory',     label: 'Inventory',      icon: '⊟' },
   // ── Admin ─────────────────────────────────────────────────────────────
   { to: '/admin/users',             label: 'User Management',    icon: '◎', sectionLabel: 'Admin' },
-  { to: '/admin/delivery-settings', label: 'Delivery Settings',  icon: '⊞' },
-]
+  { to: '/admin/delivery-settings', label: 'Delivery Settings',  icon: '⊞' },  { to: '/admin/company-settings',  label: 'Company Info',       icon: '⊟' },]
 
 const MOBILE_ITEMS: MobileNavItem[] = [
   { to: '/admin/dashboard',         label: 'Dashboard',   icon: '⊞' },

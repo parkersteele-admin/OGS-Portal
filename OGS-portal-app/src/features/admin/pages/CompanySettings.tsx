@@ -1,0 +1,230 @@
+/**
+ * src/features/admin/pages/CompanySettings.tsx
+ *
+ * Admin page — company information used in PDFs, invoices, quotes, and emails.
+ * Saved to /settings/company in Firestore; logo to Firebase Storage.
+ */
+
+import React, { useState, useEffect, useRef } from 'react'
+import {
+  getCompanySettings,
+  updateCompanySettings,
+  uploadCompanyLogo,
+} from '../../../services/companySettingsService'
+import type { CompanySettings } from '../../../types/companySettings'
+import { DEFAULT_COMPANY_SETTINGS } from '../../../types/companySettings'
+import { Button } from '../../../components/ui/Button'
+import { Input } from '../../../components/ui/Input'
+import './CompanySettings.css'
+
+const CompanySettingsPage: React.FC = () => {
+  const [settings, setSettings]         = useState<CompanySettings>(DEFAULT_COMPANY_SETTINGS)
+  const [loading, setLoading]           = useState(true)
+  const [saving, setSaving]             = useState(false)
+  const [saved, setSaved]               = useState(false)
+  const [error, setError]               = useState<string | null>(null)
+  const [logoFile, setLogoFile]         = useState<File | null>(null)
+  const [logoPreview, setLogoPreview]   = useState<string>('')
+  const [uploadPct, setUploadPct]       = useState<number | null>(null)
+  const fileInputRef                    = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    getCompanySettings()
+      .then(setSettings)
+      .catch(() => setError('Could not load company settings.'))
+      .finally(() => setLoading(false))
+  }, [])
+
+  function set(field: keyof CompanySettings, value: string) {
+    setSettings((prev) => ({ ...prev, [field]: value }))
+    setSaved(false)
+  }
+
+  function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setLogoFile(file)
+    setLogoPreview(URL.createObjectURL(file))
+    setSaved(false)
+    // reset input so re-selecting same file fires onChange
+    e.target.value = ''
+  }
+
+  async function handleSave() {
+    setSaving(true)
+    setError(null)
+    try {
+      let logoUrl = settings.logoUrl
+      if (logoFile) {
+        setUploadPct(0)
+        logoUrl = await uploadCompanyLogo(logoFile, setUploadPct)
+        setUploadPct(null)
+        setLogoFile(null)
+      }
+      await updateCompanySettings({ ...settings, logoUrl })
+      setSettings((prev) => ({ ...prev, logoUrl }))
+      setSaved(true)
+    } catch {
+      setError('Failed to save. Please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) return <div className="cs-loading">Loading company settings…</div>
+
+  const logoSrc = logoPreview || settings.logoUrl
+
+  return (
+    <div className="cs-page">
+      <header className="cs-header">
+        <div>
+          <h1 className="cs-header__title">Company Information</h1>
+          <p className="cs-header__sub">
+            This information appears on invoices, quotes, PDFs, and outgoing emails.
+          </p>
+        </div>
+        <Button variant="primary" size="md" loading={saving} disabled={saving} onClick={handleSave}>
+          {saved ? '✓ Saved' : 'Save changes'}
+        </Button>
+      </header>
+
+      {error && <div className="cs-error" role="alert">{error}</div>}
+
+      <div className="cs-body">
+
+        {/* ── Logo ── */}
+        <section className="cs-card">
+          <h2 className="cs-card__title">Company Logo</h2>
+          <p className="cs-card__sub">Used on PDF headers, invoices, and quotes. PNG or SVG recommended, at least 300 px wide.</p>
+          <div className="cs-logo-row">
+            <div className="cs-logo-preview">
+              {logoSrc
+                ? <img src={logoSrc} alt="Company logo" className="cs-logo-preview__img" />
+                : <span className="cs-logo-preview__placeholder">No logo</span>
+              }
+            </div>
+            <div className="cs-logo-controls">
+              <Button variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()}>
+                {logoSrc ? 'Replace logo' : 'Upload logo'}
+              </Button>
+              {logoFile && !uploadPct && (
+                <span className="cs-logo-pending">Unsaved — click Save changes to upload</span>
+              )}
+              {uploadPct !== null && (
+                <div className="cs-progress">
+                  <div className="cs-progress__bar" style={{ width: `${uploadPct}%` }} />
+                  <span className="cs-progress__label">{uploadPct}%</span>
+                </div>
+              )}
+            </div>
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/svg+xml,image/jpeg,image/webp"
+            style={{ display: 'none' }}
+            onChange={handleLogoChange}
+          />
+        </section>
+
+        {/* ── Identity ── */}
+        <section className="cs-card">
+          <h2 className="cs-card__title">Company Identity</h2>
+          <div className="cs-grid cs-grid--2">
+            <Input
+              label="Company name"
+              value={settings.name}
+              onChange={(e) => set('name', e.target.value)}
+              placeholder="OGS Gas Services"
+            />
+            <Input
+              label="Tagline / slogan"
+              value={settings.tagline}
+              onChange={(e) => set('tagline', e.target.value)}
+              placeholder="Reliable gas, delivered."
+            />
+          </div>
+        </section>
+
+        {/* ── Contact ── */}
+        <section className="cs-card">
+          <h2 className="cs-card__title">Contact Information</h2>
+          <div className="cs-grid cs-grid--3">
+            <Input
+              label="Email address"
+              type="email"
+              value={settings.email}
+              onChange={(e) => set('email', e.target.value)}
+              placeholder="info@ogsgas.com"
+            />
+            <Input
+              label="Phone number"
+              type="tel"
+              value={settings.phone}
+              onChange={(e) => set('phone', e.target.value)}
+              placeholder="(555) 000-0000"
+            />
+            <Input
+              label="Website"
+              type="url"
+              value={settings.website}
+              onChange={(e) => set('website', e.target.value)}
+              placeholder="https://ogsgas.com"
+            />
+          </div>
+        </section>
+
+        {/* ── Address ── */}
+        <section className="cs-card">
+          <h2 className="cs-card__title">Business Address</h2>
+          <div className="cs-grid cs-grid--1">
+            <Input
+              label="Street address"
+              value={settings.address}
+              onChange={(e) => set('address', e.target.value)}
+              placeholder="123 Industrial Blvd"
+            />
+          </div>
+          <div className="cs-grid cs-grid--3 cs-grid--mt">
+            <Input
+              label="City"
+              value={settings.city}
+              onChange={(e) => set('city', e.target.value)}
+              placeholder="Houston"
+            />
+            <Input
+              label="State"
+              value={settings.state}
+              onChange={(e) => set('state', e.target.value)}
+              placeholder="TX"
+            />
+            <Input
+              label="ZIP code"
+              value={settings.zip}
+              onChange={(e) => set('zip', e.target.value)}
+              placeholder="77001"
+            />
+          </div>
+        </section>
+
+        {/* ── Legal ── */}
+        <section className="cs-card">
+          <h2 className="cs-card__title">Legal &amp; Billing</h2>
+          <p className="cs-card__sub">Displayed on invoice footers and quote documents.</p>
+          <div className="cs-grid cs-grid--2">
+            <Input
+              label="Tax ID / EIN"
+              value={settings.taxId}
+              onChange={(e) => set('taxId', e.target.value)}
+              placeholder="XX-XXXXXXX"
+            />
+          </div>
+        </section>
+
+      </div>
+    </div>
+  )
+}
+
+export default CompanySettingsPage

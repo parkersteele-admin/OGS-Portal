@@ -49,7 +49,7 @@ import {
   TruckPage,
 } from '../../features/driver'
 import { LoginPage, ResetPasswordPage } from '../../features/auth'
-import { AdminDashboard, DeliverySettingsPage, UserManagement } from '../../features/admin'
+import { AdminDashboard, CompanySettingsPage, DeliverySettingsPage, UserManagement } from '../../features/admin'
 
 import BillingDashboard from '../../pages/billing/BillingDashboard'
 
@@ -204,6 +204,7 @@ export const AppRouter: React.FC = () => (
         <Route path="dashboard" element={<AdminDashboard />} />
         <Route path="users" element={<UserManagement />} />
         <Route path="delivery-settings" element={<DeliverySettingsPage />} />
+        <Route path="company-settings"  element={<CompanySettingsPage />} />
 
         {/* CRM pages inside AdminLayout */}
         <Route path="crm" element={<Navigate to="dashboard" replace />} />

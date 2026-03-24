@@ -113,6 +113,7 @@ export const auditLogCol = col<AuditLogEntry>('auditLog')
 
 // ── Settings ──────────────────────────────────────────────────────────────────
 export const deliverySettingsRef = doc(db, 'settings', 'delivery')
+export const companySettingsRef  = doc(db, 'settings', 'company')
 
 // ── Onboarding / Company ──────────────────────────────────────────────────────
 import type {

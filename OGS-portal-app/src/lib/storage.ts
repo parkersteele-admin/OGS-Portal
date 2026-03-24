@@ -55,6 +55,12 @@ export const employeeAvatarRef = (employeeId: string, fileName: string) =>
 export const employeeDocRef = (employeeId: string, fileName: string) =>
   r(`employees/${employeeId}/documents/${fileName}`)
 
+// ── Company settings ─────────────────────────────────────────────────────────
+
+/** Company logo stored under settings/company/logo/. */
+export const companyLogoRef = (fileName: string) =>
+  r(`settings/company/logo/${fileName}`)
+
 // ── Compliance ────────────────────────────────────────────────────────────────
 
 /** Root compliance folder. */
