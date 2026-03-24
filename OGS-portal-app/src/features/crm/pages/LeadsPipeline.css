@@ -548,6 +548,12 @@
   flex-wrap: wrap;
 }
 
+.lp-panel__footer--danger {
+  border-top: 1px solid var(--color-danger-subtle, #fee2e2);
+  background: var(--color-danger-bg, #fff8f8);
+  justify-content: flex-end;
+}
+
 .lp-panel__title-row {
   display: flex;
   justify-content: space-between;

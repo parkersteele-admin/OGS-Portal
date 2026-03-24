@@ -38,6 +38,7 @@ import {
   subscribeToLeads,
   createLead,
   updateLead,
+  deleteLead,
   convertLeadToCustomer,
   type CreateLeadInput,
 } from '../../../services/leadService'
@@ -368,12 +369,13 @@ interface DetailPanelProps {
   onClose:   () => void
   onMoveTo:  (status: LeadStatus) => void
   onConvert: () => void
+  onDelete:  () => void
   navigate:  ReturnType<typeof useNavigate>
   crmBase:   string
 }
 
 const DetailPanel: React.FC<DetailPanelProps> = ({
-  lead, salesReps, onClose, onMoveTo, onConvert, navigate, crmBase,
+  lead, salesReps, onClose, onMoveTo, onConvert, onDelete, navigate, crmBase,
 }) => {
   const [notes,     setNotes]     = useState(lead.notes ?? '')
   const [estValue,  setEstValue]  = useState(String(lead.estimatedValue ?? ''))
@@ -589,6 +591,21 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
             ✓ Convert to customer
           </Button>
         )}
+      </div>
+
+      {/* Delete */}
+      <div className="lp-panel__footer lp-panel__footer--danger">
+        <Button
+          variant="danger"
+          size="sm"
+          onClick={() => {
+            if (confirm(`Delete lead "${lead.company ?? lead.name}"? This cannot be undone.`)) {
+              onDelete()
+            }
+          }}
+        >
+          Delete lead
+        </Button>
       </div>
     </aside>
   )
@@ -1102,6 +1119,10 @@ const LeadsPipeline: React.FC = () => {
             onClose={() => setSelectedId(null)}
             onMoveTo={status => handleMoveTo(selectedLead.id, status)}
             onConvert={() => setShowConvert(true)}
+            onDelete={async () => {
+              await deleteLead(selectedLead.id)
+              setSelectedId(null)
+            }}
             navigate={navigate}
             crmBase={crmBase}
           />
