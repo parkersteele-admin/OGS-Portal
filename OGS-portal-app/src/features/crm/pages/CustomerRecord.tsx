@@ -12,7 +12,7 @@
  */
 
 import React, { useState, useRef, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import {
   useQuery,
   useMutation,
@@ -823,6 +823,8 @@ const UserAccessTab: React.FC<UserAccessTabProps> = ({ customer, users, loading,
 const CustomerRecord: React.FC = () => {
   const { customerId } = useParams<{ customerId: string }>()
   const navigate       = useNavigate()
+  const location       = useLocation()
+  const crmBase        = location.pathname.startsWith('/admin') ? '/admin/crm' : '/crm'
   const queryClient    = useQueryClient()
   const { user }       = useAuth()
 
@@ -1093,7 +1095,7 @@ const CustomerRecord: React.FC = () => {
     return (
       <div className="cr-page cr-page--error">
         <p>Customer not found.</p>
-        <Button variant="ghost" onClick={() => navigate('/crm/customers')}>
+        <Button variant="ghost" onClick={() => navigate(`${crmBase}/customers`)}>
           ← Back to customers
         </Button>
       </div>
@@ -1114,7 +1116,7 @@ const CustomerRecord: React.FC = () => {
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <header className="cr-header">
         <div className="cr-header__back">
-          <button className="cr-back-btn" onClick={() => navigate('/crm/customers')}>
+          <button className="cr-back-btn" onClick={() => navigate(`${crmBase}/customers`)}>
             ← Customers
           </button>
         </div>

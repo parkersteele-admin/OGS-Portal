@@ -18,7 +18,7 @@ import React, {
   useCallback,
   useMemo,
 } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   createQuote,
@@ -931,6 +931,8 @@ const QuoteTable: React.FC<QuoteTableProps> = ({
 
 const QuoteBuilder: React.FC = () => {
   const navigate          = useNavigate()
+  const location          = useLocation()
+  const crmBase           = location.pathname.startsWith('/admin') ? '/admin/crm' : '/crm'
   const queryClient       = useQueryClient()
 
   const [statusFilter,setStatusFilter]= useState<QuoteStatus | 'all'>('all')
@@ -975,8 +977,8 @@ const QuoteBuilder: React.FC = () => {
     onError: () => setDeletingId(null),
   })
 
-  const handleNew  = () => navigate('/crm/quotes/new')
-  const handleEdit = (quote: Quote) => navigate(`/crm/quotes/${quote.id}`)
+  const handleNew  = () => navigate(`${crmBase}/quotes/new`)
+  const handleEdit = (quote: Quote) => navigate(`${crmBase}/quotes/${quote.id}`)
 
   return (
     <div className="qb-page">

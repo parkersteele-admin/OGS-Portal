@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import {
   subscribeToCustomers,
   createCustomer,
@@ -172,6 +172,8 @@ const AddCustomerModal: React.FC<AddCustomerModalProps> = ({ onClose, onCreated 
 
 const CustomersPage: React.FC = () => {
   const navigate                        = useNavigate()
+  const location                        = useLocation()
+  const crmBase                         = location.pathname.startsWith('/admin') ? '/admin/crm' : '/crm'
   const [customers, setCustomers]       = useState<Customer[]>([])
   const [loading, setLoading]           = useState(true)
   const [search, setSearch]             = useState('')
@@ -203,8 +205,8 @@ const CustomersPage: React.FC = () => {
 
   const handleCreated = useCallback((id: string) => {
     setShowAdd(false)
-    navigate(`/crm/customers/${id}`)
-  }, [navigate])
+    navigate(`${crmBase}/customers/${id}`)
+  }, [navigate, crmBase])
 
   return (
     <div className="cp-page page-layout">
@@ -290,9 +292,9 @@ const CustomersPage: React.FC = () => {
                   <tr
                     key={c.id}
                     className="page-table__tr cp-row"
-                    onClick={() => navigate(`/crm/customers/${c.id}`)}
+                    onClick={() => navigate(`${crmBase}/customers/${c.id}`)}
                     tabIndex={0}
-                    onKeyDown={(e) => e.key === 'Enter' && navigate(`/crm/customers/${c.id}`)}
+                    onKeyDown={(e) => e.key === 'Enter' && navigate(`${crmBase}/customers/${c.id}`)}
                   >
                     <td className="page-table__td page-table__td--strong cp-cell--name">{c.name}</td>
                     <td className="page-table__td">{c.city}{c.state ? `, ${c.state}` : ''}</td>

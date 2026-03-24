@@ -15,7 +15,7 @@ import React, {
   useMemo,
   useCallback,
 } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import {
   useQuery,
   useMutation,
@@ -369,10 +369,11 @@ interface DetailPanelProps {
   onMoveTo:  (status: LeadStatus) => void
   onConvert: () => void
   navigate:  ReturnType<typeof useNavigate>
+  crmBase:   string
 }
 
 const DetailPanel: React.FC<DetailPanelProps> = ({
-  lead, salesReps, onClose, onMoveTo, onConvert, navigate,
+  lead, salesReps, onClose, onMoveTo, onConvert, navigate, crmBase,
 }) => {
   const [notes,     setNotes]     = useState(lead.notes ?? '')
   const [estValue,  setEstValue]  = useState(String(lead.estimatedValue ?? ''))
@@ -561,7 +562,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate(`/crm/quotes/new?leadId=${lead.id}`)}
+            onClick={() => navigate(`${crmBase}/quotes/new?leadId=${lead.id}`)}
           >
             Send quote
           </Button>
@@ -575,7 +576,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate(`/crm/customers/${lead.convertedToCustomerId}`)}
+            onClick={() => navigate(`${crmBase}/customers/${lead.convertedToCustomerId}`)}
           >
             View customer
           </Button>
@@ -823,6 +824,8 @@ const ListTable: React.FC<ListTableProps> = ({
 
 const LeadsPipeline: React.FC = () => {
   const navigate     = useNavigate()
+  const location     = useLocation()
+  const crmBase      = location.pathname.startsWith('/admin') ? '/admin/crm' : '/crm'
 
   const [view,          setView]          = useState<'kanban' | 'list'>('kanban')
   const [leads,         setLeads]         = useState<Lead[]>([])
@@ -929,8 +932,8 @@ const LeadsPipeline: React.FC = () => {
   }, [])
 
   const handleQuoteLead = useCallback((lead: Lead) => {
-    navigate(`/crm/quotes/new?leadId=${lead.id}`)
-  }, [navigate])
+    navigate(`${crmBase}/quotes/new?leadId=${lead.id}`)
+  }, [navigate, crmBase])
 
   // Add lead mutation
   const addMutation = useMutation({
@@ -947,7 +950,7 @@ const LeadsPipeline: React.FC = () => {
     onSuccess: (customerId) => {
       setShowConvert(false)
       setSelectedId(null)
-      navigate(`/crm/customers/${customerId}`)
+      navigate(`${crmBase}/customers/${customerId}`)
     },
   })
 
@@ -1100,6 +1103,7 @@ const LeadsPipeline: React.FC = () => {
             onMoveTo={status => handleMoveTo(selectedLead.id, status)}
             onConvert={() => setShowConvert(true)}
             navigate={navigate}
+            crmBase={crmBase}
           />
         </>
       )}

@@ -21,7 +21,7 @@ import React, {
   useMemo,
   useRef,
 } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   getQuote,
@@ -360,6 +360,8 @@ const PdfPreviewModal: React.FC<{ url: string; onClose: () => void }> = ({ url, 
 
 const QuoteEditorPage: React.FC = () => {
   const navigate      = useNavigate()
+  const location      = useLocation()
+  const crmBase       = location.pathname.startsWith('/admin') ? '/admin/crm' : '/crm'
   const { quoteId }   = useParams<{ quoteId: string }>()
   const [searchParams] = useSearchParams()
   const isNew         = !quoteId || quoteId === 'new'
@@ -651,7 +653,7 @@ const QuoteEditorPage: React.FC = () => {
       setSavedId(id)
       setError(null)
       queryClient.invalidateQueries({ queryKey: ['quotes'] })
-      if (isNew) navigate(`/crm/quotes/${id}`, { replace: true })
+      if (isNew) navigate(`${crmBase}/quotes/${id}`, { replace: true })
     },
     onError: (e: Error) => setError(e.message),
   })
@@ -718,7 +720,7 @@ const QuoteEditorPage: React.FC = () => {
       {/* Sticky page header */}
       <div className="qep-header">
         <div className="qep-header__left">
-          <button className="qep-back" onClick={() => navigate('/crm/quotes')} aria-label="Back to quotes">
+          <button className="qep-back" onClick={() => navigate(`${crmBase}/quotes`)} aria-label="Back to quotes">
             <span className="qep-icon" aria-hidden="true"><FlatIcon name="back" /></span>
             <span>Quotes</span>
           </button>
