@@ -382,7 +382,7 @@ const QuoteEditorPage: React.FC = () => {
       const customerOpts: RecipientOption[] = customers.map((c: Customer) => ({
         type:    'customer',
         id:      c.id,
-        label:   c.name,
+        label:   c.name ?? '',
         email:   c.email ?? '',
         phone:   c.phone ?? '',
         address: [c.address, c.city, c.state, c.zip].filter(Boolean).join(', '),
@@ -393,7 +393,7 @@ const QuoteEditorPage: React.FC = () => {
         const leadOpts: RecipientOption[] = (page.data ?? []).map((l: Lead) => ({
           type:    'lead',
           id:      l.id,
-          label:   l.company ?? l.name,
+          label:   (l.company ?? l.name) ?? '',
           email:   l.email ?? '',
           phone:   l.phone ?? '',
           address: '',
@@ -791,7 +791,7 @@ const QuoteEditorPage: React.FC = () => {
                       <optgroup label="Customers">
                         {recipients
                           .filter(r => r.type === 'customer')
-                          .sort((a, b) => a.label.localeCompare(b.label))
+                          .sort((a, b) => (a.label ?? '').localeCompare(b.label ?? ''))
                           .map(r => (
                             <option key={r.id} value={r.id}>{r.label}</option>
                           ))}
@@ -801,7 +801,7 @@ const QuoteEditorPage: React.FC = () => {
                       <optgroup label="Leads">
                         {recipients
                           .filter(r => r.type === 'lead')
-                          .sort((a, b) => a.label.localeCompare(b.label))
+                          .sort((a, b) => (a.label ?? '').localeCompare(b.label ?? ''))
                           .map(r => (
                             <option key={r.id} value={r.id}>{r.label}</option>
                           ))}
