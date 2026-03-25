@@ -208,6 +208,31 @@ const CompanySettingsPage: React.FC = () => {
           </div>
         </section>
 
+        {/* ── Customer Portal Links ── */}
+        <section className="cs-card">
+          <h2 className="cs-card__title">Customer Portal Links</h2>
+          <p className="cs-card__sub">
+            Printed on invoices and quotes so customers can log in or create an account.
+            Leave blank to omit from documents.
+          </p>
+          <div className="cs-grid cs-grid--2">
+            <Input
+              label="Login link"
+              type="url"
+              value={settings.portalLoginUrl}
+              onChange={(e) => set('portalLoginUrl', e.target.value)}
+              placeholder="https://portal.ogsgas.com/login"
+            />
+            <Input
+              label="Sign-up / create account link"
+              type="url"
+              value={settings.portalSignupUrl}
+              onChange={(e) => set('portalSignupUrl', e.target.value)}
+              placeholder="https://portal.ogsgas.com/signup"
+            />
+          </div>
+        </section>
+
         {/* ── Legal ── */}
         <section className="cs-card">
           <h2 className="cs-card__title">Legal &amp; Billing</h2>
@@ -218,6 +243,24 @@ const CompanySettingsPage: React.FC = () => {
               value={settings.taxId}
               onChange={(e) => set('taxId', e.target.value)}
               placeholder="XX-XXXXXXX"
+            />
+          </div>
+        </section>
+
+        {/* ── Terms & Conditions ── */}
+        <section className="cs-card">
+          <h2 className="cs-card__title">Terms &amp; Conditions</h2>
+          <p className="cs-card__sub">
+            Appended to the bottom of quote and invoice PDFs. Leave blank to omit.
+          </p>
+          <div className="ui-field">
+            <label className="ui-field__label">Terms &amp; Conditions text</label>
+            <textarea
+              className="ui-input cs-textarea"
+              rows={8}
+              value={settings.termsAndConditions}
+              onChange={(e) => set('termsAndConditions', e.target.value)}
+              placeholder="All sales are subject to our standard terms. Payment is due within 30 days..."
             />
           </div>
         </section>

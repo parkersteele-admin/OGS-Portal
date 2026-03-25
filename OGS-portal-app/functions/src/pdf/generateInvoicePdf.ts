@@ -381,6 +381,31 @@ function buildInvoicePdf(
       .text(`Pay online at:  ${company.website ? company.website + '/portal/invoices' : 'your customer portal'}`, C_DESC + 12, BOX_Y + 38)
       .text(`Questions?    ${[company.phone, company.email].filter(Boolean).join('  ·  ') || ''}`, C_DESC + 12, BOX_Y + 52)
 
+    // ── Portal links below payment box ─────────────────────────────────────
+    rowY = BOX_Y + BOX_H + 12
+    if (company.portalLoginUrl || company.portalSignupUrl) {
+      if (company.portalLoginUrl) {
+        doc.fontSize(8).font('Helvetica').fillColor('#555555')
+          .text(`Log in to your account:  ${company.portalLoginUrl}`, C_DESC, rowY)
+        rowY += 13
+      }
+      if (company.portalSignupUrl) {
+        doc.fontSize(8).font('Helvetica').fillColor('#555555')
+          .text(`Create an account:  ${company.portalSignupUrl}`, C_DESC, rowY)
+        rowY += 13
+      }
+    }
+
+    // ── Terms & Conditions ─────────────────────────────────────────────────
+    if (company.termsAndConditions) {
+      rowY += 8
+      doc.fontSize(7).font('Helvetica-Bold').fillColor('#999999')
+        .text('TERMS & CONDITIONS', C_DESC, rowY)
+      rowY += 12
+      doc.fontSize(7.5).font('Helvetica').fillColor('#555555')
+        .text(company.termsAndConditions, C_DESC, rowY, { width: CONTENT_W })
+    }
+
     // ── Footer ─────────────────────────────────────────────────────────────
     const FOOTER_Y = 748
 

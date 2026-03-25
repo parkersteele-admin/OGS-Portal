@@ -377,6 +377,31 @@ function buildQuotePdf(
       .text(`Reply to this email or call  ${company.phone || company.email || ''}`, C_DESC + 12, rowY + 38)
       .text(`Questions?  ${company.email || company.phone || ''}`, C_DESC + 12, rowY + 52)
 
+    // ── Portal links below info box ────────────────────────────────────────
+    rowY += BOX_H + 12
+    if (company.portalLoginUrl || company.portalSignupUrl) {
+      if (company.portalLoginUrl) {
+        doc.fontSize(8).font('Helvetica').fillColor('#555555')
+          .text(`Log in to your account:  ${company.portalLoginUrl}`, C_DESC, rowY)
+        rowY += 13
+      }
+      if (company.portalSignupUrl) {
+        doc.fontSize(8).font('Helvetica').fillColor('#555555')
+          .text(`Create an account:  ${company.portalSignupUrl}`, C_DESC, rowY)
+        rowY += 13
+      }
+    }
+
+    // ── Terms & Conditions ─────────────────────────────────────────────────
+    if (company.termsAndConditions) {
+      rowY += 8
+      doc.fontSize(7).font('Helvetica-Bold').fillColor('#999999')
+        .text('TERMS & CONDITIONS', C_DESC, rowY)
+      rowY += 12
+      doc.fontSize(7.5).font('Helvetica').fillColor('#555555')
+        .text(company.termsAndConditions, C_DESC, rowY, { width: CONTENT_W })
+    }
+
     // ── Footer ─────────────────────────────────────────────────────────────
     const FOOTER_Y = 748
 

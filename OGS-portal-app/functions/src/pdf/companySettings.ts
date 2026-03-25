@@ -10,31 +10,37 @@ import * as http from 'http'
 import { db } from '../admin'
 
 export interface CompanySettings {
-  name:    string
-  tagline: string
-  email:   string
-  phone:   string
-  website: string
-  address: string
-  city:    string
-  state:   string
-  zip:     string
-  taxId:   string
-  logoUrl: string
+  name:               string
+  tagline:            string
+  email:              string
+  phone:              string
+  website:            string
+  address:            string
+  city:               string
+  state:              string
+  zip:                string
+  taxId:              string
+  logoUrl:            string
+  portalLoginUrl:     string
+  portalSignupUrl:    string
+  termsAndConditions: string
 }
 
 const DEFAULTS: CompanySettings = {
-  name:    'OGS Gas Services',
-  tagline: '',
-  email:   '',
-  phone:   '',
-  website: '',
-  address: '',
-  city:    '',
-  state:   '',
-  zip:     '',
-  taxId:   '',
-  logoUrl: '',
+  name:               'OGS Gas Services',
+  tagline:            '',
+  email:              '',
+  phone:              '',
+  website:            '',
+  address:            '',
+  city:               '',
+  state:              '',
+  zip:                '',
+  taxId:              '',
+  logoUrl:            '',
+  portalLoginUrl:     '',
+  portalSignupUrl:    '',
+  termsAndConditions: '',
 }
 
 export async function getCompanySettings(): Promise<CompanySettings> {
