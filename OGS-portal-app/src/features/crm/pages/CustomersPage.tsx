@@ -22,10 +22,12 @@ import './CustomersPage.css'
 
 // ── Status badge ──────────────────────────────────────────────────────────────
 
-const STATUS_VARIANT: Record<CustomerStatus, 'success' | 'warning' | 'danger'> = {
+const STATUS_VARIANT: Record<CustomerStatus, 'success' | 'warning' | 'danger' | 'neutral'> = {
   active:   'success',
   hold:     'warning',
   inactive: 'danger',
+  archived: 'neutral',
+  deleted:  'neutral',
 }
 
 // ── Add-customer modal ────────────────────────────────────────────────────────
