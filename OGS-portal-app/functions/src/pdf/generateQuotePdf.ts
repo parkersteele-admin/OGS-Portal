@@ -10,6 +10,8 @@
 
 import PDFDocument from 'pdfkit'
 import { db, storage, FieldValue } from '../admin'
+import { getCompanySettings } from './companySettings'
+import type { CompanySettings } from './companySettings'
 
 // ── Brand constants (shared with invoice PDF) ─────────────────────────────────
 
@@ -45,7 +47,7 @@ export async function generateQuotePdf(quoteId: string): Promise<string> {
     if (snap.exists) recipient = snap.data()!
   }
 
-  const pdfBuffer = await buildQuotePdf(quoteId, quote, recipient)
+  const pdfBuffer = await buildQuotePdf(quoteId, quote, recipient, await getCompanySettings())
 
   const storagePath = `ogs-portal/quotes/${quoteId}.pdf`
   const fileRef     = storage.bucket().file(storagePath)
@@ -76,6 +78,7 @@ function buildQuotePdf(
   quoteId:   string,
   quote:     Record<string, unknown>,
   recipient: Record<string, unknown>,
+  company:   CompanySettings,
 ): Promise<Buffer> {
   return new Promise<Buffer>((resolve, reject) => {
     const doc    = new PDFDocument({ margin: 0, size: 'LETTER' })
@@ -110,20 +113,26 @@ function buildQuotePdf(
     // ── Left accent bar ────────────────────────────────────────────────────
     doc.rect(0, 0, 8, PAGE_H).fill(OGS_ORANGE)
 
-    // ── Company header ─────────────────────────────────────────────────────
+    // ── Company header ──────────────────────────────────────────────────
     doc
       .fontSize(17)
       .font('Helvetica-Bold')
       .fillColor('#111111')
-      .text('Ohio Gas Supply Co.', MARGIN_L, 40)
+      .text(company.name || 'OGS Gas Services', MARGIN_L, 40)
 
-    doc
-      .fontSize(8.5)
-      .font('Helvetica')
-      .fillColor('#666666')
-      .text('Propane & Natural Gas Delivery', MARGIN_L, 63)
-      .text('1-800-OGS-FUEL  ·  info@ohiogassupply.com', MARGIN_L, 74)
-      .text('ohiogassupply.com', MARGIN_L, 85)
+    let headerY = 63
+    if (company.tagline) {
+      doc.fontSize(8.5).font('Helvetica').fillColor('#666666').text(company.tagline, MARGIN_L, headerY)
+      headerY += 11
+    }
+    const contactLine = [company.phone, company.email].filter(Boolean).join('  ·  ')
+    if (contactLine) {
+      doc.fontSize(8.5).font('Helvetica').fillColor('#666666').text(contactLine, MARGIN_L, headerY)
+      headerY += 11
+    }
+    if (company.website) {
+      doc.fontSize(8.5).font('Helvetica').fillColor('#666666').text(company.website, MARGIN_L, headerY)
+    }
 
     // ── "QUOTE" title ──────────────────────────────────────────────────────
     doc
