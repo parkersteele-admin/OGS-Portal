@@ -362,6 +362,15 @@ service cloud.firestore {
     }
 
 
+    // ── App-level settings (delivery, company, etc.) ──────────────────────────
+    match /settings/{docId} {
+      // Any authenticated staff member needs to read settings (e.g. delivery fees in order builder).
+      allow read:  if isAuthenticated();
+      // Only admins may write settings.
+      allow write: if isAdmin();
+    }
+
+
     // ── Deny everything else ──────────────────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;
