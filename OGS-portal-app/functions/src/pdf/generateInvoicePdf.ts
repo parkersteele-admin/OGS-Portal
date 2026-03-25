@@ -153,6 +153,7 @@ function buildInvoicePdf(
     }
     if (company.website) {
       doc.fontSize(8.5).font('Helvetica').fillColor('#666666').text(company.website, MARGIN_L, headerY)
+      headerY += 11
     }
 
     // ── "INVOICE" title (right, y = 40) ───────────────────────────────────
@@ -170,10 +171,13 @@ function buildInvoicePdf(
       .fillColor('#555555')
       .text(`#${invoiceNum}`, 0, 78, { align: 'right', width: RIGHT_EDGE })
 
+    // Divider sits below whichever side is tallest (company info left, title+num right)
+    const DIVIDER_Y = Math.max(headerY + 12, 108)
+
     // ── Orange accent divider ──────────────────────────────────────────────
     doc
-      .moveTo(MARGIN_L, 108)
-      .lineTo(RIGHT_EDGE, 108)
+      .moveTo(MARGIN_L, DIVIDER_Y)
+      .lineTo(RIGHT_EDGE, DIVIDER_Y)
       .strokeColor(OGS_ORANGE)
       .lineWidth(1.5)
       .stroke()
@@ -185,8 +189,8 @@ function buildInvoicePdf(
       .fontSize(7)
       .font('Helvetica-Bold')
       .fillColor('#999999')
-      .text('BILL TO', MARGIN_L, 118)
-      .text('INVOICE DETAILS', META_X, 118)
+      .text('BILL TO', MARGIN_L, DIVIDER_Y + 10)
+      .text('INVOICE DETAILS', META_X, DIVIDER_Y + 10)
 
     // ── Bill-to block ──────────────────────────────────────────────────────
     const custName  = (customer.name    as string) || '—'
@@ -199,7 +203,7 @@ function buildInvoicePdf(
       customer.zip   as string,
     ].filter(Boolean).join(', ')
 
-    let leftY = 131
+    let leftY = DIVIDER_Y + 23
 
     doc.fontSize(10.5).font('Helvetica-Bold').fillColor('#111111').text(custName, MARGIN_L, leftY)
     leftY += 15
@@ -228,7 +232,7 @@ function buildInvoicePdf(
       ['Status',      ((invoice.status as string) || 'pending').toUpperCase()],
     ]
 
-    let rightY = 131
+    let rightY = DIVIDER_Y + 23
     const META_LBL_W = 80
     const META_VAL_X = META_X + META_LBL_W + 4
 

@@ -143,6 +143,7 @@ function buildQuotePdf(
     }
     if (company.website) {
       doc.fontSize(8.5).font('Helvetica').fillColor('#666666').text(company.website, MARGIN_L, headerY)
+      headerY += 11
     }
 
     // ── "QUOTE" title ──────────────────────────────────────────────────────
@@ -160,10 +161,13 @@ function buildQuotePdf(
       .fillColor('#555555')
       .text(`#${quoteNum}`, 0, 78, { align: 'right', width: RIGHT_EDGE })
 
+    // Divider sits below whichever side is tallest (company info left, title+num right)
+    const DIVIDER_Y = Math.max(headerY + 12, 108)
+
     // ── Orange divider ─────────────────────────────────────────────────────
     doc
-      .moveTo(MARGIN_L, 108)
-      .lineTo(RIGHT_EDGE, 108)
+      .moveTo(MARGIN_L, DIVIDER_Y)
+      .lineTo(RIGHT_EDGE, DIVIDER_Y)
       .strokeColor(OGS_ORANGE)
       .lineWidth(1.5)
       .stroke()
@@ -175,8 +179,8 @@ function buildQuotePdf(
       .fontSize(7)
       .font('Helvetica-Bold')
       .fillColor('#999999')
-      .text('BILL TO', MARGIN_L, 118)
-      .text('QUOTE DETAILS', META_X, 118)
+      .text('BILL TO', MARGIN_L, DIVIDER_Y + 10)
+      .text('QUOTE DETAILS', META_X, DIVIDER_Y + 10)
 
     // ── Bill-to block ──────────────────────────────────────────────────────
     const recName  = (recipient.name    as string) || (recipient.company as string) || '—'
@@ -189,7 +193,7 @@ function buildQuotePdf(
       recipient.zip   as string,
     ].filter(Boolean).join(', ')
 
-    let leftY = 131
+    let leftY = DIVIDER_Y + 23
 
     doc.fontSize(10.5).font('Helvetica-Bold').fillColor('#111111').text(recName, MARGIN_L, leftY)
     leftY += 15
@@ -218,7 +222,7 @@ function buildQuotePdf(
       ['Status',      ((quote.status as string) || 'draft').toUpperCase()],
     ]
 
-    let rightY = 131
+    let rightY = DIVIDER_Y + 23
     const META_LBL_W = 80
     const META_VAL_X = META_X + META_LBL_W + 4
 
