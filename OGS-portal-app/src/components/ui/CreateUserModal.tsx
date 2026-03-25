@@ -24,6 +24,8 @@ import type { Customer } from '../../types/customer'
 
 const ALL_ROLES: UserRole[] = ['admin', 'dispatch', 'driver', 'sales', 'customer']
 
+const PORTAL_ROLES = new Set<UserRole>(['owner', 'manager', 'billing', 'delivery', 'viewer'])
+
 const ROLE_LABELS: Record<UserRole, string> = {
   admin:    'Admin',
   dispatch: 'Dispatch',
@@ -162,11 +164,15 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
 
   const mutation = useMutation({
     mutationFn: async () => {
+      const isPortalRole = PORTAL_ROLES.has(role)
       const payload: CreateUserInput = {
-        name:  name.trim(),
-        email: email.trim().toLowerCase(),
+        name:      name.trim(),
+        email:     email.trim().toLowerCase(),
         role,
-        customerId: role === 'customer' ? customer?.id : undefined,
+        // Portal sub-roles (owner/manager/billing/delivery/viewer) use companyId.
+        // Legacy 'customer' role uses customerId.
+        companyId:  isPortalRole ? customer?.id : undefined,
+        customerId: role === 'customer'  ? customer?.id : undefined,
       }
       const uid = await createAppUser(payload)
 
@@ -249,6 +255,11 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
               {role === 'driver'   && <p className="cum-role-desc">Driver app — assigned runs and delivery confirmations.</p>}
               {role === 'sales'    && <p className="cum-role-desc">CRM access — customers, leads, quotes, billing.</p>}
               {role === 'customer' && <p className="cum-role-desc">Customer portal — orders, invoices, tank levels.</p>}
+              {role === 'owner'    && <p className="cum-role-desc">Full company access — team management, orders, invoices, tanks.</p>}
+              {role === 'manager'  && <p className="cum-role-desc">Manage orders, view invoices, and adjust settings.</p>}
+              {role === 'billing'  && <p className="cum-role-desc">Invoices, payments, and billing history only.</p>}
+              {role === 'delivery' && <p className="cum-role-desc">View and manage delivery schedules.</p>}
+              {role === 'viewer'   && <p className="cum-role-desc">Read-only access to orders and invoices.</p>}
             </div>
           </div>
 

@@ -167,6 +167,7 @@ export interface CreateUserInput {
   email:       string
   role:        UserRole
   customerId?: string
+  companyId?:  string
 }
 
 export async function createAppUser(data: CreateUserInput): Promise<string> {

@@ -18,8 +18,14 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https'
 import { db, adminAuth, FieldValue } from './admin'
 
-const VALID_ROLES = ['admin', 'dispatch', 'driver', 'sales', 'customer'] as const
+const VALID_ROLES = [
+  'admin', 'dispatch', 'driver', 'sales', 'customer',        // OGS internal + legacy
+  'owner', 'manager', 'billing', 'delivery', 'viewer',      // Customer portal sub-roles
+] as const
 type UserRole = typeof VALID_ROLES[number]
+
+/** These roles belong to customer-company portal users and need companyId in claims. */
+const PORTAL_ROLES = new Set(['owner', 'manager', 'billing', 'delivery', 'viewer'])
 
 export const adminCreateUser = onCall(async (request) => {
   // ── Auth guard ─────────────────────────────────────────────────────────────
@@ -36,14 +42,15 @@ export const adminCreateUser = onCall(async (request) => {
   const email      = data.email      as string | undefined
   const role       = data.role       as UserRole | undefined
   const customerId = data.customerId as string | undefined
+  const companyId  = data.companyId  as string | undefined
 
   if (!name  || typeof name  !== 'string') throw new HttpsError('invalid-argument', 'name is required.')
   if (!email || typeof email !== 'string') throw new HttpsError('invalid-argument', 'email is required.')
   if (!role || !VALID_ROLES.includes(role)) {
     throw new HttpsError('invalid-argument', `role must be one of: ${VALID_ROLES.join(', ')}.`)
   }
-  if (role === 'customer' && customerId && typeof customerId !== 'string') {
-    throw new HttpsError('invalid-argument', 'customerId must be a string when provided.')
+  if (PORTAL_ROLES.has(role) && !companyId) {
+    throw new HttpsError('invalid-argument', 'companyId is required for portal user roles (owner, manager, billing, delivery, viewer).')
   }
 
   // ── Create Firebase Auth user ──────────────────────────────────────────────
@@ -67,10 +74,16 @@ export const adminCreateUser = onCall(async (request) => {
   }
 
   // ── Set custom claims immediately ──────────────────────────────────────────
-  await adminAuth.setCustomUserClaims(uid, {
-    role,
-    customerId: customerId ?? null,
-  })
+  // Portal sub-roles need companyId; legacy 'customer' role uses customerId.
+  const claims: Record<string, unknown> = { role }
+  if (PORTAL_ROLES.has(role) && companyId) {
+    claims.companyId = companyId
+  } else if (role === 'customer' && customerId) {
+    claims.customerId = customerId
+  } else {
+    claims.customerId = null
+  }
+  await adminAuth.setCustomUserClaims(uid, claims)
 
   // ── Write Firestore user doc ───────────────────────────────────────────────
   const userDoc: Record<string, unknown> = {
@@ -81,7 +94,11 @@ export const adminCreateUser = onCall(async (request) => {
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
   }
-  if (customerId) userDoc.customerId = customerId
+  if (PORTAL_ROLES.has(role) && companyId) {
+    userDoc.companyId = companyId
+  } else if (customerId) {
+    userDoc.customerId = customerId
+  }
 
   await db.collection('users').doc(uid).set(userDoc)
 
