@@ -49,7 +49,23 @@ export async function generateQuotePdf(quoteId: string): Promise<string> {
 
   const company   = await getCompanySettings()
   const logoBuf   = await fetchLogoBuffer(company.logoUrl)
-  const pdfBuffer = await buildQuotePdf(quoteId, quote, recipient, company, logoBuf)
+
+  // Fetch assigned sales rep (createdBy field holds the rep's UID)
+  let salesRep: { name: string; email: string; phone: string } | null = null
+  const repUid = (quote.createdBy ?? quote.assignedTo) as string | undefined
+  if (repUid) {
+    const repSnap = await db.collection('users').doc(repUid).get()
+    if (repSnap.exists) {
+      const d = repSnap.data()!
+      salesRep = {
+        name:  (d.name  as string) || '',
+        email: (d.email as string) || '',
+        phone: (d.phone as string) || '',
+      }
+    }
+  }
+
+  const pdfBuffer = await buildQuotePdf(quoteId, quote, recipient, company, logoBuf, salesRep)
 
   const storagePath = `ogs-portal/quotes/${quoteId}.pdf`
   const fileRef     = storage.bucket().file(storagePath)
@@ -82,6 +98,7 @@ function buildQuotePdf(
   recipient: Record<string, unknown>,
   company:   CompanySettings,
   logoBuf:   Buffer | null,
+  salesRep:  { name: string; email: string; phone: string } | null,
 ): Promise<Buffer> {
   return new Promise<Buffer>((resolve, reject) => {
     const doc    = new PDFDocument({ margin: 0, size: 'LETTER' })
@@ -360,26 +377,85 @@ function buildQuotePdf(
       rowY += doc.heightOfString(notesText, { width: CONTENT_W }) + 16
     }
 
-    // ── Info box ───────────────────────────────────────────────────────────
-    const BOX_H = 66
+    // ── Info box — "To Accept This Quote" + Sales Rep section ───────────────
+    const hasRep    = !!(salesRep?.name)
+    const repContact = hasRep
+      ? [salesRep!.phone, salesRep!.email].filter(Boolean).join('  ·  ')
+      : ''
+    // Height: base 3 rows (title + valid until + contact) = 66
+    //         + rep block (divider + header + name + contact line + tagline) = 76
+    const BOX_H = hasRep ? 148 : 66
+
     doc
       .rect(C_DESC, rowY, CONTENT_W, BOX_H)
       .fillAndStroke('#FFF8F3', OGS_ORANGE)
       .lineWidth(0.75)
 
+    // Row 1: section title
     doc
       .fontSize(8.5)
       .font('Helvetica-Bold')
       .fillColor(OGS_ORANGE)
       .text('TO ACCEPT THIS QUOTE', C_DESC + 12, rowY + 10)
 
+    // Row 2–3: acceptance instructions
+    const contactDetail = company.phone || company.email || ''
     doc
       .fontSize(9)
       .font('Helvetica')
       .fillColor('#333333')
-      .text(`Valid until:    ${fmtDate(quote.validUntil)}`, C_DESC + 12, rowY + 24)
-      .text(`Reply to this email or call  ${company.phone || company.email || ''}`, C_DESC + 12, rowY + 38)
-      .text(`Questions?  ${company.email || company.phone || ''}`, C_DESC + 12, rowY + 52)
+      .text(`Valid until:  ${fmtDate(quote.validUntil)}`, C_DESC + 12, rowY + 26)
+      .text(
+        contactDetail
+          ? `Ready to accept? Reply to this email or call ${contactDetail}.`
+          : 'Ready to accept? Reply to this email to let us know.',
+        C_DESC + 12, rowY + 40,
+        { width: CONTENT_W - 24 },
+      )
+
+    if (hasRep) {
+      // Thin divider separating acceptance text from rep section
+      doc
+        .moveTo(C_DESC + 12, rowY + 58)
+        .lineTo(RIGHT_EDGE - 12, rowY + 58)
+        .strokeColor(OGS_ORANGE)
+        .lineWidth(0.4)
+        .stroke()
+
+      // "YOUR ACCOUNT REPRESENTATIVE" label
+      doc
+        .fontSize(7.5)
+        .font('Helvetica-Bold')
+        .fillColor('#999999')
+        .text('YOUR ACCOUNT REPRESENTATIVE', C_DESC + 12, rowY + 66)
+
+      // Rep name
+      doc
+        .fontSize(10)
+        .font('Helvetica-Bold')
+        .fillColor('#111111')
+        .text(salesRep!.name, C_DESC + 12, rowY + 79)
+
+      // Rep contact (phone · email)
+      if (repContact) {
+        doc
+          .fontSize(8.5)
+          .font('Helvetica')
+          .fillColor('#555555')
+          .text(repContact, C_DESC + 12, rowY + 93)
+      }
+
+      // Personal closing line
+      doc
+        .fontSize(9)
+        .font('Helvetica-Oblique')
+        .fillColor(OGS_ORANGE)
+        .text(
+          'We look forward to doing business with you!',
+          C_DESC + 12, rowY + 112,
+          { width: CONTENT_W - 24 },
+        )
+    }
 
     // ── Portal links below info box ────────────────────────────────────────
     rowY += BOX_H + 12
@@ -396,17 +472,7 @@ function buildQuotePdf(
       }
     }
 
-    // ── Terms & Conditions ─────────────────────────────────────────────────
-    if (company.termsAndConditions) {
-      rowY += 8
-      doc.fontSize(7).font('Helvetica-Bold').fillColor('#999999')
-        .text('TERMS & CONDITIONS', C_DESC, rowY)
-      rowY += 12
-      doc.fontSize(7.5).font('Helvetica').fillColor('#555555')
-        .text(company.termsAndConditions, C_DESC, rowY, { width: CONTENT_W })
-    }
-
-    // ── Footer ─────────────────────────────────────────────────────────────
+    // ── Footer (Page 1) ────────────────────────────────────────────────────
     const FOOTER_Y = 748
 
     doc
@@ -435,6 +501,77 @@ function buildQuotePdf(
       .font('Helvetica')
       .fillColor('#888888')
       .text(footerLine || ' ', C_DESC, FOOTER_Y + 22, { align: 'center', width: CONTENT_W })
+
+    // ── Page 2: Terms & Conditions ──────────────────────────────────────────
+    if (company.termsAndConditions) {
+      doc.addPage({ margin: 0, size: 'LETTER' })
+
+      // Accent bar on page 2
+      doc.rect(0, 0, 8, PAGE_H).fill(OGS_ORANGE)
+
+      // Page 2 header: company name
+      doc
+        .fontSize(11)
+        .font('Helvetica-Bold')
+        .fillColor('#111111')
+        .text(company.name || 'OGS Gas Services', MARGIN_L, 40)
+
+      // Orange divider
+      doc
+        .moveTo(MARGIN_L, 56)
+        .lineTo(RIGHT_EDGE, 56)
+        .strokeColor(OGS_ORANGE)
+        .lineWidth(1.5)
+        .stroke()
+
+      // Title
+      doc
+        .fontSize(16)
+        .font('Helvetica-Bold')
+        .fillColor(OGS_ORANGE)
+        .text('Terms & Conditions', MARGIN_L, 68)
+
+      // Quote reference line
+      const quoteNum2 = (quote.quoteNumber as string) || quoteId.slice(-8).toUpperCase()
+      doc
+        .fontSize(8.5)
+        .font('Helvetica')
+        .fillColor('#888888')
+        .text(`Quote #${quoteNum2}`, MARGIN_L, 94)
+
+      // Thin separator
+      doc
+        .moveTo(MARGIN_L, 106)
+        .lineTo(RIGHT_EDGE, 106)
+        .strokeColor('#DDDDDD')
+        .lineWidth(0.5)
+        .stroke()
+
+      // T&C body text
+      doc
+        .fontSize(8.5)
+        .font('Helvetica')
+        .fillColor('#333333')
+        .text(company.termsAndConditions, MARGIN_L, 118, {
+          width: CONTENT_W,
+          lineGap: 2,
+        })
+
+      // Page 2 footer
+      doc
+        .moveTo(MARGIN_L, 748)
+        .lineTo(RIGHT_EDGE, 748)
+        .strokeColor('#DDDDDD')
+        .lineWidth(0.5)
+        .stroke()
+
+      const footerLine2 = [company.name, company.website, company.phone].filter(Boolean).join('  ·  ')
+      doc
+        .fontSize(7.5)
+        .font('Helvetica')
+        .fillColor('#888888')
+        .text(footerLine2 || ' ', MARGIN_L, 758, { align: 'center', width: CONTENT_W })
+    }
 
     doc.end()
   })

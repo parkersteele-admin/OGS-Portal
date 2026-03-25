@@ -15,6 +15,7 @@ import { productsCol, customerTanksCol, ordersCol } from '../../../lib/firestore
 import { useAuth } from '../../../hooks/useAuth'
 import { useCustomer } from '../../../hooks/queries'
 import { usePricingAccess } from '../../../hooks/usePricingAccess'
+import { useCompanySettings } from '../../../hooks/useCompanySettings'
 import {
   createBatchOrders,
   getDeliverySettings,
@@ -1255,6 +1256,7 @@ const OrderPage: React.FC = () => {
   const [searchParams] = useSearchParams()
   const customerId = user?.customerId ?? ''
   const { pricingUnlocked, isLoading: pricingLoading } = usePricingAccess()
+  const company = useCompanySettings()
   const preselectedProductId = searchParams.get('productId') ?? ''
   const locationState = location.state as { reorder?: ReorderState; orderType?: OrderType; modifyThisOnly?: boolean; orderId?: string } | null
   const reorder = locationState?.reorder
@@ -1455,10 +1457,17 @@ const OrderPage: React.FC = () => {
             a quote, ordering will be unlocked automatically.
           </p>
           <p className="po-pricing-gate__body">
-            Questions?{' '}
-            <a href="mailto:sales@ohiogassupply.com" className="po-pricing-gate__link">
-              Contact our sales team
-            </a>
+            Questions? Contact us at{' '}
+            {company.email
+              ? <a href={`mailto:${company.email}`} className="po-pricing-gate__link">{company.email}</a>
+              : null
+            }
+            {company.email && company.phone ? ' or call ' : null}
+            {company.phone
+              ? <a href={`tel:${company.phone.replace(/\D/g,'')}`} className="po-pricing-gate__link">{company.phone}</a>
+              : null
+            }
+            {!company.email && !company.phone ? 'our team.' : '.'}
           </p>
         </div>
       </div>
