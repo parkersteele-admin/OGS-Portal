@@ -36,6 +36,9 @@ export const customersCol = col<Customer>('customers')
 export const customerTanksCol = (customerId: string) =>
   col<Tank>(`customers/${customerId}/tanks`)
 
+export const customerProductPricingCol = (customerId: string) =>
+  col<import('../types/customerPricing').CustomerProductPricing>(`customers/${customerId}/productPricing`)
+
 // ── Tanks (top-level for fleet queries) ──────────────────────────────────────
 export const tanksCol      = col<Tank>('tanks')
 export const tankEventsCol = (tankId: string) =>

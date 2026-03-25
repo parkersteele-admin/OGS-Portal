@@ -1128,3 +1128,78 @@
 .cr-access-role--delivery { background: rgba(59,130,246,.12); color: #2563eb; }
 .cr-access-role--viewer   { background: var(--color-bg-3, var(--color-bg-2)); color: var(--color-text-3); border: 1px solid var(--color-border); }
 .cr-access-role--customer { background: var(--color-bg-3, var(--color-bg-2)); color: var(--color-text-3); border: 1px solid var(--color-border); }
+
+
+/* -- Product Pricing tab ---------------------------------------------------- */
+
+.cr-section-desc {
+  font-size: var(--font-size-13);
+  color: var(--color-text-3);
+  margin: var(--space-1) 0 0;
+}
+
+.cr-table--pricing {
+  width: 100%;
+}
+
+.cr-table--pricing th:last-child,
+.cr-table--pricing td:last-child {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.cr-pricing-row--set td {
+  background: rgba(16, 185, 129, 0.04);
+}
+
+.cr-pricing-row__name {
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.cr-pricing-row__cat {
+  color: var(--color-text-3);
+  font-size: var(--font-size-12);
+}
+
+.cr-pricing-row__val {
+  font-weight: 600;
+  color: #059669;
+}
+
+.cr-pricing-row__unit {
+  font-weight: 400;
+  color: var(--color-text-3);
+  font-size: var(--font-size-12);
+}
+
+.cr-pricing-row__none {
+  color: var(--color-text-3);
+}
+
+.cr-pricing-row__source {
+  vertical-align: middle;
+}
+
+.cr-pricing-row__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.cr-pricing-edit {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cr-pricing-edit__prefix {
+  font-size: var(--font-size-13);
+  color: var(--color-text-3);
+}
+
+.cr-pricing-edit__input {
+  width: 90px;
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--font-size-13);
+}

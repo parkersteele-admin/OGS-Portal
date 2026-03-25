@@ -4,6 +4,7 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  writeBatch,
   onSnapshot,
   query,
   where,
@@ -168,12 +169,55 @@ export async function updateQuote(
   )
 }
 
+/** Write all quoted line-item prices to the customer's productPricing subcollection. */
+async function applyQuotePricingToCustomer(
+  customerId: string,
+  quoteId: string,
+  lineItems: QuoteItem[],
+  setBy: string,
+): Promise<void> {
+  const eligible = lineItems.filter(
+    (i) => i.productId && i.productId !== 'delivery' && i.productId !== 'rental' && i.unitPrice > 0,
+  )
+  if (eligible.length === 0) return
+  const batch = writeBatch(db)
+  for (const item of eligible) {
+    const ref = doc(db, 'customers', customerId, 'productPricing', item.productId)
+    batch.set(ref, {
+      productId: item.productId,
+      price:     item.unitPrice,
+      source:    'quote',
+      quoteId,
+      setBy,
+      setAt:     serverTimestamp(),
+    })
+  }
+  await batch.commit()
+}
+
 export async function sendQuote(id: string): Promise<void> {
   return updateQuote(id, { status: 'sent' })
 }
 
-export async function acceptQuote(id: string): Promise<void> {
-  return updateQuote(id, { status: 'accepted', acceptedAt: serverTimestamp() as never })
+/**
+ * Mark a quote as accepted and apply its quoted prices to the customer's
+ * per-product pricing subcollection so they're visible in My Products.
+ *
+ * @param id          Quote document ID
+ * @param acceptedBy  UID of the staff member accepting (optional)
+ */
+export async function acceptQuote(id: string, acceptedBy?: string): Promise<void> {
+  return serviceCall(async () => {
+    const quote = await getQuote(id)
+    await updateDoc(doc(db, 'quotes', id), {
+      status:     'accepted' as QuoteStatus,
+      acceptedAt: serverTimestamp(),
+      updatedAt:  serverTimestamp(),
+    })
+    if (quote.customerId && quote.lineItems.length > 0) {
+      await applyQuotePricingToCustomer(quote.customerId, id, quote.lineItems, acceptedBy ?? 'system')
+    }
+  })
 }
 
 export async function declineQuote(id: string): Promise<void> {
@@ -203,18 +247,20 @@ export async function generateQuotePdf(quoteId: string): Promise<string> {
 // ── Convert to order ──────────────────────────────────────────────────────────
 
 /**
- * Converts an accepted quote's line items into an Order and marks the quote
- * with the resulting order ID.
+ * Converts a sent or accepted quote's line items into an Order, marks the
+ * quote as accepted, records the resulting order ID, and applies quoted
+ * prices to the customer's per-product pricing subcollection.
  */
 export async function convertQuoteToOrder(
   quoteId: string,
   customerId: string,
   unitPrice: number,
+  convertedBy?: string,
 ): Promise<string> {
   return serviceCall(async () => {
     const quote = await getQuote(quoteId)
-    if (quote.status !== 'accepted') {
-      throw new OgsValidationError('Only accepted quotes can be converted to orders')
+    if (!['draft', 'sent', 'accepted'].includes(quote.status)) {
+      throw new OgsValidationError('Only draft, sent, or accepted quotes can be converted to orders')
     }
     if (quote.customerId && quote.customerId !== customerId) {
       throw new OgsValidationError('Quote customer does not match provided customerId')
@@ -228,17 +274,23 @@ export async function convertQuoteToOrder(
       {
         customerId,
         productId: firstItem.productId,
-        quantity: firstItem.quantity,
+        quantity:  firstItem.quantity,
         deliveryTier: 'standard',
         notes: quote.notes,
       },
       unitPrice,
     )
 
+    // Mark quote accepted and record the order ID
     await updateDoc(doc(db, 'quotes', quoteId), {
+      status:           'accepted' as QuoteStatus,
+      acceptedAt:       serverTimestamp(),
       convertedOrderId: orderId,
-      updatedAt: serverTimestamp(),
+      updatedAt:        serverTimestamp(),
     })
+
+    // Apply all line-item prices to the customer's product pricing subcollection
+    await applyQuotePricingToCustomer(customerId, quoteId, quote.lineItems, convertedBy ?? 'system')
 
     return orderId
   })

@@ -42,7 +42,9 @@ import { useAuth } from '../../../hooks/useAuth'
 import { updateCustomer, archiveCustomer, deleteCustomer, restoreCustomer } from '../../../services/customerService'
 import { getUsersByCompany, assignUserRole, deactivateUser, reactivateUser, sendPasswordReset } from '../../../services/userService'
 import { getInvoices, createInvoice } from '../../../services/invoiceService'
-import { getProductDropdown, type ProductDropdownItem } from '../../../services/productService'
+import { getProductDropdown, getVisibleProducts, type ProductDropdownItem } from '../../../services/productService'
+import { getCustomerProductPricing, setCustomerProductPrice, removeCustomerProductPrice } from '../../../services/customerPricingService'
+import type { CustomerProductPricing } from '../../../types/customerPricing'
 import { getFilesForEntity, uploadFile, deleteFile } from '../../../services/fileService'
 import { formatCurrency, formatDate, formatRelative } from '../../../utils/format'
 import { formatAddress, getGoogleMapsUrl } from '../../../utils/addressUtils'
@@ -74,14 +76,15 @@ interface ContactLogWithFollowUp extends ContactLog {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-type TabKey = 'overview' | 'history' | 'notes' | 'documents' | 'access'
+type TabKey = 'overview' | 'history' | 'notes' | 'documents' | 'access' | 'productPricing'
 
 const TABS: { key: TabKey; label: string }[] = [
-  { key: 'overview',  label: 'Overview' },
-  { key: 'history',   label: 'Contact History' },
-  { key: 'notes',     label: 'Account Notes' },
-  { key: 'documents', label: 'Documents' },
-  { key: 'access',    label: 'User Access' },
+  { key: 'overview',       label: 'Overview' },
+  { key: 'history',        label: 'Contact History' },
+  { key: 'notes',          label: 'Account Notes' },
+  { key: 'documents',      label: 'Documents' },
+  { key: 'access',         label: 'User Access' },
+  { key: 'productPricing', label: 'Product Pricing' },
 ]
 
 const STATUS_BADGE: Record<CustomerStatus, { label: string; variant: 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'brand' }> = {
@@ -899,6 +902,9 @@ const CustomerRecord: React.FC = () => {
   const [uploadProgress, setUploadProgress] = useState<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Product Pricing tab — inline editing state (productId → input string)
+  const [pricingEditMap, setPricingEditMap] = useState<Map<string, string>>(new Map())
+
   // ── Queries ──────────────────────────────────────────────────────────────────
 
   const {
@@ -983,7 +989,39 @@ const CustomerRecord: React.FC = () => {
     staleTime: 30_000,
   })
 
+  // Customer product pricing (fetched when pricing tab active)
+  const { data: customerPricingEntries = [], isLoading: pricingLoading } = useQuery<CustomerProductPricing[]>({
+    queryKey: ['customer-product-pricing', customerId],
+    queryFn: () => getCustomerProductPricing(customerId!),
+    enabled: !!customerId && activeTab === 'productPricing',
+    staleTime: 30_000,
+  })
+
+  // All visible products for pricing tab
+  const { data: allProducts = [], isLoading: allProductsLoading } = useQuery({
+    queryKey: ['visible-products'],
+    queryFn: getVisibleProducts,
+    enabled: activeTab === 'productPricing',
+    staleTime: 10 * 60_000,
+  })
+
   // ── Mutations ────────────────────────────────────────────────────────────────
+
+  const setPriceMutation = useMutation({
+    mutationFn: ({ productId, price }: { productId: string; price: number }) =>
+      setCustomerProductPrice(customerId!, productId, price, user!.id, { source: 'manual' }),
+    onSuccess: (_data, { productId }) => {
+      void queryClient.invalidateQueries({ queryKey: ['customer-product-pricing', customerId] })
+      setPricingEditMap((prev) => { const next = new Map(prev); next.delete(productId); return next })
+    },
+  })
+
+  const removePriceMutation = useMutation({
+    mutationFn: (productId: string) => removeCustomerProductPrice(customerId!, productId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['customer-product-pricing', customerId] })
+    },
+  })
 
   const saveMutation = useMutation({
     mutationFn: (data: Partial<CustomerRecord>) =>
@@ -1718,6 +1756,155 @@ const CustomerRecord: React.FC = () => {
           />
         </div>
       )}
+
+      {/* ── Tab: Product Pricing ──────────────────────────────────────────── */}
+      {activeTab === 'productPricing' && (() => {
+        const pricingMap = new Map(customerPricingEntries.map((p) => [p.productId, p]))
+        const pricingProducts = allProducts.filter((p) => p.category !== 'Fees')
+        const isLoadingTab = pricingLoading || allProductsLoading
+
+        const startEdit = (productId: string, currentPrice?: number) => {
+          setPricingEditMap((prev) => {
+            const next = new Map(prev)
+            next.set(productId, currentPrice !== undefined ? String(currentPrice) : '')
+            return next
+          })
+        }
+
+        const cancelEdit = (productId: string) => {
+          setPricingEditMap((prev) => { const next = new Map(prev); next.delete(productId); return next })
+        }
+
+        const savePrice = (productId: string) => {
+          const raw = pricingEditMap.get(productId) ?? ''
+          const price = parseFloat(raw)
+          if (!Number.isFinite(price) || price < 0) return
+          setPriceMutation.mutate({ productId, price })
+        }
+
+        return (
+          <div className="cr-tab-panel" role="tabpanel">
+            <div className="cr-panel-header">
+              <h3 className="cr-section-title">Product pricing</h3>
+              <p className="cr-section-desc">Custom prices for this customer. Leave blank to use list price.</p>
+            </div>
+
+            {isLoadingTab ? (
+              <div className="cr-skeleton cr-skeleton--list" />
+            ) : pricingProducts.length === 0 ? (
+              <Card><CardBody><p className="cr-empty">No products found.</p></CardBody></Card>
+            ) : (
+              <Card>
+                <CardBody>
+                  <table className="cr-table cr-table--pricing">
+                    <thead>
+                      <tr>
+                        <th>Product</th>
+                        <th>Category</th>
+                        <th>Custom Price</th>
+                        <th>Source</th>
+                        <th />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pricingProducts.map((product) => {
+                        const pricing = pricingMap.get(product.id)
+                        const isEditing = pricingEditMap.has(product.id)
+                        const editVal = pricingEditMap.get(product.id) ?? ''
+                        const isSaving = setPriceMutation.isPending && (setPriceMutation.variables as { productId: string } | undefined)?.productId === product.id
+                        const isRemoving = removePriceMutation.isPending && removePriceMutation.variables === product.id
+
+                        return (
+                          <tr key={product.id} className={pricing ? 'cr-pricing-row--set' : ''}>
+                            <td className="cr-pricing-row__name">{product.name}</td>
+                            <td className="cr-pricing-row__cat">{product.category}</td>
+                            <td className="cr-pricing-row__price">
+                              {isEditing ? (
+                                <div className="cr-pricing-edit">
+                                  <span className="cr-pricing-edit__prefix">$</span>
+                                  <input
+                                    className="ui-input cr-pricing-edit__input"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={editVal}
+                                    onChange={(e) => {
+                                      setPricingEditMap((prev) => { const next = new Map(prev); next.set(product.id, e.target.value); return next })
+                                    }}
+                                    onKeyDown={(e) => { if (e.key === 'Enter') savePrice(product.id); if (e.key === 'Escape') cancelEdit(product.id) }}
+                                    autoFocus
+                                    aria-label={`Price for ${product.name}`}
+                                  />
+                                </div>
+                              ) : pricing ? (
+                                <span className="cr-pricing-row__val">
+                                  {formatCurrency(pricing.price)}
+                                  <span className="cr-pricing-row__unit"> / {product.unit}</span>
+                                </span>
+                              ) : (
+                                <span className="cr-pricing-row__none">—</span>
+                              )}
+                            </td>
+                            <td className="cr-pricing-row__source">
+                              {pricing ? (
+                                <Badge variant={pricing.source === 'quote' ? 'brand' : 'neutral'}>
+                                  {pricing.source === 'quote' ? 'From quote' : 'Manual'}
+                                </Badge>
+                              ) : null}
+                            </td>
+                            <td className="cr-pricing-row__actions">
+                              {isEditing ? (
+                                <>
+                                  <Button
+                                    variant="primary"
+                                    size="sm"
+                                    loading={isSaving}
+                                    onClick={() => savePrice(product.id)}
+                                  >
+                                    Save
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => cancelEdit(product.id)}
+                                    disabled={isSaving}
+                                  >
+                                    Cancel
+                                  </Button>
+                                </>
+                              ) : (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => startEdit(product.id, pricing?.price)}
+                                  >
+                                    {pricing ? 'Edit' : 'Set price'}
+                                  </Button>
+                                  {pricing && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      loading={isRemoving}
+                                      onClick={() => removePriceMutation.mutate(product.id)}
+                                    >
+                                      Remove
+                                    </Button>
+                                  )}
+                                </>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </CardBody>
+              </Card>
+            )}
+          </div>
+        )
+      })()}
 
       {/* ── Modals ─────────────────────────────────────────────────────────── */}
       {showEdit && (

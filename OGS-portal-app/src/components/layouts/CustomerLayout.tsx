@@ -67,7 +67,7 @@ const NAV_ITEMS: SidebarItem[] = [
   { to: '/portal/invoices',  label: 'Invoices',   icon: IC_INVOICES },
   { to: '/portal/autopay',   label: 'Autopay',    icon: IC_AUTOPAY },
   { to: '/portal/tanks',     label: 'My Tanks',   icon: IC_TANKS },
-  { to: '/portal/catalog',   label: 'Products',   icon: IC_PRODUCTS },
+  { to: '/portal/catalog',   label: 'My Products', icon: IC_PRODUCTS },
   { to: '/portal/profile',   label: 'My Profile',  icon: IC_PROFILE },
 ]
 

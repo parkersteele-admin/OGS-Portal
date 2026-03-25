@@ -16,6 +16,7 @@ import { useAuth } from '../../../hooks/useAuth'
 import { useCustomer } from '../../../hooks/queries'
 import { usePricingAccess } from '../../../hooks/usePricingAccess'
 import { useCompanySettings } from '../../../hooks/useCompanySettings'
+import { getCustomerProductPricing } from '../../../services/customerPricingService'
 import {
   createBatchOrders,
   getDeliverySettings,
@@ -153,13 +154,17 @@ function summarizeOrder(
   products: Product[],
   tier: DeliveryTier,
   settings: DeliverySettings,
+  pricingMap: Map<string, number> = new Map(),
 ): OrderSummaryData {
   const config = settings[tier]
   const lines = items
     .map((item) => {
       const product = products.find((p) => p.id === item.productId)
       if (!product) return null
-      const effectivePrice = product.pricePerUnit * (1 + config.upchargePercent)
+      const basePrice = pricingMap.has(item.productId)
+        ? pricingMap.get(item.productId)!
+        : product.pricePerUnit
+      const effectivePrice = basePrice * (1 + config.upchargePercent)
       const subtotal = parseFloat((effectivePrice * item.quantity).toFixed(2))
       return { item, product, subtotal }
     })
@@ -487,6 +492,7 @@ interface Step1Props {
   recentProductIds: string[]
   settings: DeliverySettings
   orderMode: OrderType
+  pricingMap?: Map<string, number>
   onOrderModeChange: (mode: OrderType) => void
   onToggleProduct: (productId: string) => void
   onQuantityChange: (productId: string, quantity: number) => void
@@ -498,11 +504,11 @@ const CATEGORY_ORDER = ['CO₂ Cylinders', 'Nitrogen', 'Beer Gas', 'Propane', 'R
 
 const Step1: React.FC<Step1Props> = ({
   products, tanks, state, recentProductIds, settings,
-  orderMode, onOrderModeChange,
+  orderMode, onOrderModeChange, pricingMap = new Map(),
   onToggleProduct, onQuantityChange, onTankChange, onNext,
 }) => {
   const summary = useMemo(
-    () => summarizeOrder(state.items, products, state.tier, settings),
+    () => summarizeOrder(state.items, products, state.tier, settings, pricingMap),
     [state.items, products, state.tier, settings],
   )
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
@@ -639,6 +645,7 @@ interface Step2Props {
   state: WizardState
   settings: DeliverySettings
   orderMode: OrderType
+  pricingMap?: Map<string, number>
   routeForm: RouteScheduleForm
   onRouteFormChange: (patch: Partial<RouteScheduleForm>) => void
   onChange: (patch: Partial<WizardState>) => void
@@ -650,11 +657,12 @@ interface Step2Props {
 
 const Step2: React.FC<Step2Props> = ({
   products, state, settings, orderMode, routeForm, onRouteFormChange,
+  pricingMap = new Map(),
   onChange, onQuantityChange, onRemoveItem, onBack, onNext,
 }) => {
   const summary = useMemo(
-    () => summarizeOrder(state.items, products, state.tier, settings),
-    [state.items, products, state.tier, settings],
+    () => summarizeOrder(state.items, products, state.tier, settings, pricingMap),
+    [state.items, products, state.tier, settings, pricingMap],
   )
   const { min: dateMin, max: dateMax } = dateConstraints(state.tier)
 
@@ -850,6 +858,7 @@ interface Step3Props {
   tanks: Tank[]
   groupId: string
   orderMode: OrderType
+  pricingMap?: Map<string, number>
   routeForm: RouteScheduleForm
   nextRouteOrderId: string | null
   nextRouteDate: Date | null
@@ -859,7 +868,7 @@ interface Step3Props {
 
 const Step3: React.FC<Step3Props> = ({
   products, state, settings, customerId, tanks, groupId,
-  orderMode, routeForm, nextRouteOrderId, nextRouteDate,
+  orderMode, routeForm, nextRouteOrderId, nextRouteDate, pricingMap = new Map(),
   onBack, onConfirm,
 }) => {
   const { user } = useAuth()
@@ -867,8 +876,8 @@ const Step3: React.FC<Step3Props> = ({
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const summary = useMemo(
-    () => summarizeOrder(state.items, products, state.tier, settings),
-    [state.items, products, state.tier, settings],
+    () => summarizeOrder(state.items, products, state.tier, settings, pricingMap),
+    [state.items, products, state.tier, settings, pricingMap],
   )
   const tierMeta = TIER_META[state.tier]
   const tierConfig = settings[state.tier]
@@ -1189,13 +1198,14 @@ interface SuccessProps {
   state: WizardState
   products: Product[]
   settings: DeliverySettings
+  pricingMap?: Map<string, number>
 }
 
-const SuccessScreen: React.FC<SuccessProps> = ({ groupId, state, products, settings }) => {
+const SuccessScreen: React.FC<SuccessProps> = ({ groupId, state, products, settings, pricingMap = new Map() }) => {
   const navigate = useNavigate()
   const summary = useMemo(
-    () => summarizeOrder(state.items, products, state.tier, settings),
-    [state, products, settings],
+    () => summarizeOrder(state.items, products, state.tier, settings, pricingMap),
+    [state, products, settings, pricingMap],
   )
 
   return (
@@ -1388,6 +1398,16 @@ const OrderPage: React.FC = () => {
     staleTime: 5 * 60 * 1000,
   })
 
+  const { data: customerPricingEntries = [] } = useQuery({
+    queryKey: ['customer-product-pricing', customerId],
+    queryFn:  () => getCustomerProductPricing(customerId),
+    enabled:  !!customerId,
+    staleTime: 5 * 60 * 1000,
+  })
+  const customerPricingMap = new Map(
+    customerPricingEntries.map((p: { productId: string; price: number }) => [p.productId, p.price])
+  )
+
   const patch = useCallback((nextPatch: Partial<WizardState>) => {
     setWizState((prev) => ({ ...prev, ...nextPatch }))
   }, [])
@@ -1434,6 +1454,7 @@ const OrderPage: React.FC = () => {
           state={wizState}
           products={products}
           settings={deliverySettings}
+          pricingMap={customerPricingMap}
         />
       </div>
     )
@@ -1494,6 +1515,7 @@ const OrderPage: React.FC = () => {
           recentProductIds={recentProductIds}
           settings={deliverySettings}
           orderMode={orderMode}
+          pricingMap={customerPricingMap}
           onOrderModeChange={setOrderMode}
           onToggleProduct={toggleProduct}
           onQuantityChange={(productId, quantity) => updateItem(productId, { quantity })}
@@ -1508,6 +1530,7 @@ const OrderPage: React.FC = () => {
           state={wizState}
           settings={deliverySettings}
           orderMode={orderMode}
+          pricingMap={customerPricingMap}
           routeForm={routeForm}
           onRouteFormChange={(p) => setRouteForm((prev) => ({ ...prev, ...p }))}
           onChange={patch}
@@ -1527,6 +1550,7 @@ const OrderPage: React.FC = () => {
           tanks={tanks}
           groupId={groupId}
           orderMode={orderMode}
+          pricingMap={customerPricingMap}
           routeForm={routeForm}
           nextRouteOrderId={nextRouteOrder?.id ?? null}
           nextRouteDate={nextRouteOrder?.date ?? null}

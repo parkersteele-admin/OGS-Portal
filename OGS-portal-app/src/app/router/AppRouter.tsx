@@ -33,10 +33,10 @@ import {
   DashboardPage,
   InvoicesPage,
   ManageAutopay,
+  MyProducts,
   OrderPage,
   OrdersPage,
   PayInvoicePage,
-  ProductCatalog,
   ProfilePage,
   TankLevelsPage,
 } from '../../features/customer'
@@ -117,7 +117,7 @@ export const AppRouter: React.FC = () => (
         <Route path="invoices/:invoiceId/pay" element={<PayInvoicePage />} />
         <Route path="autopay" element={<ManageAutopay />} />
         <Route path="tanks" element={<TankLevelsPage />} />
-        <Route path="catalog" element={<ProductCatalog />} />
+        <Route path="catalog" element={<MyProducts />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route path="settings/team" element={<TeamSettingsPage />} />
       </Route>

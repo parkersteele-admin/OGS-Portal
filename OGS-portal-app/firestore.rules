@@ -140,6 +140,15 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // Per-customer product pricing (set by sales/dispatch; read by portal users)
+      match /productPricing/{productId} {
+        allow read:  if isDispatch()
+          || isSales()
+          || (isPortalUser() && linkedCompanyId() == customerId)
+          || (isCustomer() && linkedCustomerId() == customerId);
+        allow write: if isDispatch() || isSales();
+      }
+
       // Delivery locations under the company
       match /locations/{locationId} {
         allow read:  if isDispatch()
