@@ -183,7 +183,9 @@ const CustomersPage: React.FC = () => {
   useEffect(() => {
     setLoading(true)
     const unsub = subscribeToCustomers({}, (cs) => {
-      setCustomers(cs)
+      // Exclude hard-deleted documents from the customer list — they are only
+      // visible on the individual CustomerRecord page during the 30-day grace window.
+      setCustomers(cs.filter((c) => c.status !== 'deleted'))
       setLoading(false)
     })
     return unsub
@@ -231,7 +233,7 @@ const CustomersPage: React.FC = () => {
             <h2 className="page-filters__title">Filters</h2>
           </div>
           <div className="cp-filter-pills page-filters__presets">
-            {(['All', 'active', 'hold', 'inactive'] as const).map((s) => (
+            {(['All', 'active', 'hold', 'inactive', 'archived'] as const).map((s) => (
               <button
                 key={s}
                 type="button"

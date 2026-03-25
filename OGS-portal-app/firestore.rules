@@ -94,18 +94,34 @@ service cloud.firestore {
 
 
     // ── Customers (companies) ─────────────────────────────────────────────────
+    // status lifecycle: active | inactive | hold → archived → deleted (purged after 30 days)
+    //
+    // "Overwrite" semantics for deleted docs:
+    //   A soft-deleted document (status == 'deleted') can be restored or overwritten
+    //   by admins via update — the doc ID is preserved so foreign-key references in
+    //   orders/invoices/tanks remain valid during the 30-day grace window.
+    //   New customer sign-ups always use addDoc (auto-ID) so they never collide with
+    //   existing deleted documents.
     match /customers/{customerId} {
-      // Portal users can read their own company; ops can read all.
+      // Deleted/archived customers are invisible to portal users — only ops staff
+      // and admins may read them.
       allow read: if isDispatch()
         || isSales()
-        || (isPortalUser() && linkedCompanyId() == customerId)
-        || (isCustomer()   && linkedCustomerId() == customerId);
+        || (isPortalUser() && linkedCompanyId() == customerId
+            && !(resource.data.status in ['deleted', 'archived']))
+        || (isCustomer() && linkedCustomerId() == customerId
+            && !(resource.data.status in ['deleted', 'archived']));
       // Any authenticated user may create a company doc (sign-up flow).
       allow create: if isAuthenticated();
-      // Portal users can update their own company during onboarding; ops can update any.
-      allow update: if isDispatch()
-        || isSales()
-        || (isPortalUser() && linkedCompanyId() == customerId);
+      // Admins can update any customer including deleted/archived ones (restore/overwrite).
+      // Other ops staff can update non-deleted customers only.
+      allow update: if isAdmin()
+        || (isDispatch() && resource.data.status != 'deleted')
+        || (isSales()    && resource.data.status != 'deleted')
+        || (isPortalUser() && linkedCompanyId() == customerId
+            && resource.data.status != 'deleted'
+            && resource.data.status != 'archived');
+      // Hard-delete is admin-only; soft-delete is handled via update above.
       allow delete: if isAdmin();
 
       // Customer-scoped tanks (mirrors the top-level /tanks collection).

@@ -5,6 +5,7 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  deleteField,
   onSnapshot,
   query,
   where,
@@ -123,8 +124,42 @@ export async function updateCustomer(
   })
 }
 
+/** Soft-archive a customer. The record is retained but hidden from normal lists. */
+export async function archiveCustomer(id: string): Promise<void> {
+  return serviceCall(() =>
+    updateDoc(doc(db, 'customers', id), {
+      status: 'archived' as CustomerStatus,
+      archivedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }),
+  )
+}
+
+/**
+ * Soft-delete a customer. The document is retained with status='deleted' and
+ * will be permanently purged by the purgeDeletedCustomers scheduled function
+ * after 30 days.
+ */
 export async function deleteCustomer(id: string): Promise<void> {
-  return serviceCall(() => deleteDoc(doc(db, 'customers', id)))
+  return serviceCall(() =>
+    updateDoc(doc(db, 'customers', id), {
+      status: 'deleted' as CustomerStatus,
+      deletedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }),
+  )
+}
+
+/** Restore an archived or soft-deleted customer back to active. */
+export async function restoreCustomer(id: string): Promise<void> {
+  return serviceCall(() =>
+    updateDoc(doc(db, 'customers', id), {
+      status: 'active' as CustomerStatus,
+      archivedAt: deleteField(),
+      deletedAt: deleteField(),
+      updatedAt: serverTimestamp(),
+    }),
+  )
 }
 
 // ── Geocode helper ────────────────────────────────────────────────────────────

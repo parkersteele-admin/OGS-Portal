@@ -136,6 +136,18 @@
   border: 1px solid #d1d5db;
 }
 
+.cr-action-error {
+  font-size: 0.8rem;
+  color: var(--color-danger, #dc2626);
+}
+
+.cr-confirm-body {
+  padding: var(--space-2) 0 var(--space-3);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--color-text);
+}
+
 /* ── Contact card ──────────────────────────────────────────────────────────── */
 
 .cr-contact-grid {

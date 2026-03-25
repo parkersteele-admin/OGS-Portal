@@ -39,7 +39,7 @@ import {
 } from '../../../hooks/queries'
 import { useCustomerTanks } from '../../../hooks/useCustomerTanks'
 import { useAuth } from '../../../hooks/useAuth'
-import { updateCustomer } from '../../../services/customerService'
+import { updateCustomer, archiveCustomer, deleteCustomer, restoreCustomer } from '../../../services/customerService'
 import { getUsersByCompany, assignUserRole, deactivateUser, reactivateUser, sendPasswordReset } from '../../../services/userService'
 import { getInvoices, createInvoice } from '../../../services/invoiceService'
 import { getProductDropdown, type ProductDropdownItem } from '../../../services/productService'
@@ -88,6 +88,8 @@ const STATUS_BADGE: Record<CustomerStatus, { label: string; variant: 'success' |
   active:   { label: 'Active',   variant: 'success' },
   inactive: { label: 'Inactive', variant: 'neutral' },
   hold:     { label: 'On Hold',  variant: 'warning' },
+  archived: { label: 'Archived', variant: 'neutral' },
+  deleted:  { label: 'Deleted',  variant: 'danger'  },
 }
 
 const METHOD_ICONS: Record<ContactMethod, string> = {
@@ -833,6 +835,10 @@ const CustomerRecord: React.FC = () => {
   const [showLogModal,      setShowLogModal]      = useState(false)
   const [showCreateInvoice, setShowCreateInvoice] = useState(false)
   const [invoiceError,      setInvoiceError]      = useState<string | null>(null)
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false)
+  const [showDeleteConfirm,  setShowDeleteConfirm]  = useState(false)
+  const [custActionLoading,  setCustActionLoading]  = useState(false)
+  const [custActionError,    setCustActionError]    = useState<string | null>(null)
 
   // Notes tab local state (mirrors customer doc, saved on blur)
   const [notes,             setNotes]             = useState('')
@@ -1069,6 +1075,51 @@ const CustomerRecord: React.FC = () => {
     )
   }, [customer, customerId, queryClient])
 
+  const handleArchive = useCallback(async () => {
+    if (!customerId) return
+    setCustActionLoading(true)
+    setCustActionError(null)
+    try {
+      await archiveCustomer(customerId)
+      queryClient.invalidateQueries({ queryKey: queryKeys.customers.detail(customerId) })
+      setShowArchiveConfirm(false)
+    } catch (e: unknown) {
+      setCustActionError(e instanceof Error ? e.message : 'Failed to archive customer')
+    } finally {
+      setCustActionLoading(false)
+    }
+  }, [customerId, queryClient])
+
+  const handleDelete = useCallback(async () => {
+    if (!customerId) return
+    setCustActionLoading(true)
+    setCustActionError(null)
+    try {
+      await deleteCustomer(customerId)
+      queryClient.invalidateQueries({ queryKey: queryKeys.customers.detail(customerId) })
+      setShowDeleteConfirm(false)
+      navigate(`${crmBase}/customers`)
+    } catch (e: unknown) {
+      setCustActionError(e instanceof Error ? e.message : 'Failed to delete customer')
+    } finally {
+      setCustActionLoading(false)
+    }
+  }, [customerId, queryClient, navigate, crmBase])
+
+  const handleRestore = useCallback(async () => {
+    if (!customerId) return
+    setCustActionLoading(true)
+    setCustActionError(null)
+    try {
+      await restoreCustomer(customerId)
+      queryClient.invalidateQueries({ queryKey: queryKeys.customers.detail(customerId) })
+    } catch (e: unknown) {
+      setCustActionError(e instanceof Error ? e.message : 'Failed to restore customer')
+    } finally {
+      setCustActionLoading(false)
+    }
+  }, [customerId, queryClient])
+
   const handleTogglePricing = useCallback(() => {
     if (!customer) return
     const cr = customer as CustomerRecord
@@ -1169,6 +1220,36 @@ const CustomerRecord: React.FC = () => {
           <Button variant="secondary" size="sm" onClick={() => setShowEdit(true)}>
             Edit
           </Button>
+          {cr.status === 'archived' || cr.status === 'deleted' ? (
+            <Button
+              variant="success"
+              size="sm"
+              loading={custActionLoading}
+              onClick={() => void handleRestore()}
+            >
+              Restore
+            </Button>
+          ) : (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowArchiveConfirm(true)}
+              >
+                Archive
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={() => setShowDeleteConfirm(true)}
+              >
+                Delete
+              </Button>
+            </>
+          )}
+          {custActionError && (
+            <span className="cr-action-error">{custActionError}</span>
+          )}
         </div>
       </header>
 
@@ -1649,6 +1730,45 @@ const CustomerRecord: React.FC = () => {
           }}
           saving={createInvoiceMutation.isPending}
         />
+      )}
+
+      {/* ── Archive confirmation ────────────────────────────────────────── */}
+      {showArchiveConfirm && (
+        <Modal open onClose={() => setShowArchiveConfirm(false)} title="Archive customer" size="sm">
+          <div className="cr-confirm-body">
+            <p>Archive <strong>{cr.name}</strong>? The customer will be hidden from active lists but can be restored at any time.</p>
+            {custActionError && <p className="cr-form-error">{custActionError}</p>}
+          </div>
+          <div className="cr-modal-actions">
+            <Button variant="ghost" onClick={() => setShowArchiveConfirm(false)} disabled={custActionLoading}>
+              Cancel
+            </Button>
+            <Button variant="secondary" loading={custActionLoading} onClick={() => void handleArchive()}>
+              Archive
+            </Button>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Delete confirmation ─────────────────────────────────────────── */}
+      {showDeleteConfirm && (
+        <Modal open onClose={() => setShowDeleteConfirm(false)} title="Delete customer" size="sm">
+          <div className="cr-confirm-body">
+            <p>
+              Delete <strong>{cr.name}</strong>? The record will be soft-deleted and permanently
+              removed after 30 days. You can restore the customer within that window.
+            </p>
+            {custActionError && <p className="cr-form-error">{custActionError}</p>}
+          </div>
+          <div className="cr-modal-actions">
+            <Button variant="ghost" onClick={() => setShowDeleteConfirm(false)} disabled={custActionLoading}>
+              Cancel
+            </Button>
+            <Button variant="danger" loading={custActionLoading} onClick={() => void handleDelete()}>
+              Delete customer
+            </Button>
+          </div>
+        </Modal>
       )}
     </div>
   )

@@ -9,7 +9,7 @@ export interface Address {
   zip: string
 }
 
-export type CustomerStatus = 'active' | 'inactive' | 'hold'
+export type CustomerStatus = 'active' | 'inactive' | 'hold' | 'archived' | 'deleted'
 
 export interface Customer {
   id: string
@@ -42,6 +42,10 @@ export interface Customer {
   autopayEnabled?: boolean
   /** Stripe PM ID currently used for autopay charges. */
   autopayStripePaymentMethodId?: string
+  /** Set when the customer is archived (soft-archived, not deleted). */
+  archivedAt?: Timestamp
+  /** Set when the customer is soft-deleted. Document is purged 30 days after this. */
+  deletedAt?: Timestamp
   createdAt: Timestamp
   updatedAt: Timestamp
 }
