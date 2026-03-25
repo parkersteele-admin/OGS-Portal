@@ -191,9 +191,14 @@ interface EditCustomerModalProps {
   onClose: () => void
   onSave: (data: Partial<CustomerRecord>) => Promise<void>
   saving: boolean
+  onArchive: () => void
+  onDelete: () => void
+  onRestore: () => void
+  actionLoading: boolean
+  actionError: string | null
 }
 
-const EditCustomerModal: React.FC<EditCustomerModalProps> = ({ customer, onClose, onSave, saving }) => {
+const EditCustomerModal: React.FC<EditCustomerModalProps> = ({ customer, onClose, onSave, saving, onArchive, onDelete, onRestore, actionLoading, actionError }) => {
   const [form, setForm] = useState({
     name:        customer.name,
     email:       customer.email,
@@ -257,13 +262,53 @@ const EditCustomerModal: React.FC<EditCustomerModalProps> = ({ customer, onClose
           step="100"
         />
         <div className="cr-modal-actions">
-          <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>
+          <Button type="button" variant="ghost" onClick={onClose} disabled={saving || actionLoading}>
             Cancel
           </Button>
-          <Button type="submit" variant="primary" loading={saving}>
+          <Button type="submit" variant="primary" loading={saving} disabled={actionLoading}>
             Save changes
           </Button>
         </div>
+
+        {/* ── Danger zone ── */}
+        {customer.status !== 'deleted' && (
+          <div className="cr-modal-danger">
+            <p className="cr-modal-danger__label">Danger zone</p>
+            <div className="cr-modal-danger__actions">
+              {customer.status === 'archived' ? (
+                <Button
+                  type="button"
+                  variant="success"
+                  size="sm"
+                  loading={actionLoading}
+                  onClick={onRestore}
+                >
+                  Restore customer
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  loading={actionLoading}
+                  onClick={onArchive}
+                >
+                  Archive customer
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="danger"
+                size="sm"
+                loading={actionLoading}
+                onClick={onDelete}
+              >
+                Delete customer
+              </Button>
+            </div>
+            {actionError && <p className="cr-form-error" style={{ marginTop: 6 }}>{actionError}</p>}
+          </div>
+        )}
       </form>
     </Modal>
   )
@@ -1220,36 +1265,6 @@ const CustomerRecord: React.FC = () => {
           <Button variant="secondary" size="sm" onClick={() => setShowEdit(true)}>
             Edit
           </Button>
-          {cr.status === 'archived' || cr.status === 'deleted' ? (
-            <Button
-              variant="success"
-              size="sm"
-              loading={custActionLoading}
-              onClick={() => void handleRestore()}
-            >
-              Restore
-            </Button>
-          ) : (
-            <>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowArchiveConfirm(true)}
-              >
-                Archive
-              </Button>
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={() => setShowDeleteConfirm(true)}
-              >
-                Delete
-              </Button>
-            </>
-          )}
-          {custActionError && (
-            <span className="cr-action-error">{custActionError}</span>
-          )}
         </div>
       </header>
 
@@ -1711,6 +1726,11 @@ const CustomerRecord: React.FC = () => {
           onClose={() => setShowEdit(false)}
           onSave={handleEditSave}
           saving={saveMutation.isPending}
+          onArchive={() => setShowArchiveConfirm(true)}
+          onDelete={() => setShowDeleteConfirm(true)}
+          onRestore={() => void handleRestore()}
+          actionLoading={custActionLoading}
+          actionError={custActionError}
         />
       )}
 
