@@ -53,8 +53,9 @@ export const adminCreateUser = onCall(async (request) => {
     throw new HttpsError('invalid-argument', 'companyId is required for portal user roles (owner, manager, billing, delivery, viewer).')
   }
 
-  // ── Create Firebase Auth user ──────────────────────────────────────────────
+  // ── Create Firebase Auth user (or link an existing one) ──────────────────
   let uid: string
+  let isExistingUser = false
   try {
     const record = await adminAuth.createUser({
       email:         email.trim().toLowerCase(),
@@ -67,10 +68,25 @@ export const adminCreateUser = onCall(async (request) => {
   } catch (err: unknown) {
     const msg = (err as { message?: string }).message ?? String(err)
     if (msg.includes('email-already-exists') || msg.includes('EMAIL_EXISTS')) {
-      throw new HttpsError('already-exists', 'An account with this email already exists.')
+      // Look up the existing account and link it to this company instead of failing.
+      const existing = await adminAuth.getUserByEmail(email.trim().toLowerCase())
+      const existingRole = (existing.customClaims as Record<string, unknown> | undefined)?.role as string | undefined
+
+      // Never silently overwrite OGS staff accounts.
+      const OGS_STAFF_ROLES = new Set(['admin', 'dispatch', 'driver', 'sales'])
+      if (existingRole && OGS_STAFF_ROLES.has(existingRole)) {
+        throw new HttpsError(
+          'already-exists',
+          `This email belongs to an OGS staff account (${existingRole}). It cannot be added as a portal user.`,
+        )
+      }
+
+      uid = existing.uid
+      isExistingUser = true
+    } else {
+      console.error('[adminCreateUser] createUser error:', err)
+      throw new HttpsError('internal', `Failed to create Auth user: ${msg}`)
     }
-    console.error('[adminCreateUser] createUser error:', err)
-    throw new HttpsError('internal', `Failed to create Auth user: ${msg}`)
   }
 
   // ── Set custom claims immediately ──────────────────────────────────────────
@@ -91,8 +107,10 @@ export const adminCreateUser = onCall(async (request) => {
     email:     email.trim().toLowerCase(),
     role,
     active:    true,
-    createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
+  }
+  if (!isExistingUser) {
+    userDoc.createdAt = FieldValue.serverTimestamp()
   }
   if (PORTAL_ROLES.has(role) && companyId) {
     userDoc.companyId = companyId
@@ -100,24 +118,27 @@ export const adminCreateUser = onCall(async (request) => {
     userDoc.customerId = customerId
   }
 
-  await db.collection('users').doc(uid).set(userDoc)
+  // merge: true so we don't wipe extra fields on an existing user doc
+  await db.collection('users').doc(uid).set(userDoc, { merge: true })
 
   // ── Send password-reset / setup email ─────────────────────────────────────
-  // This email lets the user set their own password on first sign-in.
+  // Skip for existing users — they already have a password set.
   // Non-fatal: Auth + Firestore are complete regardless.
-  try {
-    const resetLink = await adminAuth.generatePasswordResetLink(
-      email.trim().toLowerCase(),
-      { url: 'https://ogs-portal.web.app/login' },
-    )
-    console.log(`[adminCreateUser] Password-reset link generated for ${email}: ${resetLink}`)
-    // TODO: send via SendGrid when available — for now the link is logged
-    // and the client also calls sendPasswordResetEmail() as belt-and-suspenders
-  } catch (emailErr) {
-    console.warn('[adminCreateUser] Failed to generate reset link:', emailErr)
+  if (!isExistingUser) {
+    try {
+      const resetLink = await adminAuth.generatePasswordResetLink(
+        email.trim().toLowerCase(),
+        { url: 'https://ogs-portal.web.app/login' },
+      )
+      console.log(`[adminCreateUser] Password-reset link generated for ${email}: ${resetLink}`)
+      // TODO: send via SendGrid when available — for now the link is logged
+      // and the client also calls sendPasswordResetEmail() as belt-and-suspenders
+    } catch (emailErr) {
+      console.warn('[adminCreateUser] Failed to generate reset link:', emailErr)
+    }
   }
 
-  return { uid }
+  return { uid, linked: isExistingUser }
 })
 
 /**

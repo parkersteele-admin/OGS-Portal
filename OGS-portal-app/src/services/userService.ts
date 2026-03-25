@@ -170,15 +170,15 @@ export interface CreateUserInput {
   companyId?:  string
 }
 
-export async function createAppUser(data: CreateUserInput): Promise<string> {
+export async function createAppUser(data: CreateUserInput): Promise<{ uid: string; linked: boolean }> {
   return serviceCall(async () => {
     const { httpsCallable } = await import('firebase/functions')
     const { functions }     = await import('../lib/firebase')
-    const fn = httpsCallable<CreateUserInput, { uid: string }>(
+    const fn = httpsCallable<CreateUserInput, { uid: string; linked: boolean }>(
       functions,
       'adminCreateUser',
     )
     const result = await fn(data)
-    return result.data.uid
+    return result.data
   })
 }

@@ -160,7 +160,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
   const [role,     setRole]     = useState<UserRole>(roles[0] ?? 'driver')
   const [customer, setCustomer] = useState<Customer | null>(preselectedCustomer ?? null)
   const [error,    setError]    = useState('')
-  const [success,  setSuccess]  = useState(false)
+  const [success,  setSuccess]  = useState<'created' | 'linked' | null>(null)
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -174,22 +174,18 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
         companyId:  isPortalRole ? customer?.id : undefined,
         customerId: role === 'customer'  ? customer?.id : undefined,
       }
-      const uid = await createAppUser(payload)
-
-      // Send password-setup email (belt-and-suspenders; CF may already send it)
-      try {
-        await sendPasswordResetEmail(auth, payload.email)
-      } catch {
-        console.warn('[CreateUserModal] sendPasswordResetEmail: CF may have already sent it')
-      }
-
-      return uid
+      return createAppUser(payload)  // returns { uid, linked }
     },
-    onSuccess: () => {
-      setSuccess(true)
-      setTimeout(() => {
-        onCreated()
-      }, 1200)
+    onSuccess: (result) => {
+      const linked = (result as unknown as { linked?: boolean })?.linked
+      setSuccess(linked ? 'linked' : 'created')
+      // Only send password email for brand-new accounts
+      if (!linked) {
+        sendPasswordResetEmail(auth, email.trim().toLowerCase()).catch(() => {
+          console.warn('[CreateUserModal] sendPasswordResetEmail: CF may have already sent it')
+        })
+      }
+      setTimeout(() => { onCreated() }, 1500)
     },
     onError: (err: Error) => {
       setError(err.message || 'Failed to create user. Please try again.')
@@ -213,7 +209,11 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
       {success ? (
         <div className="cum-success">
           <p className="cum-success__icon">✓</p>
-          <p className="cum-success__msg">User created! Password-setup email sent.</p>
+          {success === 'linked' ? (
+            <p className="cum-success__msg">Existing account linked to this company. They can sign in with their current password.</p>
+          ) : (
+            <p className="cum-success__msg">User created! Password-setup email sent.</p>
+          )}
         </div>
       ) : (
         <form className="cum-form" onSubmit={handleSubmit} noValidate>
