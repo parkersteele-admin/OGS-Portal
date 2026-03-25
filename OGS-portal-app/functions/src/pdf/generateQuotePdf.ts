@@ -10,7 +10,7 @@
 
 import PDFDocument from 'pdfkit'
 import { db, storage, FieldValue } from '../admin'
-import { getCompanySettings } from './companySettings'
+import { getCompanySettings, fetchLogoBuffer } from './companySettings'
 import type { CompanySettings } from './companySettings'
 
 // ── Brand constants (shared with invoice PDF) ─────────────────────────────────
@@ -47,7 +47,9 @@ export async function generateQuotePdf(quoteId: string): Promise<string> {
     if (snap.exists) recipient = snap.data()!
   }
 
-  const pdfBuffer = await buildQuotePdf(quoteId, quote, recipient, await getCompanySettings())
+  const company   = await getCompanySettings()
+  const logoBuf   = await fetchLogoBuffer(company.logoUrl)
+  const pdfBuffer = await buildQuotePdf(quoteId, quote, recipient, company, logoBuf)
 
   const storagePath = `ogs-portal/quotes/${quoteId}.pdf`
   const fileRef     = storage.bucket().file(storagePath)
@@ -79,6 +81,7 @@ function buildQuotePdf(
   quote:     Record<string, unknown>,
   recipient: Record<string, unknown>,
   company:   CompanySettings,
+  logoBuf:   Buffer | null,
 ): Promise<Buffer> {
   return new Promise<Buffer>((resolve, reject) => {
     const doc    = new PDFDocument({ margin: 0, size: 'LETTER' })
@@ -114,13 +117,21 @@ function buildQuotePdf(
     doc.rect(0, 0, 8, PAGE_H).fill(OGS_ORANGE)
 
     // ── Company header ──────────────────────────────────────────────────
+    // Logo (top-left, max 120 × 50 pt) — placed before text so text renders on top if needed
+    if (logoBuf) {
+      try {
+        doc.image(logoBuf, MARGIN_L, 34, { fit: [120, 50] })
+      } catch { /* ignore malformed image */ }
+    }
+
+    const nameY = logoBuf ? 92 : 40
     doc
-      .fontSize(17)
+      .fontSize(logoBuf ? 13 : 17)
       .font('Helvetica-Bold')
       .fillColor('#111111')
-      .text(company.name || 'OGS Gas Services', MARGIN_L, 40)
+      .text(company.name || 'OGS Gas Services', MARGIN_L, nameY)
 
-    let headerY = 63
+    let headerY = nameY + (logoBuf ? 16 : 23)
     if (company.tagline) {
       doc.fontSize(8.5).font('Helvetica').fillColor('#666666').text(company.tagline, MARGIN_L, headerY)
       headerY += 11
@@ -363,8 +374,8 @@ function buildQuotePdf(
       .font('Helvetica')
       .fillColor('#333333')
       .text(`Valid until:    ${fmtDate(quote.validUntil)}`, C_DESC + 12, rowY + 24)
-      .text('Reply to this email or call  1-800-OGS-FUEL', C_DESC + 12, rowY + 38)
-      .text('Questions?  sales@ohiogassupply.com', C_DESC + 12, rowY + 52)
+      .text(`Reply to this email or call  ${company.phone || company.email || ''}`, C_DESC + 12, rowY + 38)
+      .text(`Questions?  ${company.email || company.phone || ''}`, C_DESC + 12, rowY + 52)
 
     // ── Footer ─────────────────────────────────────────────────────────────
     const FOOTER_Y = 748
@@ -380,21 +391,21 @@ function buildQuotePdf(
       .fontSize(9)
       .font('Helvetica-Bold')
       .fillColor('#111111')
-      .text('Thank you for considering Ohio Gas Supply.', C_DESC, FOOTER_Y + 8, {
+      .text(`Thank you for considering ${company.name || 'us'}.`, C_DESC, FOOTER_Y + 8, {
         align: 'center',
         width: CONTENT_W,
       })
 
+    const footerLine = [
+      company.name,
+      company.website,
+      company.phone,
+    ].filter(Boolean).join('  ·  ')
     doc
       .fontSize(7.5)
       .font('Helvetica')
       .fillColor('#888888')
-      .text(
-        'Ohio Gas Supply Co.  ·  ohiogassupply.com  ·  1-800-OGS-FUEL',
-        C_DESC,
-        FOOTER_Y + 22,
-        { align: 'center', width: CONTENT_W },
-      )
+      .text(footerLine || ' ', C_DESC, FOOTER_Y + 22, { align: 'center', width: CONTENT_W })
 
     doc.end()
   })

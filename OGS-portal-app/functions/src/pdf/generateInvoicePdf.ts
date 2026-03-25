@@ -14,7 +14,7 @@
 
 import PDFDocument from 'pdfkit'
 import { db, storage, FieldValue } from '../admin'
-import { getCompanySettings } from './companySettings'
+import { getCompanySettings, fetchLogoBuffer } from './companySettings'
 import type { CompanySettings } from './companySettings'
 
 // ── Brand constants ──────────────────────────────────────────────────────────
@@ -53,7 +53,9 @@ export async function generateInvoicePdf(invoiceId: string): Promise<string> {
   }
 
   // ── Build PDF bytes ────────────────────────────────────────────────────────
-  const pdfBuffer = await buildInvoicePdf(invoiceId, invoice, customer, await getCompanySettings())
+  const company   = await getCompanySettings()
+  const logoBuf   = await fetchLogoBuffer(company.logoUrl)
+  const pdfBuffer = await buildInvoicePdf(invoiceId, invoice, customer, company, logoBuf)
 
   // ── Upload to Firebase Storage ─────────────────────────────────────────────
   const storagePath = `ogs-portal/invoices/${customerId ?? '_unknown'}/${invoiceId}.pdf`
@@ -90,6 +92,7 @@ function buildInvoicePdf(
   invoice:   Record<string, unknown>,
   customer:  Record<string, unknown>,
   company:   CompanySettings,
+  logoBuf:   Buffer | null,
 ): Promise<Buffer> {
   return new Promise<Buffer>((resolve, reject) => {
     const doc    = new PDFDocument({ margin: 0, size: 'LETTER' })
@@ -124,13 +127,21 @@ function buildInvoicePdf(
     doc.rect(0, 0, 8, PAGE_H).fill(OGS_ORANGE)
 
     // ── Company header (left, y = 40) ──────────────────────────────────────
+    // Logo (top-left, max 120 × 50 pt) — placed first so text layers on top
+    if (logoBuf) {
+      try {
+        doc.image(logoBuf, MARGIN_L, 34, { fit: [120, 50] })
+      } catch { /* ignore malformed image */ }
+    }
+
+    const nameY = logoBuf ? 92 : 40
     doc
-      .fontSize(17)
+      .fontSize(logoBuf ? 13 : 17)
       .font('Helvetica-Bold')
       .fillColor('#111111')
-      .text(company.name || 'OGS Gas Services', MARGIN_L, 40)
+      .text(company.name || 'OGS Gas Services', MARGIN_L, nameY)
 
-    let headerY = 63
+    let headerY = nameY + (logoBuf ? 16 : 23)
     if (company.tagline) {
       doc.fontSize(8.5).font('Helvetica').fillColor('#666666').text(company.tagline, MARGIN_L, headerY)
       headerY += 11
@@ -366,9 +377,9 @@ function buildInvoicePdf(
       .fontSize(9)
       .font('Helvetica')
       .fillColor('#333333')
-      .text(`Due Date:     ${fmtDate(invoice.dueAt)}`,                     C_DESC + 12, BOX_Y + 24)
-      .text('Pay online at:  ohiogassupply.com/portal/invoices',            C_DESC + 12, BOX_Y + 38)
-      .text('Questions?    1-800-OGS-FUEL  ·  billing@ohiogassupply.com',  C_DESC + 12, BOX_Y + 52)
+      .text(`Due Date:     ${fmtDate(invoice.dueAt)}`,                              C_DESC + 12, BOX_Y + 24)
+      .text(`Pay online at:  ${company.website ? company.website + '/portal/invoices' : 'your customer portal'}`, C_DESC + 12, BOX_Y + 38)
+      .text(`Questions?    ${[company.phone, company.email].filter(Boolean).join('  ·  ') || ''}`, C_DESC + 12, BOX_Y + 52)
 
     // ── Footer ─────────────────────────────────────────────────────────────
     const FOOTER_Y = 748
@@ -389,16 +400,16 @@ function buildInvoicePdf(
         width: CONTENT_W,
       })
 
+    const footerLine = [
+      company.name,
+      company.website,
+      company.phone,
+    ].filter(Boolean).join('  ·  ')
     doc
       .fontSize(7.5)
       .font('Helvetica')
       .fillColor('#888888')
-      .text(
-        'Ohio Gas Supply Co.  ·  ohiogassupply.com  ·  1-800-OGS-FUEL',
-        C_DESC,
-        FOOTER_Y + 22,
-        { align: 'center', width: CONTENT_W },
-      )
+      .text(footerLine || ' ', C_DESC, FOOTER_Y + 22, { align: 'center', width: CONTENT_W })
 
     doc.end()
   })
