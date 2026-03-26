@@ -542,7 +542,7 @@ function AutopayStatusCard({
 
 export default function ManageAutopay(): React.ReactElement {
   const { user }   = useAuth()
-  const customerId = user?.customerId ?? ''
+  const customerId = user?.companyId ?? user?.customerId ?? ''
 
   // Real-time customer doc — autopayEnabled + autopayStripePaymentMethodId
   const [customer, setCustomer] = useState<Customer | null>(null)

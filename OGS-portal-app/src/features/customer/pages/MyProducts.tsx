@@ -202,7 +202,7 @@ const CartBar: React.FC<CartBarProps> = ({ items, submitting, submitted, onRemov
 const MyProducts: React.FC = () => {
   const navigate   = useNavigate()
   const { user }   = useAuth()
-  const customerId   = user?.customerId ?? ''
+  const customerId   = user?.companyId ?? user?.customerId ?? ''
   // companyId is in the auth token claim — used for quoteRequests rule validation
   const companyId    = user?.companyId ?? user?.customerId ?? ''
 

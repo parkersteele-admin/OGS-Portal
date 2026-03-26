@@ -519,7 +519,7 @@ const OrderRow: React.FC<OrderRowProps> = ({
 const OrdersPage: React.FC = () => {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const customerId = user?.customerId ?? null
+  const customerId = user?.companyId ?? user?.customerId ?? null
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [dateFrom, setDateFrom] = useState('')

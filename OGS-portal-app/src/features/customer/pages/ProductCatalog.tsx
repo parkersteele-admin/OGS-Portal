@@ -143,7 +143,7 @@ const CategorySection: React.FC<CategorySectionProps> = ({
 const ProductCatalog: React.FC = () => {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const customerId = user?.customerId ?? ''
+  const customerId = user?.companyId ?? user?.customerId ?? ''
   const { pricingUnlocked, isLoading: pricingLoading } = usePricingAccess()
   const [products,  setProducts]  = useState<Product[]>([])
   const [loading,   setLoading]   = useState(true)

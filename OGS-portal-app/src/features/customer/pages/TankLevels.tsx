@@ -453,7 +453,7 @@ function TankCard({
 const TankLevels: React.FC = () => {
   const { user }   = useAuth()
   const navigate   = useNavigate()
-  const customerId = user?.customerId ?? ''
+  const customerId = user?.companyId ?? user?.customerId ?? ''
   const userName   = user?.name ?? 'Customer'
 
   const { tanks, loading, error } = useCustomerTanks(customerId)

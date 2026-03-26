@@ -300,7 +300,7 @@ const InvoiceRow: React.FC<InvoiceRowProps> = ({
 const InvoicesPage: React.FC = () => {
   const { user }    = useAuth()
   const navigate    = useNavigate()
-  const customerId  = user?.customerId ?? ''
+  const customerId  = user?.companyId ?? user?.customerId ?? ''
 
   const [invoices, setInvoices]   = useState<Invoice[]>([])
   const [loading, setLoading]     = useState(true)

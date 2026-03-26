@@ -38,7 +38,7 @@ const ProfilePage: React.FC = () => {
   const { user } = useAuth()
 
   // Customers link to their record via AppUser.customerId (falls back to user.id)
-  const customerId = user?.customerId ?? user?.id ?? null
+  const customerId = user?.companyId ?? user?.customerId ?? user?.id ?? null
 
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [form, setForm]         = useState<FormState | null>(null)

@@ -202,7 +202,7 @@ export default function PayInvoicePage() {
   const { invoiceId } = useParams<{ invoiceId: string }>()
   const navigate      = useNavigate()
   const { user }      = useAuth()
-  const customerId    = user?.customerId
+  const customerId    = user?.companyId ?? user?.customerId
 
   const [invoice, setInvoice]           = useState<Invoice | null>(null)
   const [invoiceLoading, setInvoiceLoading] = useState(true)

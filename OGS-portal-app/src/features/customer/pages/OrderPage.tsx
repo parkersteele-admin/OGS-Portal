@@ -1264,7 +1264,7 @@ const OrderPage: React.FC = () => {
   const { user } = useAuth()
   const location = useLocation()
   const [searchParams] = useSearchParams()
-  const customerId = user?.customerId ?? ''
+  const customerId = user?.companyId ?? user?.customerId ?? ''
   const { pricingUnlocked, isLoading: pricingLoading } = usePricingAccess()
   const company = useCompanySettings()
   const preselectedProductId = searchParams.get('productId') ?? ''

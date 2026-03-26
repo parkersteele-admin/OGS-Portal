@@ -110,7 +110,7 @@ function AddPaymentMethodForm({ setupIntentId, onSuccess, onCancel }: AddFormPro
 
 export default function AutopayPage() {
   const { user } = useAuth()
-  const customerId = user?.customerId
+  const customerId = user?.companyId ?? user?.customerId
 
   const { methods, loading, error } = usePaymentMethods(customerId)
 

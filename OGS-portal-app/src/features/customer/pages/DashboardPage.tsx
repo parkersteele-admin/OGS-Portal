@@ -151,7 +151,7 @@ const OrderRow: React.FC<OrderRowProps> = ({ order, productName }) => {
 const DashboardPage: React.FC = () => {
   const navigate   = useNavigate()
   const { user }   = useAuth()
-  const customerId = user?.customerId ?? null
+  const customerId = user?.companyId ?? user?.customerId ?? null
 
   // Onboarding state
   const { setupComplete, setupStep, companyId, loading: obLoading } = useOnboarding()
