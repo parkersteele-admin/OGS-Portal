@@ -1,0 +1,341 @@
+/* ── Public Quote Page ──────────────────────────────────────────────────────── */
+
+.pqp-shell {
+  min-height: 100vh;
+  background: #f4f6f8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pqp-header {
+  width: 100%;
+  background: #E87722;
+  padding: 28px 32px 20px;
+  text-align: center;
+}
+
+.pqp-header h1 {
+  margin: 0;
+  color: #fff;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.pqp-header__tagline {
+  margin: 6px 0 0;
+  color: #ffe0c0;
+  font-size: 13px;
+}
+
+/* ── Card ───────────────────────────────────────────────────────────────────── */
+
+.pqp-card {
+  width: 100%;
+  max-width: 660px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 28px 32px;
+  margin: 24px 16px;
+  box-sizing: border-box;
+}
+
+/* ── Loading / Error ────────────────────────────────────────────────────────── */
+
+.pqp-loading {
+  margin-top: 80px;
+  text-align: center;
+  color: #555;
+}
+
+.pqp-spinner {
+  display: inline-block;
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e0e0e0;
+  border-top-color: #E87722;
+  border-radius: 50%;
+  animation: pqp-spin 0.8s linear infinite;
+}
+
+@keyframes pqp-spin {
+  to { transform: rotate(360deg); }
+}
+
+.pqp-error-card {
+  margin-top: 60px;
+  background: #fff;
+  border: 1px solid #fca5a5;
+  border-radius: 8px;
+  padding: 32px;
+  max-width: 480px;
+  text-align: center;
+}
+
+.pqp-error-icon {
+  width: 48px;
+  height: 48px;
+  background: #fee2e2;
+  color: #dc2626;
+  border-radius: 50%;
+  font-size: 22px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+}
+
+.pqp-error-hint {
+  font-size: 13px;
+  color: #888;
+  margin-top: 12px;
+}
+
+/* ── Quote meta row ─────────────────────────────────────────────────────────── */
+
+.pqp-quote-meta {
+  display: flex;
+  gap: 40px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.pqp-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 2px;
+}
+
+.pqp-value {
+  font-size: 15px;
+  font-weight: 600;
+  color: #111;
+}
+
+/* ── Line items table ───────────────────────────────────────────────────────── */
+
+.pqp-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
+.pqp-table thead tr {
+  background: #f5f5f5;
+}
+
+.pqp-table th {
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.pqp-table td {
+  padding: 10px 10px;
+  border-bottom: 1px solid #f0f0f0;
+  color: #333;
+}
+
+.pqp-table__num {
+  text-align: right !important;
+}
+
+.pqp-table tfoot td {
+  border-top: 2px solid #e0e0e0;
+  border-bottom: none;
+  font-weight: 700;
+}
+
+.pqp-table__total-label {
+  text-align: right;
+  color: #444;
+  font-size: 14px;
+}
+
+.pqp-table__total-val {
+  text-align: right;
+  color: #E87722;
+  font-size: 16px;
+}
+
+/* ── Notes ──────────────────────────────────────────────────────────────────── */
+
+.pqp-notes {
+  padding: 14px;
+  background: #f9f9f9;
+  border-radius: 6px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  color: #444;
+}
+
+/* ── Actions ────────────────────────────────────────────────────────────────── */
+
+.pqp-actions {
+  margin-bottom: 20px;
+}
+
+.pqp-accept-error {
+  color: #dc2626;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+/* ── Buttons ────────────────────────────────────────────────────────────────── */
+
+.pqp-btn {
+  display: inline-block;
+  padding: 13px 32px;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+  text-decoration: none;
+  border: none;
+  transition: opacity 0.15s;
+}
+
+.pqp-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pqp-btn--primary {
+  background: #E87722;
+  color: #fff;
+}
+
+.pqp-btn--primary:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.pqp-btn--wide {
+  width: 100%;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+/* ── Discuss / contact block ────────────────────────────────────────────────── */
+
+.pqp-discuss {
+  padding: 16px 20px;
+  background: #fff8f3;
+  border-left: 3px solid #E87722;
+  border-radius: 4px;
+}
+
+.pqp-discuss__note {
+  margin: 0 0 10px;
+  font-size: 14px;
+  color: #555;
+}
+
+/* ── Rep info ───────────────────────────────────────────────────────────────── */
+
+.pqp-rep {
+  margin-top: 8px;
+}
+
+.pqp-rep__label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0 0 4px;
+}
+
+.pqp-rep__name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #111;
+  margin: 0 0 4px;
+}
+
+.pqp-rep__contact {
+  font-size: 13px;
+  color: #555;
+  margin: 0 0 2px;
+}
+
+.pqp-rep__contact a {
+  color: #E87722;
+  text-decoration: none;
+}
+
+.pqp-rep__contact a:hover {
+  text-decoration: underline;
+}
+
+.pqp-rep--success {
+  margin-top: 20px;
+  padding: 14px 16px;
+  background: #f0fdf4;
+  border-radius: 6px;
+}
+
+/* ── Success state ──────────────────────────────────────────────────────────── */
+
+.pqp-success {
+  text-align: center;
+  padding: 8px 0;
+}
+
+.pqp-success__icon {
+  width: 56px;
+  height: 56px;
+  background: #16a34a;
+  color: #fff;
+  border-radius: 50%;
+  font-size: 26px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+}
+
+.pqp-success h2 {
+  margin: 0 0 12px;
+  font-size: 22px;
+  color: #111;
+}
+
+.pqp-success p {
+  color: #555;
+  font-size: 15px;
+  margin: 0 0 20px;
+}
+
+/* ── Status note ────────────────────────────────────────────────────────────── */
+
+.pqp-status-note {
+  text-align: center;
+}
+
+.pqp-status-note h2 {
+  margin: 0 0 12px;
+}
+
+/* ── Footer ─────────────────────────────────────────────────────────────────── */
+
+.pqp-footer {
+  width: 100%;
+  max-width: 660px;
+  text-align: center;
+  font-size: 11px;
+  color: #aaa;
+  padding: 0 16px 24px;
+}

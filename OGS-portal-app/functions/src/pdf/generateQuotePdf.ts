@@ -407,8 +407,8 @@ function buildQuotePdf(
       .text(`Valid until:  ${fmtDate(quote.validUntil)}`, C_DESC + 12, rowY + 26)
       .text(
         contactDetail
-          ? `Ready to accept? Reply to this email or call ${contactDetail}.`
-          : 'Ready to accept? Reply to this email to let us know.',
+          ? `To accept, contact your account representative or reach us at ${contactDetail}.`
+          : 'To accept this quote, please contact your account representative.',
         C_DESC + 12, rowY + 40,
         { width: CONTENT_W - 24 },
       )

@@ -50,7 +50,7 @@ import {
   TruckPage,
 } from '../../features/driver'
 import { LoginPage, ResetPasswordPage } from '../../features/auth'
-import { AdminDashboard, CompanySettingsPage, DeliverySettingsPage, UserManagement } from '../../features/admin'
+import { AdminDashboard, CompanySettingsPage, DeliverySettingsPage, UserManagement, EmailTemplatesPage } from '../../features/admin'
 
 import BillingDashboard from '../../pages/billing/BillingDashboard'
 
@@ -67,6 +67,9 @@ import { OnboardingLayout } from '../../components/layouts/OnboardingLayout'
 // Ops customer views
 import CustomerListPage   from '../../pages/ops/CustomerList'
 import CustomerDetailPage from '../../pages/ops/CustomerDetail'
+
+// Public quote acceptance (no auth required)
+import PublicQuotePage from '../../pages/public/PublicQuotePage'
 
 
 
@@ -89,6 +92,9 @@ export const AppRouter: React.FC = () => (
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/signup" element={<SignUp />} />
       <Route path="/accept-invite" element={<AcceptInvitePage />} />
+
+      {/* Public quote acceptance — no auth required, token in query string */}
+      <Route path="/quote/:quoteId" element={<PublicQuotePage />} />
 
       {/* Onboarding wizard — minimal layout, no sidebar */}
       <Route
@@ -207,6 +213,7 @@ export const AppRouter: React.FC = () => (
         <Route path="users" element={<UserManagement />} />
         <Route path="delivery-settings" element={<DeliverySettingsPage />} />
         <Route path="company-settings"  element={<CompanySettingsPage />} />
+        <Route path="email-templates"   element={<EmailTemplatesPage />} />
 
         {/* CRM pages inside AdminLayout */}
         <Route path="crm" element={<Navigate to="dashboard" replace />} />

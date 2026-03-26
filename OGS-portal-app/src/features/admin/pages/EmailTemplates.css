@@ -1,0 +1,131 @@
+/* ── Email Templates Admin Page ─────────────────────────────────────────────── */
+
+.et-page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 32px 24px 60px;
+}
+
+.et-loading {
+  padding: 40px;
+  text-align: center;
+  color: #888;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────────── */
+
+.et-header {
+  margin-bottom: 28px;
+}
+
+.et-header__title {
+  margin: 0 0 6px;
+  font-size: 22px;
+  font-weight: 700;
+  color: #111;
+}
+
+.et-header__sub {
+  margin: 0;
+  font-size: 14px;
+  color: #666;
+}
+
+/* ── Error banner ───────────────────────────────────────────────────────────── */
+
+.et-error {
+  padding: 12px 16px;
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
+  border-radius: 6px;
+  color: #b91c1c;
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+/* ── Section ────────────────────────────────────────────────────────────────── */
+
+.et-section {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 24px 28px;
+  margin-bottom: 24px;
+}
+
+.et-section__header {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.et-section__title {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #111;
+}
+
+.et-section__desc {
+  margin: 0;
+  font-size: 13px;
+  color: #666;
+  line-height: 1.5;
+}
+
+/* ── Field ──────────────────────────────────────────────────────────────────── */
+
+.et-field {
+  margin-bottom: 20px;
+}
+
+.et-field:last-child {
+  margin-bottom: 0;
+}
+
+.et-field__label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.et-field__hint {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: #888;
+  line-height: 1.5;
+}
+
+.et-field__textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #333;
+  background: #fff;
+  resize: vertical;
+  line-height: 1.6;
+  font-family: inherit;
+  transition: border-color 0.15s;
+}
+
+.et-field__textarea:focus {
+  outline: none;
+  border-color: #E87722;
+  box-shadow: 0 0 0 3px rgba(232, 119, 34, 0.12);
+}
+
+.et-field__textarea::placeholder {
+  color: #bbb;
+}
+
+/* ── Actions ────────────────────────────────────────────────────────────────── */
+
+.et-actions {
+  display: flex;
+  justify-content: flex-end;
+}

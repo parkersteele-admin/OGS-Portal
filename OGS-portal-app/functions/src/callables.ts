@@ -11,6 +11,7 @@ import { GOOGLE_MAPS_KEY, SENDGRID_API_KEY, requireSecret } from './config'
 import { performGeocode } from './triggers/geocodeCustomer'
 import { generateInvoicePdf as generatePdf } from './pdf/generateInvoicePdf'
 import { generateQuotePdf as generateQuotePdfCore } from './pdf/generateQuotePdf'
+import { getCompanySettings } from './pdf/companySettings'
 import { sendEmail } from './email/sendEmail'
 
 // ── generateInvoicePdf ────────────────────────────────────────────────────────
@@ -115,6 +116,33 @@ export const generateQuotePdf = onCall(
       : ''
 
     if (isSent) {
+      // Fetch company settings, sales rep info, and email template wording
+      const company = await getCompanySettings()
+
+      let repInfo: { name: string; email: string; phone: string } | null = null
+      const repUid = (quote.createdBy as string | undefined)
+      if (repUid) {
+        const repSnap = await db.collection('users').doc(repUid).get()
+        if (repSnap.exists) {
+          const rd = repSnap.data()!
+          repInfo = {
+            name:  (rd.name  as string) || '',
+            email: (rd.email as string) || '',
+            phone: (rd.phone as string) || '',
+          }
+        }
+      }
+
+      // Fetch admin-customizable email template wording
+      const tplSnap    = await db.collection('settings').doc('emailTemplates').get()
+      const tpl        = tplSnap.exists ? (tplSnap.data() as Record<string, string>) : {}
+      const emailIntro  = tpl.quoteIntro      || `Thank you for your interest in ${company.name || 'Ohio Gas Supply'}. Please review your quote below.`
+      const discussNote = tpl.quoteDiscussNote || "We want to ensure you're completely happy with our service. Please reach out to us to discuss any adjustments."
+
+      // Generate a one-time public token so the recipient can accept without logging in
+      const publicToken = crypto.randomUUID()
+      await db.collection('quotes').doc(data.quoteId as string).update({ publicToken })
+
       // Resolve recipient email from customer or lead
       let recipientEmail = ''
       let recipientName  = 'Valued Customer'
@@ -139,7 +167,7 @@ export const generateQuotePdf = onCall(
         try {
           requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY')
           const total      = `$${((quote.total as number) ?? 0).toFixed(2)}`
-          const portalLink = `https://app.ohiogassupply.com/portal/quotes/${data.quoteId as string}`
+          const publicLink = `https://app.ohiogassupply.com/quote/${data.quoteId as string}?token=${publicToken}`
 
           // Build line items rows for the estimate table
           const lineItems = (quote.lineItems ?? []) as Array<{
@@ -168,21 +196,33 @@ export const generateQuotePdf = onCall(
             console.warn('generateQuotePdf: failed to fetch PDF for attachment —', fetchErr)
           }
 
+          // Sales rep contact block (shown below Accept button instead of a Decline button)
+          const repBlockHtml = repInfo
+            ? `<div style="margin:20px 0;padding:16px 20px;background:#fff8f3;border-left:3px solid #E87722;border-radius:4px">
+                <p style="margin:0 0 6px;font-size:14px;font-weight:bold;color:#333">${repInfo.name ? `Questions? Contact ${repInfo.name}.` : 'Questions? Reach out to us.'}</p>
+                <p style="margin:0 0 8px;font-size:13px;color:#555">${discussNote}</p>
+                ${repInfo.email ? `<p style="margin:0 0 4px;font-size:13px;color:#555">Email: <a href="mailto:${repInfo.email}" style="color:#E87722">${repInfo.email}</a></p>` : ''}
+                ${repInfo.phone ? `<p style="margin:0;font-size:13px;color:#555">Phone: ${repInfo.phone}</p>` : ''}
+              </div>`
+            : `<p style="margin:20px 0 8px;font-size:13px;color:#666">${discussNote}</p>`
+
+          // Company footer line — only use fields from settings (no hardcoded phone)
+          const footerParts = [company.name, company.website, company.phone].filter(Boolean)
+          const footerLine  = footerParts.join(' &nbsp;·&nbsp; ')
+
           await sendEmail({
             to:      recipientEmail,
-            subject: `Quote #${quoteNum} from Ohio Gas Supply`,
+            subject: `Quote #${quoteNum} from ${company.name || 'Ohio Gas Supply'}`,
             attachments: pdfAttachment ? [pdfAttachment] : undefined,
             html: `
 <div style="font-family:Arial,sans-serif;max-width:620px;margin:auto;color:#333">
   <div style="background:#E87722;padding:24px 32px 16px">
-    <h1 style="margin:0;color:#fff;font-size:22px">Ohio Gas Supply Co.</h1>
-    <p style="margin:6px 0 0;color:#ffe0c0;font-size:13px">Propane &amp; Natural Gas Delivery</p>
+    <h1 style="margin:0;color:#fff;font-size:22px">${company.name || 'Ohio Gas Supply'}</h1>
+    ${company.tagline ? `<p style="margin:6px 0 0;color:#ffe0c0;font-size:13px">${company.tagline}</p>` : ''}
   </div>
   <div style="padding:28px 32px 8px;border:1px solid #e8e8e8;border-top:none">
     <p style="margin:0 0 16px">Dear ${recipientName},</p>
-    <p style="margin:0 0 20px">
-      Thank you for your interest in Ohio Gas Supply. Please review your quote below.
-    </p>
+    <p style="margin:0 0 20px">${emailIntro}</p>
 
     <!-- Quote summary -->
     <table style="width:100%;border-collapse:collapse;margin:0 0 4px">
@@ -212,31 +252,22 @@ export const generateQuotePdf = onCall(
       </tfoot>
     </table>
 
-    <!-- CTA buttons -->
-    <table style="border-collapse:collapse;margin:0 0 24px">
-      <tr>
-        <td style="padding-right:12px">
-          <a href="${portalLink}" clicktracking="off"
-             style="display:inline-block;background:#E87722;color:#fff;padding:13px 30px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:15px">
-            ✓ Accept This Quote
-          </a>
-        </td>
-        <td>
-          <a href="${portalLink}" clicktracking="off"
-             style="display:inline-block;background:#fff;color:#dc2626;padding:13px 30px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:15px;border:2px solid #dc2626">
-            ✕ Decline
-          </a>
-        </td>
-      </tr>
-    </table>
+    <!-- Accept button only — no Decline button -->
+    <div style="margin:0 0 4px">
+      <a href="${publicLink}" clicktracking="off"
+         style="display:inline-block;background:#E87722;color:#fff;padding:13px 30px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:15px">
+        ✓ Accept This Quote
+      </a>
+    </div>
 
-    <p style="margin:0 0 8px;font-size:13px;color:#666">
-      Click <strong>Accept This Quote</strong> to confirm your pricing and unlock ordering through the portal.
-      The full quote PDF is attached to this email. You can also reply or call <strong>1-800-OGS-FUEL</strong>.
+    ${repBlockHtml}
+
+    <p style="margin:16px 0 8px;font-size:13px;color:#666">
+      The full quote PDF is attached to this email for your records.
     </p>
   </div>
   <div style="padding:14px 32px;background:#f9f9f9;border:1px solid #e8e8e8;border-top:none;text-align:center;font-size:11px;color:#aaa">
-    Ohio Gas Supply Co. &nbsp;·&nbsp; ohiogassupply.com &nbsp;·&nbsp; 1-800-OGS-FUEL
+    ${footerLine}
   </div>
 </div>`,
           })
@@ -613,3 +644,185 @@ export const backfillMissingLeads = onCall(async (request) => {
   return { created, skipped }
 })
 
+// ── getPublicQuote ─────────────────────────────────────────────────────────────
+
+/**
+ * Returns a sanitized quote for public email-link viewing.
+ * No authentication required — access is gated by the one-time publicToken
+ * that is generated when a quote is sent.
+ *
+ * Input:  { quoteId: string, token: string }
+ * Output: { quote, company, rep, discussNote }
+ */
+export const getPublicQuote = onCall(async (request) => {
+  const data    = request.data as Record<string, unknown>
+  const quoteId = data.quoteId as string | undefined
+  const token   = data.token   as string | undefined
+
+  if (!quoteId || !token) {
+    throw new HttpsError('invalid-argument', 'quoteId and token are required.')
+  }
+
+  const quoteSnap = await db.collection('quotes').doc(quoteId).get()
+  if (!quoteSnap.exists) {
+    throw new HttpsError('not-found', 'Quote not found.')
+  }
+
+  const quote = quoteSnap.data()!
+  if (!quote.publicToken || quote.publicToken !== token) {
+    throw new HttpsError('permission-denied', 'Invalid or expired link.')
+  }
+
+  const company = await getCompanySettings()
+
+  // Sales rep info
+  let rep: { name: string; email: string; phone: string } | null = null
+  const repUid = (quote.createdBy ?? quote.assignedTo) as string | undefined
+  if (repUid) {
+    const repSnap = await db.collection('users').doc(repUid).get()
+    if (repSnap.exists) {
+      const rd = repSnap.data()!
+      rep = {
+        name:  (rd.name  as string) || '',
+        email: (rd.email as string) || '',
+        phone: (rd.phone as string) || '',
+      }
+    }
+  }
+
+  const tplSnap    = await db.collection('settings').doc('emailTemplates').get()
+  const tpl        = tplSnap.exists ? (tplSnap.data() as Record<string, string>) : {}
+  const discussNote = tpl.quoteDiscussNote || "We want to ensure you're completely happy with our service. Please reach out to discuss any adjustments."
+
+  return {
+    quote: {
+      id:          quoteId,
+      quoteNumber: (quote.quoteNumber as string) ?? '',
+      status:      (quote.status      as string) ?? 'sent',
+      validUntil:  quote.validUntil ?? null,
+      lineItems:   (quote.lineItems   ?? []) as Array<{ description: string; quantity: number; unitPrice: number; amount: number }>,
+      subtotal:    (quote.subtotal    as number) ?? 0,
+      total:       (quote.total       as number) ?? 0,
+      notes:       (quote.notes       as string) || '',
+    },
+    company: {
+      name:    company.name    || '',
+      tagline: company.tagline || '',
+      phone:   company.phone   || '',
+      email:   company.email   || '',
+      website: company.website || '',
+      logoUrl: company.logoUrl || '',
+    },
+    rep,
+    discussNote,
+  }
+})
+
+// ── respondToQuotePublic ───────────────────────────────────────────────────────
+
+/**
+ * Allows a lead/prospect to accept a quote directly from an email link
+ * without needing a portal account. Access is gated by the publicToken.
+ *
+ * Input:  { quoteId: string, token: string, response: 'accepted' }
+ * Output: { success: true }
+ */
+export const respondToQuotePublic = onCall(
+  { secrets: [SENDGRID_API_KEY] },
+  async (request) => {
+    const data    = request.data as Record<string, unknown>
+    const quoteId = data.quoteId as string | undefined
+    const token   = data.token   as string | undefined
+    const resp    = data.response as string | undefined
+
+    if (!quoteId || !token) {
+      throw new HttpsError('invalid-argument', 'quoteId and token are required.')
+    }
+    if (resp !== 'accepted') {
+      throw new HttpsError('invalid-argument', 'response must be "accepted".')
+    }
+
+    const quoteSnap = await db.collection('quotes').doc(quoteId).get()
+    if (!quoteSnap.exists) {
+      throw new HttpsError('not-found', 'Quote not found.')
+    }
+
+    const quote = quoteSnap.data()!
+    if (!quote.publicToken || quote.publicToken !== token) {
+      throw new HttpsError('permission-denied', 'Invalid or expired link.')
+    }
+    if (quote.status !== 'sent') {
+      throw new HttpsError(
+        'failed-precondition',
+        `This quote has already been ${quote.status as string}.`,
+      )
+    }
+
+    const now = FieldValue.serverTimestamp()
+    await db.collection('quotes').doc(quoteId).update({
+      status:      'accepted',
+      acceptedAt:  now,
+      updatedAt:   now,
+      acceptedVia: 'public-link',
+    })
+
+    // Notify the sales rep
+    try {
+      const repUid = (quote.createdBy as string | undefined)
+      if (repUid) {
+        const repAuthUser = await adminAuth.getUser(repUid).catch(() => null)
+        const repEmail    = repAuthUser?.email
+        if (repEmail) {
+          requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY')
+          const company  = await getCompanySettings()
+          const quoteNum = (quote.quoteNumber as string) || quoteId
+          const total    = `$${((quote.total as number) ?? 0).toFixed(2)}`
+
+          let entityName = 'the customer'
+          if (quote.customerId) {
+            const cSnap = await db.collection('customers').doc(quote.customerId as string).get()
+            if (cSnap.exists) entityName = (cSnap.data()!.name as string) || entityName
+          } else if (quote.leadId) {
+            const lSnap = await db.collection('leads').doc(quote.leadId as string).get()
+            if (lSnap.exists) {
+              const l = lSnap.data()!
+              entityName = (l.company as string) || (l.name as string) || entityName
+            }
+          }
+
+          const quoteLink = `https://app.ohiogassupply.com/crm/quotes/${quoteId}`
+          await sendEmail({
+            to:      repEmail,
+            subject: `✓ Quote #${quoteNum} was ACCEPTED by ${entityName}`,
+            html: `
+<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#333">
+  <div style="background:#16a34a;padding:24px 32px 16px">
+    <h1 style="margin:0;color:#fff;font-size:20px">${company.name || 'Ohio Gas Supply'}</h1>
+    <p style="margin:6px 0 0;color:#bbf7d0;font-size:13px">Quote Accepted</p>
+  </div>
+  <div style="padding:28px 32px 24px;border:1px solid #e8e8e8;border-top:none">
+    <p style="margin:0 0 16px;font-size:15px">
+      <strong>${entityName}</strong> has <strong style="color:#16a34a">accepted</strong> Quote #${quoteNum} (${total}).
+    </p>
+    <p style="margin:0 0 20px;font-size:14px;color:#555">
+      This acceptance was submitted via the email link (no portal login required). You can now proceed with setting up their account and confirming the service agreement.
+    </p>
+    <a href="${quoteLink}" clicktracking="off"
+       style="display:inline-block;background:#E87722;color:#fff;padding:11px 26px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:14px">
+      Open Quote in CRM
+    </a>
+  </div>
+  <div style="padding:12px 32px;background:#f9f9f9;border:1px solid #e8e8e8;border-top:none;text-align:center;font-size:11px;color:#aaa">
+    ${company.name || 'Ohio Gas Supply'}${company.website ? ` &nbsp;·&nbsp; ${company.website}` : ''}
+  </div>
+</div>`,
+          })
+        }
+      }
+    } catch (notifyErr) {
+      console.warn('[respondToQuotePublic] failed to send notification —', notifyErr)
+    }
+
+    return { success: true }
+  },
+)
