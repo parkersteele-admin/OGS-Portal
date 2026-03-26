@@ -302,7 +302,7 @@ service cloud.firestore {
     // ── Quotes ────────────────────────────────────────────────────────────────
     match /quotes/{quoteId} {
       allow read: if isSales()
-        || (isCustomer() && resource.data.customerId == linkedCustomerId());
+        || (isPortalUser() && resource.data.customerId == linkedCustomerId());
       allow write: if isSales();
     }
 
