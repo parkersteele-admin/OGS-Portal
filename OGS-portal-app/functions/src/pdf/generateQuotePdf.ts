@@ -260,7 +260,10 @@ function buildQuotePdf(
     }
 
     // ── Line items table ───────────────────────────────────────────────────
-    const TABLE_TOP = 226
+    // TABLE_TOP must sit below both the bill-to block (leftY) and the meta
+    // block (rightY), plus a small gap. Use a minimum of 226 to keep a
+    // reasonable top margin when the header content is short.
+    const TABLE_TOP = Math.max(226, Math.max(leftY, rightY) + 18)
     const C_DESC    = MARGIN_L
     const C_QTY     = 358
     const C_RATE    = 425
@@ -404,11 +407,11 @@ function buildQuotePdf(
       .fontSize(9)
       .font('Helvetica')
       .fillColor('#333333')
-      .text(`Valid until:  ${fmtDate(quote.validUntil)}`, C_DESC + 12, rowY + 26)
+      .text(`This quote is valid until:  ${fmtDate(quote.validUntil)}`, C_DESC + 12, rowY + 26)
       .text(
         contactDetail
-          ? `To accept, contact your account representative or reach us at ${contactDetail}.`
-          : 'To accept this quote, please contact your account representative.',
+          ? `To accept this quote, please contact your account representative. You can also reach us at ${contactDetail}.`
+          : 'To accept this quote, please contact your account representative directly.',
         C_DESC + 12, rowY + 40,
         { width: CONTENT_W - 24 },
       )
