@@ -64,10 +64,16 @@ import './CustomerRecord.css'
 // ── Extended types for CRM-specific Firestore fields ─────────────────────────
 
 interface CustomerRecord extends Customer {
-  isPriority?: boolean
-  holdReason?: string
-  deliveryNotes?: string
-  accessInstructions?: string
+  isPriority?:          boolean
+  holdReason?:          string
+  deliveryNotes?:       string
+  accessInstructions?:  string
+  // Company / onboarding fields stored in the same customers/{id} document
+  companyName?:         string
+  billingContactName?:  string
+  billingEmail?:        string
+  billingAddress?:      { street?: string; city?: string; state?: string; zip?: string } | null
+  deliveryAddress?:     { street?: string; city?: string; state?: string; zip?: string } | null
 }
 
 interface ContactLogWithFollowUp extends ContactLog {
@@ -1237,9 +1243,20 @@ const CustomerRecord: React.FC = () => {
   }
 
   const cr = customer as CustomerRecord
+
+  // ── Helpers to resolve contact/address from either flat or Company fields ──
+  function resolveEmail(r: CustomerRecord)  { return r.email   || r.billingEmail || '' }
+  function resolvePhone(r: CustomerRecord)  { return r.phone   || '' }
+  function resolveAddress(r: CustomerRecord): string {
+    if (r.address) return formatAddress(r)
+    const addr = r.deliveryAddress ?? r.billingAddress
+    if (!addr) return ''
+    return formatAddress({ address: addr.street || '', city: addr.city || '', state: addr.state || '', zip: addr.zip || '' })
+  }
+
   const mapsUrl = cr.lat && cr.lng
     ? getGoogleMapsUrl(cr.lat, cr.lng, cr.name)
-    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formatAddress(cr))}`
+    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(resolveAddress(cr))}`
   const statusCfg = STATUS_BADGE[cr.status]
 
   // ── Render ────────────────────────────────────────────────────────────────────
@@ -1312,11 +1329,11 @@ const CustomerRecord: React.FC = () => {
           <div className="cr-contact-grid">
             <div className="cr-contact-item">
               <span className="cr-contact-item__icon">✉️</span>
-              <a href={`mailto:${cr.email}`} className="cr-contact-item__value">{cr.email}</a>
+              <a href={`mailto:${resolveEmail(cr)}`} className="cr-contact-item__value">{resolveEmail(cr) || <span style={{color:'#bbb'}}>No email on file</span>}</a>
             </div>
             <div className="cr-contact-item">
               <span className="cr-contact-item__icon">📞</span>
-              <a href={`tel:${cr.phone}`} className="cr-contact-item__value">{cr.phone}</a>
+              <a href={`tel:${resolvePhone(cr)}`} className="cr-contact-item__value">{resolvePhone(cr) || <span style={{color:'#bbb'}}>No phone on file</span>}</a>
             </div>
             <div className="cr-contact-item">
               <span className="cr-contact-item__icon">📍</span>
@@ -1326,7 +1343,7 @@ const CustomerRecord: React.FC = () => {
                 rel="noopener noreferrer"
                 className="cr-contact-item__value"
               >
-                {formatAddress(cr)}
+                {resolveAddress(cr) || <span style={{color:'#bbb'}}>No address on file</span>}
               </a>
             </div>
           </div>

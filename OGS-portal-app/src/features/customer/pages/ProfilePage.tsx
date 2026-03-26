@@ -17,16 +17,31 @@ import './ProfilePage.css'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function initForm(c: Customer) {
+// The customers/{id} document holds BOTH the flat Customer fields and the
+// richer Company/onboarding fields (billingAddress, deliveryAddress, etc.).
+// Cast to this extended type so both shapes are accessible.
+type CustomerDoc = Customer & {
+  companyName?:         string
+  billingContactName?:  string
+  billingEmail?:        string
+  phone?:               string
+  billingAddress?:      { street?: string; city?: string; state?: string; zip?: string } | null
+  deliveryAddress?:     { street?: string; city?: string; state?: string; zip?: string } | null
+}
+
+function initForm(raw: Customer) {
+  const c = raw as CustomerDoc
+  // For the delivery address, prefer deliveryAddress (if set), else billingAddress
+  const addr = c.deliveryAddress ?? c.billingAddress
   return {
-    name:    c.name    ?? '',
-    email:   c.email   ?? '',
-    phone:   c.phone   ?? '',
-    address: c.address ?? '',
-    city:    c.city    ?? '',
-    state:   c.state   ?? '',
-    zip:     c.zip     ?? '',
-    notes:   c.notes   ?? '',
+    name:    c.name    || c.billingContactName || c.companyName || '',
+    email:   c.email   || c.billingEmail       || '',
+    phone:   c.phone   || '',
+    address: c.address || addr?.street         || '',
+    city:    c.city    || addr?.city           || '',
+    state:   c.state   || addr?.state          || '',
+    zip:     c.zip     || addr?.zip            || '',
+    notes:   (c as Customer & { notes?: string }).notes ?? '',
   }
 }
 

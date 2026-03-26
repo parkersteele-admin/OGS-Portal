@@ -502,7 +502,7 @@ export const respondToQuote = onCall(async (request) => {
     })
 
     // Apply quoted prices to customer's productPricing subcollection
-    const lineItems = (quote.lineItems ?? []) as Array<{ productId: string; unitPrice: number }>
+    const lineItems = (quote.lineItems ?? []) as Array<{ productId: string; description: string; quantity: number; unitPrice: number; amount: number }>
     const eligible  = lineItems.filter(
       (i) => i.productId && i.productId !== 'delivery' && i.productId !== 'rental' && i.unitPrice > 0,
     )
@@ -524,6 +524,36 @@ export const respondToQuote = onCall(async (request) => {
         })
       }
       await batch.commit()
+    }
+
+    // Create a draft invoice from the accepted quote
+    try {
+      const quoteLineItems = (quote.lineItems ?? []) as Array<{
+        description: string; quantity: number; unitPrice: number; amount: number
+      }>
+      const subtotal = quoteLineItems.reduce((sum, i) => sum + (i.amount ?? 0), 0)
+      const invoiceNumber = `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`
+      const dueAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      await db.collection('invoices').add({
+        invoiceNumber,
+        customerId:  quote.customerId,
+        quoteId:     data.quoteId,
+        quoteNumber: (quote.quoteNumber as string) || '',
+        status:      'draft',
+        lineItems:   quoteLineItems,
+        subtotal,
+        tax:         0,
+        total:       subtotal,
+        issuedAt:    now,
+        dueAt,
+        createdAt:   now,
+        updatedAt:   now,
+        notes:       (quote.notes as string) || '',
+      })
+      console.log(`[respondToQuote] draft invoice created for quote ${data.quoteId as string}`)
+    } catch (invoiceErr) {
+      // Non-fatal — the acceptance is already saved
+      console.warn('[respondToQuote] failed to create invoice —', invoiceErr)
     }
   } else {
     await db.collection('quotes').doc(data.quoteId).update({
@@ -765,6 +795,68 @@ export const respondToQuotePublic = onCall(
       updatedAt:   now,
       acceptedVia: 'public-link',
     })
+
+    // Apply quoted prices to customer's productPricing subcollection
+    // (same logic as respondToQuote — needed so portal shows correct pricing)
+    if (quote.customerId) {
+      try {
+        const lineItems = (quote.lineItems ?? []) as Array<{ productId: string; description: string; quantity: number; unitPrice: number; amount: number }>
+        const eligible  = lineItems.filter(
+          (i) => i.productId && i.productId !== 'delivery' && i.productId !== 'rental' && i.unitPrice > 0,
+        )
+        if (eligible.length > 0) {
+          const pricingBatch = db.batch()
+          for (const item of eligible) {
+            const ref = db
+              .collection('customers')
+              .doc(quote.customerId as string)
+              .collection('productPricing')
+              .doc(item.productId)
+            pricingBatch.set(ref, {
+              productId: item.productId,
+              price:     item.unitPrice,
+              source:    'quote',
+              quoteId,
+              setAt:     now,
+            })
+          }
+          await pricingBatch.commit()
+        }
+      } catch (pricingErr) {
+        console.warn('[respondToQuotePublic] failed to write productPricing —', pricingErr)
+      }
+    }
+
+    // Create a draft invoice from the accepted quote
+    try {
+      const quoteLineItems = (quote.lineItems ?? []) as Array<{
+        description: string; quantity: number; unitPrice: number; amount: number
+      }>
+      const subtotal = quoteLineItems.reduce((sum, i) => sum + (i.amount ?? 0), 0)
+      const invoiceNumber = `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`
+      const dueAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      await db.collection('invoices').add({
+        invoiceNumber,
+        customerId:  quote.customerId  || null,
+        leadId:      quote.leadId      || null,
+        quoteId,
+        quoteNumber: (quote.quoteNumber as string) || '',
+        acceptedVia: 'public-link',
+        status:      'draft',
+        lineItems:   quoteLineItems,
+        subtotal,
+        tax:         0,
+        total:       subtotal,
+        issuedAt:    now,
+        dueAt,
+        createdAt:   now,
+        updatedAt:   now,
+        notes:       (quote.notes as string) || '',
+      })
+      console.log(`[respondToQuotePublic] draft invoice created for quote ${quoteId}`)
+    } catch (invoiceErr) {
+      console.warn('[respondToQuotePublic] failed to create invoice —', invoiceErr)
+    }
 
     // Notify the sales rep
     try {
