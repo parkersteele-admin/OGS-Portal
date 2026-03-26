@@ -138,8 +138,9 @@ export const generateQuotePdf = onCall(
       if (recipientEmail) {
         try {
           requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY')
-          const total = `$${((quote.total as number) ?? 0).toFixed(2)}`
-          const validLine = validUntil ? `<p style="margin:0 0 8px">This quote is valid until <strong>${validUntil}</strong>.</p>` : ''
+          const total      = `$${((quote.total as number) ?? 0).toFixed(2)}`
+          const validLine  = validUntil ? `<p style="margin:0 0 8px">This quote is valid until <strong>${validUntil}</strong>.</p>` : ''
+          const portalLink = `https://app.ogsportal.com/portal/quotes/${data.quoteId}`
 
           await sendEmail({
             to:      recipientEmail,
@@ -153,7 +154,7 @@ export const generateQuotePdf = onCall(
   <div style="padding:28px 32px 24px;border:1px solid #e8e8e8;border-top:none">
     <p style="margin:0 0 16px">Dear ${recipientName},</p>
     <p style="margin:0 0 16px">
-      Thank you for your interest in Ohio Gas Supply. Please find your quote attached below.
+      Thank you for your interest in Ohio Gas Supply. Please find your quote details below.
     </p>
     <table style="width:100%;border-collapse:collapse;margin:0 0 20px">
       <tr style="background:#f5f5f5">
@@ -167,9 +168,19 @@ export const generateQuotePdf = onCall(
       ${validUntil ? `<tr style="background:#f5f5f5"><td style="padding:8px 12px;font-weight:bold">Valid Until</td><td style="padding:8px 12px">${validUntil}</td></tr>` : ''}
     </table>
     ${validLine}
-    <a href="${url}" clicktracking="off" style="display:inline-block;background:#E87722;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:15px">View &amp; Download Quote PDF</a>
-    <p style="margin:24px 0 8px;font-size:13px;color:#666">
-      To accept this quote, reply to this email or call us at <strong>1-800-OGS-FUEL</strong>.
+    <table style="border-collapse:collapse;margin:0 0 20px">
+      <tr>
+        <td style="padding-right:12px">
+          <a href="${portalLink}" clicktracking="off" style="display:inline-block;background:#E87722;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:15px">Accept This Quote</a>
+        </td>
+        <td>
+          <a href="${url}" clicktracking="off" style="display:inline-block;background:#fff;color:#E87722;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:15px;border:2px solid #E87722">View PDF</a>
+        </td>
+      </tr>
+    </table>
+    <p style="margin:0 0 8px;font-size:13px;color:#666">
+      Click <strong>Accept This Quote</strong> to confirm your pricing and unlock ordering through your portal.
+      You can also reply to this email or call us at <strong>1-800-OGS-FUEL</strong>.
     </p>
   </div>
   <div style="padding:14px 32px;background:#f9f9f9;border:1px solid #e8e8e8;border-top:none;text-align:center;font-size:11px;color:#aaa">
@@ -347,6 +358,104 @@ export const backfillGeocodeCustomers = onCall(
  * Access: admin only
  * Output: { created: number, skipped: number }
  */
+// ── respondToQuote ────────────────────────────────────────────────────────────
+
+/**
+ * Allows a portal customer to accept or decline a quote that has been sent
+ * to them by OGS sales.
+ *
+ * When accepted the customer's per-product pricing subcollection is updated
+ * with the quoted prices (same logic as the staff-side acceptQuote service).
+ *
+ * Access: any portal customer role (customer, owner, manager, billing, delivery, viewer).
+ *
+ * Input:  { quoteId: string, response: 'accepted' | 'declined' }
+ * Output: { success: true }
+ */
+export const respondToQuote = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'You must be signed in.')
+  }
+
+  const callerRole = request.auth.token.role as string
+  const portalRoles = ['customer', 'owner', 'manager', 'billing', 'delivery', 'viewer']
+  if (!portalRoles.includes(callerRole)) {
+    throw new HttpsError('permission-denied', 'Only portal customers can respond to quotes.')
+  }
+
+  const data = request.data as Record<string, unknown>
+  if (typeof data.quoteId !== 'string' || !data.quoteId) {
+    throw new HttpsError('invalid-argument', 'quoteId must be a non-empty string.')
+  }
+  if (data.response !== 'accepted' && data.response !== 'declined') {
+    throw new HttpsError('invalid-argument', 'response must be "accepted" or "declined".')
+  }
+
+  const quoteSnap = await db.collection('quotes').doc(data.quoteId).get()
+  if (!quoteSnap.exists) {
+    throw new HttpsError('not-found', 'Quote not found.')
+  }
+
+  const quote           = quoteSnap.data()!
+  const callerCompanyId = request.auth.token.companyId as string | undefined
+  if (!callerCompanyId || quote.customerId !== callerCompanyId) {
+    throw new HttpsError('permission-denied', 'You are not authorised to respond to this quote.')
+  }
+
+  if (quote.status !== 'sent') {
+    throw new HttpsError(
+      'failed-precondition',
+      `This quote has already been ${quote.status as string}.`,
+    )
+  }
+
+  const now = FieldValue.serverTimestamp()
+
+  if (data.response === 'accepted') {
+    await db.collection('quotes').doc(data.quoteId).update({
+      status:     'accepted',
+      acceptedAt: now,
+      updatedAt:  now,
+    })
+
+    // Apply quoted prices to customer's productPricing subcollection
+    const lineItems = (quote.lineItems ?? []) as Array<{ productId: string; unitPrice: number }>
+    const eligible  = lineItems.filter(
+      (i) => i.productId && i.productId !== 'delivery' && i.productId !== 'rental' && i.unitPrice > 0,
+    )
+    if (eligible.length > 0) {
+      const batch = db.batch()
+      for (const item of eligible) {
+        const ref = db
+          .collection('customers')
+          .doc(quote.customerId as string)
+          .collection('productPricing')
+          .doc(item.productId)
+        batch.set(ref, {
+          productId: item.productId,
+          price:     item.unitPrice,
+          source:    'quote',
+          quoteId:   data.quoteId,
+          setBy:     request.auth.uid,
+          setAt:     now,
+        })
+      }
+      await batch.commit()
+    }
+  } else {
+    await db.collection('quotes').doc(data.quoteId).update({
+      status:    'declined',
+      updatedAt: now,
+    })
+  }
+
+  console.log(`[respondToQuote] quote=${data.quoteId} response=${data.response as string} by=${request.auth.uid}`)
+  return { success: true }
+})
+
+
+// ── backfillMissingLeads ───────────────────────────────────────────────────────
+
 export const backfillMissingLeads = onCall(async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
   if (request.auth.token.role !== 'admin') throw new HttpsError('permission-denied', 'Admin only.')

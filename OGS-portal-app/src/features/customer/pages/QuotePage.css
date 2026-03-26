@@ -1,0 +1,227 @@
+/* src/features/customer/pages/QuotePage.css */
+
+.qp {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: var(--space-6, 24px) var(--space-4, 16px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5, 20px);
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────────── */
+
+.qp__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2, 8px);
+}
+
+.qp__header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3, 12px);
+  flex-wrap: wrap;
+}
+
+.qp__title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-gray-900, #111827);
+  margin: 0;
+}
+
+.qp__expires {
+  font-size: 0.875rem;
+  color: var(--color-gray-500, #6b7280);
+  margin: 0;
+}
+
+/* ── Cards ───────────────────────────────────────────────────────────────────── */
+
+.qp__card {
+  background: #fff;
+  border: 1px solid var(--color-gray-200, #e5e7eb);
+  border-radius: 10px;
+  padding: var(--space-5, 20px) var(--space-6, 24px);
+}
+
+.qp__section-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-gray-800, #1f2937);
+  margin: 0 0 var(--space-4, 16px);
+}
+
+/* ── Line items table ────────────────────────────────────────────────────────── */
+
+.qp__table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.qp__th {
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-gray-500, #6b7280);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--color-gray-200, #e5e7eb);
+}
+
+.qp__th--num { text-align: right; }
+
+.qp__tr:nth-child(even) td {
+  background: var(--color-gray-50, #f9fafb);
+}
+
+.qp__td {
+  padding: 10px;
+  font-size: 0.9rem;
+  color: var(--color-gray-700, #374151);
+  border-bottom: 1px solid var(--color-gray-100, #f3f4f6);
+}
+
+.qp__td--num { text-align: right; }
+
+.qp__tr-total td {
+  padding: 8px 10px;
+  font-size: 0.875rem;
+  color: var(--color-gray-600, #4b5563);
+  border-bottom: none;
+}
+
+.qp__td--total-label { text-align: right; font-weight: 500; }
+
+.qp__tr-grand td {
+  padding: 10px 10px 2px;
+  border-top: 2px solid var(--color-gray-200, #e5e7eb);
+  border-bottom: none;
+}
+
+.qp__td--grand-label {
+  text-align: right;
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--color-gray-900, #111827);
+}
+
+.qp__td--grand-num {
+  text-align: right;
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--color-brand, #E87722);
+}
+
+/* ── Notes ───────────────────────────────────────────────────────────────────── */
+
+.qp__notes-text {
+  font-size: 0.9rem;
+  color: var(--color-gray-600, #4b5563);
+  white-space: pre-wrap;
+  margin: 0;
+}
+
+/* ── Action area ─────────────────────────────────────────────────────────────── */
+
+.qp__card--actions {
+  border-color: var(--color-brand, #E87722);
+}
+
+.qp__action-desc {
+  font-size: 0.875rem;
+  color: var(--color-gray-600, #4b5563);
+  margin: 0 0 var(--space-4, 16px);
+}
+
+.qp__error {
+  font-size: 0.875rem;
+  color: var(--color-danger, #dc2626);
+  margin: 0 0 var(--space-3, 12px);
+}
+
+.qp__action-row {
+  display: flex;
+  gap: var(--space-3, 12px);
+  flex-wrap: wrap;
+}
+
+/* ── Status cards ─────────────────────────────────────────────────────────────── */
+
+.qp__card--accepted {
+  border-color: var(--color-success, #16a34a);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4, 16px);
+  flex-wrap: wrap;
+}
+
+.qp__accepted-msg {
+  font-size: 0.9rem;
+  color: var(--color-success, #16a34a);
+  font-weight: 500;
+  margin: 0;
+  flex: 1;
+}
+
+.qp__card--declined {
+  border-color: var(--color-gray-300, #d1d5db);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4, 16px);
+  flex-wrap: wrap;
+}
+
+.qp__declined-msg {
+  font-size: 0.9rem;
+  color: var(--color-gray-600, #4b5563);
+  margin: 0;
+  flex: 1;
+}
+
+.qp__card--expired {
+  border-color: var(--color-gray-300, #d1d5db);
+}
+
+.qp__expired-msg {
+  font-size: 0.9rem;
+  color: var(--color-gray-500, #6b7280);
+  margin: 0;
+}
+
+/* ── States ──────────────────────────────────────────────────────────────────── */
+
+.qp-loading {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-16, 64px);
+}
+
+.qp-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4, 16px);
+  padding: var(--space-16, 64px) var(--space-4, 16px);
+  text-align: center;
+}
+
+.qp-empty__msg {
+  font-size: 0.9rem;
+  color: var(--color-gray-500, #6b7280);
+  margin: 0;
+}
+
+/* ── Mobile ───────────────────────────────────────────────────────────────────── */
+
+@media (max-width: 600px) {
+  .qp__table { font-size: 0.82rem; }
+  .qp__th, .qp__td { padding: 7px 6px; }
+  .qp__card { padding: var(--space-4, 16px); }
+  .qp__card--accepted,
+  .qp__card--declined { flex-direction: column; align-items: flex-start; }
+}
