@@ -251,7 +251,8 @@ service cloud.firestore {
     match /invoices/{invoiceId} {
       allow read: if isDispatch()
         || isSales()
-        || (isCustomer() && resource.data.customerId == linkedCustomerId());
+        || (isCustomer() && resource.data.customerId == linkedCustomerId())
+        || (isPortalUser() && resource.data.customerId == linkedCompanyId());
       allow write: if isAdmin() || isDispatch();
     }
 
@@ -261,7 +262,8 @@ service cloud.firestore {
     // Client-side writes are never permitted.
     match /payments/{paymentId} {
       allow read: if isDispatch()
-        || (isCustomer() && resource.data.customerId == linkedCustomerId());
+        || (isCustomer() && resource.data.customerId == linkedCustomerId())
+        || (isPortalUser() && resource.data.customerId == linkedCompanyId());
       allow write: if false;
     }
 
