@@ -105,6 +105,19 @@
   color: #9a3412;
 }
 
+.qep-notice {
+  margin: 0.75rem 1.25rem 0;
+  padding: 0.7rem 0.95rem;
+  border-radius: 8px;
+  font-size: 0.86rem;
+}
+
+.qep-notice--declined {
+  background: #fff1f2;
+  border: 1px solid #fda4af;
+  color: #9f1239;
+}
+
 .qep-toast {
   margin: 0.75rem 1.25rem 0;
   padding: 0.7rem 0.95rem;

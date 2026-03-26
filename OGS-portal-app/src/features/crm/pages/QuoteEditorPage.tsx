@@ -644,7 +644,9 @@ const QuoteEditorPage: React.FC = () => {
         leadId:     rec?.type === 'lead'     ? rec.id : undefined,
       }
       if (savedId) {
-        await updateQuote(savedId, { ...payload, status } as unknown as Partial<Omit<Quote, 'id' | 'createdAt'>>)
+        // When re-editing a declined quote, reset it to draft so it can be re-sent
+        const nextStatus: QuoteStatus = status === 'declined' ? 'draft' : status
+        await updateQuote(savedId, { ...payload, status: nextStatus } as unknown as Partial<Omit<Quote, 'id' | 'createdAt'>>)
         return savedId
       }
       return createQuote(payload)
@@ -652,6 +654,7 @@ const QuoteEditorPage: React.FC = () => {
     onSuccess: (id) => {
       setSavedId(id)
       setError(null)
+      if (status === 'declined') setStatus('draft')
       queryClient.invalidateQueries({ queryKey: ['quotes'] })
       if (isNew) navigate(`${crmBase}/quotes/${id}`, { replace: true })
     },
@@ -707,7 +710,8 @@ const QuoteEditorPage: React.FC = () => {
   })
 
   const isBusy = saveMutation.isPending || previewMutation.isPending || sendMutation.isPending || convertMutation.isPending
-  const isReadOnly = status === 'accepted' || status === 'declined'
+  const isReadOnly = status === 'accepted'
+  const isDeclinedRevision = status === 'declined'
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -742,9 +746,9 @@ const QuoteEditorPage: React.FC = () => {
                 onClick={() => previewMutation.mutate()}>
                 <span className="qep-action-label"><span className="qep-icon" aria-hidden="true"><FlatIcon name="preview" /></span>Preview PDF</span>
               </Button>
-              <Button variant="primary" size="sm" loading={sendMutation.isPending} disabled={isBusy || status === 'sent'}
+              <Button variant="primary" size="sm" loading={sendMutation.isPending} disabled={isBusy || (status === 'sent')}
                 onClick={() => sendMutation.mutate()}>
-                <span className="qep-action-label"><span className="qep-icon" aria-hidden="true"><FlatIcon name="send" /></span>Send</span>
+                <span className="qep-action-label"><span className="qep-icon" aria-hidden="true"><FlatIcon name="send" /></span>{isDeclinedRevision ? 'Save & Re-send' : 'Send'}</span>
               </Button>
             </>
           )}
@@ -760,6 +764,12 @@ const QuoteEditorPage: React.FC = () => {
       {error && <div className="qep-error" role="alert">{error}</div>}
 
       {sendToast && <div className="qep-toast" role="status">{sendToast}</div>}
+
+      {isDeclinedRevision && (
+        <div className="qep-notice qep-notice--declined" role="status">
+          This quote was declined by the customer. Edit freely and click <strong>Save &amp; Re-send</strong> to send a revised version.
+        </div>
+      )}
 
       {marginViolations.length > 0 && (
         <div className="qep-error qep-error--warn" role="alert">

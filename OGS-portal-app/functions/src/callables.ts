@@ -6,7 +6,7 @@
  */
 
 import { onCall, HttpsError } from 'firebase-functions/v2/https'
-import { db, FieldValue } from './admin'
+import { db, FieldValue, adminAuth } from './admin'
 import { GOOGLE_MAPS_KEY, SENDGRID_API_KEY, requireSecret } from './config'
 import { performGeocode } from './triggers/geocodeCustomer'
 import { generateInvoicePdf as generatePdf } from './pdf/generateInvoicePdf'
@@ -447,6 +447,66 @@ export const respondToQuote = onCall(async (request) => {
       status:    'declined',
       updatedAt: now,
     })
+
+    // Notify the sales rep who created the quote
+    try {
+      const createdBy = quote.createdBy as string | undefined
+      if (createdBy) {
+        const repAuthUser = await adminAuth.getUser(createdBy).catch(() => null)
+        const repEmail    = repAuthUser?.email
+        if (repEmail) {
+          requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY')
+          const quoteNum  = (quote.quoteNumber as string) || (data.quoteId as string)
+          const total     = `$${((quote.total as number) ?? 0).toFixed(2)}`
+
+          // Resolve the customer / lead name for context
+          let entityName = 'the customer'
+          if (quote.customerId) {
+            const cSnap = await db.collection('customers').doc(quote.customerId as string).get()
+            if (cSnap.exists) entityName = (cSnap.data()!.name as string) || entityName
+          } else if (quote.leadId) {
+            const lSnap = await db.collection('leads').doc(quote.leadId as string).get()
+            if (lSnap.exists) {
+              const l = lSnap.data()!
+              entityName = (l.company as string) || (l.name as string) || entityName
+            }
+          }
+
+          const quoteLink = `https://app.ogsportal.com/crm/quotes/${data.quoteId}`
+
+          await sendEmail({
+            to:      repEmail,
+            subject: `Quote #${quoteNum} was declined by ${entityName}`,
+            html: `
+<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#333">
+  <div style="background:#E87722;padding:24px 32px 16px">
+    <h1 style="margin:0;color:#fff;font-size:20px">Ohio Gas Supply Co.</h1>
+    <p style="margin:6px 0 0;color:#ffe0c0;font-size:13px">CRM Notification</p>
+  </div>
+  <div style="padding:28px 32px 24px;border:1px solid #e8e8e8;border-top:none">
+    <p style="margin:0 0 16px;font-size:15px">
+      <strong>${entityName}</strong> has <strong style="color:#dc2626">declined</strong> Quote #${quoteNum} (${total}).
+    </p>
+    <p style="margin:0 0 20px;font-size:14px;color:#555">
+      You can revise the quote and re-send it — the quote editor allows edits directly on a declined quote.
+    </p>
+    <a href="${quoteLink}" clicktracking="off"
+       style="display:inline-block;background:#E87722;color:#fff;padding:11px 26px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:14px">
+      Open Quote in CRM
+    </a>
+  </div>
+  <div style="padding:12px 32px;background:#f9f9f9;border:1px solid #e8e8e8;border-top:none;text-align:center;font-size:11px;color:#aaa">
+    Ohio Gas Supply Co. &nbsp;·&nbsp; ohiogassupply.com
+  </div>
+</div>`,
+          })
+          console.log(`[respondToQuote] decline notification sent to ${repEmail} for quote ${data.quoteId as string}`)
+        }
+      }
+    } catch (notifyErr) {
+      // Non-fatal — the decline is already saved
+      console.warn('[respondToQuote] failed to send decline notification —', notifyErr)
+    }
   }
 
   console.log(`[respondToQuote] quote=${data.quoteId} response=${data.response as string} by=${request.auth.uid}`)
