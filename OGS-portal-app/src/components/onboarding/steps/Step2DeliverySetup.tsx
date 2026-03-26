@@ -27,6 +27,7 @@ interface Props {
   locations: DeliveryLocation[]
   onNext: () => void
   onBack: () => void
+  onSkip?: () => void
 }
 
 const DAYS: { value: PreferredDay; label: string }[] = [
@@ -72,6 +73,7 @@ export const Step2DeliverySetup: React.FC<Props> = ({
   locations: initialLocations,
   onNext,
   onBack,
+  onSkip,
 }) => {
   const companyId = company.companyId
 
@@ -454,6 +456,13 @@ export const Step2DeliverySetup: React.FC<Props> = ({
           Next: Gas Usage
         </Button>
       </div>
+      {onSkip && (
+        <div className="ob-step__skip">
+          <button type="button" className="ob-step__skip-btn" onClick={onSkip}>
+            Skip this step for now
+          </button>
+        </div>
+      )}
     </div>
   )
 }

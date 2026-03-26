@@ -132,6 +132,7 @@ const OnboardingPage: React.FC = () => {
               }
             }}
             onBack={() => goToStep(1)}
+            onSkip={() => handleStepComplete(2)}
           />
         )}
 
@@ -140,6 +141,7 @@ const OnboardingPage: React.FC = () => {
             company={company}
             onNext={() => handleStepComplete(3)}
             onBack={() => goToStep(2)}
+            onSkip={() => handleStepComplete(3)}
           />
         )}
 
@@ -149,6 +151,7 @@ const OnboardingPage: React.FC = () => {
             uid={user.id}
             onNext={() => handleStepComplete(4)}
             onBack={() => goToStep(3)}
+            onSkip={() => handleStepComplete(4)}
           />
         )}
 

@@ -27,6 +27,7 @@ interface Props {
   uid: string
   onNext: () => void
   onBack: () => void
+  onSkip?: () => void
 }
 
 type PMCard = {
@@ -47,6 +48,7 @@ export const Step4PaymentNotifications: React.FC<Props> = ({
   uid,
   onNext,
   onBack,
+  onSkip,
 }) => {
   const companyId = company.companyId
 
@@ -328,6 +330,13 @@ export const Step4PaymentNotifications: React.FC<Props> = ({
           Next: Review
         </Button>
       </div>
+      {onSkip && (
+        <div className="ob-step__skip">
+          <button type="button" className="ob-step__skip-btn" onClick={onSkip}>
+            Skip this step for now
+          </button>
+        </div>
+      )}
     </div>
   )
 }

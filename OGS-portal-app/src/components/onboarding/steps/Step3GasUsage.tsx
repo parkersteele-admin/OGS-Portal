@@ -19,6 +19,7 @@ interface Props {
   company: Company
   onNext: () => void
   onBack: () => void
+  onSkip?: () => void
 }
 
 interface CategoryCard {
@@ -52,7 +53,7 @@ const OWNERSHIP_OPTIONS = [
   'Not sure',
 ]
 
-export const Step3GasUsage: React.FC<Props> = ({ company, onNext, onBack }) => {
+export const Step3GasUsage: React.FC<Props> = ({ company, onNext, onBack, onSkip }) => {
   const companyId = company.companyId
 
   // Build initial usage map from company data
@@ -292,6 +293,13 @@ export const Step3GasUsage: React.FC<Props> = ({ company, onNext, onBack }) => {
           Next: Payment &amp; Notifications
         </Button>
       </div>
+      {onSkip && (
+        <div className="ob-step__skip">
+          <button type="button" className="ob-step__skip-btn" onClick={onSkip}>
+            Skip this step for now
+          </button>
+        </div>
+      )}
     </div>
   )
 }

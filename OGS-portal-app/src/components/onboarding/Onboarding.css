@@ -381,6 +381,26 @@
   width: 100%;
 }
 
+.ob-step__skip {
+  margin-top: 0.75rem;
+  text-align: center;
+}
+
+.ob-step__skip-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.875rem;
+  color: #9ca3af;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.ob-step__skip-btn:hover {
+  color: #6b7280;
+}
+
 /* ── Review cards ────────────────────────────────────────────────────────── */
 .ob-review__card {
   border: 1px solid #e5e7eb;
