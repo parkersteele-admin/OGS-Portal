@@ -31,12 +31,20 @@ const REPLY_TO       = 'support@ohiogassupply.com'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
+export interface MailAttachment {
+  /** Base64-encoded file content */
+  content:  string
+  filename: string
+  type:     string
+}
+
 export interface MailOptions {
-  to:       string
-  subject:  string
-  html:     string
-  from?:    string
-  replyTo?: string
+  to:           string
+  subject:      string
+  html:         string
+  from?:        string
+  replyTo?:     string
+  attachments?: MailAttachment[]
 }
 
 // ── Internal: log to Firestore ─────────────────────────────────────────────────
@@ -76,12 +84,13 @@ function initSg(): void {
 export async function sendEmail(opts: MailOptions): Promise<void> {
   initSg()
 
-  const msg = {
+  const msg: Parameters<typeof sgMail.send>[0] = {
     to:      opts.to,
     from:    { email: opts.from ?? FROM_ADDRESS, name: FROM_NAME },
     replyTo: opts.replyTo ?? REPLY_TO,
     subject: opts.subject,
     html:    opts.html,
+    ...(opts.attachments && opts.attachments.length > 0 ? { attachments: opts.attachments } : {}),
   }
 
   try {

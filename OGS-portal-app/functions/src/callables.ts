@@ -139,48 +139,100 @@ export const generateQuotePdf = onCall(
         try {
           requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY')
           const total      = `$${((quote.total as number) ?? 0).toFixed(2)}`
-          const validLine  = validUntil ? `<p style="margin:0 0 8px">This quote is valid until <strong>${validUntil}</strong>.</p>` : ''
-          const portalLink = `https://app.ogsportal.com/portal/quotes/${data.quoteId}`
+          const portalLink = `https://app.ogsportal.com/portal/quotes/${data.quoteId as string}`
+
+          // Build line items rows for the estimate table
+          const lineItems = (quote.lineItems ?? []) as Array<{
+            description: string; quantity: number; unitPrice: number; amount: number
+          }>
+          const lineItemRows = lineItems.map((item) =>
+            `<tr>
+              <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0">${item.description}</td>
+              <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;text-align:right">${item.quantity}</td>
+              <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;text-align:right">$${item.unitPrice.toFixed(2)}</td>
+              <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;text-align:right">$${item.amount.toFixed(2)}</td>
+            </tr>`,
+          ).join('')
+
+          // Fetch the PDF bytes and base64-encode for attachment
+          let pdfAttachment: { content: string; filename: string; type: string } | null = null
+          try {
+            const pdfRes    = await fetch(url)
+            const pdfBuffer = await pdfRes.arrayBuffer()
+            pdfAttachment = {
+              content:  Buffer.from(pdfBuffer).toString('base64'),
+              filename: `Quote-${quoteNum}.pdf`,
+              type:     'application/pdf',
+            }
+          } catch (fetchErr) {
+            console.warn('generateQuotePdf: failed to fetch PDF for attachment —', fetchErr)
+          }
 
           await sendEmail({
             to:      recipientEmail,
             subject: `Quote #${quoteNum} from Ohio Gas Supply`,
+            attachments: pdfAttachment ? [pdfAttachment] : undefined,
             html: `
-<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#333">
+<div style="font-family:Arial,sans-serif;max-width:620px;margin:auto;color:#333">
   <div style="background:#E87722;padding:24px 32px 16px">
     <h1 style="margin:0;color:#fff;font-size:22px">Ohio Gas Supply Co.</h1>
     <p style="margin:6px 0 0;color:#ffe0c0;font-size:13px">Propane &amp; Natural Gas Delivery</p>
   </div>
-  <div style="padding:28px 32px 24px;border:1px solid #e8e8e8;border-top:none">
+  <div style="padding:28px 32px 8px;border:1px solid #e8e8e8;border-top:none">
     <p style="margin:0 0 16px">Dear ${recipientName},</p>
-    <p style="margin:0 0 16px">
-      Thank you for your interest in Ohio Gas Supply. Please find your quote details below.
+    <p style="margin:0 0 20px">
+      Thank you for your interest in Ohio Gas Supply. Please review your quote below.
     </p>
-    <table style="width:100%;border-collapse:collapse;margin:0 0 20px">
+
+    <!-- Quote summary -->
+    <table style="width:100%;border-collapse:collapse;margin:0 0 4px">
       <tr style="background:#f5f5f5">
         <td style="padding:8px 12px;font-weight:bold">Quote #</td>
         <td style="padding:8px 12px">${quoteNum}</td>
       </tr>
-      <tr>
-        <td style="padding:8px 12px;font-weight:bold">Total</td>
-        <td style="padding:8px 12px;color:#E87722;font-weight:bold">${total}</td>
-      </tr>
-      ${validUntil ? `<tr style="background:#f5f5f5"><td style="padding:8px 12px;font-weight:bold">Valid Until</td><td style="padding:8px 12px">${validUntil}</td></tr>` : ''}
+      ${validUntil ? `<tr><td style="padding:8px 12px;font-weight:bold">Valid Until</td><td style="padding:8px 12px">${validUntil}</td></tr>` : ''}
     </table>
-    ${validLine}
-    <table style="border-collapse:collapse;margin:0 0 20px">
+
+    <!-- Line items -->
+    <table style="width:100%;border-collapse:collapse;margin:0 0 20px">
+      <thead>
+        <tr style="background:#f0f0f0">
+          <th style="padding:8px 12px;text-align:left;font-size:12px;color:#555">Description</th>
+          <th style="padding:8px 12px;text-align:right;font-size:12px;color:#555">Qty</th>
+          <th style="padding:8px 12px;text-align:right;font-size:12px;color:#555">Unit Price</th>
+          <th style="padding:8px 12px;text-align:right;font-size:12px;color:#555">Amount</th>
+        </tr>
+      </thead>
+      <tbody>${lineItemRows}</tbody>
+      <tfoot>
+        <tr style="background:#f9f9f9">
+          <td colspan="3" style="padding:10px 12px;font-weight:bold;text-align:right">Total</td>
+          <td style="padding:10px 12px;font-weight:bold;color:#E87722;text-align:right">${total}</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <!-- CTA buttons -->
+    <table style="border-collapse:collapse;margin:0 0 24px">
       <tr>
         <td style="padding-right:12px">
-          <a href="${portalLink}" clicktracking="off" style="display:inline-block;background:#E87722;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:15px">Accept This Quote</a>
+          <a href="${portalLink}" clicktracking="off"
+             style="display:inline-block;background:#E87722;color:#fff;padding:13px 30px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:15px">
+            ✓ Accept This Quote
+          </a>
         </td>
         <td>
-          <a href="${url}" clicktracking="off" style="display:inline-block;background:#fff;color:#E87722;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:15px;border:2px solid #E87722">View PDF</a>
+          <a href="${portalLink}" clicktracking="off"
+             style="display:inline-block;background:#fff;color:#dc2626;padding:13px 30px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:15px;border:2px solid #dc2626">
+            ✕ Decline
+          </a>
         </td>
       </tr>
     </table>
+
     <p style="margin:0 0 8px;font-size:13px;color:#666">
-      Click <strong>Accept This Quote</strong> to confirm your pricing and unlock ordering through your portal.
-      You can also reply to this email or call us at <strong>1-800-OGS-FUEL</strong>.
+      Click <strong>Accept This Quote</strong> to confirm your pricing and unlock ordering through the portal.
+      The full quote PDF is attached to this email. You can also reply or call <strong>1-800-OGS-FUEL</strong>.
     </p>
   </div>
   <div style="padding:14px 32px;background:#f9f9f9;border:1px solid #e8e8e8;border-top:none;text-align:center;font-size:11px;color:#aaa">
@@ -194,7 +246,7 @@ export const generateQuotePdf = onCall(
           console.warn('generateQuotePdf: email send failed —', emailErr)
         }
       } else {
-        console.warn(`generateQuotePdf: no recipient email found for quote ${data.quoteId}`)
+        console.warn(`generateQuotePdf: no recipient email found for quote ${data.quoteId as string}`)
       }
     }
 
