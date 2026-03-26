@@ -139,7 +139,7 @@ export const generateQuotePdf = onCall(
         try {
           requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY')
           const total      = `$${((quote.total as number) ?? 0).toFixed(2)}`
-          const portalLink = `https://app.ogsportal.com/portal/quotes/${data.quoteId as string}`
+          const portalLink = `https://app.ohiogassupply.com/portal/quotes/${data.quoteId as string}`
 
           // Build line items rows for the estimate table
           const lineItems = (quote.lineItems ?? []) as Array<{
@@ -524,7 +524,7 @@ export const respondToQuote = onCall(async (request) => {
             }
           }
 
-          const quoteLink = `https://app.ogsportal.com/crm/quotes/${data.quoteId}`
+          const quoteLink = `https://app.ohiogassupply.com/crm/quotes/${data.quoteId as string}`
 
           await sendEmail({
             to:      repEmail,

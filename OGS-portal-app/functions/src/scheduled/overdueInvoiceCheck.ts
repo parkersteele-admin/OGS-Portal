@@ -30,7 +30,7 @@ const THRESHOLD_30D = 30
 const THRESHOLD_60D = 60
 const THRESHOLD_90D = 90
 
-const PORTAL_URL = 'https://app.ogsportal.com'
+const PORTAL_URL = 'https://app.ohiogassupply.com'
 
 export const overdueInvoiceCheck = onSchedule(
   {

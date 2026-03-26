@@ -332,7 +332,7 @@ export const onDeliveryComplete = onDocumentUpdated(
               <strong>$${totalAmount.toFixed(2)}</strong> is now ready.</p>
               <p><strong>Due:</strong> ${dueDateStr}</p>
               <p style="margin-top:24px">
-                <a href="https://app.ogsportal.com/portal/invoices"
+                <a href="https://app.ohiogassupply.com/portal/invoices"
                    style="background:#2563eb;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none">
                   Pay Now →
                 </a>

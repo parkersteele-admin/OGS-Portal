@@ -248,7 +248,7 @@ async function handlePaymentIntentSucceeded(pi: Stripe.PaymentIntent): Promise<v
           for invoice <strong>#${invoiceNumber ?? invoiceId}</strong>.</p>
           <p>Thank you — your account is up to date.</p>
           <p style="margin-top:24px">
-            <a href="https://app.ogsportal.com/portal/invoices"
+            <a href="https://app.ohiogassupply.com/portal/invoices"
                style="background:#2563eb;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none">
               View Invoices →
             </a>
@@ -341,7 +341,7 @@ async function handlePaymentIntentFailed(pi: Stripe.PaymentIntent): Promise<void
           <p><strong>Reason:</strong> ${failReason}</p>
           <p>Please update your payment method or contact us to resolve this.</p>
           <p style="margin-top:24px">
-            <a href="https://app.ogsportal.com/portal/invoices"
+            <a href="https://app.ohiogassupply.com/portal/invoices"
                style="background:#dc2626;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none">
               Resolve Payment →
             </a>

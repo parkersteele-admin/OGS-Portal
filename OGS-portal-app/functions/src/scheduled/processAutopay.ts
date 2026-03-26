@@ -171,7 +171,7 @@ export const processAutopay = onSchedule(
                   was automatically collected for invoice <strong>#${invoiceNumber}</strong>.</p>
                   <p>Thank you for using autopay.</p>
                   <p style="margin-top:24px">
-                    <a href="https://app.ogsportal.com/portal/invoices"
+                    <a href="https://app.ohiogassupply.com/portal/invoices"
                        style="background:#2563eb;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none">
                       View Invoices →
                     </a>
@@ -252,7 +252,7 @@ async function handleAutopayFailure(
             <p><strong>Reason:</strong> ${reason}</p>
             <p>Please update your payment method to avoid service interruption.</p>
             <p style="margin-top:24px">
-              <a href="https://app.ogsportal.com/portal/invoices"
+              <a href="https://app.ohiogassupply.com/portal/invoices"
                  style="background:#dc2626;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none">
                 Resolve Now →
               </a>

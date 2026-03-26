@@ -130,7 +130,7 @@ export const certExpiryCheck = onSchedule(
                           <tr><td style="padding:4px 16px 4px 0;color:#555">Days Remaining</td><td><strong style="color:#dc2626">${daysLeft}</strong></td></tr>
                         </table>
                         <p style="margin-top:24px">
-                          <a href="https://app.ogsportal.com/ops/compliance"
+                          <a href="https://app.ohiogassupply.com/ops/compliance"
                              style="background:#dc2626;color:#fff;padding:10px 22px;border-radius:6px;text-decoration:none;font-weight:600">
                             View Compliance →
                           </a>

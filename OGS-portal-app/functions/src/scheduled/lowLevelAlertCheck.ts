@@ -20,7 +20,7 @@ import { sendEmail } from '../mail'
 
 const LOW_LEVEL_PCT = 25       // alert threshold (%)
 const DEDUP_DAYS    = 7        // suppress repeat alerts within this window
-const PORTAL_URL    = 'https://app.ogsportal.com'
+const PORTAL_URL    = 'https://app.ohiogassupply.com'
 
 export const lowLevelAlertCheck = onSchedule(
   {
