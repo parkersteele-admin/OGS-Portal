@@ -32,7 +32,8 @@ export const Step5Review: React.FC<Props> = ({ company, locations, onEditStep })
       // 1. Mark setup complete + move to pending_quote
       await updateDoc(doc(db, 'customers', company.companyId), {
         setupComplete: true,
-        status: 'pending_quote',
+        // 'inactive' = valid CustomerStatus visible in CRM; OGS activates after sending first quote
+        status: 'inactive',
         setupStep: 5,
       })
 

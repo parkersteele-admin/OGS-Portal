@@ -13,6 +13,145 @@ import { generateInvoicePdf as generatePdf } from './pdf/generateInvoicePdf'
 import { generateQuotePdf as generateQuotePdfCore } from './pdf/generateQuotePdf'
 import { getCompanySettings } from './pdf/companySettings'
 import { sendEmail } from './email/sendEmail'
+import { normalizeCompanyName, extractDomain } from './utils/companyName'
+
+// ── Shared: resolveOrCreateCustomer ──────────────────────────────────────────
+
+/**
+ * Given a leadId, ensures a `customers` document exists that represents the
+ * lead.  Resolution order:
+ *
+ *  1. Lead already has `companyId` → use it.
+ *  2. Lead already has `convertedToCustomerId` → use it.
+ *  3. Search customers for an exact or fuzzy company-name match.
+ *  4. If no match → create a new `customers` doc from the lead data.
+ *
+ * In all cases the lead is updated with `companyId` + `convertedToCustomerId`
+ * so future look-ups skip the search.
+ *
+ * Returns the customerId (Firestore document ID of the customers doc).
+ */
+async function resolveOrCreateCustomer(
+  leadId: string,
+  now:    FirebaseFirestore.FieldValue,
+): Promise<string> {
+  const leadSnap = await db.collection('leads').doc(leadId).get()
+  if (!leadSnap.exists) throw new Error(`Lead ${leadId} not found`)
+
+  const lead = leadSnap.data()!
+
+  // ── 1. Already linked on the lead itself ──────────────────────────────────
+  const existingId = (lead.companyId ?? lead.convertedToCustomerId) as string | undefined
+  if (existingId) {
+    const check = await db.collection('customers').doc(existingId).get()
+    if (check.exists) {
+      // Ensure both link fields are set
+      await leadSnap.ref.update({ companyId: existingId, convertedToCustomerId: existingId, updatedAt: now })
+      return existingId
+    }
+  }
+
+  // ── 2. Search customers for a matching company name or email domain ────────
+  const leadCompany = (lead.company ?? lead.name ?? '') as string
+  const leadEmail   = (lead.email ?? '') as string
+  const normalized  = normalizeCompanyName(leadCompany)
+  const domain      = extractDomain(leadEmail)
+
+  const customersSnap = await db.collection('customers').get()
+
+  let matchedId: string | null = null
+
+  for (const doc of customersSnap.docs) {
+    const d = doc.data()
+
+    // Exact companyName match (normalized)
+    const candidateName = (d.companyName ?? d.name ?? '') as string
+    if (candidateName && normalizeCompanyName(candidateName) === normalized && normalized.length > 0) {
+      matchedId = doc.id
+      break
+    }
+
+    // Domain match (non-generic email domain)
+    if (domain) {
+      const candidateEmail = (d.billingEmail ?? d.email ?? '') as string
+      const candidateDomain = extractDomain(candidateEmail)
+      if (candidateDomain && candidateDomain === domain) {
+        matchedId = doc.id
+        break
+      }
+    }
+  }
+
+  // ── 3. Create a new customers doc if no match ─────────────────────────────
+  if (!matchedId) {
+    const companyName = leadCompany || 'Unknown'
+    const newRef = db.collection('customers').doc()
+    await newRef.set({
+      companyId:             newRef.id,
+      companyName,
+      companyNameNormalized: normalized,
+      domain:                domain ?? null,
+      // Flat Customer fields for CRM display/search
+      name:                  companyName,
+      email:                 leadEmail,
+      phone:                 (lead.phone ?? '') as string,
+      address:               (lead.address ?? '') as string,
+      city:                  (lead.city ?? '') as string,
+      state:                 (lead.state ?? '') as string,
+      zip:                   (lead.zip ?? '') as string,
+      billingAddress: {
+        street: (lead.address ?? '') as string,
+        city:   (lead.city ?? '') as string,
+        state:  (lead.state ?? '') as string,
+        zip:    (lead.zip ?? '') as string,
+      },
+      deliveryAddress:       null,
+      billingEmail:          leadEmail,
+      billingContactName:    (lead.name ?? '') as string,
+      generalManagerName:    null,
+      leadId,
+      status:                'active',
+      setupStep:             0,
+      setupComplete:         false,
+      paymentMethod:         null,
+      smsOptIn:              false,
+      smsPhone:              null,
+      smsConsentAt:          null,
+      usageProfile:          [],
+      businessType:          null,
+      taxExempt:             false,
+      taxExemptNumber:       null,
+      pwaInstallPrompted:    false,
+      creditLimit:           0,
+      createdAt:             now,
+      updatedAt:             now,
+      createdBy:             'system',
+    })
+    matchedId = newRef.id
+    console.log(`[resolveOrCreateCustomer] created customers/${matchedId} from lead/${leadId}`)
+  } else {
+    // Ensure the matched customer has leadId set
+    const matchedSnap = await db.collection('customers').doc(matchedId).get()
+    const matchedData = matchedSnap.data()!
+    const updates: Record<string, unknown> = { updatedAt: now }
+    if (!matchedData.leadId) updates.leadId = leadId
+    if (matchedData.status === 'inactive' || matchedData.status === 'pending_verification' || matchedData.status === 'pending_quote') {
+      updates.status = 'active'
+    }
+    await db.collection('customers').doc(matchedId).update(updates)
+    console.log(`[resolveOrCreateCustomer] matched lead/${leadId} → customers/${matchedId}`)
+  }
+
+  // Back-fill the lead with the resolved companyId
+  await leadSnap.ref.update({
+    companyId:              matchedId,
+    convertedToCustomerId:  matchedId,
+    status:                 'won',
+    updatedAt:              now,
+  })
+
+  return matchedId
+}
 
 // ── generateInvoicePdf ────────────────────────────────────────────────────────
 
@@ -96,6 +235,13 @@ export const generateQuotePdf = onCall(
 
     let url: string
     try {
+      // If the quote is in 'sent' status, generate and persist the publicToken BEFORE
+      // building the PDF so the PDF generator can embed it as a QR code.
+      const quoteStatus = (quoteSnap.data()!.status as string) ?? ''
+      if (quoteStatus === 'sent' && !quoteSnap.data()!.publicToken) {
+        const earlyToken = crypto.randomUUID()
+        await db.collection('quotes').doc(data.quoteId).update({ publicToken: earlyToken })
+      }
       url = await generateQuotePdfCore(data.quoteId)
     } catch (err) {
       console.error(`generateQuotePdf callable [${data.quoteId}]:`, err)
@@ -139,9 +285,15 @@ export const generateQuotePdf = onCall(
       const emailIntro  = tpl.quoteIntro      || `Thank you for your interest in ${company.name || 'Ohio Gas Supply'}. Please review your quote below.`
       const discussNote = tpl.quoteDiscussNote || "We want to ensure you're completely happy with our service. Please reach out to us to discuss any adjustments."
 
-      // Generate a one-time public token so the recipient can accept without logging in
-      const publicToken = crypto.randomUUID()
-      await db.collection('quotes').doc(data.quoteId as string).update({ publicToken })
+      // Generate a one-time public token so the recipient can accept without logging in.
+      // Re-read the quote in case the token was already written before PDF generation.
+      const freshSnap   = await db.collection('quotes').doc(data.quoteId as string).get()
+      const freshData   = freshSnap.data()!
+      const existingTok = freshData.publicToken as string | undefined
+      const publicToken = existingTok || crypto.randomUUID()
+      if (!existingTok) {
+        await db.collection('quotes').doc(data.quoteId as string).update({ publicToken })
+      }
 
       // Resolve recipient email from customer or lead
       let recipientEmail = ''
@@ -455,7 +607,9 @@ export const backfillGeocodeCustomers = onCall(
  * Input:  { quoteId: string, response: 'accepted' | 'declined' }
  * Output: { success: true }
  */
-export const respondToQuote = onCall(async (request) => {
+export const respondToQuote = onCall(
+  { secrets: [SENDGRID_API_KEY] },
+  async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'You must be signed in.')
   }
@@ -481,8 +635,60 @@ export const respondToQuote = onCall(async (request) => {
 
   const quote           = quoteSnap.data()!
   const callerCompanyId = request.auth.token.companyId as string | undefined
-  if (!callerCompanyId || quote.customerId !== callerCompanyId) {
-    throw new HttpsError('permission-denied', 'You are not authorised to respond to this quote.')
+
+  if (!callerCompanyId) {
+    throw new HttpsError('permission-denied', 'No company context found on your account.')
+  }
+
+  // Allow acceptance if:
+  //  a) the quote is directly assigned to the caller's company, OR
+  //  b) the quote was originally sent to a lead that is linked to the caller's company
+  //     (identified by customers/{callerCompanyId}.leadId === quote.leadId)
+  const quoteCustomerId = quote.customerId as string | undefined
+  const quoteLeadId     = quote.leadId     as string | undefined
+
+  let effectiveCustomerId = quoteCustomerId ?? callerCompanyId
+
+  if (quoteCustomerId && quoteCustomerId !== callerCompanyId) {
+    // Direct customerId mismatch — check if the caller's company is the same entity
+    // under a different ID (e.g. OGS-created record vs. portal self-signup record)
+    const callerCompSnap = await db.collection('customers').doc(callerCompanyId).get()
+    const callerComp     = callerCompSnap.data()
+    const callerLeadId   = callerComp?.leadId as string | undefined
+
+    const isLinked = quoteLeadId && callerLeadId && quoteLeadId === callerLeadId
+    if (!isLinked) {
+      throw new HttpsError('permission-denied', 'You are not authorised to respond to this quote.')
+    }
+    // If both have the same leadId, treat as same entity
+    effectiveCustomerId = callerCompanyId
+  } else if (!quoteCustomerId && quoteLeadId) {
+    // Quote was sent to a lead — verify caller's company has that leadId,
+    // OR auto-resolve via company-name matching and set it.
+    const callerCompSnap = await db.collection('customers').doc(callerCompanyId).get()
+    const callerComp     = callerCompSnap.data()
+    const callerLeadId   = callerComp?.leadId as string | undefined
+
+    if (callerLeadId && callerLeadId === quoteLeadId) {
+      // Already linked — use caller's company
+      effectiveCustomerId = callerCompanyId
+    } else {
+      // Try fuzzy company-name match: does the lead belong to the caller's company?
+      const leadSnap     = await db.collection('leads').doc(quoteLeadId).get()
+      const leadData     = leadSnap.data()
+      const leadCompany  = leadData ? ((leadData.company ?? leadData.name ?? '') as string) : ''
+      const callerName   = ((callerComp?.companyName ?? callerComp?.name ?? '') as string)
+      const leadNorm     = normalizeCompanyName(leadCompany)
+      const callerNorm   = normalizeCompanyName(callerName)
+
+      if (leadNorm.length > 0 && leadNorm === callerNorm) {
+        // Names match — link the lead to the caller's company and proceed
+        await db.collection('customers').doc(callerCompanyId).update({ leadId: quoteLeadId, updatedAt: FieldValue.serverTimestamp() })
+        effectiveCustomerId = callerCompanyId
+      } else {
+        throw new HttpsError('permission-denied', 'You are not authorised to respond to this quote.')
+      }
+    }
   }
 
   if (quote.status !== 'sent') {
@@ -495,11 +701,23 @@ export const respondToQuote = onCall(async (request) => {
   const now = FieldValue.serverTimestamp()
 
   if (data.response === 'accepted') {
+    // Update the quote — link customerId if it was previously a lead-only quote
     await db.collection('quotes').doc(data.quoteId).update({
-      status:     'accepted',
-      acceptedAt: now,
-      updatedAt:  now,
+      status:       'accepted',
+      acceptedAt:   now,
+      updatedAt:    now,
+      customerId:   effectiveCustomerId,
     })
+
+    // Activate the customer in the CRM (move from inactive/pending to active)
+    try {
+      await db.collection('customers').doc(effectiveCustomerId).update({
+        status:    'active',
+        updatedAt: now,
+      })
+    } catch (statusErr) {
+      console.warn('[respondToQuote] failed to activate customer —', statusErr)
+    }
 
     // Apply quoted prices to customer's productPricing subcollection
     const lineItems = (quote.lineItems ?? []) as Array<{ productId: string; description: string; quantity: number; unitPrice: number; amount: number }>
@@ -511,7 +729,7 @@ export const respondToQuote = onCall(async (request) => {
       for (const item of eligible) {
         const ref = db
           .collection('customers')
-          .doc(quote.customerId as string)
+          .doc(effectiveCustomerId)
           .collection('productPricing')
           .doc(item.productId)
         batch.set(ref, {
@@ -526,34 +744,96 @@ export const respondToQuote = onCall(async (request) => {
       await batch.commit()
     }
 
-    // Create a draft invoice from the accepted quote
+    // Flag the quote so staff know to set up a standing order for this customer.
+    // Invoices are generated from completed deliveries, not from quote acceptance.
+    await db.collection('quotes').doc(data.quoteId as string).update({ needsOrderSetup: true, updatedAt: now })
+    console.log(`[respondToQuote] quote ${data.quoteId as string} accepted — needs order setup`)
+
+    // Generate a portal setup link so staff can share a QR code with the customer.
+    if (effectiveCustomerId) {
+      try {
+        const custSnap = await db.collection('customers').doc(effectiveCustomerId).get()
+        if (custSnap.exists && !custSnap.data()!.setupComplete && !custSnap.data()!.setupToken) {
+          const setupToken       = crypto.randomUUID()
+          const setupTokenExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+          await custSnap.ref.update({ setupToken, setupTokenExpiry, updatedAt: now })
+          console.log(`[respondToQuote] setup token generated for customers/${effectiveCustomerId}`)
+        }
+      } catch (setupErr) {
+        console.warn('[respondToQuote] failed to generate setup token —', setupErr)
+      }
+    }
+
+    // Notify the sales rep of the acceptance
     try {
-      const quoteLineItems = (quote.lineItems ?? []) as Array<{
-        description: string; quantity: number; unitPrice: number; amount: number
-      }>
-      const subtotal = quoteLineItems.reduce((sum, i) => sum + (i.amount ?? 0), 0)
-      const invoiceNumber = `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`
-      const dueAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-      await db.collection('invoices').add({
-        invoiceNumber,
-        customerId:  quote.customerId,
-        quoteId:     data.quoteId,
-        quoteNumber: (quote.quoteNumber as string) || '',
-        status:      'draft',
-        lineItems:   quoteLineItems,
-        subtotal,
-        tax:         0,
-        total:       subtotal,
-        issuedAt:    now,
-        dueAt,
-        createdAt:   now,
-        updatedAt:   now,
-        notes:       (quote.notes as string) || '',
-      })
-      console.log(`[respondToQuote] draft invoice created for quote ${data.quoteId as string}`)
-    } catch (invoiceErr) {
-      // Non-fatal — the acceptance is already saved
-      console.warn('[respondToQuote] failed to create invoice —', invoiceErr)
+      const createdBy = quote.createdBy as string | undefined
+      if (createdBy) {
+        const repAuthUser = await adminAuth.getUser(createdBy).catch(() => null)
+        const repEmail    = repAuthUser?.email
+        const quoteNum    = (quote.quoteNumber as string) || (data.quoteId as string)
+        const total       = `$${((quote.total as number) ?? 0).toFixed(2)}`
+
+        let entityName = 'the customer'
+        if (effectiveCustomerId) {
+          const cSnap = await db.collection('customers').doc(effectiveCustomerId).get()
+          if (cSnap.exists) entityName = (cSnap.data()!.name as string) || entityName
+        } else if (quote.leadId) {
+          const lSnap = await db.collection('leads').doc(quote.leadId as string).get()
+          if (lSnap.exists) {
+            const l = lSnap.data()!
+            entityName = (l.company as string) || (l.name as string) || entityName
+          }
+        }
+
+        // In-app notification
+        await db.collection('notifications').add({
+          userId:    createdBy,
+          type:      'quote_accepted',
+          title:     `Quote #${quoteNum} accepted`,
+          body:      `${entityName} accepted Quote #${quoteNum} (${total}). Set up their standing order.`,
+          link:      `/crm/quotes/${data.quoteId as string}`,
+          entityId:  data.quoteId,
+          priority:  'high',
+          read:      false,
+          createdAt: now,
+        })
+
+        // Email notification
+        if (repEmail) {
+          requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY')
+          const company   = await getCompanySettings()
+          const quoteLink = `https://app.ohiogassupply.com/crm/quotes/${data.quoteId as string}`
+          await sendEmail({
+            to:      repEmail,
+            subject: `✓ Quote #${quoteNum} was ACCEPTED by ${entityName}`,
+            html: `
+<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#333">
+  <div style="background:#16a34a;padding:24px 32px 16px">
+    <h1 style="margin:0;color:#fff;font-size:20px">${company.name || 'Ohio Gas Supply'}</h1>
+    <p style="margin:6px 0 0;color:#bbf7d0;font-size:13px">Quote Accepted</p>
+  </div>
+  <div style="padding:28px 32px 24px;border:1px solid #e8e8e8;border-top:none">
+    <p style="margin:0 0 16px;font-size:15px">
+      <strong>${entityName}</strong> has <strong style="color:#16a34a">accepted</strong> Quote #${quoteNum} (${total}).
+    </p>
+    <p style="margin:0 0 20px;font-size:14px;color:#555">
+      Next step: set up their standing delivery order in the portal.
+    </p>
+    <a href="${quoteLink}" clicktracking="off"
+       style="display:inline-block;background:#E87722;color:#fff;padding:11px 26px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:14px">
+      Open Quote in CRM
+    </a>
+  </div>
+  <div style="padding:12px 32px;background:#f9f9f9;border:1px solid #e8e8e8;border-top:none;text-align:center;font-size:11px;color:#aaa">
+    ${company.name || 'Ohio Gas Supply'}${company.website ? ` &nbsp;·&nbsp; ${company.website}` : ''}
+  </div>
+</div>`,
+          })
+          console.log(`[respondToQuote] acceptance notification sent to ${repEmail} for quote ${data.quoteId as string}`)
+        }
+      }
+    } catch (notifyErr) {
+      console.warn('[respondToQuote] failed to send acceptance notification —', notifyErr)
     }
   } else {
     await db.collection('quotes').doc(data.quoteId).update({
@@ -622,9 +902,10 @@ export const respondToQuote = onCall(async (request) => {
     }
   }
 
-  console.log(`[respondToQuote] quote=${data.quoteId} response=${data.response as string} by=${request.auth.uid}`)
-  return { success: true }
-})
+    console.log(`[respondToQuote] quote=${data.quoteId} response=${data.response as string} by=${request.auth.uid}`)
+    return { success: true }
+  },
+)
 
 
 // ── backfillMissingLeads ───────────────────────────────────────────────────────
@@ -672,6 +953,133 @@ export const backfillMissingLeads = onCall(async (request) => {
 
   console.log(`backfillMissingLeads: created=${created} skipped=${skipped}`)
   return { created, skipped }
+})
+
+// ── matchLeadsToCustomers ─────────────────────────────────────────────────────
+
+/**
+ * Admin-only: scans all leads and attempts to match each unlinked lead to an
+ * existing `customers` doc via fuzzy company-name / email-domain matching.
+ * Leads that have no existing customer are left alone (they become customers
+ * only when their quote is accepted).
+ *
+ * Also scans customers that have no leadId and tries to find a lead match.
+ *
+ * Input:  {} (no parameters)
+ * Output: { linked: number, skipped: number }
+ */
+export const matchLeadsToCustomers = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
+  if (request.auth.token.role !== 'admin') throw new HttpsError('permission-denied', 'Admin only.')
+
+  const [leadsSnap, customersSnap] = await Promise.all([
+    db.collection('leads').get(),
+    db.collection('customers').get(),
+  ])
+
+  const now = FieldValue.serverTimestamp()
+
+  // Build lookup maps: normalized name → customerId, and domain → customerId
+  const nameToCustomer = new Map<string, string>()
+  const domainToCustomer = new Map<string, string>()
+
+  for (const doc of customersSnap.docs) {
+    const d    = doc.data()
+    const name = normalizeCompanyName((d.companyName ?? d.name ?? '') as string)
+    if (name) nameToCustomer.set(name, doc.id)
+
+    const email  = (d.billingEmail ?? d.email ?? '') as string
+    const domain = extractDomain(email)
+    if (domain) domainToCustomer.set(domain, doc.id)
+  }
+
+  let linked  = 0
+  let skipped = 0
+
+  for (const leadDoc of leadsSnap.docs) {
+    const lead = leadDoc.data()
+
+    // Skip leads already fully linked
+    if (lead.companyId && lead.convertedToCustomerId) {
+      skipped++
+      continue
+    }
+
+    const leadCompany = (lead.company ?? lead.name ?? '') as string
+    const leadEmail   = (lead.email ?? '') as string
+    const normalized  = normalizeCompanyName(leadCompany)
+    const domain      = extractDomain(leadEmail)
+
+    let matchedCustomerId: string | null = null
+
+    // Name match
+    if (normalized && nameToCustomer.has(normalized)) {
+      matchedCustomerId = nameToCustomer.get(normalized)!
+    }
+    // Domain match (fallback)
+    if (!matchedCustomerId && domain && domainToCustomer.has(domain)) {
+      matchedCustomerId = domainToCustomer.get(domain)!
+    }
+
+    if (!matchedCustomerId) {
+      skipped++
+      continue
+    }
+
+    // Link lead ↔ customer
+    const batch = db.batch()
+    batch.update(leadDoc.ref, {
+      companyId:             matchedCustomerId,
+      convertedToCustomerId: matchedCustomerId,
+      updatedAt:             now,
+    })
+    const custRef = db.collection('customers').doc(matchedCustomerId)
+    batch.update(custRef, {
+      leadId:    leadDoc.id,
+      updatedAt: now,
+    })
+    await batch.commit()
+
+    linked++
+    console.log(`[matchLeadsToCustomers] linked lead/${leadDoc.id} (${leadCompany}) → customers/${matchedCustomerId}`)
+  }
+
+  // Second pass: customers with no leadId — search leads for a name match
+  for (const custDoc of customersSnap.docs) {
+    const cust = custDoc.data()
+    if (cust.leadId) continue   // already linked
+
+    const custName   = normalizeCompanyName((cust.companyName ?? cust.name ?? '') as string)
+    const custEmail  = (cust.billingEmail ?? cust.email ?? '') as string
+    const custDomain = extractDomain(custEmail)
+
+    for (const leadDoc of leadsSnap.docs) {
+      const lead       = leadDoc.data()
+      const leadName   = normalizeCompanyName((lead.company ?? lead.name ?? '') as string)
+      const leadEmail2 = (lead.email ?? '') as string
+      const leadDomain = extractDomain(leadEmail2)
+
+      const nameHit   = custName.length > 0 && custName === leadName
+      const domainHit = custDomain && leadDomain && custDomain === leadDomain
+
+      if (nameHit || domainHit) {
+        const batch = db.batch()
+        batch.update(custDoc.ref, { leadId: leadDoc.id, updatedAt: now })
+        batch.update(leadDoc.ref, {
+          companyId:             custDoc.id,
+          convertedToCustomerId: custDoc.id,
+          updatedAt:             now,
+        })
+        await batch.commit()
+        linked++
+        console.log(`[matchLeadsToCustomers] reverse-linked customers/${custDoc.id} → lead/${leadDoc.id}`)
+        break
+      }
+    }
+  }
+
+  console.log(`matchLeadsToCustomers: linked=${linked} skipped=${skipped}`)
+  return { linked, skipped }
 })
 
 // ── getPublicQuote ─────────────────────────────────────────────────────────────
@@ -724,6 +1132,20 @@ export const getPublicQuote = onCall(async (request) => {
   const tpl        = tplSnap.exists ? (tplSnap.data() as Record<string, string>) : {}
   const discussNote = tpl.quoteDiscussNote || "We want to ensure you're completely happy with our service. Please reach out to discuss any adjustments."
 
+  // If already accepted, return the setup URL so the page can show the QR code
+  let setupUrl: string | null = null
+  if (quote.status === 'accepted' && quote.customerId) {
+    try {
+      const custSnap = await db.collection('customers').doc(quote.customerId as string).get()
+      if (custSnap.exists) {
+        const cd = custSnap.data()!
+        if (cd.setupToken && !cd.setupComplete) {
+          setupUrl = `https://app.ohiogassupply.com/join/${cd.setupToken as string}`
+        }
+      }
+    } catch { /* non-fatal */ }
+  }
+
   return {
     quote: {
       id:          quoteId,
@@ -745,6 +1167,7 @@ export const getPublicQuote = onCall(async (request) => {
     },
     rep,
     discussNote,
+    setupUrl,
   }
 })
 
@@ -796,9 +1219,40 @@ export const respondToQuotePublic = onCall(
       acceptedVia: 'public-link',
     })
 
+    // Resolve or create the customer record for this quote.
+    // resolveOrCreateCustomer does fuzzy name+domain matching and will create
+    // a customers doc from lead data if no match exists.  It also marks the
+    // lead as 'won' and sets companyId / convertedToCustomerId on the lead.
+    let effectiveCustomerId: string | null = (quote.customerId as string | undefined) || null
+
+    if (quote.leadId) {
+      try {
+        const resolvedId = await resolveOrCreateCustomer(quote.leadId as string, now)
+        effectiveCustomerId = resolvedId
+        // Back-fill the quote's customerId so future portal look-ups work
+        if (!quote.customerId || quote.customerId !== resolvedId) {
+          await db.collection('quotes').doc(quoteId).update({ customerId: resolvedId })
+        }
+      } catch (resolveErr) {
+        console.warn('[respondToQuotePublic] failed to resolve customer from lead —', resolveErr)
+      }
+    }
+
+    // Activate the customer in the CRM now that they've accepted a quote
+    if (effectiveCustomerId) {
+      try {
+        await db.collection('customers').doc(effectiveCustomerId).update({
+          status:    'active',
+          updatedAt: now,
+        })
+      } catch (statusErr) {
+        console.warn('[respondToQuotePublic] failed to activate customer —', statusErr)
+      }
+    }
+
     // Apply quoted prices to customer's productPricing subcollection
     // (same logic as respondToQuote — needed so portal shows correct pricing)
-    if (quote.customerId) {
+    if (effectiveCustomerId) {
       try {
         const lineItems = (quote.lineItems ?? []) as Array<{ productId: string; description: string; quantity: number; unitPrice: number; amount: number }>
         const eligible  = lineItems.filter(
@@ -809,7 +1263,7 @@ export const respondToQuotePublic = onCall(
           for (const item of eligible) {
             const ref = db
               .collection('customers')
-              .doc(quote.customerId as string)
+              .doc(effectiveCustomerId)
               .collection('productPricing')
               .doc(item.productId)
             pricingBatch.set(ref, {
@@ -827,61 +1281,77 @@ export const respondToQuotePublic = onCall(
       }
     }
 
-    // Create a draft invoice from the accepted quote
-    try {
-      const quoteLineItems = (quote.lineItems ?? []) as Array<{
-        description: string; quantity: number; unitPrice: number; amount: number
-      }>
-      const subtotal = quoteLineItems.reduce((sum, i) => sum + (i.amount ?? 0), 0)
-      const invoiceNumber = `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`
-      const dueAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-      await db.collection('invoices').add({
-        invoiceNumber,
-        customerId:  quote.customerId  || null,
-        leadId:      quote.leadId      || null,
-        quoteId,
-        quoteNumber: (quote.quoteNumber as string) || '',
-        acceptedVia: 'public-link',
-        status:      'draft',
-        lineItems:   quoteLineItems,
-        subtotal,
-        tax:         0,
-        total:       subtotal,
-        issuedAt:    now,
-        dueAt,
-        createdAt:   now,
-        updatedAt:   now,
-        notes:       (quote.notes as string) || '',
-      })
-      console.log(`[respondToQuotePublic] draft invoice created for quote ${quoteId}`)
-    } catch (invoiceErr) {
-      console.warn('[respondToQuotePublic] failed to create invoice —', invoiceErr)
+    // Flag the quote so staff know to set up a standing order for this customer.
+    // Invoices are generated from completed deliveries, not from quote acceptance.
+    await db.collection('quotes').doc(quoteId).update({ needsOrderSetup: true, updatedAt: now })
+    console.log(`[respondToQuotePublic] quote ${quoteId} accepted via public link — needs order setup`)
+
+    // Generate a portal setup link and return it so the public quote page can
+    // immediately show the QR code + button to the customer.
+    let setupUrl: string | null = null
+    if (effectiveCustomerId) {
+      try {
+        const custSnap = await db.collection('customers').doc(effectiveCustomerId).get()
+        if (custSnap.exists) {
+          const cd = custSnap.data()!
+          let finalToken: string
+          if (cd.setupToken && !cd.setupComplete) {
+            finalToken = cd.setupToken as string
+          } else if (!cd.setupComplete) {
+            finalToken = crypto.randomUUID()
+            const setupTokenExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+            await custSnap.ref.update({ setupToken: finalToken, setupTokenExpiry, updatedAt: now })
+          } else {
+            finalToken = ''
+          }
+          if (finalToken) {
+            setupUrl = `https://app.ohiogassupply.com/join/${finalToken}`
+          }
+        }
+        if (setupUrl) console.log(`[respondToQuotePublic] setup link ready for customers/${effectiveCustomerId}`)
+      } catch (setupErr) {
+        console.warn('[respondToQuotePublic] failed to generate setup token —', setupErr)
+      }
     }
 
-    // Notify the sales rep
+    // Notify the sales rep (email + in-app)
     try {
       const repUid = (quote.createdBy as string | undefined)
       if (repUid) {
         const repAuthUser = await adminAuth.getUser(repUid).catch(() => null)
         const repEmail    = repAuthUser?.email
+        const quoteNum    = (quote.quoteNumber as string) || quoteId
+        const total       = `$${((quote.total as number) ?? 0).toFixed(2)}`
+
+        let entityName = 'the customer'
+        if (effectiveCustomerId) {
+          const cSnap = await db.collection('customers').doc(effectiveCustomerId).get()
+          if (cSnap.exists) entityName = (cSnap.data()!.name as string) || (cSnap.data()!.companyName as string) || entityName
+        } else if (quote.leadId) {
+          const lSnap = await db.collection('leads').doc(quote.leadId as string).get()
+          if (lSnap.exists) {
+            const l = lSnap.data()!
+            entityName = (l.company as string) || (l.name as string) || entityName
+          }
+        }
+
+        // In-app notification
+        await db.collection('notifications').add({
+          userId:    repUid,
+          type:      'quote_accepted',
+          title:     `Quote #${quoteNum} accepted`,
+          body:      `${entityName} accepted Quote #${quoteNum} (${total}) via email link. Set up their standing order.`,
+          link:      `/crm/quotes/${quoteId}`,
+          entityId:  quoteId,
+          priority:  'high',
+          read:      false,
+          createdAt: now,
+        })
+
+        // Email notification
         if (repEmail) {
           requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY')
-          const company  = await getCompanySettings()
-          const quoteNum = (quote.quoteNumber as string) || quoteId
-          const total    = `$${((quote.total as number) ?? 0).toFixed(2)}`
-
-          let entityName = 'the customer'
-          if (quote.customerId) {
-            const cSnap = await db.collection('customers').doc(quote.customerId as string).get()
-            if (cSnap.exists) entityName = (cSnap.data()!.name as string) || entityName
-          } else if (quote.leadId) {
-            const lSnap = await db.collection('leads').doc(quote.leadId as string).get()
-            if (lSnap.exists) {
-              const l = lSnap.data()!
-              entityName = (l.company as string) || (l.name as string) || entityName
-            }
-          }
-
+          const company   = await getCompanySettings()
           const quoteLink = `https://app.ohiogassupply.com/crm/quotes/${quoteId}`
           await sendEmail({
             to:      repEmail,
@@ -897,7 +1367,7 @@ export const respondToQuotePublic = onCall(
       <strong>${entityName}</strong> has <strong style="color:#16a34a">accepted</strong> Quote #${quoteNum} (${total}).
     </p>
     <p style="margin:0 0 20px;font-size:14px;color:#555">
-      This acceptance was submitted via the email link (no portal login required). You can now proceed with setting up their account and confirming the service agreement.
+      This acceptance was submitted via the email link (no portal login required). Next step: set up their standing delivery order.
     </p>
     <a href="${quoteLink}" clicktracking="off"
        style="display:inline-block;background:#E87722;color:#fff;padding:11px 26px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:14px">
@@ -909,12 +1379,69 @@ export const respondToQuotePublic = onCall(
   </div>
 </div>`,
           })
+          console.log(`[respondToQuotePublic] acceptance notification sent to ${repEmail} for quote ${quoteId}`)
         }
       }
     } catch (notifyErr) {
       console.warn('[respondToQuotePublic] failed to send notification —', notifyErr)
     }
 
-    return { success: true }
+    // Send confirmation email to the customer with setup link + QR code
+    if (setupUrl) {
+      try {
+        let recipientEmail = ''
+        if (effectiveCustomerId) {
+          const cSnap = await db.collection('customers').doc(effectiveCustomerId).get()
+          if (cSnap.exists) recipientEmail = (cSnap.data()!.email as string) || ''
+        } else if (quote.leadId) {
+          const lSnap = await db.collection('leads').doc(quote.leadId as string).get()
+          if (lSnap.exists) recipientEmail = (lSnap.data()!.email as string) || ''
+        }
+        if (recipientEmail) {
+          requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY')
+          const company  = await getCompanySettings()
+          const quoteNum = (quote.quoteNumber as string) || quoteId
+          const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(setupUrl)}&color=1e293b&bgcolor=ffffff`
+          await sendEmail({
+            to:      recipientEmail,
+            subject: `You're confirmed — set up your ${company.name || 'OGS'} portal account`,
+            html: `
+<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#333">
+  <div style="background:#E87722;padding:24px 32px 16px">
+    <h1 style="margin:0;color:#fff;font-size:20px">${company.name || 'Ohio Gas Supply'}</h1>
+    <p style="margin:6px 0 0;color:#fde8d0;font-size:13px">Quote #${quoteNum} Accepted</p>
+  </div>
+  <div style="padding:28px 32px 24px;border:1px solid #e8e8e8;border-top:none">
+    <p style="margin:0 0 8px;font-size:16px;font-weight:bold">Thank you!</p>
+    <p style="margin:0 0 20px;font-size:14px;color:#555">
+      Your quote has been accepted. To manage your orders, view invoices, and track deliveries,
+      create your free portal account using the button or QR code below.
+    </p>
+    <div style="text-align:center;margin:28px 0">
+      <a href="${setupUrl}" clicktracking="off"
+         style="display:inline-block;background:#E87722;color:#fff;padding:13px 32px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:15px">
+        Set Up My Portal Account
+      </a>
+    </div>
+    <div style="text-align:center;margin:24px 0 8px">
+      <p style="margin:0 0 12px;font-size:12px;color:#888">Or scan this QR code on your phone</p>
+      <img src="${qrImgUrl}" alt="Account setup QR code" width="180" height="180"
+           style="display:block;margin:0 auto;border:1px solid #e2e8f0;border-radius:6px;padding:6px" />
+    </div>
+    <p style="margin:20px 0 0;font-size:12px;color:#aaa;text-align:center">This link is valid for 30 days.</p>
+  </div>
+  <div style="padding:12px 32px;background:#f9f9f9;border:1px solid #e8e8e8;border-top:none;text-align:center;font-size:11px;color:#aaa">
+    ${company.name || 'Ohio Gas Supply'}${company.website ? ` &nbsp;·&nbsp; ${company.website}` : ''}
+  </div>
+</div>`,
+          })
+          console.log(`[respondToQuotePublic] customer setup email sent to ${recipientEmail}`)
+        }
+      } catch (custEmailErr) {
+        console.warn('[respondToQuotePublic] failed to send customer setup email —', custEmailErr)
+      }
+    }
+
+    return { success: true, setupUrl: setupUrl ?? null }
   },
 )

@@ -44,7 +44,9 @@ import { getUsersByCompany, assignUserRole, deactivateUser, reactivateUser, send
 import { getInvoices, createInvoice } from '../../../services/invoiceService'
 import { getProductDropdown, getVisibleProducts, type ProductDropdownItem } from '../../../services/productService'
 import { getCustomerProductPricing, setCustomerProductPrice, removeCustomerProductPrice } from '../../../services/customerPricingService'
+import { getRouteSchedule, updateRouteSchedule } from '../../../services/orderService'
 import type { CustomerProductPricing } from '../../../types/customerPricing'
+import type { RouteSchedule, RouteCadence } from '../../../types/order'
 import { getFilesForEntity, uploadFile, deleteFile } from '../../../services/fileService'
 import { formatCurrency, formatDate, formatRelative } from '../../../utils/format'
 import { formatAddress, getGoogleMapsUrl } from '../../../utils/addressUtils'
@@ -82,7 +84,7 @@ interface ContactLogWithFollowUp extends ContactLog {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-type TabKey = 'overview' | 'history' | 'notes' | 'documents' | 'access' | 'productPricing'
+type TabKey = 'overview' | 'history' | 'notes' | 'documents' | 'access' | 'productPricing' | 'standingOrder'
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'overview',       label: 'Overview' },
@@ -91,6 +93,7 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'documents',      label: 'Documents' },
   { key: 'access',         label: 'User Access' },
   { key: 'productPricing', label: 'Product Pricing' },
+  { key: 'standingOrder',  label: 'Standing Order' },
 ]
 
 const STATUS_BADGE: Record<CustomerStatus, { label: string; variant: 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'brand' }> = {
@@ -911,6 +914,37 @@ const CustomerRecord: React.FC = () => {
   // Product Pricing tab — inline editing state (productId → input string)
   const [pricingEditMap, setPricingEditMap] = useState<Map<string, string>>(new Map())
 
+  // Standing Order tab — local form state
+  const CADENCE_OPTS: { value: RouteCadence; label: string }[] = [
+    { value: 'weekly',   label: 'Weekly'   },
+    { value: 'biweekly', label: 'Biweekly' },
+    { value: 'monthly',  label: 'Monthly'  },
+    { value: 'custom',   label: 'Custom'   },
+  ]
+  const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+
+  type SOLineItem = { productId: string; qty: number; unitPrice: number }
+  const [soForm, setSoForm] = useState<{
+    isActive: boolean
+    cadence: RouteCadence
+    customIntervalDays: number
+    dayOfWeek: number
+    nextDeliveryDate: string
+    lineItems: SOLineItem[]
+    notes: string
+  }>({
+    isActive: true,
+    cadence: 'weekly',
+    customIntervalDays: 7,
+    dayOfWeek: 1,
+    nextDeliveryDate: '',
+    lineItems: [],
+    notes: '',
+  })
+  const [soInitialised, setSoInitialised] = useState(false)
+  const [soSaved, setSoSaved] = useState(false)
+  const [soError, setSoError] = useState<string | null>(null)
+
   // ── Queries ──────────────────────────────────────────────────────────────────
 
   const {
@@ -1011,6 +1045,51 @@ const CustomerRecord: React.FC = () => {
     staleTime: 10 * 60_000,
   })
 
+  // Route schedule (fetched when standing order tab active)
+  const { data: routeSchedule, isLoading: scheduleLoading } = useQuery<RouteSchedule | null>({
+    queryKey: ['route-schedule', customerId],
+    queryFn: () => getRouteSchedule(customerId!),
+    enabled: !!customerId && activeTab === 'standingOrder',
+    staleTime: 30_000,
+  })
+
+  // Products for standing order tab (all non-Fee products)
+  const { data: soProducts = [], isLoading: soProductsLoading } = useQuery({
+    queryKey: ['visible-products'],
+    queryFn: getVisibleProducts,
+    enabled: activeTab === 'standingOrder',
+    staleTime: 10 * 60_000,
+  })
+
+  // Customer pricing for pre-filling unit prices in standing order
+  const { data: soPricingEntries = [] } = useQuery<CustomerProductPricing[]>({
+    queryKey: ['customer-product-pricing', customerId],
+    queryFn: () => getCustomerProductPricing(customerId!),
+    enabled: !!customerId && activeTab === 'standingOrder',
+    staleTime: 30_000,
+  })
+
+  // Initialise standing order form once schedule loads
+  React.useEffect(() => {
+    if (soInitialised || scheduleLoading) return
+    if (routeSchedule) {
+      setSoInitialised(true)
+      const nd = routeSchedule.nextDeliveryDate as unknown as { toDate?: () => Date }
+      const ndDate = typeof nd?.toDate === 'function' ? nd.toDate() : new Date()
+      setSoForm({
+        isActive:           routeSchedule.isActive,
+        cadence:            routeSchedule.cadence,
+        customIntervalDays: routeSchedule.customIntervalDays ?? 7,
+        dayOfWeek:          routeSchedule.dayOfWeek ?? 1,
+        nextDeliveryDate:   ndDate.toISOString().slice(0, 10),
+        lineItems:          routeSchedule.lineItems.map((li) => ({ productId: li.productId, qty: li.qty, unitPrice: li.unitPrice })),
+        notes:              routeSchedule.notes ?? '',
+      })
+    } else if (!scheduleLoading && activeTab === 'standingOrder') {
+      setSoInitialised(true)
+    }
+  }, [routeSchedule, scheduleLoading, soInitialised, activeTab])
+
   // ── Mutations ────────────────────────────────────────────────────────────────
 
   const setPriceMutation = useMutation({
@@ -1077,6 +1156,34 @@ const CustomerRecord: React.FC = () => {
     mutationFn: deleteFile,
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ['files', 'customer', customerId] }),
+  })
+
+  const saveScheduleMutation = useMutation({
+    mutationFn: async () => {
+      if (!customerId || !user) throw new Error('Missing context')
+      if (!soForm.nextDeliveryDate) throw new Error('Next delivery date is required.')
+      if (soForm.lineItems.length === 0) throw new Error('Add at least one line item.')
+      const schedule: Partial<RouteSchedule> = {
+        isActive:            soForm.isActive,
+        cadence:             soForm.cadence,
+        customIntervalDays:  soForm.cadence === 'custom' ? soForm.customIntervalDays : undefined,
+        dayOfWeek:           soForm.dayOfWeek,
+        nextDeliveryDate:    Timestamp.fromDate(new Date(soForm.nextDeliveryDate)) as unknown as import('firebase/firestore').Timestamp,
+        lineItems:           soForm.lineItems.filter((li) => li.productId && li.qty > 0),
+        routeId:             '',
+        notes:               soForm.notes,
+        updatedBy:           user.id,
+        updatedAt:           Timestamp.now() as unknown as import('firebase/firestore').Timestamp,
+      }
+      await updateRouteSchedule(customerId, schedule, user.id)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['route-schedule', customerId] })
+      setSoSaved(true)
+      setSoError(null)
+      setTimeout(() => setSoSaved(false), 3000)
+    },
+    onError: (e: Error) => setSoError(e.message),
   })
 
   const createInvoiceMutation = useMutation({
@@ -1916,6 +2023,235 @@ const CustomerRecord: React.FC = () => {
                       })}
                     </tbody>
                   </table>
+                </CardBody>
+              </Card>
+            )}
+          </div>
+        )
+      })()}
+
+      {/* ── Standing Order tab ────────────────────────────────────────────── */}
+      {activeTab === 'standingOrder' && (() => {
+        const soPricingMap = new Map(soPricingEntries.map((p) => [p.productId, p.price]))
+        const availableProducts = soProducts.filter((p) => p.category !== 'Fees')
+        const isLoading = scheduleLoading || soProductsLoading
+
+        const addLineItem = () => {
+          setSoForm((prev) => ({
+            ...prev,
+            lineItems: [...prev.lineItems, { productId: '', qty: 1, unitPrice: 0 }],
+          }))
+        }
+
+        const removeLineItem = (i: number) => {
+          setSoForm((prev) => ({ ...prev, lineItems: prev.lineItems.filter((_, idx) => idx !== i) }))
+        }
+
+        const updateLineItem = (i: number, field: 'productId' | 'qty' | 'unitPrice', value: string | number) => {
+          setSoForm((prev) => {
+            const items = prev.lineItems.map((li, idx) => {
+              if (idx !== i) return li
+              if (field === 'productId') {
+                const productId = value as string
+                const customPrice = soPricingMap.get(productId)
+                const product     = availableProducts.find((p) => p.id === productId)
+                const unitPrice   = customPrice ?? product?.basePrice ?? 0
+                return { ...li, productId, unitPrice }
+              }
+              return { ...li, [field]: field === 'qty' ? Math.max(1, Number(value)) : Number(value) }
+            })
+            return { ...prev, lineItems: items }
+          })
+        }
+
+        return (
+          <div className="cr-tab-panel" role="tabpanel">
+            <div className="cr-panel-header">
+              <h3 className="cr-section-title">Standing delivery order</h3>
+              <p className="cr-section-desc">
+                Set up a recurring schedule for this customer. Line item prices are pre-filled from
+                their custom pricing. The scheduler will auto-create orders ahead of each delivery.
+              </p>
+            </div>
+
+            {isLoading ? (
+              <div className="cr-skeleton cr-skeleton--list" />
+            ) : (
+              <Card>
+                <CardBody>
+                  {/* ── Active toggle ── */}
+                  <div className="cr-so-row cr-so-row--toggle">
+                    <label className="cr-so-toggle-wrap">
+                      <input
+                        type="checkbox"
+                        checked={soForm.isActive}
+                        onChange={(e) => setSoForm((prev) => ({ ...prev, isActive: e.target.checked }))}
+                        className="cr-so-toggle-check"
+                      />
+                      <span className="cr-so-toggle-label">
+                        {soForm.isActive ? 'Active — scheduler will create orders' : 'Paused — no orders will be created'}
+                      </span>
+                    </label>
+                  </div>
+
+                  {/* ── Cadence ── */}
+                  <div className="cr-so-field">
+                    <label className="cr-so-label">Delivery cadence</label>
+                    <div className="cr-so-cadence-grid">
+                      {CADENCE_OPTS.map(({ value, label }) => (
+                        <button
+                          key={value}
+                          type="button"
+                          className={`cr-so-cadence-btn${soForm.cadence === value ? ' cr-so-cadence-btn--active' : ''}`}
+                          onClick={() => setSoForm((prev) => ({ ...prev, cadence: value }))}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    {soForm.cadence === 'custom' && (
+                      <div className="cr-so-inline-field">
+                        <label className="cr-so-label">Interval (days)</label>
+                        <input
+                          type="number"
+                          min={1}
+                          className="ui-input cr-so-narrow-input"
+                          value={soForm.customIntervalDays}
+                          onChange={(e) => setSoForm((prev) => ({ ...prev, customIntervalDays: parseInt(e.target.value, 10) || 1 }))}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ── Day of week ── */}
+                  <div className="cr-so-field">
+                    <label className="cr-so-label">Preferred delivery day</label>
+                    <div className="cr-so-day-grid">
+                      {DAY_NAMES.map((day, i) => (
+                        <button
+                          key={day}
+                          type="button"
+                          className={`cr-so-day-btn${soForm.dayOfWeek === i ? ' cr-so-day-btn--active' : ''}`}
+                          onClick={() => setSoForm((prev) => ({ ...prev, dayOfWeek: i }))}
+                        >
+                          {day.slice(0, 3)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* ── Next delivery date ── */}
+                  <div className="cr-so-field">
+                    <label className="cr-so-label">Next delivery date</label>
+                    <input
+                      type="date"
+                      className="ui-input cr-so-date-input"
+                      value={soForm.nextDeliveryDate}
+                      onChange={(e) => setSoForm((prev) => ({ ...prev, nextDeliveryDate: e.target.value }))}
+                    />
+                  </div>
+
+                  {/* ── Line items ── */}
+                  <div className="cr-so-field">
+                    <label className="cr-so-label">Products per delivery</label>
+                    {soForm.lineItems.length > 0 && (
+                      <div className="cr-so-items">
+                        <div className="cr-so-items-header">
+                          <span>Product</span>
+                          <span>Qty</span>
+                          <span>Unit price</span>
+                          <span>Total</span>
+                          <span />
+                        </div>
+                        {soForm.lineItems.map((li, i) => {
+                          const product = availableProducts.find((p) => p.id === li.productId)
+                          const lineTotal = li.qty * li.unitPrice
+                          return (
+                            <div key={i} className="cr-so-item-row">
+                              <select
+                                className="ui-input cr-so-product-select"
+                                value={li.productId}
+                                onChange={(e) => updateLineItem(i, 'productId', e.target.value)}
+                              >
+                                <option value="">— Select product —</option>
+                                {availableProducts.map((p) => (
+                                  <option key={p.id} value={p.id}>
+                                    {p.name}{soPricingMap.has(p.id) ? ' ★' : ''}
+                                  </option>
+                                ))}
+                              </select>
+                              <input
+                                type="number"
+                                min={1}
+                                className="ui-input cr-so-qty-input"
+                                value={li.qty}
+                                onChange={(e) => updateLineItem(i, 'qty', e.target.value)}
+                              />
+                              <div className="cr-so-price-wrap">
+                                <span className="cr-so-price-prefix">$</span>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                  className="ui-input cr-so-price-input"
+                                  value={li.unitPrice}
+                                  onChange={(e) => updateLineItem(i, 'unitPrice', e.target.value)}
+                                />
+                                {product && <span className="cr-so-unit">/ {product.unit}</span>}
+                              </div>
+                              <span className="cr-so-line-total">{formatCurrency(lineTotal)}</span>
+                              <button
+                                type="button"
+                                className="cr-so-remove-btn"
+                                onClick={() => removeLineItem(i)}
+                                title="Remove"
+                              >✕</button>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                    <button type="button" className="cr-link cr-so-add-item" onClick={addLineItem}>
+                      + Add product
+                    </button>
+                  </div>
+
+                  {/* ── Notes ── */}
+                  <div className="cr-so-field">
+                    <label className="cr-so-label">Delivery notes <span className="cr-optional">(optional)</span></label>
+                    <textarea
+                      className="ui-input cr-textarea"
+                      rows={2}
+                      placeholder="Access instructions, timing preferences…"
+                      value={soForm.notes}
+                      onChange={(e) => setSoForm((prev) => ({ ...prev, notes: e.target.value }))}
+                    />
+                  </div>
+
+                  {soError && <p className="cr-form-error">{soError}</p>}
+                  {soSaved && <p className="cr-save-confirm">✓ Standing order saved</p>}
+
+                  <div className="cr-modal-actions cr-modal-actions--left">
+                    <Button
+                      variant="primary"
+                      loading={saveScheduleMutation.isPending}
+                      onClick={() => { setSoError(null); void saveScheduleMutation.mutateAsync() }}
+                    >
+                      Save standing order
+                    </Button>
+                    {routeSchedule && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSoInitialised(false)
+                          queryClient.invalidateQueries({ queryKey: ['route-schedule', customerId] })
+                        }}
+                      >
+                        Discard changes
+                      </Button>
+                    )}
+                  </div>
                 </CardBody>
               </Card>
             )}

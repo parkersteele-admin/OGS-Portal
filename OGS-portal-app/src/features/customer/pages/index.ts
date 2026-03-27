@@ -1,4 +1,5 @@
 export { default as AutopayPage } from './AutopayPage'
+export { default as CompanyProfilePage } from './CompanyProfilePage'
 export { default as DashboardPage } from './DashboardPage'
 export { default as InvoicesPage } from './InvoicesPage'
 export { default as ManageAutopay } from './ManageAutopay'

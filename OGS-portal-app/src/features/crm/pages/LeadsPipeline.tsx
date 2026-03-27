@@ -61,15 +61,20 @@ interface StageConfig {
   accent?: boolean
 }
 
-const STAGES: StageConfig[] = [
+const ACTIVE_STAGES: StageConfig[] = [
   { key: 'pending_setup', label: 'Pending Setup' },
   { key: 'new',           label: 'New Lead' },
   { key: 'contacted',     label: 'Contacted' },
   { key: 'qualified',     label: 'Qualified' },
   { key: 'proposal',      label: 'Quote Sent', accent: true },
-  { key: 'won',           label: 'Won',        accent: true },
-  { key: 'lost',          label: 'Lost' },
 ]
+
+const ARCHIVED_STAGES: StageConfig[] = [
+  { key: 'won',  label: 'Won',  accent: true },
+  { key: 'lost', label: 'Lost' },
+]
+
+const STAGES = [...ACTIVE_STAGES, ...ARCHIVED_STAGES]
 
 const STAGE_MAP = Object.fromEntries(STAGES.map(s => [s.key, s])) as Record<LeadStatus, StageConfig>
 
@@ -854,6 +859,7 @@ const LeadsPipeline: React.FC = () => {
   const [sortCol,       setSortCol]       = useState<SortCol>('updatedAt')
   const [sortDir,       setSortDir]       = useState<'asc' | 'desc'>('desc')
   const [stageFilter,   setStageFilter]   = useState<LeadStatus | 'all'>('all')
+  const [showArchived,  setShowArchived]  = useState(false)
   const [backfilling,   setBackfilling]   = useState(false)
   const [backfillMsg,   setBackfillMsg]   = useState<string | null>(null)
 
@@ -907,11 +913,16 @@ const LeadsPipeline: React.FC = () => {
 
   // Derived: filtered + sorted leads
   const filteredLeads = useMemo(() => {
-    const base = stageFilter === 'all' ? leads : leads.filter(l => l.status === stageFilter)
+    const ARCHIVED: LeadStatus[] = ['won', 'lost']
+    let base = showArchived
+      ? leads
+      : leads.filter(l => !ARCHIVED.includes(l.status))
+    if (stageFilter !== 'all') base = base.filter(l => l.status === stageFilter)
     return view === 'list' ? sortLeads(base, sortCol, sortDir) : base
-  }, [leads, stageFilter, view, sortCol, sortDir])
+  }, [leads, stageFilter, showArchived, view, sortCol, sortDir])
 
-  // Leads by stage for Kanban
+  // Leads by stage for Kanban — only active columns
+  const kanbanStages = showArchived ? STAGES : ACTIVE_STAGES
   const leadsByStage = useMemo(
     () => Object.fromEntries(
       STAGES.map(s => [s.key, filteredLeads.filter(l => l.status === s.key)])
@@ -1006,8 +1017,8 @@ const LeadsPipeline: React.FC = () => {
               <span className="lp-metric__value lp-metric__value--won">{formatCurrency(wonValue)}</span>
             </div>
             <div className="lp-metric">
-              <span className="lp-metric__label">Total leads</span>
-              <span className="lp-metric__value">{leads.length}</span>
+              <span className="lp-metric__label">Active leads</span>
+              <span className="lp-metric__value">{leads.filter(l => l.status !== 'won' && l.status !== 'lost').length}</span>
             </div>
           </div>
         </div>
@@ -1020,7 +1031,7 @@ const LeadsPipeline: React.FC = () => {
             onChange={e => setStageFilter(e.target.value as LeadStatus | 'all')}
           >
             <option value="all">All stages</option>
-            {STAGES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+            {(showArchived ? STAGES : ACTIVE_STAGES).map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
           </select>
 
           {/* View toggle */}
@@ -1043,6 +1054,14 @@ const LeadsPipeline: React.FC = () => {
 
           <Button variant="primary" size="sm" onClick={() => setShowAdd(true)}>
             Add lead
+          </Button>
+          <Button
+            variant={showArchived ? 'primary' : 'secondary'}
+            size="sm"
+            onClick={() => { setShowArchived(p => !p); setStageFilter('all') }}
+            title="Show won and lost leads"
+          >
+            {showArchived ? 'Hide archived' : 'Show archived'}
           </Button>
           <Button
             variant="secondary"
@@ -1076,7 +1095,7 @@ const LeadsPipeline: React.FC = () => {
         <div className="lp-content">
           {view === 'kanban' ? (
             <div className="lp-board">
-              {STAGES.map(stage => (
+              {kanbanStages.map(stage => (
                 <KanbanColumn
                   key={stage.key}
                   stage={stage}

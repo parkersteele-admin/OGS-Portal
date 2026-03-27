@@ -46,6 +46,12 @@ export interface Customer {
   archivedAt?: Timestamp
   /** Set when the customer is soft-deleted. Document is purged 30 days after this. */
   deletedAt?: Timestamp
+  /** One-time token for the self-service account setup QR code flow. */
+  setupToken?: string
+  /** Expiry date for the setupToken (30 days from generation). */
+  setupTokenExpiry?: Timestamp
+  /** True once the customer has completed portal account setup. */
+  setupComplete?: boolean
   createdAt: Timestamp
   updatedAt: Timestamp
 }

@@ -9,6 +9,8 @@
  */
 
 import PDFDocument from 'pdfkit'
+import * as https from 'https'
+import * as http from 'http'
 import { db, storage, FieldValue } from '../admin'
 import { getCompanySettings, fetchLogoBuffer } from './companySettings'
 import type { CompanySettings } from './companySettings'
@@ -50,6 +52,21 @@ export async function generateQuotePdf(quoteId: string): Promise<string> {
   const company   = await getCompanySettings()
   const logoBuf   = await fetchLogoBuffer(company.logoUrl)
 
+  // Build QR code image for the "accept / setup" link in the PDF.
+  // Use the setupToken URL if present (quote accepted), otherwise the public quote link.
+  let qrBuf: Buffer | null = null
+  const setupToken  = quote.setupToken  as string | undefined
+  const publicToken = quote.publicToken as string | undefined
+  let qrUrl: string | null = null
+  if (setupToken) {
+    qrUrl = `https://app.ohiogassupply.com/join/${setupToken}`
+  } else if (publicToken) {
+    qrUrl = `https://app.ohiogassupply.com/quote/${quoteId}?token=${publicToken}`
+  }
+  if (qrUrl) {
+    qrBuf = await fetchImageBuffer(`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(qrUrl)}&color=1e293b&bgcolor=ffffff`)
+  }
+
   // Fetch assigned sales rep (createdBy field holds the rep's UID)
   let salesRep: { name: string; email: string; phone: string } | null = null
   const repUid = (quote.createdBy ?? quote.assignedTo) as string | undefined
@@ -65,7 +82,7 @@ export async function generateQuotePdf(quoteId: string): Promise<string> {
     }
   }
 
-  const pdfBuffer = await buildQuotePdf(quoteId, quote, recipient, company, logoBuf, salesRep)
+  const pdfBuffer = await buildQuotePdf(quoteId, quote, recipient, company, logoBuf, salesRep, qrBuf, qrUrl)
 
   const storagePath = `ogs-portal/quotes/${quoteId}.pdf`
   const fileRef     = storage.bucket().file(storagePath)
@@ -90,6 +107,21 @@ export async function generateQuotePdf(quoteId: string): Promise<string> {
   return downloadUrl
 }
 
+// ── Fetch image buffer (QR codes, etc.) ──────────────────────────────────────
+
+function fetchImageBuffer(url: string): Promise<Buffer | null> {
+  return new Promise((resolve) => {
+    const client = url.startsWith('https') ? https : http
+    client.get(url, (res) => {
+      if ((res.statusCode ?? 0) < 200 || (res.statusCode ?? 0) >= 300) { resolve(null); return }
+      const chunks: Buffer[] = []
+      res.on('data', (c: Buffer) => chunks.push(c))
+      res.on('end',  () => resolve(Buffer.concat(chunks)))
+      res.on('error', () => resolve(null))
+    }).on('error', () => resolve(null))
+  })
+}
+
 // ── PDF builder ───────────────────────────────────────────────────────────────
 
 function buildQuotePdf(
@@ -99,6 +131,8 @@ function buildQuotePdf(
   company:   CompanySettings,
   logoBuf:   Buffer | null,
   salesRep:  { name: string; email: string; phone: string } | null,
+  qrBuf:     Buffer | null = null,
+  qrUrl:     string | null = null,
 ): Promise<Buffer> {
   return new Promise<Buffer>((resolve, reject) => {
     const doc    = new PDFDocument({ margin: 0, size: 'LETTER' })
@@ -380,19 +414,38 @@ function buildQuotePdf(
       rowY += doc.heightOfString(notesText, { width: CONTENT_W }) + 16
     }
 
-    // ── Info box — "To Accept This Quote" + Sales Rep section ───────────────
+    // ── Info box — "To Accept This Quote" + Sales Rep (+ QR code) ───────────
     const hasRep    = !!(salesRep?.name)
     const repContact = hasRep
       ? [salesRep!.phone, salesRep!.email].filter(Boolean).join('  ·  ')
       : ''
-    // Height: base 3 rows (title + valid until + contact) = 66
-    //         + rep block (divider + header + name + contact line + tagline) = 76
+    const hasQr = !!(qrBuf && qrUrl)
+    // Width of the QR block when present (80pt image + 12pt right margin)
+    const QR_BLOCK_W = hasQr ? 96 : 0
+    // Height: base rows + optional rep block, same as before
     const BOX_H = hasRep ? 148 : 66
 
     doc
       .rect(C_DESC, rowY, CONTENT_W, BOX_H)
       .fillAndStroke('#FFF8F3', OGS_ORANGE)
       .lineWidth(0.75)
+
+    // ── QR code block on the right of the info box ─────────────────────────
+    const TEXT_CONTENT_W = CONTENT_W - QR_BLOCK_W - 24
+    if (hasQr && qrBuf) {
+      const QR_SIZE  = 72
+      const QR_X     = RIGHT_EDGE - QR_BLOCK_W + 4
+      const QR_Y     = rowY + (BOX_H - QR_SIZE - 18) / 2
+      try {
+        doc.image(qrBuf, QR_X, QR_Y, { width: QR_SIZE, height: QR_SIZE })
+      } catch { /* non-fatal */ }
+      // Small "Scan to accept" label below QR
+      doc
+        .fontSize(6.5)
+        .font('Helvetica')
+        .fillColor('#888888')
+        .text('Scan to accept', QR_X, QR_Y + QR_SIZE + 3, { width: QR_SIZE, align: 'center' })
+    }
 
     // Row 1: section title
     doc
@@ -413,7 +466,7 @@ function buildQuotePdf(
           ? `To accept this quote, please contact your account representative. You can also reach us at ${contactDetail}.`
           : 'To accept this quote, please contact your account representative directly.',
         C_DESC + 12, rowY + 40,
-        { width: CONTENT_W - 24 },
+        { width: TEXT_CONTENT_W },
       )
 
     if (hasRep) {

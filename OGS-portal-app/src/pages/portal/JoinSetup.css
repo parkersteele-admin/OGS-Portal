@@ -1,0 +1,187 @@
+/* src/pages/portal/JoinSetup.css */
+
+/* ── Company header block ─────────────────────────────────────────────────── */
+.join-company {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin-bottom: 20px;
+  padding: 14px 18px;
+  background: #f0f7ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.join-company__label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.join-company__name {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.join-company__location {
+  font-size: 13px;
+  color: #64748b;
+}
+
+/* ── Step indicator ───────────────────────────────────────────────────────── */
+.join-steps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  margin-bottom: 24px;
+}
+
+.join-steps__dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  background: #e2e8f0;
+  color: #94a3b8;
+  flex-shrink: 0;
+  transition: background 0.2s, color 0.2s;
+}
+
+.join-steps__dot--active {
+  background: #E87722;
+  color: #fff;
+}
+
+.join-steps__dot--done {
+  background: #16a34a;
+  color: #fff;
+}
+
+.join-steps__line {
+  width: 48px;
+  height: 2px;
+  background: #e2e8f0;
+  flex-shrink: 0;
+}
+
+/* ── Role cards ───────────────────────────────────────────────────────────── */
+.join-role-step {
+  width: 100%;
+}
+
+.join-roles {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.join-role {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  background: #fff;
+}
+
+.join-role:hover {
+  border-color: #E87722;
+  background: #fffbf7;
+}
+
+.join-role--selected {
+  border-color: #E87722;
+  background: #fff8f3;
+}
+
+.join-role__radio {
+  margin-top: 3px;
+  accent-color: #E87722;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+
+.join-role__content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.join-role__label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.join-role__desc {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+/* ── Form actions row ─────────────────────────────────────────────────────── */
+.join-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.join-back-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 13px;
+  color: #64748b;
+  cursor: pointer;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.join-back-btn:hover {
+  color: #E87722;
+}
+
+/* ── Done state ───────────────────────────────────────────────────────────── */
+.join-done {
+  text-align: center;
+  padding: 16px 0;
+}
+
+.join-done__icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.join-done__title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 8px;
+}
+
+.join-done__body {
+  font-size: 14px;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+/* ── Wide card for role step ──────────────────────────────────────────────── */
+.join-card {
+  max-width: 480px;
+}

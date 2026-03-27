@@ -59,16 +59,25 @@ const IC_PROFILE = (
     <path d="M2.5 13.5c0-2.485 2.462-4.5 5.5-4.5s5.5 2.015 5.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
   </svg>
 )
+const IC_COMPANY = (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+    <rect x="1.5" y="5" width="9" height="9.5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+    <path d="M5 14.5V11h3v3.5" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+    <path d="M10.5 7.5V2.5a1 1 0 0 1 1-1H14a.5.5 0 0 1 .5.5v12" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+    <path d="M3.5 8h1M3.5 10.5h1M11.5 5h1M11.5 7.5h1M11.5 10h1" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round"/>
+  </svg>
+)
 
 const NAV_ITEMS: SidebarItem[] = [
-  { to: '/portal/dashboard', label: 'Dashboard', icon: IC_DASHBOARD },
-  { to: '/portal/order',     label: 'New Order',  icon: IC_ORDER },
-  { to: '/portal/orders',    label: 'My Orders',  icon: IC_ORDERS },
-  { to: '/portal/invoices',  label: 'Invoices',   icon: IC_INVOICES },
-  { to: '/portal/autopay',   label: 'Autopay',    icon: IC_AUTOPAY },
-  { to: '/portal/tanks',     label: 'My Tanks',   icon: IC_TANKS },
-  { to: '/portal/catalog',   label: 'My Products', icon: IC_PRODUCTS },
-  { to: '/portal/profile',   label: 'My Profile',  icon: IC_PROFILE },
+  { to: '/portal/dashboard', label: 'Dashboard',       icon: IC_DASHBOARD },
+  { to: '/portal/order',     label: 'New Order',       icon: IC_ORDER },
+  { to: '/portal/orders',    label: 'My Orders',       icon: IC_ORDERS },
+  { to: '/portal/invoices',  label: 'Invoices',        icon: IC_INVOICES },
+  { to: '/portal/autopay',   label: 'Autopay',         icon: IC_AUTOPAY },
+  { to: '/portal/tanks',     label: 'My Tanks',        icon: IC_TANKS },
+  { to: '/portal/catalog',   label: 'My Products',     icon: IC_PRODUCTS },
+  { to: '/portal/profile',   label: 'My Profile',      icon: IC_PROFILE },
+  { to: '/portal/company',   label: 'Company Profile', icon: IC_COMPANY },
 ]
 
 const MOBILE_ITEMS: MobileNavItem[] = NAV_ITEMS.slice(0, 4).map(

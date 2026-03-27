@@ -65,6 +65,10 @@ export interface Quote {
   total: number
   validUntil: Timestamp
   acceptedAt?: Timestamp
+  /** Set after a draft invoice is auto-created on acceptance. */
+  invoiceId?: string
+  /** Set to true on acceptance — prompts staff to create a standing order. */
+  needsOrderSetup?: boolean
   /** UID of the sales rep who created the quote. */
   createdBy: string
   notes?: string

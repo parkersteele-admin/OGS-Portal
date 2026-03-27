@@ -34,6 +34,10 @@ import {
 import { subscribeToCustomers } from '../../../services/customerService'
 import { getLeads } from '../../../services/leadService'
 import { useAuth } from '../../../hooks/useAuth'
+import { getDoc, doc } from 'firebase/firestore'
+import { httpsCallable } from 'firebase/functions'
+import { db, functions } from '../../../lib/firebase'
+import { QRCodeSVG } from 'qrcode.react'
 import { formatCurrency, formatDate } from '../../../utils/format'
 import { Badge } from '../../../components/ui/Badge'
 import { Button } from '../../../components/ui/Button'
@@ -447,6 +451,10 @@ const QuoteEditorPage: React.FC = () => {
   const [pdfLoading,     setPdfLoading]     = useState(false)
   const [savedId,        setSavedId]        = useState<string | null>(isNew ? null : quoteId!)
   const [status,         setStatus]         = useState<QuoteStatus>('draft')
+  const [needsOrderSetup, setNeedsOrderSetup] = useState(false)
+  const [setupUrl,       setSetupUrl]       = useState<string | null>(null)
+  const [setupComplete,  setSetupComplete]  = useState(false)
+  const [setupUrlLoading, setSetupUrlLoading] = useState(false)
   const [error,          setError]          = useState<string | null>(null)
   const [sendToast,      setSendToast]      = useState<string | null>(null)
   const summaryRef = useRef<HTMLDivElement | null>(null)
@@ -477,6 +485,21 @@ const QuoteEditorPage: React.FC = () => {
       })).map((row) => recalcRow(row, 'unitPrice')))
       setNotes(q.notes ?? '')
       setStatus(q.status)
+      if (q.needsOrderSetup) setNeedsOrderSetup(true)
+
+      // Load setup token from customer doc to show QR code
+      if (q.status === 'accepted' && q.customerId) {
+        getDoc(doc(db, 'customers', q.customerId as string)).then((cSnap) => {
+          if (!cSnap.exists()) return
+          const cd = cSnap.data()
+          if (cd.setupComplete) {
+            setSetupComplete(true)
+          } else if (cd.setupToken) {
+            setSetupUrl(`https://app.ohiogassupply.com/join/${cd.setupToken as string}`)
+          }
+        }).catch(() => null)
+      }
+
       if (q.validUntil) {
         setValidUntil((q.validUntil as { toDate(): Date }).toDate().toISOString().slice(0, 10))
       }
@@ -758,12 +781,110 @@ const QuoteEditorPage: React.FC = () => {
               <span className="qep-action-label"><span className="qep-icon" aria-hidden="true"><FlatIcon name="convert" /></span>Convert to order</span>
             </Button>
           )}
+          {status === 'accepted' && needsOrderSetup && (
+            <Button variant="primary" size="sm"
+              onClick={() => {
+                const base = location.pathname.startsWith('/admin') ? '/admin' : ''
+                const custParam = recipientId ? `?customerId=${recipientId}` : ''
+                navigate(`${base}/orders/new${custParam}`)
+              }}>
+              Set Up Standing Order
+            </Button>
+          )}
         </div>
       </div>
 
       {error && <div className="qep-error" role="alert">{error}</div>}
 
       {sendToast && <div className="qep-toast" role="status">{sendToast}</div>}
+
+      {status === 'accepted' && needsOrderSetup && (
+        <div className="qep-notice qep-notice--action" role="status">
+          ✅ Quote accepted — pricing is locked in. Next step: set up this customer’s
+          {' '}<button
+            type="button"
+            className="qep-notice__link"
+            onClick={() => {
+              const base = location.pathname.startsWith('/admin') ? '/admin' : ''
+              const custParam = recipientId ? `?customerId=${recipientId}` : ''
+              navigate(`${base}/orders/new${custParam}`)
+            }}
+          >standing delivery order</button>.
+        </div>
+      )}
+
+      {/* ── Customer portal setup QR code ───────────────────────────────── */}
+      {status === 'accepted' && selectedRecipient?.type === 'customer' && (
+        <div className="qep-setup-qr">
+          <div className="qep-setup-qr__header">
+            <span className="qep-setup-qr__title">Customer Portal Setup</span>
+            {setupComplete ? (
+              <span className="qep-setup-qr__badge qep-setup-qr__badge--done">✓ Account created</span>
+            ) : setupUrl ? (
+              <span className="qep-setup-qr__badge">Scan or share to set up</span>
+            ) : null}
+          </div>
+
+          {setupComplete ? (
+            <p className="qep-setup-qr__done">
+              This customer has already set up their portal account.
+            </p>
+          ) : setupUrl ? (
+            <div className="qep-setup-qr__body">
+              <div className="qep-setup-qr__code">
+                <QRCodeSVG value={setupUrl} size={140} includeMargin />
+              </div>
+              <div className="qep-setup-qr__info">
+                <p className="qep-setup-qr__hint">
+                  Show or send this QR code so the customer can create their portal account.
+                  They'll pick their role and set a password — no further action needed.
+                </p>
+                <div className="qep-setup-qr__actions">
+                  <button
+                    type="button"
+                    className="qep-setup-qr__copy"
+                    onClick={() => {
+                      navigator.clipboard.writeText(setupUrl).catch(() => null)
+                    }}
+                  >
+                    Copy link
+                  </button>
+                  <a
+                    href={setupUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="qep-setup-qr__open"
+                  >
+                    Open ↗
+                  </a>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="qep-setup-qr__body qep-setup-qr__body--empty">
+              <p className="qep-setup-qr__hint">
+                Generate a setup link to create a QR code the customer can scan to create their portal account.
+              </p>
+              <button
+                type="button"
+                className="qep-setup-qr__generate"
+                disabled={setupUrlLoading}
+                onClick={() => {
+                  if (!recipientId) return
+                  setSetupUrlLoading(true)
+                  const fn = httpsCallable<{ customerId: string }, { url: string }>(functions, 'generateSetupLink')
+                  fn({ customerId: recipientId })
+                    .then((res) => setSetupUrl(res.data.url))
+                    .catch((err: { message?: string }) => setError(err.message ?? 'Failed to generate setup link.'))
+                    .finally(() => setSetupUrlLoading(false))
+                }}
+              >
+                {setupUrlLoading ? 'Generating…' : 'Generate QR setup link'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {isDeclinedRevision && (
         <div className="qep-notice qep-notice--declined" role="status">

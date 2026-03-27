@@ -16,6 +16,9 @@ export interface Invoice {
   invoiceNumber: string
   customerId: string
   orderId?: string
+  quoteId?: string
+  quoteNumber?: string
+  leadId?: string
   status: InvoiceStatus
   lineItems: InvoiceLineItem[]
   subtotal: number

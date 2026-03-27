@@ -898,6 +898,9 @@ const QuoteTable: React.FC<QuoteTableProps> = ({
                 <td className="qb-td qb-td--right qb-td--bold">{formatCurrency(q.total)}</td>
                 <td className="qb-td">
                   <Badge variant={cfg.variant}>{cfg.label}</Badge>
+                  {q.status === 'accepted' && (q as Quote & { needsOrderSetup?: boolean }).needsOrderSetup && (
+                    <span className="qb-needs-order" title="Standing order not yet set up">⚡ Needs order</span>
+                  )}
                 </td>
                 <td className="qb-td">
                   {'sentAt' in q && q.sentAt

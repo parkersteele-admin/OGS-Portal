@@ -449,6 +449,41 @@ export const acceptInvite = onCall(async (request) => {
     acceptedAt: FieldValue.serverTimestamp(),
   })
 
+  // Sync the invited user's personal info to the company profile so it
+  // appears correctly in the CRM.  For the 'owner' role (primary portal user),
+  // update the billing contact name and email if they are not yet set.
+  try {
+    const userSnap  = await db.collection('users').doc(request.auth!.uid).get()
+    const userData  = userSnap.data() ?? {}
+    const userName  = (userData.name  as string | undefined) || ''
+    const userEmail = (userData.email as string | undefined)
+      || (request.auth!.token.email as string | undefined) || ''
+
+    if (userName || userEmail) {
+      const compSnap   = await db.collection('customers').doc(inv.companyId).get()
+      const compData   = compSnap.data() ?? {}
+      const updatePayload: Record<string, unknown> = {}
+
+      // Always ensure flat 'name' and 'email' exist for CRM display
+      if (!compData.name  && userName)  updatePayload.name  = userName
+      if (!compData.email && userEmail) updatePayload.email = userEmail
+
+      // For owner role: set billingContactName / billingEmail if missing
+      if (inv.role === 'owner') {
+        if (!compData.billingContactName && userName)  updatePayload.billingContactName = userName
+        if (!compData.billingEmail       && userEmail) updatePayload.billingEmail       = userEmail
+      }
+
+      if (Object.keys(updatePayload).length > 0) {
+        updatePayload.updatedAt = FieldValue.serverTimestamp()
+        await db.collection('customers').doc(inv.companyId).update(updatePayload)
+      }
+    }
+  } catch (syncErr) {
+    // Non-fatal — claim is already applied
+    console.warn('[acceptInvite] failed to sync user info to company —', syncErr)
+  }
+
   return { success: true, companyId: inv.companyId, role: inv.role }
 })
 
@@ -484,4 +519,167 @@ export const adminAssignUser = onCall(async (request) => {
 
   await applyCompanyClaim(uid, companyId, role)
   return { success: true }
+})
+
+// ── generateSetupLink ─────────────────────────────────────────────────────────
+
+/**
+ * Generate (or refresh) a one-time setup link for a customer to create their
+ * portal account via QR code or shared URL.
+ *
+ * Input:  { customerId: string }
+ * Output: { url: string; expiresAt: string }  (ISO date)
+ */
+export const generateSetupLink = onCall(async (request) => {
+  assertAuth(request)
+
+  const callerRole = request.auth!.token.role as string
+  if (!['admin', 'sales'].includes(callerRole)) {
+    throw new HttpsError('permission-denied', 'Only admins and sales staff can generate setup links.')
+  }
+
+  const data       = request.data as Record<string, unknown>
+  const customerId = typeof data.customerId === 'string' ? data.customerId.trim() : ''
+  if (!customerId) throw new HttpsError('invalid-argument', 'customerId is required.')
+
+  const compSnap = await db.collection('customers').doc(customerId).get()
+  if (!compSnap.exists) throw new HttpsError('not-found', 'Customer not found.')
+  if (compSnap.data()!.setupComplete) {
+    throw new HttpsError('failed-precondition', 'This customer has already completed account setup.')
+  }
+
+  const setupToken       = crypto.randomUUID()
+  const expiresAt        = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+
+  await db.collection('customers').doc(customerId).update({
+    setupToken,
+    setupTokenExpiry: expiresAt,
+    updatedAt: FieldValue.serverTimestamp(),
+  })
+
+  return {
+    url:       `https://app.ohiogassupply.com/join/${setupToken}`,
+    expiresAt: expiresAt.toISOString(),
+  }
+})
+
+// ── getSetupLinkInfo ──────────────────────────────────────────────────────────
+
+/**
+ * Public (unauthenticated) lookup of a setup token.
+ * Returns the minimal company info needed to render the account-creation form.
+ *
+ * Input:  { token: string }
+ * Output: { companyId, companyName, address, city, state }
+ */
+export const getSetupLinkInfo = onCall(async (request) => {
+  const data  = request.data as Record<string, unknown>
+  const token = typeof data.token === 'string' ? data.token.trim() : ''
+  if (!token) throw new HttpsError('invalid-argument', 'token is required.')
+
+  const snap = await db.collection('customers')
+    .where('setupToken', '==', token)
+    .limit(1)
+    .get()
+
+  if (snap.empty) throw new HttpsError('not-found', 'Invalid or expired setup link.')
+
+  const doc      = snap.docs[0]
+  const customer = doc.data()
+
+  const expiry = customer.setupTokenExpiry?.toDate?.() as Date | undefined
+  if (expiry && expiry < new Date()) {
+    throw new HttpsError('deadline-exceeded', 'This setup link has expired. Ask your sales rep for a new one.')
+  }
+  if (customer.setupComplete) {
+    throw new HttpsError('failed-precondition', 'An account has already been created for this company.')
+  }
+
+  return {
+    companyId:   doc.id,
+    companyName: (customer.companyName || customer.name || '') as string,
+    address:     (customer.address   || '') as string,
+    city:        (customer.city      || '') as string,
+    state:       (customer.state     || '') as string,
+  }
+})
+
+// ── completeAccountSetup ──────────────────────────────────────────────────────
+
+/**
+ * Called after the customer creates their Firebase Auth account on the /join page.
+ * Validates the setup token, applies the company claim, and marks setup complete.
+ *
+ * Input:  { token: string; role: CustomerRole }
+ * Output: { success: true; companyId: string; role: CustomerRole }
+ */
+export const completeAccountSetup = onCall(async (request) => {
+  assertAuth(request)
+
+  const data  = request.data as Record<string, unknown>
+  const token = typeof data.token === 'string' ? data.token.trim() : ''
+  const role  = (data.role as CustomerRole | undefined) ?? 'owner'
+
+  if (!token) throw new HttpsError('invalid-argument', 'token is required.')
+  if (!CUSTOMER_ROLES.includes(role)) {
+    throw new HttpsError('invalid-argument', `role must be one of: ${CUSTOMER_ROLES.join(', ')}`)
+  }
+
+  const snap = await db.collection('customers')
+    .where('setupToken', '==', token)
+    .limit(1)
+    .get()
+
+  if (snap.empty) throw new HttpsError('not-found', 'Invalid or expired setup link.')
+
+  const doc      = snap.docs[0]
+  const compData = doc.data()
+  const companyId = doc.id
+
+  const expiry = compData.setupTokenExpiry?.toDate?.() as Date | undefined
+  if (expiry && expiry < new Date()) {
+    await doc.ref.update({ setupToken: FieldValue.delete(), setupTokenExpiry: FieldValue.delete() })
+    throw new HttpsError('deadline-exceeded', 'This setup link has expired.')
+  }
+  if (compData.setupComplete) {
+    throw new HttpsError('failed-precondition', 'An account has already been set up for this company.')
+  }
+
+  // Link user to company with their chosen role
+  await applyCompanyClaim(request.auth!.uid, companyId, role)
+
+  // Mark setup complete and consume the one-time token
+  await doc.ref.update({
+    setupComplete:    true,
+    setupToken:       FieldValue.delete(),
+    setupTokenExpiry: FieldValue.delete(),
+    updatedAt:        FieldValue.serverTimestamp(),
+  })
+
+  // Sync user info to the company profile
+  try {
+    const userSnap  = await db.collection('users').doc(request.auth!.uid).get()
+    const userData  = userSnap.data() ?? {}
+    const userName  = (userData.name  as string | undefined) || ''
+    const userEmail = (userData.email as string | undefined)
+      || (request.auth!.token.email as string | undefined) || ''
+
+    if (userName || userEmail) {
+      const updatePayload: Record<string, unknown> = {}
+      if (!compData.name  && userName)  updatePayload.name  = userName
+      if (!compData.email && userEmail) updatePayload.email = userEmail
+      if (role === 'owner') {
+        if (!compData.billingContactName && userName)  updatePayload.billingContactName = userName
+        if (!compData.billingEmail       && userEmail) updatePayload.billingEmail       = userEmail
+      }
+      if (Object.keys(updatePayload).length > 0) {
+        updatePayload.updatedAt = FieldValue.serverTimestamp()
+        await doc.ref.update(updatePayload)
+      }
+    }
+  } catch (syncErr) {
+    console.warn('[completeAccountSetup] failed to sync user info —', syncErr)
+  }
+
+  return { success: true, companyId, role }
 })

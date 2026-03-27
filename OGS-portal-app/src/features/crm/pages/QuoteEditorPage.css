@@ -118,6 +118,25 @@
   color: #9f1239;
 }
 
+.qep-notice--action {
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+  color: #166534;
+}
+
+.qep-notice__link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: #15803d;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.qep-notice__link:hover { color: #166534; }
+
 .qep-toast {
   margin: 0.75rem 1.25rem 0;
   padding: 0.7rem 0.95rem;
@@ -132,6 +151,133 @@
 @keyframes qep-fadein {
   from { opacity: 0; transform: translateY(-4px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Customer portal setup QR block ─────────────────────────────────────── */
+.qep-setup-qr {
+  margin: 0.75rem 1.25rem 0;
+  padding: 1rem 1.125rem;
+  background: #fafafa;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.qep-setup-qr__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.qep-setup-qr__title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #475569;
+}
+
+.qep-setup-qr__badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.qep-setup-qr__badge--done {
+  background: #f0fdf4;
+  color: #15803d;
+  border-color: #86efac;
+}
+
+.qep-setup-qr__body {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+}
+
+.qep-setup-qr__body--empty {
+  display: block;
+}
+
+.qep-setup-qr__code {
+  flex-shrink: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 6px;
+  background: #fff;
+  line-height: 0;
+}
+
+.qep-setup-qr__info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+}
+
+.qep-setup-qr__hint {
+  margin: 0;
+  font-size: 0.83rem;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.qep-setup-qr__done {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #15803d;
+  font-weight: 500;
+}
+
+.qep-setup-qr__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.qep-setup-qr__copy,
+.qep-setup-qr__open {
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 5px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #334155;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.qep-setup-qr__copy:hover,
+.qep-setup-qr__open:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.qep-setup-qr__generate {
+  margin-top: 10px;
+  font-size: 0.83rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid #E87722;
+  background: #fff8f3;
+  color: #c05e12;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.qep-setup-qr__generate:hover:not(:disabled) {
+  background: #fff0e6;
+}
+
+.qep-setup-qr__generate:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .qep-body {

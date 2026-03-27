@@ -29,6 +29,7 @@ import {
   RunsPage,
 } from '../../features/operations'
 import {
+  CompanyProfilePage,
   CustomerLayout,
   DashboardPage,
   InvoicesPage,
@@ -61,6 +62,7 @@ import NewOrderPage from '../../modules/orders/new/NewOrderPage'
 import SignUp from '../../pages/public/SignUp'
 import OnboardingPage from '../../pages/portal/Onboarding'
 import AcceptInvitePage from '../../pages/portal/AcceptInvite'
+import JoinSetupPage from '../../pages/portal/JoinSetup'
 import TeamSettingsPage from '../../pages/portal/TeamSettings'
 import { OnboardingLayout } from '../../components/layouts/OnboardingLayout'
 
@@ -96,6 +98,9 @@ export const AppRouter: React.FC = () => (
       {/* Public quote acceptance — no auth required, token in query string */}
       <Route path="/quote/:quoteId" element={<PublicQuotePage />} />
 
+      {/* Customer account setup via QR code — no auth required */}
+      <Route path="/join/:token" element={<JoinSetupPage />} />
+
       {/* Onboarding wizard — minimal layout, no sidebar */}
       <Route
         path="/portal/onboarding"
@@ -127,6 +132,7 @@ export const AppRouter: React.FC = () => (
         <Route path="catalog" element={<MyProducts />} />
         <Route path="quotes/:quoteId" element={<QuotePage />} />
         <Route path="profile" element={<ProfilePage />} />
+        <Route path="company" element={<CompanyProfilePage />} />
         <Route path="settings/team" element={<TeamSettingsPage />} />
       </Route>
 

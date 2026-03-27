@@ -581,6 +581,7 @@ export const BillingDashboard: React.FC = () => {
                 <tr>
                   <th>Invoice #</th>
                   <th>Customer</th>
+                  <th>Quote #</th>
                   <th>Order</th>
                   <th>Issued</th>
                   <th>Due</th>
@@ -605,7 +606,8 @@ export const BillingDashboard: React.FC = () => {
                   return (
                     <tr key={inv.id}>
                       <td className="bd__inv-num">{inv.invoiceNumber}</td>
-                      <td>{cust?.name ?? inv.customerId}</td>
+                      <td>{cust?.name ?? (inv.customerId && inv.customerId !== 'null' ? inv.customerId : (inv.quoteNumber ? `Quote ${inv.quoteNumber}` : '—'))}</td>
+                      <td className="bd__order-id">{inv.quoteNumber ? inv.quoteNumber : '—'}</td>
                       <td className="bd__order-id">{inv.orderId ?? '—'}</td>
                       <td className="bd__date">{formatDate(inv.issuedAt)}</td>
                       <td className="bd__date">{formatDate(inv.dueAt)}</td>

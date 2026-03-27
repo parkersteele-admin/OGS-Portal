@@ -216,9 +216,13 @@ const SignUp: React.FC = () => {
         companyName: companyName.trim(),
         companyNameNormalized: normalizeCompanyName(companyName),
         domain: extractDomain(email),
+        // Flat Customer fields — required for CRM search/display
+        name:    companyName.trim(),
+        email,
         billingAddress: { street: '', city: '', state: '', zip: '' },
         deliveryAddress: null,
-        status: 'pending_verification',
+        // 'inactive' = valid CustomerStatus; OGS activates after first quote
+        status: 'inactive',
         setupStep: 0,
         setupComplete: false,
         paymentMethod: null,

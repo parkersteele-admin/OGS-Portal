@@ -11,6 +11,7 @@
 import React, { useEffect, useState } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { httpsCallable } from 'firebase/functions'
+import { QRCodeSVG } from 'qrcode.react'
 import { functions } from '../../lib/firebase'
 import './PublicQuotePage.css'
 
@@ -54,6 +55,7 @@ interface PublicQuoteResponse {
   company:     CompanyInfo
   rep:         RepInfo | null
   discussNote: string
+  setupUrl?:   string | null
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -90,6 +92,7 @@ const PublicQuotePage: React.FC = () => {
   const [accepting, setAccepting] = useState(false)
   const [accepted, setAccepted]   = useState(false)
   const [acceptError, setAcceptError] = useState<string | null>(null)
+  const [setupUrl, setSetupUrl]   = useState<string | null>(null)
 
   useEffect(() => {
     if (!quoteId || !token) {
@@ -107,7 +110,10 @@ const PublicQuotePage: React.FC = () => {
         setData(res.data)
         setLoading(false)
         // If quote was already accepted from a prior click, show success state
-        if (res.data.quote.status === 'accepted') setAccepted(true)
+        if (res.data.quote.status === 'accepted') {
+          setAccepted(true)
+          if (res.data.setupUrl) setSetupUrl(res.data.setupUrl)
+        }
       })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : 'Unable to load this quote.'
@@ -123,10 +129,11 @@ const PublicQuotePage: React.FC = () => {
     try {
       const fn = httpsCallable<
         { quoteId: string; token: string; response: string },
-        { success: boolean }
+        { success: boolean; setupUrl?: string | null }
       >(functions, 'respondToQuotePublic')
-      await fn({ quoteId, token, response: 'accepted' })
+      const result = await fn({ quoteId, token, response: 'accepted' })
       setAccepted(true)
+      if (result.data.setupUrl) setSetupUrl(result.data.setupUrl)
       if (data) {
         setData({ ...data, quote: { ...data.quote, status: 'accepted' } })
       }
@@ -184,6 +191,27 @@ const PublicQuotePage: React.FC = () => {
               Thank you for accepting Quote #{quote.quoteNumber}. Your account representative has
               been notified and will be in touch shortly to complete your setup.
             </p>
+
+            {setupUrl ? (
+              <div className="pqp-setup-block">
+                <p className="pqp-setup-block__heading">Set up your portal account</p>
+                <p className="pqp-setup-block__sub">
+                  Track orders, view invoices, and manage your account online.
+                  Scan the QR code or tap the button below.
+                </p>
+                <div className="pqp-setup-block__qr">
+                  <QRCodeSVG value={setupUrl} size={160} includeMargin />
+                </div>
+                <a href={setupUrl} className="pqp-btn pqp-btn--primary pqp-btn--wide">
+                  Create Your Portal Account
+                </a>
+              </div>
+            ) : (
+              <Link to="/signup" className="pqp-btn pqp-btn--primary pqp-btn--wide">
+                Create Your Portal Account
+              </Link>
+            )}
+
             {rep && (
               <div className="pqp-rep pqp-rep--success">
                 <p className="pqp-rep__name">{rep.name}</p>
@@ -191,9 +219,6 @@ const PublicQuotePage: React.FC = () => {
                 {rep.phone && <p className="pqp-rep__contact">{rep.phone}</p>}
               </div>
             )}
-            <Link to="/signup" className="pqp-btn pqp-btn--primary pqp-btn--wide">
-              Create Your Portal Account
-            </Link>
           </div>
         </div>
         {company.name && (
