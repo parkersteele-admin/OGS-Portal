@@ -1,0 +1,90 @@
+name: Deploy to Firebase Production
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: OGS-portal-app/package-lock.json
+
+      - name: Install dependencies
+        working-directory: OGS-portal-app
+        run: npm ci
+
+      - name: Build Vite app (production)
+        working-directory: OGS-portal-app
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_STRIPE_PUBLISHABLE_KEY: ${{ secrets.VITE_STRIPE_PUBLISHABLE_KEY }}
+          VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_KEY }}
+          VITE_APP_ENV: production
+        run: npm run build
+
+      - name: Prepare Firebase auth (production)
+        env:
+          FIREBASE_AUTH_SECRET: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PRODUCTION }}
+        run: |
+          if [ -z "$FIREBASE_AUTH_SECRET" ]; then
+            echo "Missing FIREBASE_SERVICE_ACCOUNT_PRODUCTION secret" >&2
+            exit 1
+          fi
+
+          if [[ "$FIREBASE_AUTH_SECRET" == \{* ]]; then
+            echo "$FIREBASE_AUTH_SECRET" > "$RUNNER_TEMP/firebase-service-account.json"
+            echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-service-account.json" >> "$GITHUB_ENV"
+            echo "FIREBASE_CLI_TOKEN=" >> "$GITHUB_ENV"
+          else
+            echo "FIREBASE_CLI_TOKEN=$FIREBASE_AUTH_SECRET" >> "$GITHUB_ENV"
+          fi
+
+      - name: Deploy to Firebase Hosting live channel
+        working-directory: OGS-portal-app
+        run: |
+          if [ -n "$FIREBASE_CLI_TOKEN" ]; then
+            npx firebase-tools deploy --only hosting --project ogs-portal --token "$FIREBASE_CLI_TOKEN"
+          else
+            npx firebase-tools deploy --only hosting --project ogs-portal
+          fi
+
+      - name: Deploy Firebase Functions
+        working-directory: OGS-portal-app
+        run: |
+          if [ -n "$FIREBASE_CLI_TOKEN" ]; then
+            npx firebase-tools deploy --only functions --project ogs-portal --token "$FIREBASE_CLI_TOKEN"
+          else
+            npx firebase-tools deploy --only functions --project ogs-portal
+          fi
+
+      - name: Deploy Firestore security rules
+        working-directory: OGS-portal-app
+        run: |
+          if [ -n "$FIREBASE_CLI_TOKEN" ]; then
+            npx firebase-tools deploy --only firestore:rules --project ogs-portal --token "$FIREBASE_CLI_TOKEN"
+          else
+            npx firebase-tools deploy --only firestore:rules --project ogs-portal
+          fi
+
+      - name: Notify on success/failure
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Add logic to notify on success/failure
+            // Placeholder: replace with actual implementation
+            console.log('Deployment notification sent');
