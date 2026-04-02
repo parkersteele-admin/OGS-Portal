@@ -5,15 +5,15 @@
  * optimizeRoute      — Callable: calls Google Maps Routes API to reorder run stops
  */
 
-import { onCall, HttpsError } from 'firebase-functions/v2/https'
-import { db, FieldValue, adminAuth } from './admin'
-import { GOOGLE_MAPS_KEY, SENDGRID_API_KEY, requireSecret } from './config'
-import { performGeocode } from './triggers/geocodeCustomer'
-import { generateInvoicePdf as generatePdf } from './pdf/generateInvoicePdf'
-import { generateQuotePdf as generateQuotePdfCore } from './pdf/generateQuotePdf'
-import { getCompanySettings } from './pdf/companySettings'
-import { sendEmail } from './email/sendEmail'
-import { normalizeCompanyName, extractDomain } from './utils/companyName'
+import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { db, FieldValue, adminAuth } from './admin';
+import { GOOGLE_MAPS_KEY, SENDGRID_API_KEY, requireSecret } from './config';
+import { performGeocode } from './triggers/geocodeCustomer';
+import { generateInvoicePdf as generatePdf } from './pdf/generateInvoicePdf';
+import { generateQuotePdf as generateQuotePdfCore } from './pdf/generateQuotePdf';
+import { getCompanySettings } from './pdf/companySettings';
+import { sendEmail } from './email/sendEmail';
+import { normalizeCompanyName, extractDomain } from './utils/companyName';
 
 // ── Shared: resolveOrCreateCustomer ──────────────────────────────────────────
 
@@ -33,124 +33,136 @@ import { normalizeCompanyName, extractDomain } from './utils/companyName'
  */
 async function resolveOrCreateCustomer(
   leadId: string,
-  now:    FirebaseFirestore.FieldValue,
+  now: FirebaseFirestore.FieldValue
 ): Promise<string> {
-  const leadSnap = await db.collection('leads').doc(leadId).get()
-  if (!leadSnap.exists) throw new Error(`Lead ${leadId} not found`)
+  const leadSnap = await db.collection('leads').doc(leadId).get();
+  if (!leadSnap.exists) throw new Error(`Lead ${leadId} not found`);
 
-  const lead = leadSnap.data()!
+  const lead = leadSnap.data()!;
 
   // ── 1. Already linked on the lead itself ──────────────────────────────────
-  const existingId = (lead.companyId ?? lead.convertedToCustomerId) as string | undefined
+  const existingId = (lead.companyId ?? lead.convertedToCustomerId) as string | undefined;
   if (existingId) {
-    const check = await db.collection('customers').doc(existingId).get()
+    const check = await db.collection('customers').doc(existingId).get();
     if (check.exists) {
       // Ensure both link fields are set
-      await leadSnap.ref.update({ companyId: existingId, convertedToCustomerId: existingId, updatedAt: now })
-      return existingId
+      await leadSnap.ref.update({
+        companyId: existingId,
+        convertedToCustomerId: existingId,
+        updatedAt: now,
+      });
+      return existingId;
     }
   }
 
   // ── 2. Search customers for a matching company name or email domain ────────
-  const leadCompany = (lead.company ?? lead.name ?? '') as string
-  const leadEmail   = (lead.email ?? '') as string
-  const normalized  = normalizeCompanyName(leadCompany)
-  const domain      = extractDomain(leadEmail)
+  const leadCompany = (lead.company ?? lead.name ?? '') as string;
+  const leadEmail = (lead.email ?? '') as string;
+  const normalized = normalizeCompanyName(leadCompany);
+  const domain = extractDomain(leadEmail);
 
-  const customersSnap = await db.collection('customers').get()
+  const customersSnap = await db.collection('customers').get();
 
-  let matchedId: string | null = null
+  let matchedId: string | null = null;
 
   for (const doc of customersSnap.docs) {
-    const d = doc.data()
+    const d = doc.data();
 
     // Exact companyName match (normalized)
-    const candidateName = (d.companyName ?? d.name ?? '') as string
-    if (candidateName && normalizeCompanyName(candidateName) === normalized && normalized.length > 0) {
-      matchedId = doc.id
-      break
+    const candidateName = (d.companyName ?? d.name ?? '') as string;
+    if (
+      candidateName &&
+      normalizeCompanyName(candidateName) === normalized &&
+      normalized.length > 0
+    ) {
+      matchedId = doc.id;
+      break;
     }
 
     // Domain match (non-generic email domain)
     if (domain) {
-      const candidateEmail = (d.billingEmail ?? d.email ?? '') as string
-      const candidateDomain = extractDomain(candidateEmail)
+      const candidateEmail = (d.billingEmail ?? d.email ?? '') as string;
+      const candidateDomain = extractDomain(candidateEmail);
       if (candidateDomain && candidateDomain === domain) {
-        matchedId = doc.id
-        break
+        matchedId = doc.id;
+        break;
       }
     }
   }
 
   // ── 3. Create a new customers doc if no match ─────────────────────────────
   if (!matchedId) {
-    const companyName = leadCompany || 'Unknown'
-    const newRef = db.collection('customers').doc()
+    const companyName = leadCompany || 'Unknown';
+    const newRef = db.collection('customers').doc();
     await newRef.set({
-      companyId:             newRef.id,
+      companyId: newRef.id,
       companyName,
       companyNameNormalized: normalized,
-      domain:                domain ?? null,
+      domain: domain ?? null,
       // Flat Customer fields for CRM display/search
-      name:                  companyName,
-      email:                 leadEmail,
-      phone:                 (lead.phone ?? '') as string,
-      address:               (lead.address ?? '') as string,
-      city:                  (lead.city ?? '') as string,
-      state:                 (lead.state ?? '') as string,
-      zip:                   (lead.zip ?? '') as string,
+      name: companyName,
+      email: leadEmail,
+      phone: (lead.phone ?? '') as string,
+      address: (lead.address ?? '') as string,
+      city: (lead.city ?? '') as string,
+      state: (lead.state ?? '') as string,
+      zip: (lead.zip ?? '') as string,
       billingAddress: {
         street: (lead.address ?? '') as string,
-        city:   (lead.city ?? '') as string,
-        state:  (lead.state ?? '') as string,
-        zip:    (lead.zip ?? '') as string,
+        city: (lead.city ?? '') as string,
+        state: (lead.state ?? '') as string,
+        zip: (lead.zip ?? '') as string,
       },
-      deliveryAddress:       null,
-      billingEmail:          leadEmail,
-      billingContactName:    (lead.name ?? '') as string,
-      generalManagerName:    null,
+      deliveryAddress: null,
+      billingEmail: leadEmail,
+      billingContactName: (lead.name ?? '') as string,
+      generalManagerName: null,
       leadId,
-      status:                'active',
-      setupStep:             0,
-      setupComplete:         false,
-      paymentMethod:         null,
-      smsOptIn:              false,
-      smsPhone:              null,
-      smsConsentAt:          null,
-      usageProfile:          [],
-      businessType:          null,
-      taxExempt:             false,
-      taxExemptNumber:       null,
-      pwaInstallPrompted:    false,
-      creditLimit:           0,
-      createdAt:             now,
-      updatedAt:             now,
-      createdBy:             'system',
-    })
-    matchedId = newRef.id
-    console.log(`[resolveOrCreateCustomer] created customers/${matchedId} from lead/${leadId}`)
+      status: 'active',
+      setupStep: 0,
+      setupComplete: false,
+      paymentMethod: null,
+      smsOptIn: false,
+      smsPhone: null,
+      smsConsentAt: null,
+      usageProfile: [],
+      businessType: null,
+      taxExempt: false,
+      taxExemptNumber: null,
+      pwaInstallPrompted: false,
+      creditLimit: 0,
+      createdAt: now,
+      updatedAt: now,
+      createdBy: 'system',
+    });
+    matchedId = newRef.id;
+    console.log(`[resolveOrCreateCustomer] created customers/${matchedId} from lead/${leadId}`);
   } else {
     // Ensure the matched customer has leadId set
-    const matchedSnap = await db.collection('customers').doc(matchedId).get()
-    const matchedData = matchedSnap.data()!
-    const updates: Record<string, unknown> = { updatedAt: now }
-    if (!matchedData.leadId) updates.leadId = leadId
-    if (matchedData.status === 'inactive' || matchedData.status === 'pending_verification' || matchedData.status === 'pending_quote') {
-      updates.status = 'active'
+    const matchedSnap = await db.collection('customers').doc(matchedId).get();
+    const matchedData = matchedSnap.data()!;
+    const updates: Record<string, unknown> = { updatedAt: now };
+    if (!matchedData.leadId) updates.leadId = leadId;
+    if (
+      matchedData.status === 'inactive' ||
+      matchedData.status === 'pending_verification' ||
+      matchedData.status === 'pending_quote'
+    ) {
+      updates.status = 'active';
     }
-    await db.collection('customers').doc(matchedId).update(updates)
-    console.log(`[resolveOrCreateCustomer] matched lead/${leadId} → customers/${matchedId}`)
+    await db.collection('customers').doc(matchedId).update(updates);
+    console.log(`[resolveOrCreateCustomer] matched lead/${leadId} → customers/${matchedId}`);
   }
 
   // Back-fill the lead with the resolved companyId
   await leadSnap.ref.update({
-    companyId:              matchedId,
-    convertedToCustomerId:  matchedId,
-    status:                 'won',
-    updatedAt:              now,
-  })
+    companyId: matchedId,
+    convertedToCustomerId: matchedId,
+    status: 'won',
+    updatedAt: now,
+  });
 
-  return matchedId
+  return matchedId;
 }
 
 // ── generateInvoicePdf ────────────────────────────────────────────────────────
@@ -168,36 +180,36 @@ async function resolveOrCreateCustomer(
  */
 export const generateInvoicePdf = onCall(async (request) => {
   if (!request.auth) {
-    throw new HttpsError('unauthenticated', 'You must be signed in.')
+    throw new HttpsError('unauthenticated', 'You must be signed in.');
   }
 
-  const data = request.data as Record<string, unknown>
+  const data = request.data as Record<string, unknown>;
   if (typeof data.invoiceId !== 'string' || !data.invoiceId) {
-    throw new HttpsError('invalid-argument', 'invoiceId must be a non-empty string.')
+    throw new HttpsError('invalid-argument', 'invoiceId must be a non-empty string.');
   }
 
   // Authorization: owner, admin, or dispatch
-  const invoiceSnap = await db.collection('invoices').doc(data.invoiceId).get()
+  const invoiceSnap = await db.collection('invoices').doc(data.invoiceId).get();
   if (!invoiceSnap.exists) {
-    throw new HttpsError('not-found', `Invoice ${data.invoiceId} not found.`)
+    throw new HttpsError('not-found', `Invoice ${data.invoiceId} not found.`);
   }
 
-  const invoice    = invoiceSnap.data()!
-  const callerRole = request.auth.token.role as string
-  const isOwner    = request.auth.token.customerId === invoice.customerId
+  const invoice = invoiceSnap.data()!;
+  const callerRole = request.auth.token.role as string;
+  const isOwner = request.auth.token.customerId === invoice.customerId;
 
   if (!isOwner && !['admin', 'dispatch'].includes(callerRole)) {
-    throw new HttpsError('permission-denied', 'You are not authorised to access this invoice.')
+    throw new HttpsError('permission-denied', 'You are not authorised to access this invoice.');
   }
 
   try {
-    const url = await generatePdf(data.invoiceId)
-    return { url }
+    const url = await generatePdf(data.invoiceId);
+    return { url };
   } catch (err) {
-    console.error(`generateInvoicePdf callable [${data.invoiceId}]:`, err)
-    throw new HttpsError('internal', 'PDF generation failed.')
+    console.error(`generateInvoicePdf callable [${data.invoiceId}]:`, err);
+    throw new HttpsError('internal', 'PDF generation failed.');
   }
-})
+});
 
 // ── generateQuotePdf ──────────────────────────────────────────────────────────
 
@@ -211,162 +223,183 @@ export const generateInvoicePdf = onCall(async (request) => {
  * Input:  { quoteId: string }
  * Output: { url: string }
  */
-export const generateQuotePdf = onCall(
-  { secrets: [SENDGRID_API_KEY] },
-  async (request) => {
-    if (!request.auth) {
-      throw new HttpsError('unauthenticated', 'You must be signed in.')
-    }
+export const generateQuotePdf = onCall({ secrets: [SENDGRID_API_KEY] }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'You must be signed in.');
+  }
 
-    const callerRole = request.auth.token.role as string
-    if (!['admin', 'sales'].includes(callerRole)) {
-      throw new HttpsError('permission-denied', 'Only admin/sales can generate quotes.')
-    }
+  const callerRole = request.auth.token.role as string;
+  if (!['admin', 'sales'].includes(callerRole)) {
+    throw new HttpsError('permission-denied', 'Only admin/sales can generate quotes.');
+  }
 
-    const data = request.data as Record<string, unknown>
-    if (typeof data.quoteId !== 'string' || !data.quoteId) {
-      throw new HttpsError('invalid-argument', 'quoteId must be a non-empty string.')
-    }
+  const data = request.data as Record<string, unknown>;
+  if (typeof data.quoteId !== 'string' || !data.quoteId) {
+    throw new HttpsError('invalid-argument', 'quoteId must be a non-empty string.');
+  }
 
-    const quoteSnap = await db.collection('quotes').doc(data.quoteId).get()
-    if (!quoteSnap.exists) {
-      throw new HttpsError('not-found', `Quote ${data.quoteId} not found.`)
-    }
+  const quoteSnap = await db.collection('quotes').doc(data.quoteId).get();
+  if (!quoteSnap.exists) {
+    throw new HttpsError('not-found', `Quote ${data.quoteId} not found.`);
+  }
 
-    let url: string
-    try {
-      // If the quote is in 'sent' status, generate and persist the publicToken BEFORE
-      // building the PDF so the PDF generator can embed it as a QR code.
-      const quoteStatus = (quoteSnap.data()!.status as string) ?? ''
-      if (quoteStatus === 'sent' && !quoteSnap.data()!.publicToken) {
-        const earlyToken = crypto.randomUUID()
-        await db.collection('quotes').doc(data.quoteId).update({ publicToken: earlyToken })
-      }
-      url = await generateQuotePdfCore(data.quoteId)
-    } catch (err) {
-      console.error(`generateQuotePdf callable [${data.quoteId}]:`, err)
-      throw new HttpsError('internal', 'PDF generation failed.')
+  let url: string;
+  try {
+    // If the quote is in 'sent' status, generate and persist the publicToken BEFORE
+    // building the PDF so the PDF generator can embed it as a QR code.
+    const quoteStatus = (quoteSnap.data()!.status as string) ?? '';
+    if (quoteStatus === 'sent' && !quoteSnap.data()!.publicToken) {
+      const earlyToken = crypto.randomUUID();
+      await db.collection('quotes').doc(data.quoteId).update({ publicToken: earlyToken });
     }
+    url = await generateQuotePdfCore(data.quoteId);
+  } catch (err) {
+    console.error(`generateQuotePdf callable [${data.quoteId}]:`, err);
+    throw new HttpsError('internal', 'PDF generation failed.');
+  }
 
-    // ── Email the PDF when the quote has been sent ────────────────────────
-    const quote      = quoteSnap.data()!
-    const isSent     = (quote.status as string) === 'sent'
-    const quoteNum   = (quote.quoteNumber as string) || data.quoteId
-    const validUntil = quote.validUntil
-      ? (() => {
-          const d = typeof quote.validUntil === 'object' && 'toDate' in quote.validUntil
+  // ── Email the PDF when the quote has been sent ────────────────────────
+  const quote = quoteSnap.data()!;
+  const isSent = (quote.status as string) === 'sent';
+  const quoteNum = (quote.quoteNumber as string) || data.quoteId;
+  const validUntil = quote.validUntil
+    ? (() => {
+        const d =
+          typeof quote.validUntil === 'object' && 'toDate' in quote.validUntil
             ? (quote.validUntil as { toDate(): Date }).toDate()
-            : new Date(quote.validUntil as string)
-          return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-        })()
-      : ''
+            : new Date(quote.validUntil as string);
+        return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      })()
+    : '';
 
-    if (isSent) {
-      // Fetch company settings, sales rep info, and email template wording
-      const company = await getCompanySettings()
+  if (isSent) {
+    // Fetch company settings, sales rep info, and email template wording
+    const company = await getCompanySettings();
 
-      let repInfo: { name: string; email: string; phone: string } | null = null
-      const repUid = (quote.createdBy as string | undefined)
-      if (repUid) {
-        const repSnap = await db.collection('users').doc(repUid).get()
-        if (repSnap.exists) {
-          const rd = repSnap.data()!
-          repInfo = {
-            name:  (rd.name  as string) || '',
-            email: (rd.email as string) || '',
-            phone: (rd.phone as string) || '',
-          }
-        }
+    let repInfo: { name: string; email: string; phone: string } | null = null;
+    const repUid = quote.createdBy as string | undefined;
+    if (repUid) {
+      const repSnap = await db.collection('users').doc(repUid).get();
+      if (repSnap.exists) {
+        const rd = repSnap.data()!;
+        repInfo = {
+          name: (rd.name as string) || '',
+          email: (rd.email as string) || '',
+          phone: (rd.phone as string) || '',
+        };
       }
+    }
 
-      // Fetch admin-customizable email template wording
-      const tplSnap    = await db.collection('settings').doc('emailTemplates').get()
-      const tpl        = tplSnap.exists ? (tplSnap.data() as Record<string, string>) : {}
-      const emailIntro  = tpl.quoteIntro      || `Thank you for your interest in ${company.name || 'Ohio Gas Supply'}. Please review your quote below.`
-      const discussNote = tpl.quoteDiscussNote || "We want to ensure you're completely happy with our service. Please reach out to us to discuss any adjustments."
+    // Fetch admin-customizable email template wording
+    const tplSnap = await db.collection('settings').doc('emailTemplates').get();
+    const tpl = tplSnap.exists ? (tplSnap.data() as Record<string, string>) : {};
+    const emailIntro =
+      tpl.quoteIntro ||
+      `Thank you for your interest in ${company.name || 'Ohio Gas Supply'}. Please review your quote below.`;
+    const discussNote =
+      tpl.quoteDiscussNote ||
+      "We want to ensure you're completely happy with our service. Please reach out to us to discuss any adjustments.";
 
-      // Generate a one-time public token so the recipient can accept without logging in.
-      // Re-read the quote in case the token was already written before PDF generation.
-      const freshSnap   = await db.collection('quotes').doc(data.quoteId as string).get()
-      const freshData   = freshSnap.data()!
-      const existingTok = freshData.publicToken as string | undefined
-      const publicToken = existingTok || crypto.randomUUID()
-      if (!existingTok) {
-        await db.collection('quotes').doc(data.quoteId as string).update({ publicToken })
+    // Generate a one-time public token so the recipient can accept without logging in.
+    // Re-read the quote in case the token was already written before PDF generation.
+    const freshSnap = await db
+      .collection('quotes')
+      .doc(data.quoteId as string)
+      .get();
+    const freshData = freshSnap.data()!;
+    const existingTok = freshData.publicToken as string | undefined;
+    const publicToken = existingTok || crypto.randomUUID();
+    if (!existingTok) {
+      await db
+        .collection('quotes')
+        .doc(data.quoteId as string)
+        .update({ publicToken });
+    }
+
+    // Resolve recipient email from customer or lead
+    let recipientEmail = '';
+    let recipientName = 'Valued Customer';
+
+    if (quote.customerId) {
+      const cSnap = await db
+        .collection('customers')
+        .doc(quote.customerId as string)
+        .get();
+      if (cSnap.exists) {
+        const c = cSnap.data()!;
+        recipientEmail = (c.email as string) || '';
+        recipientName = (c.name as string) || recipientName;
       }
-
-      // Resolve recipient email from customer or lead
-      let recipientEmail = ''
-      let recipientName  = 'Valued Customer'
-
-      if (quote.customerId) {
-        const cSnap = await db.collection('customers').doc(quote.customerId as string).get()
-        if (cSnap.exists) {
-          const c = cSnap.data()!
-          recipientEmail = (c.email as string) || ''
-          recipientName  = (c.name  as string) || recipientName
-        }
-      } else if (quote.leadId) {
-        const lSnap = await db.collection('leads').doc(quote.leadId as string).get()
-        if (lSnap.exists) {
-          const l = lSnap.data()!
-          recipientEmail = (l.email as string) || ''
-          recipientName  = (l.name  as string) || (l.company as string) || recipientName
-        }
+    } else if (quote.leadId) {
+      const lSnap = await db
+        .collection('leads')
+        .doc(quote.leadId as string)
+        .get();
+      if (lSnap.exists) {
+        const l = lSnap.data()!;
+        recipientEmail = (l.email as string) || '';
+        recipientName = (l.name as string) || (l.company as string) || recipientName;
       }
+    }
 
-      if (recipientEmail) {
-        try {
-          requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY')
-          const total      = `$${((quote.total as number) ?? 0).toFixed(2)}`
-          const publicLink = `https://app.ohiogassupply.com/quote/${data.quoteId as string}?token=${publicToken}`
+    if (recipientEmail) {
+      try {
+        requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY');
+        const total = `$${((quote.total as number) ?? 0).toFixed(2)}`;
+        const publicLink = `https://app.ohiogassupply.com/quote/${data.quoteId as string}?token=${publicToken}`;
 
-          // Build line items rows for the estimate table
-          const lineItems = (quote.lineItems ?? []) as Array<{
-            description: string; quantity: number; unitPrice: number; amount: number
-          }>
-          const lineItemRows = lineItems.map((item) =>
-            `<tr>
+        // Build line items rows for the estimate table
+        const lineItems = (quote.lineItems ?? []) as Array<{
+          description: string;
+          quantity: number;
+          unitPrice: number;
+          amount: number;
+        }>;
+        const lineItemRows = lineItems
+          .map(
+            (item) =>
+              `<tr>
               <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0">${item.description}</td>
               <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;text-align:right">${item.quantity}</td>
               <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;text-align:right">$${item.unitPrice.toFixed(2)}</td>
               <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;text-align:right">$${item.amount.toFixed(2)}</td>
-            </tr>`,
-          ).join('')
+            </tr>`
+          )
+          .join('');
 
-          // Fetch the PDF bytes and base64-encode for attachment
-          let pdfAttachment: { content: string; filename: string; type: string } | null = null
-          try {
-            const pdfRes    = await fetch(url)
-            const pdfBuffer = await pdfRes.arrayBuffer()
-            pdfAttachment = {
-              content:  Buffer.from(pdfBuffer).toString('base64'),
-              filename: `Quote-${quoteNum}.pdf`,
-              type:     'application/pdf',
-            }
-          } catch (fetchErr) {
-            console.warn('generateQuotePdf: failed to fetch PDF for attachment —', fetchErr)
-          }
+        // Fetch the PDF bytes and base64-encode for attachment
+        let pdfAttachment: { content: string; filename: string; type: string } | null = null;
+        try {
+          const pdfRes = await fetch(url);
+          const pdfBuffer = await pdfRes.arrayBuffer();
+          pdfAttachment = {
+            content: Buffer.from(pdfBuffer).toString('base64'),
+            filename: `Quote-${quoteNum}.pdf`,
+            type: 'application/pdf',
+          };
+        } catch (fetchErr) {
+          console.warn('generateQuotePdf: failed to fetch PDF for attachment —', fetchErr);
+        }
 
-          // Sales rep contact block (shown below Accept button instead of a Decline button)
-          const repBlockHtml = repInfo
-            ? `<div style="margin:20px 0;padding:16px 20px;background:#fff8f3;border-left:3px solid #E87722;border-radius:4px">
+        // Sales rep contact block (shown below Accept button instead of a Decline button)
+        const repBlockHtml = repInfo
+          ? `<div style="margin:20px 0;padding:16px 20px;background:#fff8f3;border-left:3px solid #E87722;border-radius:4px">
                 <p style="margin:0 0 6px;font-size:14px;font-weight:bold;color:#333">${repInfo.name ? `Questions? Contact ${repInfo.name}.` : 'Questions? Reach out to us.'}</p>
                 <p style="margin:0 0 8px;font-size:13px;color:#555">${discussNote}</p>
                 ${repInfo.email ? `<p style="margin:0 0 4px;font-size:13px;color:#555">Email: <a href="mailto:${repInfo.email}" style="color:#E87722">${repInfo.email}</a></p>` : ''}
                 ${repInfo.phone ? `<p style="margin:0;font-size:13px;color:#555">Phone: ${repInfo.phone}</p>` : ''}
               </div>`
-            : `<p style="margin:20px 0 8px;font-size:13px;color:#666">${discussNote}</p>`
+          : `<p style="margin:20px 0 8px;font-size:13px;color:#666">${discussNote}</p>`;
 
-          // Company footer line — only use fields from settings (no hardcoded phone)
-          const footerParts = [company.name, company.website, company.phone].filter(Boolean)
-          const footerLine  = footerParts.join(' &nbsp;·&nbsp; ')
+        // Company footer line — only use fields from settings (no hardcoded phone)
+        const footerParts = [company.name, company.website, company.phone].filter(Boolean);
+        const footerLine = footerParts.join(' &nbsp;·&nbsp; ');
 
-          await sendEmail({
-            to:      recipientEmail,
-            subject: `Quote #${quoteNum} from ${company.name || 'Ohio Gas Supply'}`,
-            attachments: pdfAttachment ? [pdfAttachment] : undefined,
-            html: `
+        await sendEmail({
+          to: recipientEmail,
+          subject: `Quote #${quoteNum} from ${company.name || 'Ohio Gas Supply'}`,
+          attachments: pdfAttachment ? [pdfAttachment] : undefined,
+          html: `
 <div style="font-family:Arial,sans-serif;max-width:620px;margin:auto;color:#333">
   <div style="background:#E87722;padding:24px 32px 16px">
     <h1 style="margin:0;color:#fff;font-size:22px">${company.name || 'Ohio Gas Supply'}</h1>
@@ -422,20 +455,21 @@ export const generateQuotePdf = onCall(
     ${footerLine}
   </div>
 </div>`,
-          })
-          console.log(`generateQuotePdf: quote email sent to ${recipientEmail}`)
-        } catch (emailErr) {
-          // Log but don't fail the callable — the PDF URL is the primary output
-          console.warn('generateQuotePdf: email send failed —', emailErr)
-        }
-      } else {
-        console.warn(`generateQuotePdf: no recipient email found for quote ${data.quoteId as string}`)
+        });
+        console.log(`generateQuotePdf: quote email sent to ${recipientEmail}`);
+      } catch (emailErr) {
+        // Log but don't fail the callable — the PDF URL is the primary output
+        console.warn('generateQuotePdf: email send failed —', emailErr);
       }
+    } else {
+      console.warn(
+        `generateQuotePdf: no recipient email found for quote ${data.quoteId as string}`
+      );
     }
+  }
 
-    return { url }
-  },
-)
+  return { url };
+});
 
 /**
  * Calls the Google Maps Routes API with `optimizeWaypointOrder: true` to find
@@ -448,101 +482,92 @@ export const generateQuotePdf = onCall(
  * Input:  { runId: string }
  * Output: { optimizedOrder: number[] }   — original stop indices in new order
  */
-export const optimizeRoute = onCall(
-  { secrets: [GOOGLE_MAPS_KEY] },
-  async (request) => {
-    if (!request.auth) {
-      throw new HttpsError('unauthenticated', 'You must be signed in.')
-    }
-    const callerRole = request.auth.token.role as string
-    if (!['admin', 'dispatch'].includes(callerRole)) {
-      throw new HttpsError('permission-denied', 'Only admin/dispatch can optimise routes.')
-    }
+export const optimizeRoute = onCall({ secrets: [GOOGLE_MAPS_KEY] }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'You must be signed in.');
+  }
+  const callerRole = request.auth.token.role as string;
+  if (!['admin', 'dispatch'].includes(callerRole)) {
+    throw new HttpsError('permission-denied', 'Only admin/dispatch can optimise routes.');
+  }
 
-    const data = request.data as Record<string, unknown>
-    if (typeof data.runId !== 'string' || !data.runId) {
-      throw new HttpsError('invalid-argument', 'runId must be a non-empty string.')
-    }
+  const data = request.data as Record<string, unknown>;
+  if (typeof data.runId !== 'string' || !data.runId) {
+    throw new HttpsError('invalid-argument', 'runId must be a non-empty string.');
+  }
 
-    const stopsSnap = await db
-      .collection(`runs/${data.runId}/stops`)
-      .orderBy('order')
-      .get()
+  const stopsSnap = await db.collection(`runs/${data.runId}/stops`).orderBy('order').get();
 
-    if (stopsSnap.size < 2) {
-      throw new HttpsError('failed-precondition', 'A run must have at least 2 stops to optimise.')
-    }
+  if (stopsSnap.size < 2) {
+    throw new HttpsError('failed-precondition', 'A run must have at least 2 stops to optimise.');
+  }
 
-    if (stopsSnap.size > 25) {
-      // Google Maps Routes API intermediates limit
-      throw new HttpsError('failed-precondition', 'Routes API supports at most 25 waypoints.')
-    }
+  if (stopsSnap.size > 25) {
+    // Google Maps Routes API intermediates limit
+    throw new HttpsError('failed-precondition', 'Routes API supports at most 25 waypoints.');
+  }
 
-    const stops = stopsSnap.docs.map((d) => d.data() as Record<string, unknown>)
+  const stops = stopsSnap.docs.map((d) => d.data() as Record<string, unknown>);
 
-    // Build waypoint list: first stop = origin, last = destination, rest = intermediates
-    const toWaypoint = (address: unknown) => ({
-      address: { addressQuery: { query: address as string } },
-    })
+  // Build waypoint list: first stop = origin, last = destination, rest = intermediates
+  const toWaypoint = (address: unknown) => ({
+    address: { addressQuery: { query: address as string } },
+  });
 
-    const origin       = toWaypoint(stops[0].address)
-    const destination  = toWaypoint(stops[stops.length - 1].address)
-    const intermediates = stops.slice(1, -1).map((s) => toWaypoint(s.address))
+  const origin = toWaypoint(stops[0].address);
+  const destination = toWaypoint(stops[stops.length - 1].address);
+  const intermediates = stops.slice(1, -1).map((s) => toWaypoint(s.address));
 
-    const mapsKey = requireSecret(GOOGLE_MAPS_KEY.value(), 'GOOGLE_MAPS_SERVER_KEY')
+  const mapsKey = requireSecret(GOOGLE_MAPS_KEY.value(), 'GOOGLE_MAPS_SERVER_KEY');
 
-    const mapsRes = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
-      method: 'POST',
-      headers: {
-        'Content-Type':       'application/json',
-        'X-Goog-Api-Key':     mapsKey,
-        'X-Goog-FieldMask':   'routes.optimizedIntermediateWaypointIndex',
-      },
-      body: JSON.stringify({
-        origin,
-        destination,
-        intermediates,
-        travelMode:             'DRIVE',
-        optimizeWaypointOrder:   true,
-        routingPreference:       'TRAFFIC_AWARE',
-      }),
-    })
+  const mapsRes = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': mapsKey,
+      'X-Goog-FieldMask': 'routes.optimizedIntermediateWaypointIndex',
+    },
+    body: JSON.stringify({
+      origin,
+      destination,
+      intermediates,
+      travelMode: 'DRIVE',
+      optimizeWaypointOrder: true,
+      routingPreference: 'TRAFFIC_AWARE',
+    }),
+  });
 
-    if (!mapsRes.ok) {
-      console.error('Google Maps Routes API error:', await mapsRes.text())
-      throw new HttpsError('internal', 'Google Maps route optimisation failed.')
-    }
+  if (!mapsRes.ok) {
+    console.error('Google Maps Routes API error:', await mapsRes.text());
+    throw new HttpsError('internal', 'Google Maps route optimisation failed.');
+  }
 
-    const mapsData = await mapsRes.json() as {
-      routes?: { optimizedIntermediateWaypointIndex?: number[] }[]
-    }
+  const mapsData = (await mapsRes.json()) as {
+    routes?: { optimizedIntermediateWaypointIndex?: number[] }[];
+  };
 
-    const optimizedIntermediates =
-      mapsData.routes?.[0]?.optimizedIntermediateWaypointIndex ?? []
+  const optimizedIntermediates = mapsData.routes?.[0]?.optimizedIntermediateWaypointIndex ?? [];
 
-    // Build full optimised index list: origin (0) + reordered intermediates + destination
-    const originIdx      = 0
-    const destIdx        = stops.length - 1
-    const intermediateOriginalIndices = stops
-      .slice(1, -1)
-      .map((_, i) => i + 1) // original indices for middle stops
+  // Build full optimised index list: origin (0) + reordered intermediates + destination
+  const originIdx = 0;
+  const destIdx = stops.length - 1;
+  const intermediateOriginalIndices = stops.slice(1, -1).map((_, i) => i + 1); // original indices for middle stops
 
-    const optimizedOrder: number[] = [
-      originIdx,
-      ...optimizedIntermediates.map((i) => intermediateOriginalIndices[i]),
-      destIdx,
-    ]
+  const optimizedOrder: number[] = [
+    originIdx,
+    ...optimizedIntermediates.map((i) => intermediateOriginalIndices[i]),
+    destIdx,
+  ];
 
-    // Write the new `order` values back to Firestore
-    const batch = db.batch()
-    optimizedOrder.forEach((originalIdx, newPosition) => {
-      batch.update(stopsSnap.docs[originalIdx].ref, { order: newPosition })
-    })
-    await batch.commit()
+  // Write the new `order` values back to Firestore
+  const batch = db.batch();
+  optimizedOrder.forEach((originalIdx, newPosition) => {
+    batch.update(stopsSnap.docs[originalIdx].ref, { order: newPosition });
+  });
+  await batch.commit();
 
-    return { optimizedOrder }
-  },
-)
+  return { optimizedOrder };
+});
 
 // ── backfillGeocodeCustomers ───────────────────────────────────────────────────
 
@@ -553,34 +578,34 @@ export const optimizeRoute = onCall(
  * Access: admin only
  * Output: { processed: number, skipped: number, failed: number }
  */
-export const backfillGeocodeCustomers = onCall(
-  { secrets: [GOOGLE_MAPS_KEY] },
-  async (request) => {
-    if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
-    if (request.auth.token.role !== 'admin') throw new HttpsError('permission-denied', 'Admin only.')
+export const backfillGeocodeCustomers = onCall({ secrets: [GOOGLE_MAPS_KEY] }, async (request) => {
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  if (request.auth.token.role !== 'admin') throw new HttpsError('permission-denied', 'Admin only.');
 
-    const snap = await db.collection('customers').get()
-    let processed = 0, skipped = 0, failed = 0
+  const snap = await db.collection('customers').get();
+  let processed = 0,
+    skipped = 0,
+    failed = 0;
 
-    for (const doc of snap.docs) {
-      const data = doc.data() as Record<string, unknown>
-      if (data['lat'] && data['lng'] && data['geocodeStatus'] === 'ok') {
-        skipped++
-        continue
-      }
-      try {
-        await performGeocode(doc.id, data)
-        processed++
-      } catch {
-        failed++
-      }
+  for (const doc of snap.docs) {
+    const data = doc.data() as Record<string, unknown>;
+    if (data['lat'] && data['lng'] && data['geocodeStatus'] === 'ok') {
+      skipped++;
+      continue;
     }
+    try {
+      await performGeocode(doc.id, data);
+      processed++;
+    } catch {
+      failed++;
+    }
+  }
 
-    console.log(`backfillGeocodeCustomers: processed=${processed} skipped=${skipped} failed=${failed}`)
-    return { processed, skipped, failed }
-  },
-)
-
+  console.log(
+    `backfillGeocodeCustomers: processed=${processed} skipped=${skipped} failed=${failed}`
+  );
+  return { processed, skipped, failed };
+});
 
 // ── backfillMissingLeads ───────────────────────────────────────────────────────
 
@@ -607,86 +632,90 @@ export const backfillGeocodeCustomers = onCall(
  * Input:  { quoteId: string, response: 'accepted' | 'declined' }
  * Output: { success: true }
  */
-export const respondToQuote = onCall(
-  { secrets: [SENDGRID_API_KEY] },
-  async (request) => {
+export const respondToQuote = onCall({ secrets: [SENDGRID_API_KEY] }, async (request) => {
   if (!request.auth) {
-    throw new HttpsError('unauthenticated', 'You must be signed in.')
+    throw new HttpsError('unauthenticated', 'You must be signed in.');
   }
 
-  const callerRole = request.auth.token.role as string
-  const portalRoles = ['customer', 'owner', 'manager', 'billing', 'delivery', 'viewer']
+  const callerRole = request.auth.token.role as string;
+  const portalRoles = ['customer', 'owner', 'manager', 'billing', 'delivery', 'viewer'];
   if (!portalRoles.includes(callerRole)) {
-    throw new HttpsError('permission-denied', 'Only portal customers can respond to quotes.')
+    throw new HttpsError('permission-denied', 'Only portal customers can respond to quotes.');
   }
 
-  const data = request.data as Record<string, unknown>
+  const data = request.data as Record<string, unknown>;
   if (typeof data.quoteId !== 'string' || !data.quoteId) {
-    throw new HttpsError('invalid-argument', 'quoteId must be a non-empty string.')
+    throw new HttpsError('invalid-argument', 'quoteId must be a non-empty string.');
   }
   if (data.response !== 'accepted' && data.response !== 'declined') {
-    throw new HttpsError('invalid-argument', 'response must be "accepted" or "declined".')
+    throw new HttpsError('invalid-argument', 'response must be "accepted" or "declined".');
   }
 
-  const quoteSnap = await db.collection('quotes').doc(data.quoteId).get()
+  const quoteSnap = await db.collection('quotes').doc(data.quoteId).get();
   if (!quoteSnap.exists) {
-    throw new HttpsError('not-found', 'Quote not found.')
+    throw new HttpsError('not-found', 'Quote not found.');
   }
 
-  const quote           = quoteSnap.data()!
-  const callerCompanyId = request.auth.token.companyId as string | undefined
+  const quote = quoteSnap.data()!;
+  const callerCompanyId = request.auth.token.companyId as string | undefined;
 
   if (!callerCompanyId) {
-    throw new HttpsError('permission-denied', 'No company context found on your account.')
+    throw new HttpsError('permission-denied', 'No company context found on your account.');
   }
 
   // Allow acceptance if:
   //  a) the quote is directly assigned to the caller's company, OR
   //  b) the quote was originally sent to a lead that is linked to the caller's company
   //     (identified by customers/{callerCompanyId}.leadId === quote.leadId)
-  const quoteCustomerId = quote.customerId as string | undefined
-  const quoteLeadId     = quote.leadId     as string | undefined
+  const quoteCustomerId = quote.customerId as string | undefined;
+  const quoteLeadId = quote.leadId as string | undefined;
 
-  let effectiveCustomerId = quoteCustomerId ?? callerCompanyId
+  let effectiveCustomerId = quoteCustomerId ?? callerCompanyId;
 
   if (quoteCustomerId && quoteCustomerId !== callerCompanyId) {
     // Direct customerId mismatch — check if the caller's company is the same entity
     // under a different ID (e.g. OGS-created record vs. portal self-signup record)
-    const callerCompSnap = await db.collection('customers').doc(callerCompanyId).get()
-    const callerComp     = callerCompSnap.data()
-    const callerLeadId   = callerComp?.leadId as string | undefined
+    const callerCompSnap = await db.collection('customers').doc(callerCompanyId).get();
+    const callerComp = callerCompSnap.data();
+    const callerLeadId = callerComp?.leadId as string | undefined;
 
-    const isLinked = quoteLeadId && callerLeadId && quoteLeadId === callerLeadId
+    const isLinked = quoteLeadId && callerLeadId && quoteLeadId === callerLeadId;
     if (!isLinked) {
-      throw new HttpsError('permission-denied', 'You are not authorised to respond to this quote.')
+      throw new HttpsError('permission-denied', 'You are not authorised to respond to this quote.');
     }
     // If both have the same leadId, treat as same entity
-    effectiveCustomerId = callerCompanyId
+    effectiveCustomerId = callerCompanyId;
   } else if (!quoteCustomerId && quoteLeadId) {
     // Quote was sent to a lead — verify caller's company has that leadId,
     // OR auto-resolve via company-name matching and set it.
-    const callerCompSnap = await db.collection('customers').doc(callerCompanyId).get()
-    const callerComp     = callerCompSnap.data()
-    const callerLeadId   = callerComp?.leadId as string | undefined
+    const callerCompSnap = await db.collection('customers').doc(callerCompanyId).get();
+    const callerComp = callerCompSnap.data();
+    const callerLeadId = callerComp?.leadId as string | undefined;
 
     if (callerLeadId && callerLeadId === quoteLeadId) {
       // Already linked — use caller's company
-      effectiveCustomerId = callerCompanyId
+      effectiveCustomerId = callerCompanyId;
     } else {
       // Try fuzzy company-name match: does the lead belong to the caller's company?
-      const leadSnap     = await db.collection('leads').doc(quoteLeadId).get()
-      const leadData     = leadSnap.data()
-      const leadCompany  = leadData ? ((leadData.company ?? leadData.name ?? '') as string) : ''
-      const callerName   = ((callerComp?.companyName ?? callerComp?.name ?? '') as string)
-      const leadNorm     = normalizeCompanyName(leadCompany)
-      const callerNorm   = normalizeCompanyName(callerName)
+      const leadSnap = await db.collection('leads').doc(quoteLeadId).get();
+      const leadData = leadSnap.data();
+      const leadCompany = leadData ? ((leadData.company ?? leadData.name ?? '') as string) : '';
+      const callerName = (callerComp?.companyName ?? callerComp?.name ?? '') as string;
+      const leadNorm = normalizeCompanyName(leadCompany);
+      const callerNorm = normalizeCompanyName(callerName);
 
       if (leadNorm.length > 0 && leadNorm === callerNorm) {
         // Names match — link the lead to the caller's company and proceed
-        await db.collection('customers').doc(callerCompanyId).update({ leadId: quoteLeadId, updatedAt: FieldValue.serverTimestamp() })
-        effectiveCustomerId = callerCompanyId
+        await db
+          .collection('customers')
+          .doc(callerCompanyId)
+          .update({ leadId: quoteLeadId, updatedAt: FieldValue.serverTimestamp() });
+        effectiveCustomerId = callerCompanyId;
       } else {
-        throw new HttpsError('permission-denied', 'You are not authorised to respond to this quote.')
+        throw new HttpsError(
+          'permission-denied',
+          'You are not authorised to respond to this quote.'
+        );
       }
     }
   }
@@ -694,153 +723,178 @@ export const respondToQuote = onCall(
   if (quote.status !== 'sent') {
     throw new HttpsError(
       'failed-precondition',
-      `This quote has already been ${quote.status as string}.`,
-    )
+      `This quote has already been ${quote.status as string}.`
+    );
   }
 
-  const now = FieldValue.serverTimestamp()
+  const now = FieldValue.serverTimestamp();
 
   if (data.response === 'accepted') {
     // Update the quote — link customerId if it was previously a lead-only quote
     await db.collection('quotes').doc(data.quoteId).update({
-      status:       'accepted',
-      acceptedAt:   now,
-      updatedAt:    now,
-      customerId:   effectiveCustomerId,
-    })
+      status: 'accepted',
+      acceptedAt: now,
+      updatedAt: now,
+      customerId: effectiveCustomerId,
+    });
 
     // Activate the customer in the CRM (move from inactive/pending to active)
     try {
       await db.collection('customers').doc(effectiveCustomerId).update({
-        status:    'active',
+        status: 'active',
         updatedAt: now,
-      })
+      });
     } catch (statusErr) {
-      console.warn('[respondToQuote] failed to activate customer —', statusErr)
+      console.warn('[respondToQuote] failed to activate customer —', statusErr);
     }
 
     // Apply quoted prices to customer's productPricing subcollection
-    const lineItems = (quote.lineItems ?? []) as Array<{ productId: string; description: string; quantity: number; unitPrice: number; amount: number }>
-    const eligible  = lineItems.filter(
-      (i) => i.productId && i.productId !== 'delivery' && i.productId !== 'rental' && i.unitPrice > 0,
-    )
+    const lineItems = (quote.lineItems ?? []) as Array<{
+      productId: string;
+      description: string;
+      quantity: number;
+      unitPrice: number;
+      amount: number;
+    }>;
+    const eligible = lineItems.filter(
+      (i) =>
+        i.productId && i.productId !== 'delivery' && i.productId !== 'rental' && i.unitPrice > 0
+    );
     if (eligible.length > 0) {
-      const batch = db.batch()
+      const batch = db.batch();
       for (const item of eligible) {
         const ref = db
           .collection('customers')
           .doc(effectiveCustomerId)
           .collection('productPricing')
-          .doc(item.productId)
+          .doc(item.productId);
         batch.set(ref, {
           productId: item.productId,
-          price:     item.unitPrice,
-          source:    'quote',
-          quoteId:   data.quoteId,
-          setBy:     request.auth.uid,
-          setAt:     now,
-        })
+          price: item.unitPrice,
+          source: 'quote',
+          quoteId: data.quoteId,
+          setBy: request.auth.uid,
+          setAt: now,
+        });
       }
-      await batch.commit()
+      await batch.commit();
     }
 
     // Create a 'sent' invoice from the accepted quote so it appears as an open invoice on the customer record.
-    let quoteInvoiceId: string | null = null
+    let quoteInvoiceId: string | null = null;
     try {
-      const invoiceNumber = `INV-${Date.now().toString().slice(-8)}`
-      const dueAt = new Date()
-      dueAt.setDate(dueAt.getDate() + 30)
+      const invoiceNumber = `INV-${Date.now().toString().slice(-8)}`;
+      const dueAt = new Date();
+      dueAt.setDate(dueAt.getDate() + 30);
       const rawLineItems = (quote.lineItems ?? []) as Array<{
-        description: string; quantity: number; unitPrice: number; amount: number
-      }>
+        description: string;
+        quantity: number;
+        unitPrice: number;
+        amount: number;
+      }>;
       const invoiceLineItems = rawLineItems.map(({ description, quantity, unitPrice, amount }) => ({
-        description, quantity, unitPrice, amount,
-      }))
+        description,
+        quantity,
+        unitPrice,
+        amount,
+      }));
       const invoiceDoc: Record<string, unknown> = {
         invoiceNumber,
-        customerId:  effectiveCustomerId,
-        quoteId:     data.quoteId as string,
-        status:      'sent',
-        lineItems:   invoiceLineItems,
-        subtotal:    (quote.subtotal as number) ?? 0,
-        tax:         (quote.tax as number) ?? 0,
-        total:       (quote.total as number) ?? 0,
-        issuedAt:    now,
+        customerId: effectiveCustomerId,
+        quoteId: data.quoteId as string,
+        status: 'sent',
+        lineItems: invoiceLineItems,
+        subtotal: (quote.subtotal as number) ?? 0,
+        tax: (quote.tax as number) ?? 0,
+        total: (quote.total as number) ?? 0,
+        issuedAt: now,
         dueAt,
-        createdAt:   now,
-        updatedAt:   now,
-      }
-      if (quote.quoteNumber) invoiceDoc.quoteNumber = quote.quoteNumber as string
-      if (quote.leadId)      invoiceDoc.leadId      = quote.leadId as string
-      const invoiceRef = await db.collection('invoices').add(invoiceDoc)
-      quoteInvoiceId = invoiceRef.id
-      console.log(`[respondToQuote] invoice ${quoteInvoiceId} created for quote ${data.quoteId as string}`)
+        createdAt: now,
+        updatedAt: now,
+      };
+      if (quote.quoteNumber) invoiceDoc.quoteNumber = quote.quoteNumber as string;
+      if (quote.leadId) invoiceDoc.leadId = quote.leadId as string;
+      const invoiceRef = await db.collection('invoices').add(invoiceDoc);
+      quoteInvoiceId = invoiceRef.id;
+      console.log(
+        `[respondToQuote] invoice ${quoteInvoiceId} created for quote ${data.quoteId as string}`
+      );
     } catch (invoiceErr) {
-      console.warn('[respondToQuote] failed to create invoice from accepted quote —', invoiceErr)
+      console.warn('[respondToQuote] failed to create invoice from accepted quote —', invoiceErr);
     }
 
     // Flag the quote so staff know to set up a standing order, and link the new invoice.
-    const quoteUpdate: Record<string, unknown> = { needsOrderSetup: true, updatedAt: now }
-    if (quoteInvoiceId) quoteUpdate.invoiceId = quoteInvoiceId
-    await db.collection('quotes').doc(data.quoteId as string).update(quoteUpdate)
-    console.log(`[respondToQuote] quote ${data.quoteId as string} accepted — invoice ${quoteInvoiceId ?? 'n/a'} created, needs order setup`)
+    const quoteUpdate: Record<string, unknown> = { needsOrderSetup: true, updatedAt: now };
+    if (quoteInvoiceId) quoteUpdate.invoiceId = quoteInvoiceId;
+    await db
+      .collection('quotes')
+      .doc(data.quoteId as string)
+      .update(quoteUpdate);
+    console.log(
+      `[respondToQuote] quote ${data.quoteId as string} accepted — invoice ${quoteInvoiceId ?? 'n/a'} created, needs order setup`
+    );
 
     // Generate a portal setup link so staff can share a QR code with the customer.
     if (effectiveCustomerId) {
       try {
-        const custSnap = await db.collection('customers').doc(effectiveCustomerId).get()
+        const custSnap = await db.collection('customers').doc(effectiveCustomerId).get();
         if (custSnap.exists && !custSnap.data()!.setupComplete && !custSnap.data()!.setupToken) {
-          const setupToken       = crypto.randomUUID()
-          const setupTokenExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-          await custSnap.ref.update({ setupToken, setupTokenExpiry, updatedAt: now })
-          console.log(`[respondToQuote] setup token generated for customers/${effectiveCustomerId}`)
+          const setupToken = crypto.randomUUID();
+          const setupTokenExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+          await custSnap.ref.update({ setupToken, setupTokenExpiry, updatedAt: now });
+          console.log(
+            `[respondToQuote] setup token generated for customers/${effectiveCustomerId}`
+          );
         }
       } catch (setupErr) {
-        console.warn('[respondToQuote] failed to generate setup token —', setupErr)
+        console.warn('[respondToQuote] failed to generate setup token —', setupErr);
       }
     }
 
     // Notify the sales rep of the acceptance
     try {
-      const createdBy = quote.createdBy as string | undefined
+      const createdBy = quote.createdBy as string | undefined;
       if (createdBy) {
-        const repAuthUser = await adminAuth.getUser(createdBy).catch(() => null)
-        const repEmail    = repAuthUser?.email
-        const quoteNum    = (quote.quoteNumber as string) || (data.quoteId as string)
-        const total       = `$${((quote.total as number) ?? 0).toFixed(2)}`
+        const repAuthUser = await adminAuth.getUser(createdBy).catch(() => null);
+        const repEmail = repAuthUser?.email;
+        const quoteNum = (quote.quoteNumber as string) || (data.quoteId as string);
+        const total = `$${((quote.total as number) ?? 0).toFixed(2)}`;
 
-        let entityName = 'the customer'
+        let entityName = 'the customer';
         if (effectiveCustomerId) {
-          const cSnap = await db.collection('customers').doc(effectiveCustomerId).get()
-          if (cSnap.exists) entityName = (cSnap.data()!.name as string) || entityName
+          const cSnap = await db.collection('customers').doc(effectiveCustomerId).get();
+          if (cSnap.exists) entityName = (cSnap.data()!.name as string) || entityName;
         } else if (quote.leadId) {
-          const lSnap = await db.collection('leads').doc(quote.leadId as string).get()
+          const lSnap = await db
+            .collection('leads')
+            .doc(quote.leadId as string)
+            .get();
           if (lSnap.exists) {
-            const l = lSnap.data()!
-            entityName = (l.company as string) || (l.name as string) || entityName
+            const l = lSnap.data()!;
+            entityName = (l.company as string) || (l.name as string) || entityName;
           }
         }
 
         // In-app notification
         await db.collection('notifications').add({
-          userId:    createdBy,
-          type:      'quote_accepted',
-          title:     `Quote #${quoteNum} accepted`,
-          body:      `${entityName} accepted Quote #${quoteNum} (${total}). Set up their standing order.`,
-          link:      `/crm/quotes/${data.quoteId as string}`,
-          entityId:  data.quoteId,
-          priority:  'high',
-          read:      false,
+          userId: createdBy,
+          type: 'quote_accepted',
+          title: `Quote #${quoteNum} accepted`,
+          body: `${entityName} accepted Quote #${quoteNum} (${total}). Set up their standing order.`,
+          link: `/crm/quotes/${data.quoteId as string}`,
+          entityId: data.quoteId,
+          priority: 'high',
+          read: false,
           createdAt: now,
-        })
+        });
 
         // Email notification
         if (repEmail) {
-          requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY')
-          const company   = await getCompanySettings()
-          const quoteLink = `https://app.ohiogassupply.com/crm/quotes/${data.quoteId as string}`
+          requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY');
+          const company = await getCompanySettings();
+          const quoteLink = `https://app.ohiogassupply.com/crm/quotes/${data.quoteId as string}`;
           await sendEmail({
-            to:      repEmail,
+            to: repEmail,
             subject: `✓ Quote #${quoteNum} was ACCEPTED by ${entityName}`,
             html: `
 <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#333">
@@ -864,47 +918,55 @@ export const respondToQuote = onCall(
     ${company.name || 'Ohio Gas Supply'}${company.website ? ` &nbsp;·&nbsp; ${company.website}` : ''}
   </div>
 </div>`,
-          })
-          console.log(`[respondToQuote] acceptance notification sent to ${repEmail} for quote ${data.quoteId as string}`)
+          });
+          console.log(
+            `[respondToQuote] acceptance notification sent to ${repEmail} for quote ${data.quoteId as string}`
+          );
         }
       }
     } catch (notifyErr) {
-      console.warn('[respondToQuote] failed to send acceptance notification —', notifyErr)
+      console.warn('[respondToQuote] failed to send acceptance notification —', notifyErr);
     }
   } else {
     await db.collection('quotes').doc(data.quoteId).update({
-      status:    'declined',
+      status: 'declined',
       updatedAt: now,
-    })
+    });
 
     // Notify the sales rep who created the quote
     try {
-      const createdBy = quote.createdBy as string | undefined
+      const createdBy = quote.createdBy as string | undefined;
       if (createdBy) {
-        const repAuthUser = await adminAuth.getUser(createdBy).catch(() => null)
-        const repEmail    = repAuthUser?.email
+        const repAuthUser = await adminAuth.getUser(createdBy).catch(() => null);
+        const repEmail = repAuthUser?.email;
         if (repEmail) {
-          requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY')
-          const quoteNum  = (quote.quoteNumber as string) || (data.quoteId as string)
-          const total     = `$${((quote.total as number) ?? 0).toFixed(2)}`
+          requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY');
+          const quoteNum = (quote.quoteNumber as string) || (data.quoteId as string);
+          const total = `$${((quote.total as number) ?? 0).toFixed(2)}`;
 
           // Resolve the customer / lead name for context
-          let entityName = 'the customer'
+          let entityName = 'the customer';
           if (quote.customerId) {
-            const cSnap = await db.collection('customers').doc(quote.customerId as string).get()
-            if (cSnap.exists) entityName = (cSnap.data()!.name as string) || entityName
+            const cSnap = await db
+              .collection('customers')
+              .doc(quote.customerId as string)
+              .get();
+            if (cSnap.exists) entityName = (cSnap.data()!.name as string) || entityName;
           } else if (quote.leadId) {
-            const lSnap = await db.collection('leads').doc(quote.leadId as string).get()
+            const lSnap = await db
+              .collection('leads')
+              .doc(quote.leadId as string)
+              .get();
             if (lSnap.exists) {
-              const l = lSnap.data()!
-              entityName = (l.company as string) || (l.name as string) || entityName
+              const l = lSnap.data()!;
+              entityName = (l.company as string) || (l.name as string) || entityName;
             }
           }
 
-          const quoteLink = `https://app.ohiogassupply.com/crm/quotes/${data.quoteId as string}`
+          const quoteLink = `https://app.ohiogassupply.com/crm/quotes/${data.quoteId as string}`;
 
           await sendEmail({
-            to:      repEmail,
+            to: repEmail,
             subject: `Quote #${quoteNum} was declined by ${entityName}`,
             html: `
 <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#333">
@@ -928,68 +990,71 @@ export const respondToQuote = onCall(
     Ohio Gas Supply Co. &nbsp;·&nbsp; ohiogassupply.com
   </div>
 </div>`,
-          })
-          console.log(`[respondToQuote] decline notification sent to ${repEmail} for quote ${data.quoteId as string}`)
+          });
+          console.log(
+            `[respondToQuote] decline notification sent to ${repEmail} for quote ${data.quoteId as string}`
+          );
         }
       }
     } catch (notifyErr) {
       // Non-fatal — the decline is already saved
-      console.warn('[respondToQuote] failed to send decline notification —', notifyErr)
+      console.warn('[respondToQuote] failed to send decline notification —', notifyErr);
     }
   }
 
-    console.log(`[respondToQuote] quote=${data.quoteId} response=${data.response as string} by=${request.auth.uid}`)
-    return { success: true }
-  },
-)
-
+  console.log(
+    `[respondToQuote] quote=${data.quoteId} response=${data.response as string} by=${request.auth.uid}`
+  );
+  return { success: true };
+});
 
 // ── backfillMissingLeads ───────────────────────────────────────────────────────
 
 export const backfillMissingLeads = onCall(async (request) => {
-  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
-  if (request.auth.token.role !== 'admin') throw new HttpsError('permission-denied', 'Admin only.')
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  if (request.auth.token.role !== 'admin') throw new HttpsError('permission-denied', 'Admin only.');
 
-  const customersSnap = await db.collection('customers').get()
-  let created = 0
-  let skipped = 0
+  const customersSnap = await db.collection('customers').get();
+  let created = 0;
+  let skipped = 0;
 
   for (const doc of customersSnap.docs) {
-    const leadRef  = db.collection('leads').doc(doc.id)
-    const leadSnap = await leadRef.get()
+    const leadRef = db.collection('leads').doc(doc.id);
+    const leadSnap = await leadRef.get();
     if (leadSnap.exists) {
-      skipped++
-      continue
+      skipped++;
+      continue;
     }
 
-    const data        = doc.data() as Record<string, unknown>
-    const companyName = (data['companyName'] as string | null) ?? (data['name'] as string | null) ?? 'Unknown'
-    const contactName = (data['billingContactName'] as string | null) ?? companyName
-    const email       = (data['billingEmail'] as string | null) ?? ''
-    const phone       = (data['phone'] as string | null) ?? ''
-    const now         = FieldValue.serverTimestamp()
+    const data = doc.data() as Record<string, unknown>;
+    const companyName =
+      (data['companyName'] as string | null) ?? (data['name'] as string | null) ?? 'Unknown';
+    const contactName = (data['billingContactName'] as string | null) ?? companyName;
+    const email = (data['billingEmail'] as string | null) ?? '';
+    const phone = (data['phone'] as string | null) ?? '';
+    const now = FieldValue.serverTimestamp();
 
     await leadRef.set({
-      name:           contactName,
+      name: contactName,
       email,
       phone,
-      company:        companyName,
-      status:         'pending_setup',
-      source:         'Website',
-      isWebSignup:    true,
-      companyId:      doc.id,
-      assignedTo:     null,
+      company: companyName,
+      status: 'pending_setup',
+      source: 'Website',
+      isWebSignup: true,
+      companyId: doc.id,
+      assignedTo: null,
       estimatedValue: null,
-      notes:          '',
-      createdAt:      now,
-      updatedAt:      now,
-    })
-    created++
+      notes: '',
+      createdAt: now,
+      updatedAt: now,
+    });
+    created++;
   }
 
-  console.log(`backfillMissingLeads: created=${created} skipped=${skipped}`)
-  return { created, skipped }
-})
+  console.log(`backfillMissingLeads: created=${created} skipped=${skipped}`);
+  return { created, skipped };
+});
 
 // ── matchLeadsToCustomers ─────────────────────────────────────────────────────
 
@@ -1005,118 +1070,122 @@ export const backfillMissingLeads = onCall(async (request) => {
  * Output: { linked: number, skipped: number }
  */
 export const matchLeadsToCustomers = onCall(async (request) => {
-  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.')
-  if (request.auth.token.role !== 'admin') throw new HttpsError('permission-denied', 'Admin only.')
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
+  if (request.auth.token.role !== 'admin') throw new HttpsError('permission-denied', 'Admin only.');
 
   const [leadsSnap, customersSnap] = await Promise.all([
     db.collection('leads').get(),
     db.collection('customers').get(),
-  ])
+  ]);
 
-  const now = FieldValue.serverTimestamp()
+  const now = FieldValue.serverTimestamp();
 
   // Build lookup maps: normalized name → customerId, and domain → customerId
-  const nameToCustomer = new Map<string, string>()
-  const domainToCustomer = new Map<string, string>()
+  const nameToCustomer = new Map<string, string>();
+  const domainToCustomer = new Map<string, string>();
 
   for (const doc of customersSnap.docs) {
-    const d    = doc.data()
-    const name = normalizeCompanyName((d.companyName ?? d.name ?? '') as string)
-    if (name) nameToCustomer.set(name, doc.id)
+    const d = doc.data();
+    const name = normalizeCompanyName((d.companyName ?? d.name ?? '') as string);
+    if (name) nameToCustomer.set(name, doc.id);
 
-    const email  = (d.billingEmail ?? d.email ?? '') as string
-    const domain = extractDomain(email)
-    if (domain) domainToCustomer.set(domain, doc.id)
+    const email = (d.billingEmail ?? d.email ?? '') as string;
+    const domain = extractDomain(email);
+    if (domain) domainToCustomer.set(domain, doc.id);
   }
 
-  let linked  = 0
-  let skipped = 0
+  let linked = 0;
+  let skipped = 0;
 
   for (const leadDoc of leadsSnap.docs) {
-    const lead = leadDoc.data()
+    const lead = leadDoc.data();
 
     // Skip leads already fully linked
     if (lead.companyId && lead.convertedToCustomerId) {
-      skipped++
-      continue
+      skipped++;
+      continue;
     }
 
-    const leadCompany = (lead.company ?? lead.name ?? '') as string
-    const leadEmail   = (lead.email ?? '') as string
-    const normalized  = normalizeCompanyName(leadCompany)
-    const domain      = extractDomain(leadEmail)
+    const leadCompany = (lead.company ?? lead.name ?? '') as string;
+    const leadEmail = (lead.email ?? '') as string;
+    const normalized = normalizeCompanyName(leadCompany);
+    const domain = extractDomain(leadEmail);
 
-    let matchedCustomerId: string | null = null
+    let matchedCustomerId: string | null = null;
 
     // Name match
     if (normalized && nameToCustomer.has(normalized)) {
-      matchedCustomerId = nameToCustomer.get(normalized)!
+      matchedCustomerId = nameToCustomer.get(normalized)!;
     }
     // Domain match (fallback)
     if (!matchedCustomerId && domain && domainToCustomer.has(domain)) {
-      matchedCustomerId = domainToCustomer.get(domain)!
+      matchedCustomerId = domainToCustomer.get(domain)!;
     }
 
     if (!matchedCustomerId) {
-      skipped++
-      continue
+      skipped++;
+      continue;
     }
 
     // Link lead ↔ customer
-    const batch = db.batch()
+    const batch = db.batch();
     batch.update(leadDoc.ref, {
-      companyId:             matchedCustomerId,
+      companyId: matchedCustomerId,
       convertedToCustomerId: matchedCustomerId,
-      updatedAt:             now,
-    })
-    const custRef = db.collection('customers').doc(matchedCustomerId)
-    batch.update(custRef, {
-      leadId:    leadDoc.id,
       updatedAt: now,
-    })
-    await batch.commit()
+    });
+    const custRef = db.collection('customers').doc(matchedCustomerId);
+    batch.update(custRef, {
+      leadId: leadDoc.id,
+      updatedAt: now,
+    });
+    await batch.commit();
 
-    linked++
-    console.log(`[matchLeadsToCustomers] linked lead/${leadDoc.id} (${leadCompany}) → customers/${matchedCustomerId}`)
+    linked++;
+    console.log(
+      `[matchLeadsToCustomers] linked lead/${leadDoc.id} (${leadCompany}) → customers/${matchedCustomerId}`
+    );
   }
 
   // Second pass: customers with no leadId — search leads for a name match
   for (const custDoc of customersSnap.docs) {
-    const cust = custDoc.data()
-    if (cust.leadId) continue   // already linked
+    const cust = custDoc.data();
+    if (cust.leadId) continue; // already linked
 
-    const custName   = normalizeCompanyName((cust.companyName ?? cust.name ?? '') as string)
-    const custEmail  = (cust.billingEmail ?? cust.email ?? '') as string
-    const custDomain = extractDomain(custEmail)
+    const custName = normalizeCompanyName((cust.companyName ?? cust.name ?? '') as string);
+    const custEmail = (cust.billingEmail ?? cust.email ?? '') as string;
+    const custDomain = extractDomain(custEmail);
 
     for (const leadDoc of leadsSnap.docs) {
-      const lead       = leadDoc.data()
-      const leadName   = normalizeCompanyName((lead.company ?? lead.name ?? '') as string)
-      const leadEmail2 = (lead.email ?? '') as string
-      const leadDomain = extractDomain(leadEmail2)
+      const lead = leadDoc.data();
+      const leadName = normalizeCompanyName((lead.company ?? lead.name ?? '') as string);
+      const leadEmail2 = (lead.email ?? '') as string;
+      const leadDomain = extractDomain(leadEmail2);
 
-      const nameHit   = custName.length > 0 && custName === leadName
-      const domainHit = custDomain && leadDomain && custDomain === leadDomain
+      const nameHit = custName.length > 0 && custName === leadName;
+      const domainHit = custDomain && leadDomain && custDomain === leadDomain;
 
       if (nameHit || domainHit) {
-        const batch = db.batch()
-        batch.update(custDoc.ref, { leadId: leadDoc.id, updatedAt: now })
+        const batch = db.batch();
+        batch.update(custDoc.ref, { leadId: leadDoc.id, updatedAt: now });
         batch.update(leadDoc.ref, {
-          companyId:             custDoc.id,
+          companyId: custDoc.id,
           convertedToCustomerId: custDoc.id,
-          updatedAt:             now,
-        })
-        await batch.commit()
-        linked++
-        console.log(`[matchLeadsToCustomers] reverse-linked customers/${custDoc.id} → lead/${leadDoc.id}`)
-        break
+          updatedAt: now,
+        });
+        await batch.commit();
+        linked++;
+        console.log(
+          `[matchLeadsToCustomers] reverse-linked customers/${custDoc.id} → lead/${leadDoc.id}`
+        );
+        break;
       }
     }
   }
 
-  console.log(`matchLeadsToCustomers: linked=${linked} skipped=${skipped}`)
-  return { linked, skipped }
-})
+  console.log(`matchLeadsToCustomers: linked=${linked} skipped=${skipped}`);
+  return { linked, skipped };
+});
 
 // ── getPublicQuote ─────────────────────────────────────────────────────────────
 
@@ -1129,83 +1198,95 @@ export const matchLeadsToCustomers = onCall(async (request) => {
  * Output: { quote, company, rep, discussNote }
  */
 export const getPublicQuote = onCall(async (request) => {
-  const data    = request.data as Record<string, unknown>
-  const quoteId = data.quoteId as string | undefined
-  const token   = data.token   as string | undefined
+  const data = request.data as Record<string, unknown>;
+  const quoteId = data.quoteId as string | undefined;
+  const token = data.token as string | undefined;
 
   if (!quoteId || !token) {
-    throw new HttpsError('invalid-argument', 'quoteId and token are required.')
+    throw new HttpsError('invalid-argument', 'quoteId and token are required.');
   }
 
-  const quoteSnap = await db.collection('quotes').doc(quoteId).get()
+  const quoteSnap = await db.collection('quotes').doc(quoteId).get();
   if (!quoteSnap.exists) {
-    throw new HttpsError('not-found', 'Quote not found.')
+    throw new HttpsError('not-found', 'Quote not found.');
   }
 
-  const quote = quoteSnap.data()!
+  const quote = quoteSnap.data()!;
   if (!quote.publicToken || quote.publicToken !== token) {
-    throw new HttpsError('permission-denied', 'Invalid or expired link.')
+    throw new HttpsError('permission-denied', 'Invalid or expired link.');
   }
 
-  const company = await getCompanySettings()
+  const company = await getCompanySettings();
 
   // Sales rep info
-  let rep: { name: string; email: string; phone: string } | null = null
-  const repUid = (quote.createdBy ?? quote.assignedTo) as string | undefined
+  let rep: { name: string; email: string; phone: string } | null = null;
+  const repUid = (quote.createdBy ?? quote.assignedTo) as string | undefined;
   if (repUid) {
-    const repSnap = await db.collection('users').doc(repUid).get()
+    const repSnap = await db.collection('users').doc(repUid).get();
     if (repSnap.exists) {
-      const rd = repSnap.data()!
+      const rd = repSnap.data()!;
       rep = {
-        name:  (rd.name  as string) || '',
+        name: (rd.name as string) || '',
         email: (rd.email as string) || '',
         phone: (rd.phone as string) || '',
-      }
+      };
     }
   }
 
-  const tplSnap    = await db.collection('settings').doc('emailTemplates').get()
-  const tpl        = tplSnap.exists ? (tplSnap.data() as Record<string, string>) : {}
-  const discussNote = tpl.quoteDiscussNote || "We want to ensure you're completely happy with our service. Please reach out to discuss any adjustments."
+  const tplSnap = await db.collection('settings').doc('emailTemplates').get();
+  const tpl = tplSnap.exists ? (tplSnap.data() as Record<string, string>) : {};
+  const discussNote =
+    tpl.quoteDiscussNote ||
+    "We want to ensure you're completely happy with our service. Please reach out to discuss any adjustments.";
 
   // If already accepted, return the setup URL so the page can show the QR code
-  let setupUrl: string | null = null
+  let setupUrl: string | null = null;
   if (quote.status === 'accepted' && quote.customerId) {
     try {
-      const custSnap = await db.collection('customers').doc(quote.customerId as string).get()
+      const custSnap = await db
+        .collection('customers')
+        .doc(quote.customerId as string)
+        .get();
       if (custSnap.exists) {
-        const cd = custSnap.data()!
+        const cd = custSnap.data()!;
         if (cd.setupToken && !cd.setupComplete) {
-          setupUrl = `https://app.ohiogassupply.com/join/${cd.setupToken as string}`
+          setupUrl = `https://app.ohiogassupply.com/join/${cd.setupToken as string}`;
         }
       }
-    } catch { /* non-fatal */ }
+    } catch {
+      /* non-fatal */
+    }
   }
 
   return {
     quote: {
-      id:          quoteId,
+      id: quoteId,
       quoteNumber: (quote.quoteNumber as string) ?? '',
-      status:      (quote.status      as string) ?? 'sent',
-      validUntil:  quote.validUntil ?? null,
-      lineItems:   (quote.lineItems   ?? []) as Array<{ description: string; quantity: number; unitPrice: number; amount: number }>,
-      subtotal:    (quote.subtotal    as number) ?? 0,
-      total:       (quote.total       as number) ?? 0,
-      notes:       (quote.notes       as string) || '',
+      status: (quote.status as string) ?? 'sent',
+      validUntil: quote.validUntil ?? null,
+      lineItems: (quote.lineItems ?? []) as Array<{
+        description: string;
+        quantity: number;
+        unitPrice: number;
+        amount: number;
+      }>,
+      subtotal: (quote.subtotal as number) ?? 0,
+      total: (quote.total as number) ?? 0,
+      notes: (quote.notes as string) || '',
     },
     company: {
-      name:    company.name    || '',
+      name: company.name || '',
       tagline: company.tagline || '',
-      phone:   company.phone   || '',
-      email:   company.email   || '',
+      phone: company.phone || '',
+      email: company.email || '',
       website: company.website || '',
       logoUrl: company.logoUrl || '',
     },
     rep,
     discussNote,
     setupUrl,
-  }
-})
+  };
+});
 
 // ── respondToQuotePublic ───────────────────────────────────────────────────────
 
@@ -1216,221 +1297,243 @@ export const getPublicQuote = onCall(async (request) => {
  * Input:  { quoteId: string, token: string, response: 'accepted' }
  * Output: { success: true }
  */
-export const respondToQuotePublic = onCall(
-  { secrets: [SENDGRID_API_KEY] },
-  async (request) => {
-    const data    = request.data as Record<string, unknown>
-    const quoteId = data.quoteId as string | undefined
-    const token   = data.token   as string | undefined
-    const resp    = data.response as string | undefined
+export const respondToQuotePublic = onCall({ secrets: [SENDGRID_API_KEY] }, async (request) => {
+  const data = request.data as Record<string, unknown>;
+  const quoteId = data.quoteId as string | undefined;
+  const token = data.token as string | undefined;
+  const resp = data.response as string | undefined;
 
-    if (!quoteId || !token) {
-      throw new HttpsError('invalid-argument', 'quoteId and token are required.')
-    }
-    if (resp !== 'accepted') {
-      throw new HttpsError('invalid-argument', 'response must be "accepted".')
-    }
+  if (!quoteId || !token) {
+    throw new HttpsError('invalid-argument', 'quoteId and token are required.');
+  }
+  if (resp !== 'accepted') {
+    throw new HttpsError('invalid-argument', 'response must be "accepted".');
+  }
 
-    const quoteSnap = await db.collection('quotes').doc(quoteId).get()
-    if (!quoteSnap.exists) {
-      throw new HttpsError('not-found', 'Quote not found.')
-    }
+  const quoteSnap = await db.collection('quotes').doc(quoteId).get();
+  if (!quoteSnap.exists) {
+    throw new HttpsError('not-found', 'Quote not found.');
+  }
 
-    const quote = quoteSnap.data()!
-    if (!quote.publicToken || quote.publicToken !== token) {
-      throw new HttpsError('permission-denied', 'Invalid or expired link.')
-    }
-    if (quote.status !== 'sent') {
-      throw new HttpsError(
-        'failed-precondition',
-        `This quote has already been ${quote.status as string}.`,
-      )
-    }
+  const quote = quoteSnap.data()!;
+  if (!quote.publicToken || quote.publicToken !== token) {
+    throw new HttpsError('permission-denied', 'Invalid or expired link.');
+  }
+  if (quote.status !== 'sent') {
+    throw new HttpsError(
+      'failed-precondition',
+      `This quote has already been ${quote.status as string}.`
+    );
+  }
 
-    const now = FieldValue.serverTimestamp()
-    await db.collection('quotes').doc(quoteId).update({
-      status:      'accepted',
-      acceptedAt:  now,
-      updatedAt:   now,
-      acceptedVia: 'public-link',
-    })
+  const now = FieldValue.serverTimestamp();
+  await db.collection('quotes').doc(quoteId).update({
+    status: 'accepted',
+    acceptedAt: now,
+    updatedAt: now,
+    acceptedVia: 'public-link',
+  });
 
-    // Resolve or create the customer record for this quote.
-    // resolveOrCreateCustomer does fuzzy name+domain matching and will create
-    // a customers doc from lead data if no match exists.  It also marks the
-    // lead as 'won' and sets companyId / convertedToCustomerId on the lead.
-    let effectiveCustomerId: string | null = (quote.customerId as string | undefined) || null
+  // Resolve or create the customer record for this quote.
+  // resolveOrCreateCustomer does fuzzy name+domain matching and will create
+  // a customers doc from lead data if no match exists.  It also marks the
+  // lead as 'won' and sets companyId / convertedToCustomerId on the lead.
+  let effectiveCustomerId: string | null = (quote.customerId as string | undefined) || null;
 
-    if (quote.leadId) {
-      try {
-        const resolvedId = await resolveOrCreateCustomer(quote.leadId as string, now)
-        effectiveCustomerId = resolvedId
-        // Back-fill the quote's customerId so future portal look-ups work
-        if (!quote.customerId || quote.customerId !== resolvedId) {
-          await db.collection('quotes').doc(quoteId).update({ customerId: resolvedId })
-        }
-      } catch (resolveErr) {
-        console.warn('[respondToQuotePublic] failed to resolve customer from lead —', resolveErr)
-      }
-    }
-
-    // Activate the customer in the CRM now that they've accepted a quote
-    if (effectiveCustomerId) {
-      try {
-        await db.collection('customers').doc(effectiveCustomerId).update({
-          status:    'active',
-          updatedAt: now,
-        })
-      } catch (statusErr) {
-        console.warn('[respondToQuotePublic] failed to activate customer —', statusErr)
-      }
-    }
-
-    // Apply quoted prices to customer's productPricing subcollection
-    // (same logic as respondToQuote — needed so portal shows correct pricing)
-    if (effectiveCustomerId) {
-      try {
-        const lineItems = (quote.lineItems ?? []) as Array<{ productId: string; description: string; quantity: number; unitPrice: number; amount: number }>
-        const eligible  = lineItems.filter(
-          (i) => i.productId && i.productId !== 'delivery' && i.productId !== 'rental' && i.unitPrice > 0,
-        )
-        if (eligible.length > 0) {
-          const pricingBatch = db.batch()
-          for (const item of eligible) {
-            const ref = db
-              .collection('customers')
-              .doc(effectiveCustomerId)
-              .collection('productPricing')
-              .doc(item.productId)
-            pricingBatch.set(ref, {
-              productId: item.productId,
-              price:     item.unitPrice,
-              source:    'quote',
-              quoteId,
-              setAt:     now,
-            })
-          }
-          await pricingBatch.commit()
-        }
-      } catch (pricingErr) {
-        console.warn('[respondToQuotePublic] failed to write productPricing —', pricingErr)
-      }
-    }
-
-    // Create a 'sent' invoice from the accepted quote so it appears as an open invoice on the customer record.
-    let quoteInvoiceId: string | null = null
-    if (effectiveCustomerId) {
-      try {
-        const invoiceNumber = `INV-${Date.now().toString().slice(-8)}`
-        const dueAt = new Date()
-        dueAt.setDate(dueAt.getDate() + 30)
-        const rawLineItems = (quote.lineItems ?? []) as Array<{
-          description: string; quantity: number; unitPrice: number; amount: number
-        }>
-        const invoiceLineItems = rawLineItems.map(({ description, quantity, unitPrice, amount }) => ({
-          description, quantity, unitPrice, amount,
-        }))
-        const invoiceDoc: Record<string, unknown> = {
-          invoiceNumber,
-          customerId:  effectiveCustomerId,
-          quoteId,
-          status:      'sent',
-          lineItems:   invoiceLineItems,
-          subtotal:    (quote.subtotal as number) ?? 0,
-          tax:         (quote.tax as number) ?? 0,
-          total:       (quote.total as number) ?? 0,
-          issuedAt:    now,
-          dueAt,
-          createdAt:   now,
-          updatedAt:   now,
-        }
-        if (quote.quoteNumber) invoiceDoc.quoteNumber = quote.quoteNumber as string
-        if (quote.leadId)      invoiceDoc.leadId      = quote.leadId as string
-        const invoiceRef = await db.collection('invoices').add(invoiceDoc)
-        quoteInvoiceId = invoiceRef.id
-        console.log(`[respondToQuotePublic] invoice ${quoteInvoiceId} created for quote ${quoteId}`)
-      } catch (invoiceErr) {
-        console.warn('[respondToQuotePublic] failed to create invoice from accepted quote —', invoiceErr)
-      }
-    }
-
-    // Flag the quote so staff know to set up a standing order, and link the new invoice.
-    const quoteUpdate: Record<string, unknown> = { needsOrderSetup: true, updatedAt: now }
-    if (quoteInvoiceId) quoteUpdate.invoiceId = quoteInvoiceId
-    await db.collection('quotes').doc(quoteId).update(quoteUpdate)
-    console.log(`[respondToQuotePublic] quote ${quoteId} accepted via public link — invoice ${quoteInvoiceId ?? 'n/a'} created, needs order setup`)
-
-    // Generate a portal setup link and return it so the public quote page can
-    // immediately show the QR code + button to the customer.
-    let setupUrl: string | null = null
-    if (effectiveCustomerId) {
-      try {
-        const custSnap = await db.collection('customers').doc(effectiveCustomerId).get()
-        if (custSnap.exists) {
-          const cd = custSnap.data()!
-          let finalToken: string
-          if (cd.setupToken && !cd.setupComplete) {
-            finalToken = cd.setupToken as string
-          } else if (!cd.setupComplete) {
-            finalToken = crypto.randomUUID()
-            const setupTokenExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-            await custSnap.ref.update({ setupToken: finalToken, setupTokenExpiry, updatedAt: now })
-          } else {
-            finalToken = ''
-          }
-          if (finalToken) {
-            setupUrl = `https://app.ohiogassupply.com/join/${finalToken}`
-          }
-        }
-        if (setupUrl) console.log(`[respondToQuotePublic] setup link ready for customers/${effectiveCustomerId}`)
-      } catch (setupErr) {
-        console.warn('[respondToQuotePublic] failed to generate setup token —', setupErr)
-      }
-    }
-
-    // Notify the sales rep (email + in-app)
+  if (quote.leadId) {
     try {
-      const repUid = (quote.createdBy as string | undefined)
-      if (repUid) {
-        const repAuthUser = await adminAuth.getUser(repUid).catch(() => null)
-        const repEmail    = repAuthUser?.email
-        const quoteNum    = (quote.quoteNumber as string) || quoteId
-        const total       = `$${((quote.total as number) ?? 0).toFixed(2)}`
+      const resolvedId = await resolveOrCreateCustomer(quote.leadId as string, now);
+      effectiveCustomerId = resolvedId;
+      // Back-fill the quote's customerId so future portal look-ups work
+      if (!quote.customerId || quote.customerId !== resolvedId) {
+        await db.collection('quotes').doc(quoteId).update({ customerId: resolvedId });
+      }
+    } catch (resolveErr) {
+      console.warn('[respondToQuotePublic] failed to resolve customer from lead —', resolveErr);
+    }
+  }
 
-        let entityName = 'the customer'
-        if (effectiveCustomerId) {
-          const cSnap = await db.collection('customers').doc(effectiveCustomerId).get()
-          if (cSnap.exists) entityName = (cSnap.data()!.name as string) || (cSnap.data()!.companyName as string) || entityName
-        } else if (quote.leadId) {
-          const lSnap = await db.collection('leads').doc(quote.leadId as string).get()
-          if (lSnap.exists) {
-            const l = lSnap.data()!
-            entityName = (l.company as string) || (l.name as string) || entityName
-          }
+  // Activate the customer in the CRM now that they've accepted a quote
+  if (effectiveCustomerId) {
+    try {
+      await db.collection('customers').doc(effectiveCustomerId).update({
+        status: 'active',
+        updatedAt: now,
+      });
+    } catch (statusErr) {
+      console.warn('[respondToQuotePublic] failed to activate customer —', statusErr);
+    }
+  }
+
+  // Apply quoted prices to customer's productPricing subcollection
+  // (same logic as respondToQuote — needed so portal shows correct pricing)
+  if (effectiveCustomerId) {
+    try {
+      const lineItems = (quote.lineItems ?? []) as Array<{
+        productId: string;
+        description: string;
+        quantity: number;
+        unitPrice: number;
+        amount: number;
+      }>;
+      const eligible = lineItems.filter(
+        (i) =>
+          i.productId && i.productId !== 'delivery' && i.productId !== 'rental' && i.unitPrice > 0
+      );
+      if (eligible.length > 0) {
+        const pricingBatch = db.batch();
+        for (const item of eligible) {
+          const ref = db
+            .collection('customers')
+            .doc(effectiveCustomerId)
+            .collection('productPricing')
+            .doc(item.productId);
+          pricingBatch.set(ref, {
+            productId: item.productId,
+            price: item.unitPrice,
+            source: 'quote',
+            quoteId,
+            setAt: now,
+          });
         }
+        await pricingBatch.commit();
+      }
+    } catch (pricingErr) {
+      console.warn('[respondToQuotePublic] failed to write productPricing —', pricingErr);
+    }
+  }
 
-        // In-app notification
-        await db.collection('notifications').add({
-          userId:    repUid,
-          type:      'quote_accepted',
-          title:     `Quote #${quoteNum} accepted`,
-          body:      `${entityName} accepted Quote #${quoteNum} (${total}) via email link. Set up their standing order.`,
-          link:      `/crm/quotes/${quoteId}`,
-          entityId:  quoteId,
-          priority:  'high',
-          read:      false,
-          createdAt: now,
-        })
+  // Create a 'sent' invoice from the accepted quote so it appears as an open invoice on the customer record.
+  let quoteInvoiceId: string | null = null;
+  if (effectiveCustomerId) {
+    try {
+      const invoiceNumber = `INV-${Date.now().toString().slice(-8)}`;
+      const dueAt = new Date();
+      dueAt.setDate(dueAt.getDate() + 30);
+      const rawLineItems = (quote.lineItems ?? []) as Array<{
+        description: string;
+        quantity: number;
+        unitPrice: number;
+        amount: number;
+      }>;
+      const invoiceLineItems = rawLineItems.map(({ description, quantity, unitPrice, amount }) => ({
+        description,
+        quantity,
+        unitPrice,
+        amount,
+      }));
+      const invoiceDoc: Record<string, unknown> = {
+        invoiceNumber,
+        customerId: effectiveCustomerId,
+        quoteId,
+        status: 'sent',
+        lineItems: invoiceLineItems,
+        subtotal: (quote.subtotal as number) ?? 0,
+        tax: (quote.tax as number) ?? 0,
+        total: (quote.total as number) ?? 0,
+        issuedAt: now,
+        dueAt,
+        createdAt: now,
+        updatedAt: now,
+      };
+      if (quote.quoteNumber) invoiceDoc.quoteNumber = quote.quoteNumber as string;
+      if (quote.leadId) invoiceDoc.leadId = quote.leadId as string;
+      const invoiceRef = await db.collection('invoices').add(invoiceDoc);
+      quoteInvoiceId = invoiceRef.id;
+      console.log(`[respondToQuotePublic] invoice ${quoteInvoiceId} created for quote ${quoteId}`);
+    } catch (invoiceErr) {
+      console.warn(
+        '[respondToQuotePublic] failed to create invoice from accepted quote —',
+        invoiceErr
+      );
+    }
+  }
 
-        // Email notification
-        if (repEmail) {
-          requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY')
-          const company   = await getCompanySettings()
-          const quoteLink = `https://app.ohiogassupply.com/crm/quotes/${quoteId}`
-          await sendEmail({
-            to:      repEmail,
-            subject: `✓ Quote #${quoteNum} was ACCEPTED by ${entityName}`,
-            html: `
+  // Flag the quote so staff know to set up a standing order, and link the new invoice.
+  const quoteUpdate: Record<string, unknown> = { needsOrderSetup: true, updatedAt: now };
+  if (quoteInvoiceId) quoteUpdate.invoiceId = quoteInvoiceId;
+  await db.collection('quotes').doc(quoteId).update(quoteUpdate);
+  console.log(
+    `[respondToQuotePublic] quote ${quoteId} accepted via public link — invoice ${quoteInvoiceId ?? 'n/a'} created, needs order setup`
+  );
+
+  // Generate a portal setup link and return it so the public quote page can
+  // immediately show the QR code + button to the customer.
+  let setupUrl: string | null = null;
+  if (effectiveCustomerId) {
+    try {
+      const custSnap = await db.collection('customers').doc(effectiveCustomerId).get();
+      if (custSnap.exists) {
+        const cd = custSnap.data()!;
+        let finalToken: string;
+        if (cd.setupToken && !cd.setupComplete) {
+          finalToken = cd.setupToken as string;
+        } else if (!cd.setupComplete) {
+          finalToken = crypto.randomUUID();
+          const setupTokenExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+          await custSnap.ref.update({ setupToken: finalToken, setupTokenExpiry, updatedAt: now });
+        } else {
+          finalToken = '';
+        }
+        if (finalToken) {
+          setupUrl = `https://app.ohiogassupply.com/join/${finalToken}`;
+        }
+      }
+      if (setupUrl)
+        console.log(`[respondToQuotePublic] setup link ready for customers/${effectiveCustomerId}`);
+    } catch (setupErr) {
+      console.warn('[respondToQuotePublic] failed to generate setup token —', setupErr);
+    }
+  }
+
+  // Notify the sales rep (email + in-app)
+  try {
+    const repUid = quote.createdBy as string | undefined;
+    if (repUid) {
+      const repAuthUser = await adminAuth.getUser(repUid).catch(() => null);
+      const repEmail = repAuthUser?.email;
+      const quoteNum = (quote.quoteNumber as string) || quoteId;
+      const total = `$${((quote.total as number) ?? 0).toFixed(2)}`;
+
+      let entityName = 'the customer';
+      if (effectiveCustomerId) {
+        const cSnap = await db.collection('customers').doc(effectiveCustomerId).get();
+        if (cSnap.exists)
+          entityName =
+            (cSnap.data()!.name as string) || (cSnap.data()!.companyName as string) || entityName;
+      } else if (quote.leadId) {
+        const lSnap = await db
+          .collection('leads')
+          .doc(quote.leadId as string)
+          .get();
+        if (lSnap.exists) {
+          const l = lSnap.data()!;
+          entityName = (l.company as string) || (l.name as string) || entityName;
+        }
+      }
+
+      // In-app notification
+      await db.collection('notifications').add({
+        userId: repUid,
+        type: 'quote_accepted',
+        title: `Quote #${quoteNum} accepted`,
+        body: `${entityName} accepted Quote #${quoteNum} (${total}) via email link. Set up their standing order.`,
+        link: `/crm/quotes/${quoteId}`,
+        entityId: quoteId,
+        priority: 'high',
+        read: false,
+        createdAt: now,
+      });
+
+      // Email notification
+      if (repEmail) {
+        requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY');
+        const company = await getCompanySettings();
+        const quoteLink = `https://app.ohiogassupply.com/crm/quotes/${quoteId}`;
+        await sendEmail({
+          to: repEmail,
+          subject: `✓ Quote #${quoteNum} was ACCEPTED by ${entityName}`,
+          html: `
 <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#333">
   <div style="background:#16a34a;padding:24px 32px 16px">
     <h1 style="margin:0;color:#fff;font-size:20px">${company.name || 'Ohio Gas Supply'}</h1>
@@ -1452,34 +1555,39 @@ export const respondToQuotePublic = onCall(
     ${company.name || 'Ohio Gas Supply'}${company.website ? ` &nbsp;·&nbsp; ${company.website}` : ''}
   </div>
 </div>`,
-          })
-          console.log(`[respondToQuotePublic] acceptance notification sent to ${repEmail} for quote ${quoteId}`)
-        }
+        });
+        console.log(
+          `[respondToQuotePublic] acceptance notification sent to ${repEmail} for quote ${quoteId}`
+        );
       }
-    } catch (notifyErr) {
-      console.warn('[respondToQuotePublic] failed to send notification —', notifyErr)
     }
+  } catch (notifyErr) {
+    console.warn('[respondToQuotePublic] failed to send notification —', notifyErr);
+  }
 
-    // Send confirmation email to the customer with setup link + QR code
-    if (setupUrl) {
-      try {
-        let recipientEmail = ''
-        if (effectiveCustomerId) {
-          const cSnap = await db.collection('customers').doc(effectiveCustomerId).get()
-          if (cSnap.exists) recipientEmail = (cSnap.data()!.email as string) || ''
-        } else if (quote.leadId) {
-          const lSnap = await db.collection('leads').doc(quote.leadId as string).get()
-          if (lSnap.exists) recipientEmail = (lSnap.data()!.email as string) || ''
-        }
-        if (recipientEmail) {
-          requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY')
-          const company  = await getCompanySettings()
-          const quoteNum = (quote.quoteNumber as string) || quoteId
-          const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(setupUrl)}&color=1e293b&bgcolor=ffffff`
-          await sendEmail({
-            to:      recipientEmail,
-            subject: `You're confirmed — set up your ${company.name || 'OGS'} portal account`,
-            html: `
+  // Send confirmation email to the customer with setup link + QR code
+  if (setupUrl) {
+    try {
+      let recipientEmail = '';
+      if (effectiveCustomerId) {
+        const cSnap = await db.collection('customers').doc(effectiveCustomerId).get();
+        if (cSnap.exists) recipientEmail = (cSnap.data()!.email as string) || '';
+      } else if (quote.leadId) {
+        const lSnap = await db
+          .collection('leads')
+          .doc(quote.leadId as string)
+          .get();
+        if (lSnap.exists) recipientEmail = (lSnap.data()!.email as string) || '';
+      }
+      if (recipientEmail) {
+        requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY');
+        const company = await getCompanySettings();
+        const quoteNum = (quote.quoteNumber as string) || quoteId;
+        const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(setupUrl)}&color=1e293b&bgcolor=ffffff`;
+        await sendEmail({
+          to: recipientEmail,
+          subject: `You're confirmed — set up your ${company.name || 'OGS'} portal account`,
+          html: `
 <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#333">
   <div style="background:#E87722;padding:24px 32px 16px">
     <h1 style="margin:0;color:#fff;font-size:20px">${company.name || 'Ohio Gas Supply'}</h1>
@@ -1508,14 +1616,13 @@ export const respondToQuotePublic = onCall(
     ${company.name || 'Ohio Gas Supply'}${company.website ? ` &nbsp;·&nbsp; ${company.website}` : ''}
   </div>
 </div>`,
-          })
-          console.log(`[respondToQuotePublic] customer setup email sent to ${recipientEmail}`)
-        }
-      } catch (custEmailErr) {
-        console.warn('[respondToQuotePublic] failed to send customer setup email —', custEmailErr)
+        });
+        console.log(`[respondToQuotePublic] customer setup email sent to ${recipientEmail}`);
       }
+    } catch (custEmailErr) {
+      console.warn('[respondToQuotePublic] failed to send customer setup email —', custEmailErr);
     }
+  }
 
-    return { success: true, setupUrl: setupUrl ?? null }
-  },
-)
+  return { success: true, setupUrl: setupUrl ?? null };
+});
