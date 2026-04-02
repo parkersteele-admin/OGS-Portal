@@ -744,10 +744,46 @@ export const respondToQuote = onCall(
       await batch.commit()
     }
 
-    // Flag the quote so staff know to set up a standing order for this customer.
-    // Invoices are generated from completed deliveries, not from quote acceptance.
-    await db.collection('quotes').doc(data.quoteId as string).update({ needsOrderSetup: true, updatedAt: now })
-    console.log(`[respondToQuote] quote ${data.quoteId as string} accepted — needs order setup`)
+    // Create a 'sent' invoice from the accepted quote so it appears as an open invoice on the customer record.
+    let quoteInvoiceId: string | null = null
+    try {
+      const invoiceNumber = `INV-${Date.now().toString().slice(-8)}`
+      const dueAt = new Date()
+      dueAt.setDate(dueAt.getDate() + 30)
+      const rawLineItems = (quote.lineItems ?? []) as Array<{
+        description: string; quantity: number; unitPrice: number; amount: number
+      }>
+      const invoiceLineItems = rawLineItems.map(({ description, quantity, unitPrice, amount }) => ({
+        description, quantity, unitPrice, amount,
+      }))
+      const invoiceDoc: Record<string, unknown> = {
+        invoiceNumber,
+        customerId:  effectiveCustomerId,
+        quoteId:     data.quoteId as string,
+        status:      'sent',
+        lineItems:   invoiceLineItems,
+        subtotal:    (quote.subtotal as number) ?? 0,
+        tax:         (quote.tax as number) ?? 0,
+        total:       (quote.total as number) ?? 0,
+        issuedAt:    now,
+        dueAt,
+        createdAt:   now,
+        updatedAt:   now,
+      }
+      if (quote.quoteNumber) invoiceDoc.quoteNumber = quote.quoteNumber as string
+      if (quote.leadId)      invoiceDoc.leadId      = quote.leadId as string
+      const invoiceRef = await db.collection('invoices').add(invoiceDoc)
+      quoteInvoiceId = invoiceRef.id
+      console.log(`[respondToQuote] invoice ${quoteInvoiceId} created for quote ${data.quoteId as string}`)
+    } catch (invoiceErr) {
+      console.warn('[respondToQuote] failed to create invoice from accepted quote —', invoiceErr)
+    }
+
+    // Flag the quote so staff know to set up a standing order, and link the new invoice.
+    const quoteUpdate: Record<string, unknown> = { needsOrderSetup: true, updatedAt: now }
+    if (quoteInvoiceId) quoteUpdate.invoiceId = quoteInvoiceId
+    await db.collection('quotes').doc(data.quoteId as string).update(quoteUpdate)
+    console.log(`[respondToQuote] quote ${data.quoteId as string} accepted — invoice ${quoteInvoiceId ?? 'n/a'} created, needs order setup`)
 
     // Generate a portal setup link so staff can share a QR code with the customer.
     if (effectiveCustomerId) {
@@ -1281,10 +1317,48 @@ export const respondToQuotePublic = onCall(
       }
     }
 
-    // Flag the quote so staff know to set up a standing order for this customer.
-    // Invoices are generated from completed deliveries, not from quote acceptance.
-    await db.collection('quotes').doc(quoteId).update({ needsOrderSetup: true, updatedAt: now })
-    console.log(`[respondToQuotePublic] quote ${quoteId} accepted via public link — needs order setup`)
+    // Create a 'sent' invoice from the accepted quote so it appears as an open invoice on the customer record.
+    let quoteInvoiceId: string | null = null
+    if (effectiveCustomerId) {
+      try {
+        const invoiceNumber = `INV-${Date.now().toString().slice(-8)}`
+        const dueAt = new Date()
+        dueAt.setDate(dueAt.getDate() + 30)
+        const rawLineItems = (quote.lineItems ?? []) as Array<{
+          description: string; quantity: number; unitPrice: number; amount: number
+        }>
+        const invoiceLineItems = rawLineItems.map(({ description, quantity, unitPrice, amount }) => ({
+          description, quantity, unitPrice, amount,
+        }))
+        const invoiceDoc: Record<string, unknown> = {
+          invoiceNumber,
+          customerId:  effectiveCustomerId,
+          quoteId,
+          status:      'sent',
+          lineItems:   invoiceLineItems,
+          subtotal:    (quote.subtotal as number) ?? 0,
+          tax:         (quote.tax as number) ?? 0,
+          total:       (quote.total as number) ?? 0,
+          issuedAt:    now,
+          dueAt,
+          createdAt:   now,
+          updatedAt:   now,
+        }
+        if (quote.quoteNumber) invoiceDoc.quoteNumber = quote.quoteNumber as string
+        if (quote.leadId)      invoiceDoc.leadId      = quote.leadId as string
+        const invoiceRef = await db.collection('invoices').add(invoiceDoc)
+        quoteInvoiceId = invoiceRef.id
+        console.log(`[respondToQuotePublic] invoice ${quoteInvoiceId} created for quote ${quoteId}`)
+      } catch (invoiceErr) {
+        console.warn('[respondToQuotePublic] failed to create invoice from accepted quote —', invoiceErr)
+      }
+    }
+
+    // Flag the quote so staff know to set up a standing order, and link the new invoice.
+    const quoteUpdate: Record<string, unknown> = { needsOrderSetup: true, updatedAt: now }
+    if (quoteInvoiceId) quoteUpdate.invoiceId = quoteInvoiceId
+    await db.collection('quotes').doc(quoteId).update(quoteUpdate)
+    console.log(`[respondToQuotePublic] quote ${quoteId} accepted via public link — invoice ${quoteInvoiceId ?? 'n/a'} created, needs order setup`)
 
     // Generate a portal setup link and return it so the public quote page can
     // immediately show the QR code + button to the customer.
