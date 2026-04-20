@@ -21,7 +21,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: OGS-portal-app
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: Build Vite app (production)
         working-directory: OGS-portal-app
