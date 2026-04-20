@@ -26,12 +26,12 @@ jobs:
       - name: Build Vite app (production)
         working-directory: OGS-portal-app
         env:
-          VITE_FIREBASE_API_KEY: ${{ fromJson(secrets.VITE_FIREBASE_CONFIG).apiKey }}
-          VITE_FIREBASE_AUTH_DOMAIN: ${{ fromJson(secrets.VITE_FIREBASE_CONFIG).authDomain }}
-          VITE_FIREBASE_PROJECT_ID: ${{ fromJson(secrets.VITE_FIREBASE_CONFIG).projectId }}
-          VITE_FIREBASE_STORAGE_BUCKET: ${{ fromJson(secrets.VITE_FIREBASE_CONFIG).storageBucket }}
-          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ fromJson(secrets.VITE_FIREBASE_CONFIG).messagingSenderId }}
-          VITE_FIREBASE_APP_ID: ${{ fromJson(secrets.VITE_FIREBASE_CONFIG).appId }}
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
           VITE_STRIPE_PUBLISHABLE_KEY: ${{ secrets.VITE_STRIPE_PUBLISHABLE_KEY }}
           VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_KEY }}
           VITE_APP_ENV: production
