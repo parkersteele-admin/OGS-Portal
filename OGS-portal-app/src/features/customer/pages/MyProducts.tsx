@@ -14,9 +14,9 @@ import { useQuery, useMutation } from '@tanstack/react-query'
 import { getDocs, query, where, orderBy, limit, addDoc, serverTimestamp, collection } from 'firebase/firestore'
 import { db } from '../../../lib/firebase'
 import { getVisibleProducts } from '../../../services/productService'
-import { getCustomerProductPricing } from '../../../services/customerPricingService'
 import { ordersCol } from '../../../lib/firestore'
 import { useAuth } from '../../../hooks/useAuth'
+import { useCustomerProductPricing } from '../../../hooks/useCustomerProductPricing'
 import type { Product, ProductCategory } from '../../../types/product'
 import type { CustomerProductPricing } from '../../../types/customerPricing'
 import './MyProducts.css'
@@ -223,14 +223,7 @@ const MyProducts: React.FC = () => {
   })
 
   // Customer's per-product pricing
-  const { data: pricingEntries = [] } = useQuery<CustomerProductPricing[]>({
-    queryKey: ['customer-product-pricing', customerId],
-    queryFn:  () => getCustomerProductPricing(customerId),
-    enabled:  !!customerId,
-    staleTime: 5 * 60 * 1000,
-  })
-
-  const pricingMap = new Map(pricingEntries.map((p) => [p.productId, p]))
+  const { pricingMap, isLoading: pricingLoading } = useCustomerProductPricing(customerId)
 
   // Recent product IDs (priced products only — for quick-add)
   const { data: recentProductIds = [] } = useQuery<string[]>({
@@ -368,7 +361,7 @@ const MyProducts: React.FC = () => {
 
       {error && <div className="mp-error" role="alert">{error}</div>}
 
-      {productsLoading ? (
+      {productsLoading || pricingLoading ? (
         <div className="mp-loading" aria-live="polite">Loading products…</div>
       ) : filtered.length === 0 ? (
         <div className="mp-empty">

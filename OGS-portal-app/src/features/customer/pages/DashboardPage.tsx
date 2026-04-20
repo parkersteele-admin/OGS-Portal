@@ -81,6 +81,13 @@ function orderStatusVariant(status: OrderStatus): BadgeVariant {
   return map[status] ?? 'neutral'
 }
 
+function getOrderStatusLabel(order: Order): string {
+  if (order.status === 'delivered' && order.deliveryStatus === 'signed') {
+    return 'Delivered / Signed'
+  }
+  return order.status
+}
+
 function tierLabel(tier: DeliveryTier, upchargePercent: number): string | null {
   if (tier === 'standard') return null
   const pct = Math.round(upchargePercent * 100)
@@ -139,7 +146,7 @@ const OrderRow: React.FC<OrderRowProps> = ({ order, productName }) => {
             {label}
           </Badge>
         )}
-        <Badge variant={orderStatusVariant(order.status)}>{order.status}</Badge>
+        <Badge variant={orderStatusVariant(order.status)}>{getOrderStatusLabel(order)}</Badge>
       </div>
       <span className="cust-db__ord-amount">{fmtCurrency(order.total)}</span>
     </div>

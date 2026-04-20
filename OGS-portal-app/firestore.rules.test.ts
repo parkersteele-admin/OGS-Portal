@@ -33,6 +33,7 @@ const DRIVER_UID       = 'u-driver'
 const DRIVER2_UID      = 'u-driver2'
 const SALES_UID        = 'u-sales'
 const CUSTOMER_UID     = 'u-customer'
+const OWNER_UID        = 'u-owner'
 const CUSTOMER_ID      = 'cust-001'
 const ALT_CUSTOMER_UID = 'u-customer2'
 const ALT_CUSTOMER_ID  = 'cust-002'
@@ -70,6 +71,7 @@ beforeEach(async () => {
       { uid: DRIVER2_UID,      role: 'driver' },
       { uid: SALES_UID,        role: 'sales' },
       { uid: CUSTOMER_UID,     role: 'customer', customerId: CUSTOMER_ID },
+      { uid: OWNER_UID,        role: 'owner', companyId: CUSTOMER_ID },
       { uid: ALT_CUSTOMER_UID, role: 'customer', customerId: ALT_CUSTOMER_ID },
     ]
     for (const u of usersToSeed) {
@@ -127,6 +129,7 @@ const db = {
   driver2:     () => testEnv.authenticatedContext(DRIVER2_UID).firestore(),
   sales:       () => testEnv.authenticatedContext(SALES_UID).firestore(),
   customer:    () => testEnv.authenticatedContext(CUSTOMER_UID).firestore(),
+  owner:       () => testEnv.authenticatedContext(OWNER_UID).firestore(),
   altCustomer: () => testEnv.authenticatedContext(ALT_CUSTOMER_UID).firestore(),
   unauth:      () => testEnv.unauthenticatedContext().firestore(),
 }
@@ -603,6 +606,10 @@ describe('quotes', () => {
 
   it('customer can read their own quote', async () => {
     await assertSucceeds(getDoc(doc(db.customer(), 'quotes', 'quote-001')))
+  })
+
+  it('portal owner can read their company quote', async () => {
+    await assertSucceeds(getDoc(doc(db.owner(), 'quotes', 'quote-001')))
   })
 
   it('customer cannot read another customer quote', async () => {

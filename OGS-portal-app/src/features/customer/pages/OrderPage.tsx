@@ -16,7 +16,7 @@ import { useAuth } from '../../../hooks/useAuth'
 import { useCustomer } from '../../../hooks/queries'
 import { usePricingAccess } from '../../../hooks/usePricingAccess'
 import { useCompanySettings } from '../../../hooks/useCompanySettings'
-import { getCustomerProductPricing } from '../../../services/customerPricingService'
+import { useCustomerProductPricing } from '../../../hooks/useCustomerProductPricing'
 import {
   createBatchOrders,
   getDeliverySettings,
@@ -1398,14 +1398,9 @@ const OrderPage: React.FC = () => {
     staleTime: 5 * 60 * 1000,
   })
 
-  const { data: customerPricingEntries = [] } = useQuery({
-    queryKey: ['customer-product-pricing', customerId],
-    queryFn:  () => getCustomerProductPricing(customerId),
-    enabled:  !!customerId,
-    staleTime: 5 * 60 * 1000,
-  })
+  const { entries: customerPricingEntries } = useCustomerProductPricing(customerId)
   const customerPricingMap = new Map(
-    customerPricingEntries.map((p: { productId: string; price: number }) => [p.productId, p.price])
+    customerPricingEntries.map((p) => [p.productId, p.price])
   )
 
   const patch = useCallback((nextPatch: Partial<WizardState>) => {

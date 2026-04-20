@@ -223,7 +223,12 @@ service cloud.firestore {
         allow update: if isDispatch()
           || (isDriver()
               && get(/databases/$(database)/documents/runs/$(runId)).data.driverId
-                 == request.auth.uid);
+                 == request.auth.uid
+              && onlyUpdatesFields([
+                   'status', 'arrivedAt', 'completedAt', 'gallonsDelivered',
+                   'notes', 'photoUrls', 'signatureUrl', 'signedAt',
+                   'signedByName', 'billOfLadingUrl', 'invoicePdfUrl'
+                 ]));
       }
 
       // Truck load manifest (subcollection written by QR scan check-in)
@@ -304,7 +309,8 @@ service cloud.firestore {
     // ── Quotes ────────────────────────────────────────────────────────────────
     match /quotes/{quoteId} {
       allow read: if isSales()
-        || (isPortalUser() && resource.data.customerId == linkedCustomerId());
+        || (isPortalUser() && resource.data.customerId == linkedCompanyId())
+        || (isCustomer() && resource.data.customerId == linkedCustomerId());
       allow write: if isSales();
     }
 
@@ -404,4 +410,3 @@ service cloud.firestore {
     }
   }
 }
-

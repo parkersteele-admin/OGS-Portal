@@ -42,7 +42,11 @@ export interface RunStop {
   gallonsDelivered?: number
   arrivedAt?: Timestamp
   completedAt?: Timestamp
+  signedAt?: Timestamp
+  signedByName?: string
   signatureUrl?: string
+  billOfLadingUrl?: string
+  invoicePdfUrl?: string
   photoUrls?: string[]
   notes?: string
 }

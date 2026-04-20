@@ -116,6 +116,12 @@ service firebase.storage {
       allow delete: if isAdmin();
     }
 
+    // Signed-delivery artifacts are written by Cloud Functions via Admin SDK.
+    match /ogs-portal/orders/{orderId}/{folder}/{fileId} {
+      allow read:  if isDispatch();
+      allow write: if false;
+    }
+
     // ── employees ─────────────────────────────────────────────────────────────
     // HR / onboarding documents. Employees can read their own folder;
     // only admins may upload or remove files.
@@ -161,4 +167,3 @@ service firebase.storage {
     }
   }
 }
-

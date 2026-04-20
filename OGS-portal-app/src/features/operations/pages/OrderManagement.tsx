@@ -86,16 +86,36 @@ function fmtDate(
   })
 }
 
+function fmtDateTime(
+  ts: { toDate?: () => Date } | null | undefined,
+): string {
+  if (!ts?.toDate) return '—'
+  return ts.toDate().toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
 function isRush(order: Order): boolean {
   return RUSH_TIERS.includes(order.deliveryTier)
 }
 
+function getOrderStatusLabel(order: Order): string {
+  if (order.status === 'delivered' && order.deliveryStatus === 'signed') {
+    return 'Delivered / Signed'
+  }
+  return STATUS_LABELS[order.status]
+}
+
 // ── Status badge ───────────────────────────────────────────────────────────────
 
-function StatusBadge({ status }: { status: OrderStatus }) {
+function StatusBadge({ order }: { order: Order }) {
   return (
-    <span className={`om-badge om-badge--${status}`}>
-      {STATUS_LABELS[status]}
+    <span className={`om-badge om-badge--${order.status}`}>
+      {getOrderStatusLabel(order)}
     </span>
   )
 }
@@ -252,7 +272,7 @@ function OrderDetailPanel({
             <div className="om-panel__row">
               <span className="om-panel__label">Status</span>
               <span className="om-panel__val">
-                <StatusBadge status={order.status} />
+                <StatusBadge order={order} />
               </span>
             </div>
           </section>
@@ -313,10 +333,74 @@ function OrderDetailPanel({
           {order.status === 'delivered' && (
             <section className="om-panel__section">
               <div className="om-panel__section-title">Delivery Evidence</div>
-              <p className="om-panel__hint">
-                Photos and signature are stored on the stop record. View them in
-                the driver stop detail.
-              </p>
+              <div className="om-panel__row">
+                <span className="om-panel__label">Delivery status</span>
+                <span className="om-panel__val">
+                  {getOrderStatusLabel(order)}
+                </span>
+              </div>
+              {order.signedByName && (
+                <div className="om-panel__row">
+                  <span className="om-panel__label">Signed by</span>
+                  <span className="om-panel__val">{order.signedByName}</span>
+                </div>
+              )}
+              {order.signedAt && (
+                <div className="om-panel__row">
+                  <span className="om-panel__label">Signed at</span>
+                  <span className="om-panel__val">{fmtDateTime(order.signedAt)}</span>
+                </div>
+              )}
+              {order.signatureUrl && (
+                <div className="om-panel__row" style={{ alignItems: 'flex-start' }}>
+                  <span className="om-panel__label">Signature</span>
+                  <span className="om-panel__val">
+                    <a href={order.signatureUrl} target="_blank" rel="noopener noreferrer">
+                      <img
+                        src={order.signatureUrl}
+                        alt="Delivery signature"
+                        className="sp-signature"
+                        style={{ maxWidth: 220, background: '#fff' }}
+                      />
+                    </a>
+                  </span>
+                </div>
+              )}
+              {(order.billOfLadingUrl || order.invoicePdfUrl) && (
+                <>
+                  {order.billOfLadingUrl && (
+                    <div className="om-panel__row">
+                      <span className="om-panel__label">Bill of Lading</span>
+                      <span className="om-panel__val">
+                        <a href={order.billOfLadingUrl} target="_blank" rel="noopener noreferrer">
+                          Open PDF
+                        </a>
+                      </span>
+                    </div>
+                  )}
+                  {order.invoicePdfUrl && (
+                    <div className="om-panel__row">
+                      <span className="om-panel__label">Invoice PDF</span>
+                      <span className="om-panel__val">
+                        <a href={order.invoicePdfUrl} target="_blank" rel="noopener noreferrer">
+                          Open PDF
+                        </a>
+                      </span>
+                    </div>
+                  )}
+                </>
+              )}
+              {!order.signatureUrl && !order.billOfLadingUrl && !order.invoicePdfUrl && (
+                <p className="om-panel__hint">
+                  Signed-delivery assets have not been generated for this order yet.
+                </p>
+              )}
+              {order.deliveryNotes && (
+                <div className="om-panel__row" style={{ alignItems: 'flex-start' }}>
+                  <span className="om-panel__label">Delivery notes</span>
+                  <span className="om-panel__val">{order.deliveryNotes}</span>
+                </div>
+              )}
             </section>
           )}
 
@@ -1251,7 +1335,7 @@ export default function OrderManagement() {
                     </td>
 
                     <td className="om-table__td">
-                      <StatusBadge status={order.status} />
+                      <StatusBadge order={order} />
                     </td>
 
                     <td className="om-table__td om-table__td--right om-total">

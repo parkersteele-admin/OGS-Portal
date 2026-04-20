@@ -3,7 +3,11 @@ import {
   getDocs,
   setDoc,
   deleteDoc,
+  onSnapshot,
+  orderBy,
+  query,
   serverTimestamp,
+  type Unsubscribe,
 } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import { customerProductPricingCol } from '../lib/firestore'
@@ -19,6 +23,24 @@ export async function getCustomerProductPricing(
     const snap = await getDocs(customerProductPricingCol(customerId))
     return snap.docs.map((d) => ({ ...d.data(), productId: d.id }) as CustomerProductPricing)
   })
+}
+
+export function subscribeToCustomerProductPricing(
+  customerId: string,
+  callback: (entries: CustomerProductPricing[]) => void,
+  onError?: (err: Error) => void,
+): Unsubscribe {
+  return onSnapshot(
+    query(customerProductPricingCol(customerId), orderBy('setAt', 'desc')),
+    (snap) => {
+      callback(
+        snap.docs.map((d) => ({ ...d.data(), productId: d.id }) as CustomerProductPricing),
+      )
+    },
+    (err) => {
+      onError?.(err)
+    },
+  )
 }
 
 // ── Write ─────────────────────────────────────────────────────────────────────

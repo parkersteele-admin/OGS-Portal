@@ -45,6 +45,7 @@ export { createStripePaymentIntent }                              from './stripe
 export { createSetupIntent, savePaymentMethod, removePaymentMethod } from './stripe/index'
 export { onOrderComplete }                                        from './orders'
 export { onDeliveryComplete }                                     from './triggers/onDeliveryComplete'
+export { finalizeSignedDelivery }                                 from './delivery/finalizeSignedDelivery'
 export { onRunCreated }                                           from './triggers/onRunCreated'
 export { geocodeCustomerOnCreate, geocodeCustomerOnUpdate }       from './triggers/geocodeCustomer'
 export { processAutopay }         from './scheduled/processAutopay'
@@ -98,5 +99,4 @@ export { alertUnassignedLead }          from './scheduled/alertUnassignedLead'
 export const healthCheck = onRequest((_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
-
 

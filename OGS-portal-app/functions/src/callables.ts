@@ -1327,31 +1327,28 @@ export const respondToQuotePublic = onCall({ secrets: [SENDGRID_API_KEY] }, asyn
   }
 
   const now = FieldValue.serverTimestamp();
-  await db.collection('quotes').doc(quoteId).update({
-    status: 'accepted',
-    acceptedAt: now,
-    updatedAt: now,
-    acceptedVia: 'public-link',
-  });
-
-  // Resolve or create the customer record for this quote.
-  // resolveOrCreateCustomer does fuzzy name+domain matching and will create
-  // a customers doc from lead data if no match exists.  It also marks the
-  // lead as 'won' and sets companyId / convertedToCustomerId on the lead.
   let effectiveCustomerId: string | null = (quote.customerId as string | undefined) || null;
 
   if (quote.leadId) {
     try {
       const resolvedId = await resolveOrCreateCustomer(quote.leadId as string, now);
       effectiveCustomerId = resolvedId;
-      // Back-fill the quote's customerId so future portal look-ups work
-      if (!quote.customerId || quote.customerId !== resolvedId) {
-        await db.collection('quotes').doc(quoteId).update({ customerId: resolvedId });
-      }
     } catch (resolveErr) {
       console.warn('[respondToQuotePublic] failed to resolve customer from lead —', resolveErr);
     }
   }
+
+  const quoteAcceptanceUpdate: Record<string, unknown> = {
+    status: 'accepted',
+    acceptedAt: now,
+    updatedAt: now,
+    acceptedVia: 'public-link',
+    needsOrderSetup: true,
+  };
+  if (effectiveCustomerId) {
+    quoteAcceptanceUpdate.customerId = effectiveCustomerId;
+  }
+  await db.collection('quotes').doc(quoteId).update(quoteAcceptanceUpdate);
 
   // Activate the customer in the CRM now that they've accepted a quote
   if (effectiveCustomerId) {

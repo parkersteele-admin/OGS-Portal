@@ -39,6 +39,13 @@ function fmtDate(d: Date | null | undefined): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+function getOrderStatusLabel(order: Order): string {
+  if (order.status === 'delivered' && order.deliveryStatus === 'signed') {
+    return 'Delivered / Signed'
+  }
+  return STATUS_LABEL[order.status]
+}
+
 type BadgeVariant = 'brand' | 'success' | 'warning' | 'danger' | 'info' | 'neutral'
 
 const STATUS_VARIANT: Record<OrderStatus, BadgeVariant> = {
@@ -244,7 +251,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
         <div className="oh-detail__header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <span className="oh-detail__id">#{order.id.slice(0, 8).toUpperCase()}</span>
-            <Badge variant={STATUS_VARIANT[order.status]}>{STATUS_LABEL[order.status]}</Badge>
+            <Badge variant={STATUS_VARIANT[order.status]}>{getOrderStatusLabel(order)}</Badge>
             {order.orderType && (
               <span className="oh-order-type-pill" style={ORDER_TYPE_STYLE[order.orderType]}>
                 {ORDER_TYPE_LABEL[order.orderType]}
@@ -268,7 +275,11 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
                   <React.Fragment key={step}>
                     <div className={`oh-timeline__step oh-timeline__step--${state}`}>
                       <div className="oh-timeline__dot">{state === 'done' ? '✓' : i + 1}</div>
-                      <span className="oh-timeline__step-label">{STATUS_LABEL[step]}</span>
+                      <span className="oh-timeline__step-label">
+                        {step === 'delivered' && order.deliveryStatus === 'signed'
+                          ? 'Delivered / Signed'
+                          : STATUS_LABEL[step]}
+                      </span>
                     </div>
                     {i < TIMELINE_STEPS.length - 1 && (
                       <div className={`oh-timeline__line oh-timeline__line--${state === 'done' ? 'done' : 'upcoming'}`} />
@@ -490,7 +501,7 @@ const OrderRow: React.FC<OrderRowProps> = ({
       <td className="oh-td oh-td--mono">#{order.id.slice(0, 8).toUpperCase()}</td>
       <td className="oh-td">
         <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <Badge variant={STATUS_VARIANT[order.status]}>{STATUS_LABEL[order.status]}</Badge>
+          <Badge variant={STATUS_VARIANT[order.status]}>{getOrderStatusLabel(order)}</Badge>
           {order.orderType && (
             <span className="oh-order-type-pill" style={ORDER_TYPE_STYLE[order.orderType]}>
               {ORDER_TYPE_LABEL[order.orderType]}

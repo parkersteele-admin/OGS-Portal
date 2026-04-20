@@ -43,10 +43,10 @@ import { updateCustomer, archiveCustomer, deleteCustomer, restoreCustomer } from
 import { getUsersByCompany, assignUserRole, deactivateUser, reactivateUser, sendPasswordReset } from '../../../services/userService'
 import { getInvoices, createInvoice } from '../../../services/invoiceService'
 import { getProductDropdown, getVisibleProducts, type ProductDropdownItem } from '../../../services/productService'
-import { getCustomerProductPricing, setCustomerProductPrice, removeCustomerProductPrice } from '../../../services/customerPricingService'
+import { setCustomerProductPrice, removeCustomerProductPrice } from '../../../services/customerPricingService'
+import { useCustomerProductPricing } from '../../../hooks/useCustomerProductPricing'
 import { getRouteSchedule, updateRouteSchedule } from '../../../services/orderService'
-import type { CustomerProductPricing } from '../../../types/customerPricing'
-import type { RouteSchedule, RouteCadence } from '../../../types/order'
+import type { Order, RouteSchedule, RouteCadence } from '../../../types/order'
 import { getFilesForEntity, uploadFile, deleteFile } from '../../../services/fileService'
 import { formatCurrency, formatDate, formatRelative } from '../../../utils/format'
 import { formatAddress, getGoogleMapsUrl } from '../../../utils/addressUtils'
@@ -137,6 +137,13 @@ const ORDER_BADGE: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'n
   invoiced:   'neutral',
   paid:       'success',
   cancelled:  'danger',
+}
+
+function getOrderStatusLabel(order: Order): string {
+  if (order.status === 'delivered' && order.deliveryStatus === 'signed') {
+    return 'Delivered / Signed'
+  }
+  return order.status
 }
 
 // ── Role meta ─────────────────────────────────────────────────────────────────
@@ -1030,12 +1037,10 @@ const CustomerRecord: React.FC = () => {
   })
 
   // Customer product pricing (fetched when pricing tab active)
-  const { data: customerPricingEntries = [], isLoading: pricingLoading } = useQuery<CustomerProductPricing[]>({
-    queryKey: ['customer-product-pricing', customerId],
-    queryFn: () => getCustomerProductPricing(customerId!),
-    enabled: !!customerId && activeTab === 'productPricing',
-    staleTime: 30_000,
-  })
+  const {
+    entries: customerPricingEntries,
+    isLoading: pricingLoading,
+  } = useCustomerProductPricing(activeTab === 'productPricing' ? customerId : null)
 
   // All visible products for pricing tab
   const { data: allProducts = [], isLoading: allProductsLoading } = useQuery({
@@ -1062,12 +1067,9 @@ const CustomerRecord: React.FC = () => {
   })
 
   // Customer pricing for pre-filling unit prices in standing order
-  const { data: soPricingEntries = [] } = useQuery<CustomerProductPricing[]>({
-    queryKey: ['customer-product-pricing', customerId],
-    queryFn: () => getCustomerProductPricing(customerId!),
-    enabled: !!customerId && activeTab === 'standingOrder',
-    staleTime: 30_000,
-  })
+  const { entries: soPricingEntries } = useCustomerProductPricing(
+    activeTab === 'standingOrder' ? customerId : null,
+  )
 
   // Initialise standing order form once schedule loads
   React.useEffect(() => {
@@ -1096,16 +1098,12 @@ const CustomerRecord: React.FC = () => {
     mutationFn: ({ productId, price }: { productId: string; price: number }) =>
       setCustomerProductPrice(customerId!, productId, price, user!.id, { source: 'manual' }),
     onSuccess: (_data, { productId }) => {
-      void queryClient.invalidateQueries({ queryKey: ['customer-product-pricing', customerId] })
       setPricingEditMap((prev) => { const next = new Map(prev); next.delete(productId); return next })
     },
   })
 
   const removePriceMutation = useMutation({
     mutationFn: (productId: string) => removeCustomerProductPrice(customerId!, productId),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['customer-product-pricing', customerId] })
-    },
   })
 
   const saveMutation = useMutation({
@@ -1571,7 +1569,7 @@ const CustomerRecord: React.FC = () => {
                         <td>{formatCurrency(order.total)}</td>
                         <td>
                           <Badge variant={ORDER_BADGE[order.status] ?? 'neutral'}>
-                            {order.status}
+                            {getOrderStatusLabel(order)}
                           </Badge>
                         </td>
                       </tr>

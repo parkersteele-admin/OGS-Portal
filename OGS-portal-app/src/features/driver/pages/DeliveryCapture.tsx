@@ -25,16 +25,13 @@ import {
 import { useParams, useLocation, useNavigate } from 'react-router-dom'
 import { getDoc, doc } from 'firebase/firestore'
 import { db } from '../../../lib/firebase'
-import {
-  updateRunStop,
-  updateStopStatus,
-} from '../../../services/runService'
+import { updateRunStop, updateStopStatus } from '../../../services/runService'
 import {
   uploadDeliveryPhoto,
-  uploadDeliverySignature,
 } from '../../../services/fileService'
+import { finalizeSignedDelivery } from '../../../services/deliveryService'
 import { useRunStopLive } from '../../../hooks/useRunStopLive'
-import type { RunStop } from '../../../types/run'
+import { useAuth } from '../../../hooks/useAuth'
 import type { Order } from '../../../types/order'
 import type { Customer } from '../../../types/customer'
 import type { Product } from '../../../types/product'
@@ -176,6 +173,7 @@ export default function DeliveryCapture() {
   const { state }           = useLocation() as { state?: { runId?: string } }
   const navigate            = useNavigate()
   const runId               = state?.runId ?? ''
+  const { isDriver }        = useAuth()
 
   // Live stop data
   const { stop, loading: stopLoading } = useRunStopLive(runId, stopId)
@@ -205,10 +203,6 @@ export default function DeliveryCapture() {
   // Step 4 — signature
   const sigCanvasRef       = useRef<HTMLCanvasElement>(null)
   const [hasSig,    setHasSig]    = useState(false)
-  const [sigUrl,    setSigUrl]    = useState<string | null>(null)
-  const [sigSkipped,setSigSkipped]= useState(false)
-  const [sigSkipReason, setSigSkipReason] = useState('')
-  const [sigUploading, setSigUploading]   = useState(false)
 
   // Step 5 — confirm dialog
   const [showConfirm,    setShowConfirm]    = useState(false)
@@ -314,64 +308,50 @@ export default function DeliveryCapture() {
 
   // ── Step 4: Signature ──────────────────────────────────────────────────────
 
-  async function uploadSignature(): Promise<string | null> {
+  function getSignatureDataUrl(): string | null {
     const canvas = sigCanvasRef.current
-    if (!canvas || !order) return null
-    return new Promise((resolve) => {
-      canvas.toBlob(async (blob) => {
-        if (!blob) { resolve(null); return }
-        setSigUploading(true)
-        try {
-          const url = await uploadDeliverySignature(order.id, blob, () => {})
-          resolve(url)
-        } catch (err) {
-          console.error('Signature upload failed', err)
-          resolve(null)
-        } finally {
-          setSigUploading(false)
-        }
-      }, 'image/png')
-    })
+    if (!canvas || !hasSig) return null
+    return canvas.toDataURL('image/png')
   }
 
   async function handleSigNext() {
-    if (!sigSkipped && hasSig) {
-      const url = await uploadSignature()
-      if (url) setSigUrl(url)
-    }
+    if (!hasSig) return
     setStep(5)
   }
 
   // ── Step 5: Mark delivered ─────────────────────────────────────────────────
 
   async function handleMarkDelivered() {
-    if (!stop || !runId) return
+    if (!stop || !runId || !order) return
     setSubmitting(true)
     setSubmitError(null)
     try {
-      const updates: Partial<Omit<RunStop, 'id' | 'runId'>> = {
-        gallonsDelivered: qtyDelivered,
-        notes: deliveryNotes.trim() || undefined,
+      if (!isDriver) {
+        throw new Error('Only drivers can finalize signed deliveries.')
       }
-      if (photoUrl)  updates.photoUrls   = [photoUrl]
-      if (sigUrl)    updates.signatureUrl = sigUrl
-
-      await updateRunStop(runId, stop.id, updates)
-
-      // Write final delivery breakdown to the order doc
-      if (order) {
-        const { updateOrder } = await import('../../../services/orderService')
-        const deliveredLineItems = order.productId
-          ? [{ productId: order.productId, qty: qtyDelivered }]
-          : []
-        const deliveredAddOns = order.addOns?.map((ao) => ({
-          productId: ao.productId,
-          qty: addOnQtys[ao.productId] ?? ao.qty,
-        })) ?? []
-        await updateOrder(order.id, { deliveredLineItems, ...(deliveredAddOns.length ? { deliveredAddOns } : {}) })
+      const signatureDataUrl = getSignatureDataUrl()
+      if (!signatureDataUrl) {
+        throw new Error('A signature is required before completing delivery.')
       }
 
-      await updateStopStatus(runId, stop.id, 'completed')
+      const deliveredLineItems = order.productId
+        ? [{ productId: order.productId, qty: qtyDelivered }]
+        : []
+      const deliveredAddOns = order.addOns?.map((ao) => ({
+        productId: ao.productId,
+        qty: addOnQtys[ao.productId] ?? ao.qty,
+      })) ?? []
+
+      await finalizeSignedDelivery({
+        runId,
+        stopId: stop.id,
+        qtyDelivered,
+        signatureDataUrl,
+        deliveryNotes: deliveryNotes.trim() || undefined,
+        photoUrls: photoUrl ? [photoUrl] : undefined,
+        deliveredLineItems,
+        deliveredAddOns: deliveredAddOns.length ? deliveredAddOns : undefined,
+      })
 
       // Navigate back to schedule after successful delivery
       navigate('/driver/schedule', { replace: true })
@@ -428,6 +408,17 @@ export default function DeliveryCapture() {
     return (
       <div className="dc-page">
         <div className="dc-error">Missing run ID. Please navigate here from your schedule.</div>
+        <button className="dc-back-link" onClick={() => navigate('/driver/schedule')}>
+          ← Back to schedule
+        </button>
+      </div>
+    )
+  }
+
+  if (!isDriver) {
+    return (
+      <div className="dc-page">
+        <div className="dc-error">This delivery flow is only available to drivers.</div>
         <button className="dc-back-link" onClick={() => navigate('/driver/schedule')}>
           ← Back to schedule
         </button>
@@ -649,54 +640,21 @@ export default function DeliveryCapture() {
       {step === 4 && (
         <div className="dc-body">
           <h2 className="dc-body__heading">Customer signature</h2>
+          <p className="dc-body__sub">
+            The customer must sign before we can finalize this delivery.
+          </p>
 
-          {!sigSkipped ? (
-            <>
-              <SignatureCanvas
-                canvasRef={sigCanvasRef}
-                onSigned={setHasSig}
-              />
-              <button
-                className="dc-sig-skip-btn"
-                onClick={() => setSigSkipped(true)}
-              >
-                Skip signature
-              </button>
-            </>
-          ) : (
-            <div className="dc-sig-skip-panel">
-              <p className="dc-sig-skip-panel__msg">
-                Signature skipped. Add a reason:
-              </p>
-              <select
-                className="dc-select"
-                value={sigSkipReason}
-                onChange={(e) => setSigSkipReason(e.target.value)}
-              >
-                <option value="">Select reason…</option>
-                <option value="no-one-present">No one present — drop-off permission granted</option>
-                <option value="customer-refused">Customer refused to sign</option>
-                <option value="other">Other</option>
-              </select>
-              <button
-                className="dc-sig-skip-btn dc-sig-skip-btn--undo"
-                onClick={() => { setSigSkipped(false); setSigSkipReason('') }}
-              >
-                ↩ Get signature instead
-              </button>
-            </div>
-          )}
+          <SignatureCanvas
+            canvasRef={sigCanvasRef}
+            onSigned={setHasSig}
+          />
 
           <button
             className="dc-cta dc-cta--next"
-            disabled={
-              sigUploading ||
-              (!sigSkipped && !hasSig) ||
-              (sigSkipped && !sigSkipReason)
-            }
+            disabled={!hasSig}
             onClick={handleSigNext}
           >
-            {sigUploading ? 'Uploading…' : 'Next → Confirm'}
+            Confirm Signature
           </button>
         </div>
       )}
@@ -753,11 +711,7 @@ export default function DeliveryCapture() {
             <div className="dc-summary__row">
               <span className="dc-summary__lbl">Signature</span>
               <span className="dc-summary__val">
-                {sigSkipped
-                  ? `Skipped — ${sigSkipReason || 'no reason'}`
-                  : hasSig
-                  ? '✓ Captured'
-                  : '—'}
+                {hasSig ? '✓ Captured' : '—'}
               </span>
             </div>
           </div>
@@ -798,7 +752,7 @@ export default function DeliveryCapture() {
             <p className="dc-dialog__body">
               Mark <strong>{qtyDelivered} {unitLabel}</strong> as delivered
               to <strong>{customer?.name}</strong>?<br />
-              This cannot be undone.
+              This will store the signature, attach the delivery documents, and finalize the stop.
             </p>
             {submitError && (
               <div className="dc-error-inline">{submitError}</div>

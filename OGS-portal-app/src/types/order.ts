@@ -98,6 +98,17 @@ export interface Order {
   deliveredLineItems?: { productId: string; qty: number }[]
   /** Final add-on items recorded by driver at delivery. */
   deliveredAddOns?: { productId: string; qty: number }[]
+  /** Extended proof-of-delivery state once a signature-backed delivery is finalized. */
+  deliveryStatus?: 'signed'
+  deliveredAt?: Timestamp
+  signedAt?: Timestamp
+  signedByUid?: string
+  signedByName?: string
+  signatureUrl?: string
+  billOfLadingUrl?: string
+  invoicePdfUrl?: string
+  deliveryNotes?: string
+  deliveryConfirmationRecipients?: string[]
   requestedAt: Timestamp
   scheduledAt?: Timestamp
 }
