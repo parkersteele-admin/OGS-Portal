@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID || secrets.VITE_FIREBASE_PROJECT_ID || 'ogs-portal' }}
+      VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
       FIREBASE_SERVICE_ACCOUNT_PRODUCTION: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PRODUCTION }}
       FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
       FIREBASE_SERVICE_ACCOUNT_OGS_PORTAL: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_OGS_PORTAL }}
@@ -30,8 +31,7 @@ jobs:
         working-directory: OGS-portal-app
         run: npm ci --legacy-peer-deps
 
-      - name: Build Vite app (production)
-        working-directory: OGS-portal-app
+      - name: Prepare frontend env (production)
         env:
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
@@ -41,7 +41,60 @@ jobs:
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
           VITE_STRIPE_PUBLISHABLE_KEY: ${{ secrets.VITE_STRIPE_PUBLISHABLE_KEY }}
           VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_KEY }}
-          VITE_APP_ENV: production
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs')
+
+          const githubEnv = process.env.GITHUB_ENV
+          const legacyRaw = process.env.VITE_FIREBASE_CONFIG || ''
+          let legacy = {}
+
+          if (legacyRaw.trim()) {
+            try {
+              legacy = JSON.parse(legacyRaw)
+            } catch (error) {
+              console.error('VITE_FIREBASE_CONFIG exists but is not valid JSON.')
+              process.exit(1)
+            }
+          }
+
+          const values = {
+            VITE_FIREBASE_API_KEY: process.env.VITE_FIREBASE_API_KEY || legacy.apiKey || '',
+            VITE_FIREBASE_AUTH_DOMAIN: process.env.VITE_FIREBASE_AUTH_DOMAIN || legacy.authDomain || '',
+            VITE_FIREBASE_PROJECT_ID: process.env.VITE_FIREBASE_PROJECT_ID || legacy.projectId || process.env.FIREBASE_PROJECT_ID || '',
+            VITE_FIREBASE_STORAGE_BUCKET: process.env.VITE_FIREBASE_STORAGE_BUCKET || legacy.storageBucket || '',
+            VITE_FIREBASE_MESSAGING_SENDER_ID: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || legacy.messagingSenderId || '',
+            VITE_FIREBASE_APP_ID: process.env.VITE_FIREBASE_APP_ID || legacy.appId || '',
+            VITE_STRIPE_PUBLISHABLE_KEY: process.env.VITE_STRIPE_PUBLISHABLE_KEY || '',
+            VITE_GOOGLE_MAPS_API_KEY: process.env.VITE_GOOGLE_MAPS_API_KEY || '',
+            VITE_APP_ENV: 'production',
+          }
+
+          const required = [
+            'VITE_FIREBASE_API_KEY',
+            'VITE_FIREBASE_AUTH_DOMAIN',
+            'VITE_FIREBASE_PROJECT_ID',
+            'VITE_FIREBASE_STORAGE_BUCKET',
+            'VITE_FIREBASE_MESSAGING_SENDER_ID',
+            'VITE_FIREBASE_APP_ID',
+          ]
+
+          const missing = required.filter((key) => !values[key])
+          if (missing.length > 0) {
+            console.error(`Missing frontend Firebase env for production build: ${missing.join(', ')}`)
+            process.exit(1)
+          }
+
+          fs.appendFileSync(
+            githubEnv,
+            Object.entries(values)
+              .map(([key, value]) => `${key}=${String(value).replace(/\n/g, '')}`)
+              .join('\n') + '\n',
+          )
+          NODE
+
+      - name: Build Vite app (production)
+        working-directory: OGS-portal-app
         run: npm run build
 
       - name: Prepare Firebase auth inputs
