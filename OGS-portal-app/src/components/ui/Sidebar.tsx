@@ -1,5 +1,5 @@
-import React from 'react'
-import { NavLink } from 'react-router-dom'
+import React, { useEffect, useMemo, useState } from 'react'
+import { NavLink, useLocation } from 'react-router-dom'
 import './Sidebar.css'
 
 export interface SidebarItem {
@@ -15,25 +15,69 @@ interface SidebarProps {
   items: SidebarItem[]
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ title, items }) => (
-  <nav className="sidebar" aria-label="Main navigation">
-    <div className="sidebar__logo-bar">
-      <span className="sidebar__logo-mark" aria-hidden="true">OGS</span>
-      <span className="sidebar__logo-sep" aria-hidden="true">·</span>
-      <span className="sidebar__logo-text">Portal</span>
-    </div>
+interface SidebarGroup {
+  label: string
+  items: SidebarItem[]
+}
 
-    <p className="sidebar__portal-label">{title}</p>
+function buildGroups(items: SidebarItem[]): SidebarGroup[] {
+  const groups: SidebarGroup[] = []
+  let currentGroup: SidebarGroup | null = null
 
-    <ul className="sidebar__nav" role="list">
-      {items.map(({ label, to, icon, sectionLabel }) => (
-        <React.Fragment key={to}>
-          {sectionLabel && (
-            <li className="sidebar__section-label" aria-hidden="true">
-              {sectionLabel}
-            </li>
-          )}
-          <li>
+  items.forEach((item) => {
+    if (item.sectionLabel || !currentGroup) {
+      currentGroup = {
+        label: item.sectionLabel ?? 'General',
+        items: [],
+      }
+      groups.push(currentGroup)
+    }
+
+    currentGroup.items.push(item)
+  })
+
+  return groups
+}
+
+function isRouteMatch(pathname: string, to: string): boolean {
+  return pathname === to || pathname.startsWith(`${to}/`)
+}
+
+export const Sidebar: React.FC<SidebarProps> = ({ title, items }) => {
+  const location = useLocation()
+  const hasGroupedSections = items.some((item) => item.sectionLabel)
+  const groups = useMemo(() => buildGroups(items), [items])
+
+  const activeGroupLabel = useMemo(() => {
+    const activeGroup = groups.find((group) =>
+      group.items.some((item) => isRouteMatch(location.pathname, item.to)),
+    )
+    return activeGroup?.label ?? null
+  }, [groups, location.pathname])
+
+  const [openGroupLabel, setOpenGroupLabel] = useState<string | null>(activeGroupLabel)
+
+  useEffect(() => {
+    setOpenGroupLabel(activeGroupLabel)
+  }, [activeGroupLabel])
+
+  const toggleGroup = (label: string) => {
+    setOpenGroupLabel((current) => (current === label ? null : label))
+  }
+
+  return (
+    <nav className="sidebar" aria-label="Main navigation">
+      <div className="sidebar__logo-bar">
+        <span className="sidebar__logo-mark" aria-hidden="true">OGS</span>
+        <span className="sidebar__logo-sep" aria-hidden="true">·</span>
+        <span className="sidebar__logo-text">Portal</span>
+      </div>
+
+      <p className="sidebar__portal-label">{title}</p>
+
+      <ul className="sidebar__nav" role="list">
+        {!hasGroupedSections && items.map(({ label, to, icon }) => (
+          <li key={to}>
             <NavLink
               to={to}
               className={({ isActive }) =>
@@ -44,8 +88,50 @@ export const Sidebar: React.FC<SidebarProps> = ({ title, items }) => (
               <span className="sidebar__label">{label}</span>
             </NavLink>
           </li>
-        </React.Fragment>
-      ))}
-    </ul>
-  </nav>
-)
+        ))}
+
+        {hasGroupedSections && groups.map((group) => {
+          const isOpen = openGroupLabel === group.label
+          const hasActiveItem = group.items.some((item) => isRouteMatch(location.pathname, item.to))
+
+          return (
+            <li
+              key={group.label}
+              className={`sidebar__group${isOpen ? ' sidebar__group--open' : ''}`}
+            >
+              <button
+                type="button"
+                className={`sidebar__section-toggle${hasActiveItem ? ' sidebar__section-toggle--active' : ''}`}
+                onClick={() => toggleGroup(group.label)}
+                aria-expanded={isOpen}
+              >
+                <span className="sidebar__section-toggle-label">{group.label}</span>
+                <span className="sidebar__section-toggle-icon" aria-hidden="true">
+                  {isOpen ? '−' : '+'}
+                </span>
+              </button>
+
+              {isOpen && (
+                <ul className="sidebar__group-list" role="list">
+                  {group.items.map(({ label, to, icon }) => (
+                    <li key={to}>
+                      <NavLink
+                        to={to}
+                        className={({ isActive }) =>
+                          `sidebar__link${isActive ? ' sidebar__link--active' : ''}`
+                        }
+                      >
+                        <span className="sidebar__icon" aria-hidden="true">{icon}</span>
+                        <span className="sidebar__label">{label}</span>
+                      </NavLink>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+    </nav>
+  )
+}
