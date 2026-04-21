@@ -29,7 +29,23 @@ jobs:
 
       - name: Install dependencies
         working-directory: OGS-portal-app
-        run: npm ci --legacy-peer-deps
+        run: |
+          npm config set fetch-retries 5
+          npm config set fetch-retry-factor 2
+          npm config set fetch-retry-mintimeout 20000
+          npm config set fetch-retry-maxtimeout 120000
+
+          for attempt in 1 2 3; do
+            if npm ci --legacy-peer-deps --no-audit --no-fund; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "npm ci failed after 3 attempts." >&2
+              exit 1
+            fi
+            echo "npm ci failed on attempt $attempt. Retrying..." >&2
+            sleep 15
+          done
 
       - name: Prepare frontend env (production)
         env:
