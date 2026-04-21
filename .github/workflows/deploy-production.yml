@@ -113,6 +113,14 @@ jobs:
         working-directory: OGS-portal-app
         run: npm run build
 
+      - name: Install Functions dependencies
+        working-directory: OGS-portal-app/functions
+        run: npm ci --no-audit --no-fund
+
+      - name: Build Firebase Functions
+        working-directory: OGS-portal-app/functions
+        run: npm run build
+
       - name: Prepare Firebase auth inputs
         id: firebase-auth
         run: |
