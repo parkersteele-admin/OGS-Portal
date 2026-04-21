@@ -12,41 +12,22 @@ export interface SidebarItem {
 
 interface SidebarProps {
   title: string
-  items: SidebarItem[]
+  items?: SidebarItem[]
+  groups?: SidebarGroup[]
 }
 
-interface SidebarGroup {
+export interface SidebarGroup {
   label: string
   items: SidebarItem[]
-}
-
-function buildGroups(items: SidebarItem[]): SidebarGroup[] {
-  const groups: SidebarGroup[] = []
-  let currentGroup: SidebarGroup | null = null
-
-  items.forEach((item) => {
-    if (item.sectionLabel || !currentGroup) {
-      currentGroup = {
-        label: item.sectionLabel ?? 'General',
-        items: [],
-      }
-      groups.push(currentGroup)
-    }
-
-    currentGroup.items.push(item)
-  })
-
-  return groups
 }
 
 function isRouteMatch(pathname: string, to: string): boolean {
   return pathname === to || pathname.startsWith(`${to}/`)
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ title, items }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ title, items = [], groups = [] }) => {
   const location = useLocation()
-  const hasGroupedSections = items.some((item) => item.sectionLabel)
-  const groups = useMemo(() => buildGroups(items), [items])
+  const hasAccordionGroups = groups.length > 0
 
   const activeGroupLabel = useMemo(() => {
     const activeGroup = groups.find((group) =>
@@ -76,7 +57,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ title, items }) => {
       <p className="sidebar__portal-label">{title}</p>
 
       <ul className="sidebar__nav" role="list">
-        {!hasGroupedSections && items.map(({ label, to, icon }) => (
+        {!hasAccordionGroups && items.map(({ label, to, icon, sectionLabel }) => (
+          <React.Fragment key={to}>
+            {sectionLabel && (
+              <li className="sidebar__section-label" aria-hidden="true">
+                {sectionLabel}
+              </li>
+            )}
           <li key={to}>
             <NavLink
               to={to}
@@ -88,9 +75,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ title, items }) => {
               <span className="sidebar__label">{label}</span>
             </NavLink>
           </li>
+          </React.Fragment>
         ))}
 
-        {hasGroupedSections && groups.map((group) => {
+        {hasAccordionGroups && groups.map((group) => {
           const isOpen = openGroupLabel === group.label
           const hasActiveItem = group.items.some((item) => isRouteMatch(location.pathname, item.to))
 
