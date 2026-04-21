@@ -9,7 +9,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+      FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID || secrets.VITE_FIREBASE_PROJECT_ID || 'ogs-portal' }}
       FIREBASE_SERVICE_ACCOUNT_PRODUCTION: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PRODUCTION }}
       FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
       FIREBASE_SERVICE_ACCOUNT_OGS_PORTAL: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_OGS_PORTAL }}
@@ -80,11 +80,6 @@ jobs:
             echo "FIREBASE_CLI_TOKEN=$FIREBASE_AUTH_SECRET" >> "$GITHUB_ENV"
           else
             echo "has_service_account=false" >> "$GITHUB_OUTPUT"
-          fi
-
-          if [ -z "$FIREBASE_PROJECT_ID" ]; then
-            echo "Missing VITE_FIREBASE_PROJECT_ID secret for deploy target." >&2
-            exit 1
           fi
 
       - name: Authenticate to Google Cloud
