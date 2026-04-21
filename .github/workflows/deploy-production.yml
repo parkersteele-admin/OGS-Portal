@@ -44,6 +44,7 @@ jobs:
         run: npm run build
 
       - name: Prepare Firebase auth inputs
+        id: firebase-auth
         run: |
           SERVICE_ACCOUNT_JSON=""
           FIREBASE_AUTH_SECRET=""
@@ -69,9 +70,13 @@ jobs:
               echo "$SERVICE_ACCOUNT_JSON"
               echo "EOF"
             } >> "$GITHUB_ENV"
+            echo "has_service_account=true" >> "$GITHUB_OUTPUT"
             echo "FIREBASE_CLI_TOKEN=" >> "$GITHUB_ENV"
           elif [ -n "$FIREBASE_AUTH_SECRET" ]; then
+            echo "has_service_account=false" >> "$GITHUB_OUTPUT"
             echo "FIREBASE_CLI_TOKEN=$FIREBASE_AUTH_SECRET" >> "$GITHUB_ENV"
+          else
+            echo "has_service_account=false" >> "$GITHUB_OUTPUT"
           fi
 
           if [ -z "$FIREBASE_PROJECT_ID" ]; then
@@ -80,7 +85,7 @@ jobs:
           fi
 
       - name: Authenticate to Google Cloud
-        if: env.FIREBASE_SERVICE_ACCOUNT_JSON != ''
+        if: steps.firebase-auth.outputs.has_service_account == 'true'
         uses: google-github-actions/auth@v3
         with:
           credentials_json: ${{ env.FIREBASE_SERVICE_ACCOUNT_JSON }}
