@@ -10,6 +10,10 @@ jobs:
     runs-on: ubuntu-latest
     env:
       FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+      FIREBASE_SERVICE_ACCOUNT_PRODUCTION: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PRODUCTION }}
+      FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      FIREBASE_TOKEN_PRODUCTION: ${{ secrets.FIREBASE_TOKEN_PRODUCTION }}
+      FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -39,35 +43,34 @@ jobs:
           VITE_APP_ENV: production
         run: npm run build
 
-      - name: Prepare Firebase auth (production)
-        env:
-          FIREBASE_SERVICE_ACCOUNT_PRODUCTION: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PRODUCTION }}
-          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          FIREBASE_TOKEN_PRODUCTION: ${{ secrets.FIREBASE_TOKEN_PRODUCTION }}
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+      - name: Prepare Firebase auth inputs
         run: |
+          SERVICE_ACCOUNT_JSON=""
           FIREBASE_AUTH_SECRET=""
 
           if [ -n "$FIREBASE_SERVICE_ACCOUNT_PRODUCTION" ]; then
-            FIREBASE_AUTH_SECRET="$FIREBASE_SERVICE_ACCOUNT_PRODUCTION"
+            SERVICE_ACCOUNT_JSON="$FIREBASE_SERVICE_ACCOUNT_PRODUCTION"
           elif [ -n "$FIREBASE_SERVICE_ACCOUNT" ]; then
-            FIREBASE_AUTH_SECRET="$FIREBASE_SERVICE_ACCOUNT"
+            SERVICE_ACCOUNT_JSON="$FIREBASE_SERVICE_ACCOUNT"
           elif [ -n "$FIREBASE_TOKEN_PRODUCTION" ]; then
             FIREBASE_AUTH_SECRET="$FIREBASE_TOKEN_PRODUCTION"
           elif [ -n "$FIREBASE_TOKEN" ]; then
             FIREBASE_AUTH_SECRET="$FIREBASE_TOKEN"
           fi
 
-          if [ -z "$FIREBASE_AUTH_SECRET" ]; then
+          if [ -z "$SERVICE_ACCOUNT_JSON" ] && [ -z "$FIREBASE_AUTH_SECRET" ]; then
             echo "Missing Firebase deploy auth secret. Set one of: FIREBASE_SERVICE_ACCOUNT_PRODUCTION, FIREBASE_SERVICE_ACCOUNT, FIREBASE_TOKEN_PRODUCTION, FIREBASE_TOKEN." >&2
             exit 1
           fi
 
-          if [[ "$FIREBASE_AUTH_SECRET" == \{* ]]; then
-            echo "$FIREBASE_AUTH_SECRET" > "$RUNNER_TEMP/firebase-service-account.json"
-            echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-service-account.json" >> "$GITHUB_ENV"
+          if [ -n "$SERVICE_ACCOUNT_JSON" ]; then
+            {
+              echo "FIREBASE_SERVICE_ACCOUNT_JSON<<EOF"
+              echo "$SERVICE_ACCOUNT_JSON"
+              echo "EOF"
+            } >> "$GITHUB_ENV"
             echo "FIREBASE_CLI_TOKEN=" >> "$GITHUB_ENV"
-          else
+          elif [ -n "$FIREBASE_AUTH_SECRET" ]; then
             echo "FIREBASE_CLI_TOKEN=$FIREBASE_AUTH_SECRET" >> "$GITHUB_ENV"
           fi
 
@@ -76,31 +79,43 @@ jobs:
             exit 1
           fi
 
+      - name: Authenticate to Google Cloud
+        if: env.FIREBASE_SERVICE_ACCOUNT_JSON != ''
+        uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ env.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          project_id: ${{ env.FIREBASE_PROJECT_ID }}
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
       - name: Deploy to Firebase Hosting live channel
         working-directory: OGS-portal-app
         run: |
           if [ -n "$FIREBASE_CLI_TOKEN" ]; then
-            npx firebase-tools deploy --only hosting --project "$FIREBASE_PROJECT_ID" --token "$FIREBASE_CLI_TOKEN"
+            firebase deploy --only hosting --project "$FIREBASE_PROJECT_ID" --token "$FIREBASE_CLI_TOKEN" --non-interactive
           else
-            npx firebase-tools deploy --only hosting --project "$FIREBASE_PROJECT_ID"
+            firebase deploy --only hosting --project "$FIREBASE_PROJECT_ID" --non-interactive
           fi
 
       - name: Deploy Firebase Functions
         working-directory: OGS-portal-app
         run: |
           if [ -n "$FIREBASE_CLI_TOKEN" ]; then
-            npx firebase-tools deploy --only functions --project "$FIREBASE_PROJECT_ID" --token "$FIREBASE_CLI_TOKEN"
+            firebase deploy --only functions --project "$FIREBASE_PROJECT_ID" --token "$FIREBASE_CLI_TOKEN" --non-interactive
           else
-            npx firebase-tools deploy --only functions --project "$FIREBASE_PROJECT_ID"
+            firebase deploy --only functions --project "$FIREBASE_PROJECT_ID" --non-interactive
           fi
 
       - name: Deploy Firestore security rules
         working-directory: OGS-portal-app
         run: |
           if [ -n "$FIREBASE_CLI_TOKEN" ]; then
-            npx firebase-tools deploy --only firestore:rules --project "$FIREBASE_PROJECT_ID" --token "$FIREBASE_CLI_TOKEN"
+            firebase deploy --only firestore:rules --project "$FIREBASE_PROJECT_ID" --token "$FIREBASE_CLI_TOKEN" --non-interactive
           else
-            npx firebase-tools deploy --only firestore:rules --project "$FIREBASE_PROJECT_ID"
+            firebase deploy --only firestore:rules --project "$FIREBASE_PROJECT_ID" --non-interactive
           fi
 
       - name: Notify on success/failure
