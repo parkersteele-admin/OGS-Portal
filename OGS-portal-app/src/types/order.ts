@@ -10,6 +10,7 @@ export interface AddOnItem {
   productId: string
   productName: string
   qty: number
+  unitPrice?: number
   addedBy: string
   addedAt: Timestamp
 }
@@ -92,6 +93,21 @@ export interface Order {
   parentOrderId?: string
   /** A la carte items added to this order (populated on route orders). */
   addOns?: AddOnItem[]
+  /** Quote that created this operational order, if any. */
+  quoteId?: string
+  quoteNumber?: string
+  approvedByName?: string
+  approvedByEmail?: string
+  primaryCommunicationMethod?: 'email' | 'phone' | 'text'
+  paymentPreference?: 'card_on_file' | 'net_terms' | 'cod' | 'send_invoice' | 'undecided'
+  quoteProvidedTo?: string
+  quotedLineItems?: Array<{
+    productId: string
+    description: string
+    quantity: number
+    unitPrice: number
+    amount: number
+  }>
   /** When true, changes to this order apply only to this occurrence, not the recurring schedule. */
   modifyThisOnly?: boolean
   /** Final line items recorded by driver at delivery. */
@@ -104,11 +120,18 @@ export interface Order {
   signedAt?: Timestamp
   signedByUid?: string
   signedByName?: string
+  receivedByName?: string
+  deliveryContactName?: string
+  deliveryContactPhone?: string
+  deliveryContactEmail?: string
   signatureUrl?: string
   billOfLadingUrl?: string
   invoicePdfUrl?: string
   deliveryNotes?: string
   deliveryConfirmationRecipients?: string[]
+  runId?: string
+  runStopId?: string
   requestedAt: Timestamp
+  createdAt?: Timestamp
   scheduledAt?: Timestamp
 }

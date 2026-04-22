@@ -39,6 +39,32 @@ export interface QuoteItem {
   amount: number
 }
 
+export type QuotePrimaryCommunicationMethod = 'email' | 'phone' | 'text'
+export type QuotePaymentChoice = 'card_on_file' | 'net_terms' | 'cod' | 'send_invoice' | 'undecided'
+export type QuotePaymentMethodStatus =
+  | 'saved'
+  | 'setup_requested'
+  | 'invoice_requested'
+  | 'not_provided'
+
+export interface QuoteApprovalRecord {
+  approvedByName: string
+  approvedByEmail?: string | null
+  approvedByUid?: string | null
+  approvedAt: Timestamp
+  acceptedTerms: boolean
+  acceptedTermsAt: Timestamp
+  deliveryContactName: string
+  deliveryContactPhone?: string | null
+  deliveryContactEmail?: string | null
+  primaryCommunicationMethod: QuotePrimaryCommunicationMethod
+  quoteProvidedTo?: string | null
+  paymentChoice?: QuotePaymentChoice
+  paymentMethodStatus?: QuotePaymentMethodStatus
+  requestPaymentSetup?: boolean
+  source?: 'portal' | 'public-link'
+}
+
 /**
  * Internal-only profitability metrics used by CRM/Admin quote builder.
  * These fields are never persisted in customer-facing quote payloads.
@@ -65,10 +91,25 @@ export interface Quote {
   total: number
   validUntil: Timestamp
   acceptedAt?: Timestamp
+  acceptedVia?: 'portal' | 'public-link'
+  approval?: QuoteApprovalRecord
+  approvalEvents?: Array<{
+    type: 'accepted'
+    source: 'portal' | 'public-link'
+    approvedByName: string
+    approvedByEmail?: string | null
+    primaryCommunicationMethod: QuotePrimaryCommunicationMethod
+    deliveryContactName: string
+    paymentMethodStatus?: QuotePaymentMethodStatus
+    createdAt: string
+  }>
   /** Set after a draft invoice is auto-created on acceptance. */
   invoiceId?: string
   /** Set to true on acceptance — prompts staff to create a standing order. */
   needsOrderSetup?: boolean
+  convertedOrderId?: string
+  convertedOrderIds?: string[]
+  orderGroupId?: string
   /** UID of the sales rep who created the quote. */
   createdBy: string
   notes?: string

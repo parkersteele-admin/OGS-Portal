@@ -39,7 +39,8 @@ import './admin'
 import { onRequest } from 'firebase-functions/v2/https'
 
 export { onUserCreated, onUserRoleUpdated, setUserRole }          from './auth'
-export { adminCreateUser, adminDeleteUser, adminUpdateUserCompany } from './adminCreateUser'
+export { adminCreateUser, adminDeleteUser, adminUpdateUserCompany, sendUserPasswordResetEmail } from './adminCreateUser'
+export { clearAllTestData }                                      from './adminCleanup'
 export { stripeWebhook }                                          from './webhooks/stripeWebhook'
 export { createStripePaymentIntent }                              from './stripe'
 export { createSetupIntent, savePaymentMethod, removePaymentMethod } from './stripe/index'
@@ -99,4 +100,3 @@ export { alertUnassignedLead }          from './scheduled/alertUnassignedLead'
 export const healthCheck = onRequest((_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
-

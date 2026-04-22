@@ -17,6 +17,8 @@
 
 import { onCall, HttpsError } from 'firebase-functions/v2/https'
 import { db, adminAuth, FieldValue } from './admin'
+import { SENDGRID_API_KEY, requireSecret } from './config'
+import { sendEmail } from './email/sendEmail'
 
 const VALID_ROLES = [
   'admin', 'dispatch', 'driver', 'sales', 'customer',        // OGS internal + legacy
@@ -26,8 +28,64 @@ type UserRole = typeof VALID_ROLES[number]
 
 /** These roles belong to customer-company portal users and need companyId in claims. */
 const PORTAL_ROLES = new Set(['owner', 'manager', 'billing', 'delivery', 'viewer'])
+const APP_URL = 'https://app.ohiogassupply.com'
 
-export const adminCreateUser = onCall(async (request) => {
+function buildPasswordSetupEmail(name: string, resetLink: string): string {
+  return `
+    <div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;color:#111827">
+      <div style="background:#111111;padding:24px 32px">
+        <div style="font-size:22px;font-weight:700;color:#ffffff">Ohio Gas Supply</div>
+        <div style="margin-top:8px;font-size:13px;color:#f5c9a6">Portal account setup</div>
+      </div>
+      <div style="padding:28px 32px;border:1px solid #e5e7eb;border-top:none;background:#ffffff">
+        <p style="margin:0 0 16px">Hi ${name || 'there'},</p>
+        <p style="margin:0 0 16px">
+          Your OGS Portal account is ready. Use the button below to set your password and sign in.
+        </p>
+        <p style="margin:24px 0">
+          <a
+            href="${resetLink}"
+            style="display:inline-block;background:#E87722;color:#ffffff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:700"
+          >
+            Set Password
+          </a>
+        </p>
+        <p style="margin:0 0 16px;font-size:13px;color:#4b5563">
+          If the button does not work, copy and paste this link into your browser:
+        </p>
+        <p style="margin:0 0 20px;font-size:13px;word-break:break-all;color:#E87722">${resetLink}</p>
+        <p style="margin:0;font-size:13px;color:#6b7280">
+          After setting your password, sign in at
+          <a href="${APP_URL}/login" style="color:#E87722">${APP_URL}/login</a>.
+        </p>
+      </div>
+    </div>
+  `
+}
+
+async function sendPasswordResetLinkEmail(email: string, name: string): Promise<boolean> {
+  const normalizedEmail = email.trim().toLowerCase()
+
+  try {
+    const resetLink = await adminAuth.generatePasswordResetLink(normalizedEmail, {
+      url: `${APP_URL}/login`,
+    })
+
+    requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY')
+    await sendEmail({
+      to: normalizedEmail,
+      subject: 'Set your Ohio Gas Supply Portal password',
+      html: buildPasswordSetupEmail(name.trim(), resetLink),
+    })
+    console.log(`[adminCreateUser] password setup email sent to ${normalizedEmail}`)
+    return true
+  } catch (emailErr) {
+    console.error('[adminCreateUser] Failed to send password setup email:', emailErr)
+    return false
+  }
+}
+
+export const adminCreateUser = onCall({ secrets: [SENDGRID_API_KEY] }, async (request) => {
   // ── Auth guard ─────────────────────────────────────────────────────────────
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'You must be signed in.')
@@ -124,21 +182,48 @@ export const adminCreateUser = onCall(async (request) => {
   // ── Send password-reset / setup email ─────────────────────────────────────
   // Skip for existing users — they already have a password set.
   // Non-fatal: Auth + Firestore are complete regardless.
+  let emailSent = false
   if (!isExistingUser) {
-    try {
-      const resetLink = await adminAuth.generatePasswordResetLink(
-        email.trim().toLowerCase(),
-        { url: 'https://ogs-portal.web.app/login' },
-      )
-      console.log(`[adminCreateUser] Password-reset link generated for ${email}: ${resetLink}`)
-      // TODO: send via SendGrid when available — for now the link is logged
-      // and the client also calls sendPasswordResetEmail() as belt-and-suspenders
-    } catch (emailErr) {
-      console.warn('[adminCreateUser] Failed to generate reset link:', emailErr)
-    }
+    emailSent = await sendPasswordResetLinkEmail(email, name)
   }
 
-  return { uid, linked: isExistingUser }
+  return { uid, linked: isExistingUser, emailSent }
+})
+
+/**
+ * sendUserPasswordResetEmail — sends a SendGrid-backed password-reset email.
+ *
+ * Behavior intentionally mirrors Firebase Auth reset semantics:
+ *  - Returns success even if the email does not exist, to avoid enumeration
+ *  - Can be called unauthenticated from the public reset-password screen
+ *  - Uses the same email provider/logging path as the rest of the app
+ */
+export const sendUserPasswordResetEmail = onCall({ secrets: [SENDGRID_API_KEY] }, async (request) => {
+  const data = request.data as Record<string, unknown>
+  const email = typeof data.email === 'string' ? data.email.trim().toLowerCase() : ''
+
+  if (!email) {
+    throw new HttpsError('invalid-argument', 'email is required.')
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new HttpsError('invalid-argument', 'Enter a valid email address.')
+  }
+
+  try {
+    const userRecord = await adminAuth.getUserByEmail(email)
+    const name = userRecord.displayName?.trim() || email
+    const emailSent = await sendPasswordResetLinkEmail(email, name)
+    return { success: true, emailSent }
+  } catch (err: unknown) {
+    const code = (err as { code?: string }).code ?? ''
+    if (code === 'auth/user-not-found') {
+      console.warn(`[sendUserPasswordResetEmail] No auth user found for ${email}`)
+      return { success: true, emailSent: false }
+    }
+    console.error('[sendUserPasswordResetEmail] unexpected error:', err)
+    throw new HttpsError('internal', 'Failed to send reset email.')
+  }
 })
 
 /**

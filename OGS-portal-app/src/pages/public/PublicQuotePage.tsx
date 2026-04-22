@@ -9,9 +9,8 @@
  */
 
 import React, { useEffect, useState } from 'react'
-import { useParams, useSearchParams, Link } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { httpsCallable } from 'firebase/functions'
-import { QRCodeSVG } from 'qrcode.react'
 import { functions } from '../../lib/firebase'
 import './PublicQuotePage.css'
 
@@ -33,6 +32,10 @@ interface PublicQuoteData {
   subtotal:    number
   total:       number
   notes:       string
+  approval?: {
+    paymentChoice?: PaymentChoice
+    requestPaymentSetup?: boolean
+  }
 }
 
 interface CompanyInfo {
@@ -55,7 +58,21 @@ interface PublicQuoteResponse {
   company:     CompanyInfo
   rep:         RepInfo | null
   discussNote: string
-  setupUrl?:   string | null
+}
+
+type CommunicationMethod = 'email' | 'phone' | 'text'
+type PaymentChoice = 'card_on_file' | 'net_terms' | 'cod' | 'undecided'
+
+interface ApprovalFormState {
+  approvedByName: string
+  approvedByEmail: string
+  acceptedTerms: boolean
+  deliveryContactName: string
+  deliveryContactPhone: string
+  deliveryContactEmail: string
+  primaryCommunicationMethod: CommunicationMethod
+  quoteProvidedTo: string
+  paymentChoice: PaymentChoice
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -92,7 +109,17 @@ const PublicQuotePage: React.FC = () => {
   const [accepting, setAccepting] = useState(false)
   const [accepted, setAccepted]   = useState(false)
   const [acceptError, setAcceptError] = useState<string | null>(null)
-  const [setupUrl, setSetupUrl]   = useState<string | null>(null)
+  const [form, setForm] = useState<ApprovalFormState>({
+    approvedByName: '',
+    approvedByEmail: '',
+    acceptedTerms: false,
+    deliveryContactName: '',
+    deliveryContactPhone: '',
+    deliveryContactEmail: '',
+    primaryCommunicationMethod: 'email',
+    quoteProvidedTo: '',
+    paymentChoice: 'net_terms',
+  })
 
   useEffect(() => {
     if (!quoteId || !token) {
@@ -112,7 +139,6 @@ const PublicQuotePage: React.FC = () => {
         // If quote was already accepted from a prior click, show success state
         if (res.data.quote.status === 'accepted') {
           setAccepted(true)
-          if (res.data.setupUrl) setSetupUrl(res.data.setupUrl)
         }
       })
       .catch((err: unknown) => {
@@ -122,18 +148,51 @@ const PublicQuotePage: React.FC = () => {
       })
   }, [quoteId, token])
 
+  function updateField<K extends keyof ApprovalFormState>(field: K, value: ApprovalFormState[K]) {
+    setForm((prev) => ({ ...prev, [field]: value }))
+  }
+
+  function validateForm(): string | null {
+    if (!form.approvedByName.trim()) return 'Please enter the name of the person approving the quote.'
+    if (!form.deliveryContactName.trim()) return 'Please enter the delivery point of contact.'
+    if (!form.acceptedTerms) return 'Please accept the terms and conditions to continue.'
+    return null
+  }
+
   async function handleAccept(): Promise<void> {
     if (!quoteId || !token) return
+    const validationError = validateForm()
+    if (validationError) {
+      setAcceptError(validationError)
+      return
+    }
     setAccepting(true)
     setAcceptError(null)
     try {
       const fn = httpsCallable<
-        { quoteId: string; token: string; response: string },
-        { success: boolean; setupUrl?: string | null }
+        {
+          quoteId: string
+          token: string
+          response: string
+          approval: ApprovalFormState
+        },
+        { success: boolean }
       >(functions, 'respondToQuotePublic')
-      const result = await fn({ quoteId, token, response: 'accepted' })
+      await fn({
+        quoteId,
+        token,
+        response: 'accepted',
+        approval: {
+          ...form,
+          approvedByName: form.approvedByName.trim(),
+          approvedByEmail: form.approvedByEmail.trim(),
+          deliveryContactName: form.deliveryContactName.trim(),
+          deliveryContactPhone: form.deliveryContactPhone.trim(),
+          deliveryContactEmail: form.deliveryContactEmail.trim(),
+          quoteProvidedTo: form.quoteProvidedTo.trim(),
+        },
+      })
       setAccepted(true)
-      if (result.data.setupUrl) setSetupUrl(result.data.setupUrl)
       if (data) {
         setData({ ...data, quote: { ...data.quote, status: 'accepted' } })
       }
@@ -174,6 +233,13 @@ const PublicQuotePage: React.FC = () => {
   }
 
   const { quote, company, rep, discussNote } = data
+  const paymentPreference =
+    (accepted || quote.status === 'accepted'
+      ? quote.approval?.paymentChoice
+      : form.paymentChoice) ?? 'undecided'
+  const termsUrl = company.website
+    ? `${company.website.replace(/\/$/, '')}/terms`
+    : 'https://www.ohiogassupply.com/terms'
 
   // ── Accepted state ─────────────────────────────────────────────────────────
   if (accepted || quote.status === 'accepted') {
@@ -189,28 +255,28 @@ const PublicQuotePage: React.FC = () => {
             <h2>Quote Accepted!</h2>
             <p>
               Thank you for accepting Quote #{quote.quoteNumber}. Your account representative has
-              been notified and will be in touch shortly to complete your setup.
+              been notified and will be in touch shortly.
             </p>
-
-            {setupUrl ? (
-              <div className="pqp-setup-block">
-                <p className="pqp-setup-block__heading">Set up your portal account</p>
-                <p className="pqp-setup-block__sub">
-                  Track orders, view invoices, and manage your account online.
-                  Scan the QR code or tap the button below.
-                </p>
-                <div className="pqp-setup-block__qr">
-                  <QRCodeSVG value={setupUrl} size={160} includeMargin />
-                </div>
-                <a href={setupUrl} className="pqp-btn pqp-btn--primary pqp-btn--wide">
-                  Create Your Portal Account
-                </a>
-              </div>
-            ) : (
-              <Link to="/signup" className="pqp-btn pqp-btn--primary pqp-btn--wide">
-                Create Your Portal Account
-              </Link>
-            )}
+            <div className="pqp-confirmation-block">
+              <p className="pqp-confirmation-block__heading">Approval details recorded</p>
+              <ul className="pqp-confirmation-list">
+                <li>Delivery point of contact has been saved with the order.</li>
+                <li>Terms & conditions acceptance has been recorded.</li>
+                <li>
+                  Payment preference:
+                  {' '}
+                  <strong>
+                    {paymentPreference === 'card_on_file'
+                      ? 'Credit card on file'
+                      : paymentPreference === 'net_terms'
+                        ? 'Net terms'
+                        : paymentPreference === 'cod'
+                          ? 'Cash on delivery'
+                          : 'To be decided'}
+                  </strong>
+                </li>
+              </ul>
+            </div>
 
             {rep && (
               <div className="pqp-rep pqp-rep--success">
@@ -315,16 +381,123 @@ const PublicQuotePage: React.FC = () => {
           </div>
         )}
 
-        {/* Accept action */}
-        {acceptError && <p className="pqp-accept-error">{acceptError}</p>}
-
         <div className="pqp-actions">
+          <div className="pqp-form-grid">
+            <label className="pqp-field">
+              <span className="pqp-field__label">Approved by *</span>
+              <input
+                className="pqp-input"
+                value={form.approvedByName}
+                onChange={(e) => updateField('approvedByName', e.target.value)}
+                placeholder="Full name"
+              />
+            </label>
+            <label className="pqp-field">
+              <span className="pqp-field__label">Approval email</span>
+              <input
+                className="pqp-input"
+                value={form.approvedByEmail}
+                onChange={(e) => updateField('approvedByEmail', e.target.value)}
+                placeholder="name@company.com"
+                type="email"
+              />
+            </label>
+            <label className="pqp-field">
+              <span className="pqp-field__label">Delivery point of contact *</span>
+              <input
+                className="pqp-input"
+                value={form.deliveryContactName}
+                onChange={(e) => updateField('deliveryContactName', e.target.value)}
+                placeholder="Who will receive the delivery?"
+              />
+            </label>
+            <label className="pqp-field">
+              <span className="pqp-field__label">Delivery contact phone</span>
+              <input
+                className="pqp-input"
+                value={form.deliveryContactPhone}
+                onChange={(e) => updateField('deliveryContactPhone', e.target.value)}
+                placeholder="(555) 555-5555"
+                type="tel"
+              />
+            </label>
+            <label className="pqp-field">
+              <span className="pqp-field__label">Delivery contact email</span>
+              <input
+                className="pqp-input"
+                value={form.deliveryContactEmail}
+                onChange={(e) => updateField('deliveryContactEmail', e.target.value)}
+                placeholder="delivery@company.com"
+                type="email"
+              />
+            </label>
+              <label className="pqp-field">
+                <span className="pqp-field__label">Quote provided to</span>
+                <input
+                className="pqp-input"
+                value={form.quoteProvidedTo}
+                onChange={(e) => updateField('quoteProvidedTo', e.target.value)}
+                placeholder="If different from approver"
+              />
+            </label>
+          </div>
+
+          <div className="pqp-choice-group">
+            <p className="pqp-choice-group__label">Primary communication method *</p>
+            <div className="pqp-choice-row">
+              {(['email', 'phone', 'text'] as CommunicationMethod[]).map((method) => (
+                <label key={method} className="pqp-radio">
+                  <input
+                    type="radio"
+                    checked={form.primaryCommunicationMethod === method}
+                    onChange={() => updateField('primaryCommunicationMethod', method)}
+                  />
+                  <span>{method === 'phone' ? 'Phone' : method === 'text' ? 'Text' : 'Email'}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="pqp-choice-group">
+            <p className="pqp-choice-group__label">Billing preference after delivery</p>
+            <label className="pqp-field">
+              <span className="pqp-field__label">Payment preference</span>
+              <select
+                className="pqp-input"
+                value={form.paymentChoice}
+                onChange={(e) => updateField('paymentChoice', e.target.value as PaymentChoice)}
+              >
+                <option value="net_terms">Net terms</option>
+                <option value="card_on_file">Credit card on file</option>
+                <option value="cod">Cash on delivery</option>
+                <option value="undecided">To be decided</option>
+              </select>
+            </label>
+          </div>
+
+          <label className="pqp-checkbox pqp-checkbox--terms">
+            <input
+              type="checkbox"
+              checked={form.acceptedTerms}
+              onChange={(e) => updateField('acceptedTerms', e.target.checked)}
+            />
+            <span>
+              I approve this quote and accept Ohio Gas Supply&apos;s
+              {' '}
+              <a href={termsUrl} target="_blank" rel="noopener noreferrer">
+                terms and conditions
+              </a>
+              .
+            </span>
+          </label>
+
+          {acceptError && <p className="pqp-accept-error">{acceptError}</p>}
           <button
-            className="pqp-btn pqp-btn--primary"
+            className="pqp-btn pqp-btn--primary pqp-btn--wide"
             onClick={() => void handleAccept()}
             disabled={accepting}
           >
-            {accepting ? 'Processing…' : '✓ Accept This Quote'}
+            {accepting ? 'Processing…' : 'Approve Quote'}
           </button>
         </div>
 

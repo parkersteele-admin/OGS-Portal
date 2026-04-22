@@ -15,9 +15,13 @@ import type { CompanySettings } from '../../../types/companySettings'
 import { DEFAULT_COMPANY_SETTINGS } from '../../../types/companySettings'
 import { Button } from '../../../components/ui/Button'
 import { Input } from '../../../components/ui/Input'
+import { Modal } from '../../../components/ui/Modal'
+import { useAuth } from '../../../hooks/useAuth'
+import { clearAllTestData } from '../../../services/adminService'
 import './CompanySettings.css'
 
 const CompanySettingsPage: React.FC = () => {
+  const { isAdmin }                    = useAuth()
   const [settings, setSettings]         = useState<CompanySettings>(DEFAULT_COMPANY_SETTINGS)
   const [loading, setLoading]           = useState(true)
   const [saving, setSaving]             = useState(false)
@@ -26,6 +30,10 @@ const CompanySettingsPage: React.FC = () => {
   const [logoFile, setLogoFile]         = useState<File | null>(null)
   const [logoPreview, setLogoPreview]   = useState<string>('')
   const [uploadPct, setUploadPct]       = useState<number | null>(null)
+  const [showClearModal, setShowClearModal] = useState(false)
+  const [clearConfirmText, setClearConfirmText] = useState('')
+  const [clearing, setClearing] = useState(false)
+  const [clearStatus, setClearStatus] = useState<string | null>(null)
   const fileInputRef                    = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -71,6 +79,21 @@ const CompanySettingsPage: React.FC = () => {
     }
   }
 
+  async function handleClearAllTestData() {
+    setClearing(true)
+    setClearStatus(null)
+    try {
+      const result = await clearAllTestData(clearConfirmText)
+      setClearStatus(`Success — cleared ${result.clearedCollections.join(', ')}.`)
+      setShowClearModal(false)
+      setClearConfirmText('')
+    } catch (err) {
+      setClearStatus(err instanceof Error ? err.message : 'Failed to clear test data.')
+    } finally {
+      setClearing(false)
+    }
+  }
+
   if (loading) return <div className="cs-loading">Loading company settings…</div>
 
   const logoSrc = logoPreview || settings.logoUrl
@@ -90,6 +113,7 @@ const CompanySettingsPage: React.FC = () => {
       </header>
 
       {error && <div className="cs-error" role="alert">{error}</div>}
+      {clearStatus && <div className="cs-status" role="status">{clearStatus}</div>}
 
       <div className="cs-body">
 
@@ -265,7 +289,46 @@ const CompanySettingsPage: React.FC = () => {
           </div>
         </section>
 
+        {isAdmin && (
+          <section className="cs-card cs-card--danger">
+            <h2 className="cs-card__title">Danger Zone</h2>
+            <p className="cs-card__sub">
+              Remove all customers, contacts, quotes, invoices, orders, and runs so the system is ready for live data only.
+            </p>
+            <Button variant="danger" size="md" onClick={() => setShowClearModal(true)}>
+              Clear All Test Data
+            </Button>
+          </section>
+        )}
+
       </div>
+
+      <Modal open={showClearModal} onClose={() => !clearing && setShowClearModal(false)} title="Clear All Test Data" size="md">
+        <div className="cs-danger-modal">
+          <p className="cs-danger-modal__warning">
+            This will permanently delete all customers, contacts, runs, quotes, and invoices. This cannot be undone.
+          </p>
+          <Input
+            label='Type "DELETE" to confirm'
+            value={clearConfirmText}
+            onChange={(e) => setClearConfirmText(e.target.value)}
+            placeholder="DELETE"
+          />
+          <div className="cs-danger-modal__actions">
+            <Button variant="secondary" onClick={() => setShowClearModal(false)} disabled={clearing}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleClearAllTestData}
+              loading={clearing}
+              disabled={clearConfirmText !== 'DELETE'}
+            >
+              Clear All Test Data
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

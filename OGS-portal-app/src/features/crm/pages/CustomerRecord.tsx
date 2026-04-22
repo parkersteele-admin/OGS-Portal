@@ -45,7 +45,7 @@ import { getInvoices, createInvoice } from '../../../services/invoiceService'
 import { getProductDropdown, getVisibleProducts, type ProductDropdownItem } from '../../../services/productService'
 import { setCustomerProductPrice, removeCustomerProductPrice } from '../../../services/customerPricingService'
 import { useCustomerProductPricing } from '../../../hooks/useCustomerProductPricing'
-import { getRouteSchedule, updateRouteSchedule } from '../../../services/orderService'
+import { getOrders, getRouteSchedule, updateRouteSchedule } from '../../../services/orderService'
 import type { Order, RouteSchedule, RouteCadence } from '../../../types/order'
 import { getFilesForEntity, uploadFile, deleteFile } from '../../../services/fileService'
 import { formatCurrency, formatDate, formatRelative } from '../../../utils/format'
@@ -84,10 +84,11 @@ interface ContactLogWithFollowUp extends ContactLog {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-type TabKey = 'overview' | 'history' | 'notes' | 'documents' | 'access' | 'productPricing' | 'standingOrder'
+type TabKey = 'overview' | 'orderHistory' | 'history' | 'notes' | 'documents' | 'access' | 'productPricing' | 'standingOrder'
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'overview',       label: 'Overview' },
+  { key: 'orderHistory',   label: 'Order History' },
   { key: 'history',        label: 'Contact History' },
   { key: 'notes',          label: 'Account Notes' },
   { key: 'documents',      label: 'Documents' },
@@ -144,6 +145,17 @@ function getOrderStatusLabel(order: Order): string {
     return 'Delivered / Signed'
   }
   return order.status
+}
+
+function getFileDisplayName(file: AppFile): string {
+  const kind = file.metadata?.documentKind
+  if (kind === 'terms-acceptance') {
+    return `Terms & Conditions — Accepted ${formatDate(file.createdAt)}`
+  }
+  if (kind === 'delivery-receipt') {
+    return `Delivery Receipt — ${formatDate(file.createdAt)}`
+  }
+  return file.fileName
 }
 
 // ── Role meta ─────────────────────────────────────────────────────────────────
@@ -1020,11 +1032,27 @@ const CustomerRecord: React.FC = () => {
     staleTime: 60_000,
   })
 
+  const { data: orderHistoryPage } = useQuery({
+    queryKey: ['orders', 'history', customerId],
+    queryFn: () => getOrders({ customerId: customerId! }, { pageSize: 100 }),
+    enabled: !!customerId && activeTab === 'orderHistory',
+    staleTime: 60_000,
+  })
+  const orderHistoryOrders = orderHistoryPage?.data ?? []
+
+  const { data: invoiceHistoryPage } = useQuery({
+    queryKey: ['invoices', 'history', customerId],
+    queryFn: () => getInvoices({ customerId: customerId! }, { pageSize: 100 }),
+    enabled: !!customerId && activeTab === 'orderHistory',
+    staleTime: 60_000,
+  })
+  const orderHistoryInvoices = invoiceHistoryPage?.data ?? []
+
   // Customer files (fetched when documents tab active)
   const { data: files = [], isLoading: filesLoading } = useQuery({
     queryKey: ['files', 'customer', customerId],
     queryFn: () => getFilesForEntity('customer', customerId!),
-    enabled: !!customerId && activeTab === 'documents',
+    enabled: !!customerId && (activeTab === 'documents' || activeTab === 'orderHistory'),
     staleTime: 60_000,
   })
 
@@ -1363,6 +1391,11 @@ const CustomerRecord: React.FC = () => {
     ? getGoogleMapsUrl(cr.lat, cr.lng, cr.name)
     : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(resolveAddress(cr))}`
   const statusCfg = STATUS_BADGE[cr.status]
+  const orderHistoryDocs = files.filter((file) =>
+    ['invoice', 'receipt', 'signature'].includes(file.fileType)
+    || file.metadata?.documentKind === 'delivery-receipt'
+    || file.metadata?.documentKind === 'terms-acceptance',
+  )
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
@@ -1644,6 +1677,140 @@ const CustomerRecord: React.FC = () => {
           {invoiceError && (
             <p className="cr-form-error" style={{ marginTop: 8 }}>{invoiceError}</p>
           )}
+        </div>
+      )}
+
+      {/* ── Tab: Order History ────────────────────────────────────────────── */}
+      {activeTab === 'orderHistory' && (
+        <div className="cr-tab-panel" role="tabpanel">
+          <Card>
+            <CardHeader>
+              <h3 className="cr-section-title">Orders</h3>
+            </CardHeader>
+            <CardBody>
+              {orderHistoryOrders.length === 0 ? (
+                <p className="cr-empty">No orders found for this customer.</p>
+              ) : (
+                <table className="cr-table">
+                  <thead>
+                    <tr>
+                      <th>Requested</th>
+                      <th>Status</th>
+                      <th>Quantity</th>
+                      <th>Total</th>
+                      <th>Docs</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orderHistoryOrders.map((order) => (
+                      <tr key={order.id}>
+                        <td>{order.requestedAt ? formatDate(order.requestedAt) : '—'}</td>
+                        <td>
+                          <Badge variant={ORDER_BADGE[order.status] ?? 'neutral'}>
+                            {getOrderStatusLabel(order)}
+                          </Badge>
+                        </td>
+                        <td>{order.quantity}</td>
+                        <td>{formatCurrency(order.total)}</td>
+                        <td>
+                          <div className="cr-table__links">
+                            {order.billOfLadingUrl && (
+                              <a href={order.billOfLadingUrl} target="_blank" rel="noopener noreferrer">Receipt</a>
+                            )}
+                            {order.invoicePdfUrl && (
+                              <a href={order.invoicePdfUrl} target="_blank" rel="noopener noreferrer">Invoice</a>
+                            )}
+                            {order.signatureUrl && (
+                              <a href={order.signatureUrl} target="_blank" rel="noopener noreferrer">Signature</a>
+                            )}
+                            {!order.billOfLadingUrl && !order.invoicePdfUrl && !order.signatureUrl && '—'}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <h3 className="cr-section-title">Invoices</h3>
+            </CardHeader>
+            <CardBody>
+              {orderHistoryInvoices.length === 0 ? (
+                <p className="cr-empty">No invoices found for this customer.</p>
+              ) : (
+                <table className="cr-table">
+                  <thead>
+                    <tr>
+                      <th>Invoice #</th>
+                      <th>Issued</th>
+                      <th>Status</th>
+                      <th>Amount</th>
+                      <th>PDF</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orderHistoryInvoices.map((invoice) => (
+                      <tr key={invoice.id}>
+                        <td className="cr-table__mono">{invoice.invoiceNumber || invoice.id}</td>
+                        <td>{invoice.issuedAt ? formatDate(invoice.issuedAt) : '—'}</td>
+                        <td>
+                          <Badge variant={INVOICE_BADGE[invoice.status] ?? 'neutral'}>
+                            {invoice.status}
+                          </Badge>
+                        </td>
+                        <td>{formatCurrency(invoice.total)}</td>
+                        <td>
+                          {invoice.pdfUrl ? (
+                            <a href={invoice.pdfUrl} target="_blank" rel="noopener noreferrer">Download</a>
+                          ) : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <h3 className="cr-section-title">Delivery & Acceptance Documents</h3>
+            </CardHeader>
+            <CardBody>
+              {orderHistoryDocs.length === 0 ? (
+                <p className="cr-empty">No delivery or acceptance documents found yet.</p>
+              ) : (
+                <table className="cr-table">
+                  <thead>
+                    <tr>
+                      <th>Document</th>
+                      <th>Type</th>
+                      <th>Date</th>
+                      <th>Link</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orderHistoryDocs.map((file) => (
+                      <tr key={file.id}>
+                        <td>{getFileDisplayName(file)}</td>
+                        <td>{file.metadata?.documentKind === 'terms-acceptance' ? 'Acceptance' : file.fileType}</td>
+                        <td>{formatDate(file.createdAt)}</td>
+                        <td>
+                          <a href={file.url} target="_blank" rel="noopener noreferrer">
+                            Open
+                          </a>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </CardBody>
+          </Card>
         </div>
       )}
 
@@ -2344,7 +2511,7 @@ function FileRow({
   deleting: boolean
 }) {
   const docuSealStatus = file.metadata?.docuSealStatus as string | undefined
-  const isContract = file.fileType === 'contract'
+  const isContract = ['contract', 'quote', 'invoice', 'receipt'].includes(file.fileType)
   const isSigned   = file.fileType === 'signature' || docuSealStatus === 'completed'
 
   return (
@@ -2355,7 +2522,7 @@ function FileRow({
             {isContract ? '📄' : isSigned ? '✅' : '📎'}
           </div>
           <div className="cr-file-row__info">
-            <span className="cr-file-row__name">{file.fileName}</span>
+            <span className="cr-file-row__name">{getFileDisplayName(file)}</span>
             <span className="cr-file-row__meta">
               {(file.sizeBytes / 1024).toFixed(0)} KB · {formatDate(file.createdAt)}
               {docuSealStatus && (

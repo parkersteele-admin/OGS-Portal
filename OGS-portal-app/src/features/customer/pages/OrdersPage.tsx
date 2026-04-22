@@ -393,6 +393,44 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
 
           <LinkedInvoiceRow order={order} />
 
+          {(order.invoicePdfUrl || order.billOfLadingUrl || order.signatureUrl) && (
+            <div className="oh-detail__section">
+              <p className="oh-detail__section-title">Delivery Documents</p>
+              <div className="oh-detail__links">
+                {order.invoicePdfUrl && (
+                  <a
+                    href={order.invoicePdfUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="oh-detail__doc-link"
+                  >
+                    Signed invoice
+                  </a>
+                )}
+                {order.billOfLadingUrl && (
+                  <a
+                    href={order.billOfLadingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="oh-detail__doc-link"
+                  >
+                    Delivery receipt
+                  </a>
+                )}
+                {order.signatureUrl && (
+                  <a
+                    href={order.signatureUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="oh-detail__doc-link"
+                  >
+                    Delivery signature
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* ── Add to next delivery inline drawer ── */}
           {nextRouteOrderId && !addOnSuccess && (
             <div className="oh-addon-section">

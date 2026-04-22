@@ -48,6 +48,16 @@
   font-size: var(--font-size-13);
 }
 
+.cs-status {
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: rgba(232, 119, 34, 0.08);
+  border: 1px solid rgba(232, 119, 34, 0.24);
+  border-radius: var(--radius-md);
+  color: var(--color-brand-dark);
+  font-size: var(--font-size-13);
+}
+
 /* ── Body / cards ── */
 
 .cs-body {
@@ -62,6 +72,11 @@
   border-radius: 18px;
   background: var(--color-bg);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.cs-card--danger {
+  border-color: rgba(226, 75, 74, 0.3);
+  background: linear-gradient(180deg, rgba(226, 75, 74, 0.04), rgba(226, 75, 74, 0.02));
 }
 
 .cs-card__title {
@@ -175,4 +190,22 @@
   min-height: 160px;
   font-family: inherit;
   line-height: 1.6;
+}
+
+.cs-danger-modal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.cs-danger-modal__warning {
+  margin: 0;
+  color: var(--color-text-2);
+  line-height: 1.6;
+}
+
+.cs-danger-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
 }

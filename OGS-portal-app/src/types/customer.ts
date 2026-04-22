@@ -42,6 +42,15 @@ export interface Customer {
   autopayEnabled?: boolean
   /** Stripe PM ID currently used for autopay charges. */
   autopayStripePaymentMethodId?: string
+  /** Approval-flow metadata captured when a quote is accepted. */
+  deliveryContactName?: string
+  deliveryContactPhone?: string
+  deliveryContactEmail?: string
+  primaryCommunicationMethod?: 'email' | 'phone' | 'text'
+  quoteProvidedTo?: string
+  paymentMethodStatus?: 'saved' | 'setup_requested' | 'invoice_requested' | 'not_provided'
+  quoteApprovedAt?: Timestamp
+  quoteApprovedQuoteId?: string
   /** Set when the customer is archived (soft-archived, not deleted). */
   archivedAt?: Timestamp
   /** Set when the customer is soft-deleted. Document is purged 30 days after this. */

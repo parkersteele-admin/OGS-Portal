@@ -404,6 +404,22 @@
   font-size: 0.82rem;
 }
 
+.cr-table__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cr-table__links a {
+  color: var(--color-brand);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.cr-table__links a:hover {
+  text-decoration: underline;
+}
+
 /* ── Quick actions ─────────────────────────────────────────────────────────── */
 
 .cr-quick-actions {

@@ -5,11 +5,13 @@ import { sendEmail, type MailAttachment } from '../email/sendEmail'
 import { generateInvoicePdf } from '../pdf/generateInvoicePdf'
 import { generateBillOfLadingPdf } from '../pdf/generateBillOfLadingPdf'
 import { getCompanySettings } from '../pdf/companySettings'
+import { registerGeneratedFile } from '../files/registerGeneratedFile'
 
 interface FinalizeSignedDeliveryInput {
   runId: string
   stopId: string
   qtyDelivered: number
+  receivedByName: string
   signatureDataUrl: string
   deliveryNotes?: string
   photoUrls?: string[]
@@ -44,8 +46,8 @@ export const finalizeSignedDelivery = onCall(
     }
 
     const data = request.data as Partial<FinalizeSignedDeliveryInput>
-    if (!data.runId || !data.stopId || typeof data.qtyDelivered !== 'number' || !data.signatureDataUrl) {
-      throw new HttpsError('invalid-argument', 'runId, stopId, qtyDelivered, and signatureDataUrl are required.')
+    if (!data.runId || !data.stopId || typeof data.qtyDelivered !== 'number' || !data.signatureDataUrl || !data.receivedByName?.trim()) {
+      throw new HttpsError('invalid-argument', 'runId, stopId, qtyDelivered, receivedByName, and signatureDataUrl are required.')
     }
     if (!Array.isArray(data.deliveredLineItems) || data.deliveredLineItems.length === 0) {
       throw new HttpsError('invalid-argument', 'At least one delivered line item is required.')
@@ -87,6 +89,7 @@ export const finalizeSignedDelivery = onCall(
     const order = orderSnap.data() as Record<string, unknown>
     const customer = customerSnap.data() as Record<string, unknown>
     const driverName = (userSnap.data()?.name as string | undefined) || (request.auth.token.name as string | undefined) || 'Assigned Driver'
+    const receivedByName = data.receivedByName.trim()
     const deliveryDate = new Date()
 
     const productIds = new Set<string>()
@@ -120,6 +123,26 @@ export const finalizeSignedDelivery = onCall(
       contentType: signature.contentType,
       buffer: signature.buffer,
       folder: 'signature',
+    })
+
+    await registerGeneratedFile({
+      targets: [
+        { entityType: 'order', entityId: orderId },
+        { entityType: 'customer', entityId: customerId },
+      ],
+      fileType: 'signature',
+      url: signatureUpload.url,
+      storagePath: signatureUpload.storagePath,
+      fileName: `signature-${data.stopId}.png`,
+      mimeType: signature.contentType,
+      sizeBytes: signature.buffer.length,
+      metadata: {
+        linkedEntityType: 'order',
+        linkedEntityId: orderId,
+        runId: data.runId,
+        stopId: data.stopId,
+        receivedByName,
+      },
     })
 
     let invoice = await findInvoiceForOrder(orderId)
@@ -160,6 +183,7 @@ export const finalizeSignedDelivery = onCall(
       ? {
           url: order.billOfLadingUrl as string,
           fileName: `Bill-of-Lading-${deliveryDate.toISOString().slice(0, 10)}.pdf`,
+          storagePath: `ogs-portal/orders/${orderId}/bill-of-lading/${deliveryDate.toISOString().slice(0, 10)}.pdf`,
           buffer: await downloadBuffer(order.billOfLadingUrl as string),
         }
       : await generateBillOfLadingPdf({
@@ -175,9 +199,51 @@ export const finalizeSignedDelivery = onCall(
           items: bolItems,
         })
 
+    if (billOfLading.storagePath) {
+      await registerGeneratedFile({
+        targets: [
+          { entityType: 'order', entityId: orderId },
+          { entityType: 'customer', entityId: customerId },
+        ],
+        fileType: 'receipt',
+        url: billOfLading.url,
+        storagePath: billOfLading.storagePath,
+        fileName: billOfLading.fileName,
+        mimeType: 'application/pdf',
+        sizeBytes: billOfLading.buffer.length,
+        metadata: {
+          linkedEntityType: 'order',
+          linkedEntityId: orderId,
+          invoiceId: invoice.id,
+          documentKind: 'delivery-receipt',
+        },
+      })
+    }
+
     const signedAt = FieldValue.serverTimestamp()
     const deliveryNotes = data.deliveryNotes?.trim()
     const photoUrls = Array.isArray(data.photoUrls) ? data.photoUrls.filter(Boolean) : undefined
+
+    const deliveryDocumentRef = orderSnap.ref.collection('documents').doc()
+    await deliveryDocumentRef.set({
+      type: 'delivery_acceptance',
+      customerId,
+      customerName: (customer.name as string | undefined) || 'Customer',
+      orderId,
+      orderNumber: (order.groupId as string | undefined) || orderId.slice(0, 8).toUpperCase(),
+      runId: data.runId,
+      stopId: data.stopId,
+      deliveryDate: Timestamp.fromDate(deliveryDate),
+      receivedByName,
+      signatureUrl: signatureUpload.url,
+      invoiceId: invoice.id,
+      invoicePdfUrl,
+      billOfLadingUrl: billOfLading.url,
+      deliveryNotes: deliveryNotes || null,
+      createdByUid: request.auth.uid,
+      createdByName: driverName,
+      createdAt: FieldValue.serverTimestamp(),
+    })
 
     await Promise.all([
       stopRef.update({
@@ -185,7 +251,7 @@ export const finalizeSignedDelivery = onCall(
         gallonsDelivered: data.qtyDelivered,
         completedAt: signedAt,
         signedAt,
-        signedByName: driverName,
+        signedByName: receivedByName,
         signatureUrl: signatureUpload.url,
         billOfLadingUrl: billOfLading.url,
         invoicePdfUrl,
@@ -198,7 +264,8 @@ export const finalizeSignedDelivery = onCall(
         deliveredAt: signedAt,
         signedAt,
         signedByUid: request.auth.uid,
-        signedByName: driverName,
+        signedByName: receivedByName,
+        receivedByName,
         signatureUrl: signatureUpload.url,
         billOfLadingUrl: billOfLading.url,
         invoicePdfUrl,
@@ -338,9 +405,21 @@ async function createInvoiceForDelivery(args: {
   order: Record<string, unknown>
   productMap: Map<string, ProductSnapshot>
 }): Promise<InvoiceRecord> {
+  const quotedAddOnPrices = new Map<string, number>()
+  const orderAddOns = Array.isArray(args.order.addOns)
+    ? (args.order.addOns as Array<Record<string, unknown>>)
+    : []
+  for (const addOn of orderAddOns) {
+    const productId = addOn.productId as string | undefined
+    const unitPrice = addOn.unitPrice as number | undefined
+    if (productId && typeof unitPrice === 'number') {
+      quotedAddOnPrices.set(productId, unitPrice)
+    }
+  }
+
   const lineItems = [
     ...args.primaryItems.map((item) => buildInvoiceLine(item, args.productMap.get(item.productId), args.order.unitPrice as number | undefined)),
-    ...args.addOnItems.map((item) => buildInvoiceLine(item, args.productMap.get(item.productId))),
+    ...args.addOnItems.map((item) => buildInvoiceLine(item, args.productMap.get(item.productId), quotedAddOnPrices.get(item.productId))),
   ]
 
   const deliveryFee = typeof args.order.deliveryFee === 'number' ? args.order.deliveryFee : 0
@@ -366,6 +445,8 @@ async function createInvoiceForDelivery(args: {
     invoiceNumber,
     customerId: args.customerId,
     orderId: args.orderId,
+    quoteId: args.order.quoteId ?? null,
+    quoteNumber: args.order.quoteNumber ?? null,
     status: 'sent',
     lineItems,
     subtotal,

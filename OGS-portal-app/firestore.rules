@@ -273,6 +273,31 @@ service cloud.firestore {
     }
 
 
+    // ── Files / generated documents ─────────────────────────────────────────
+    match /files/{fileId} {
+      allow read: if isDispatch()
+        || isSales()
+        || (
+          isPortalUser()
+          && resource.data.entityType == 'customer'
+          && resource.data.entityId == linkedCompanyId()
+        )
+        || (
+          isCustomer()
+          && resource.data.entityType == 'customer'
+          && resource.data.entityId == linkedCustomerId()
+        );
+      allow create: if isDispatch()
+        || isSales()
+        || (
+          isPortalUser()
+          && request.resource.data.entityType == 'customer'
+          && request.resource.data.entityId == linkedCompanyId()
+        );
+      allow update, delete: if isDispatch() || isSales();
+    }
+
+
     // ── Notifications ─────────────────────────────────────────────────────────
     match /notifications/{notifId} {
       allow read: if isAuthenticated() && isOwner(resource.data.userId);

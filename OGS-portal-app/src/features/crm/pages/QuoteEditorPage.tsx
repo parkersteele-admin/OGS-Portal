@@ -452,6 +452,7 @@ const QuoteEditorPage: React.FC = () => {
   const [savedId,        setSavedId]        = useState<string | null>(isNew ? null : quoteId!)
   const [status,         setStatus]         = useState<QuoteStatus>('draft')
   const [needsOrderSetup, setNeedsOrderSetup] = useState(false)
+  const [approvalDetails, setApprovalDetails] = useState<Quote['approval'] | null>(null)
   const [setupUrl,       setSetupUrl]       = useState<string | null>(null)
   const [setupComplete,  setSetupComplete]  = useState(false)
   const [setupUrlLoading, setSetupUrlLoading] = useState(false)
@@ -486,6 +487,7 @@ const QuoteEditorPage: React.FC = () => {
       setNotes(q.notes ?? '')
       setStatus(q.status)
       if (q.needsOrderSetup) setNeedsOrderSetup(true)
+      setApprovalDetails(q.approval ?? null)
 
       // Load setup token from customer doc to show QR code
       if (q.status === 'accepted' && q.customerId) {
@@ -810,6 +812,18 @@ const QuoteEditorPage: React.FC = () => {
               navigate(`${base}/orders/new${custParam}`)
             }}
           >standing delivery order</button>.
+        </div>
+      )}
+
+      {status === 'accepted' && approvalDetails && (
+        <div className="qep-notice" role="status">
+          <strong>Approval details:</strong> {approvalDetails.approvedByName}
+          {approvalDetails.approvedByEmail ? ` (${approvalDetails.approvedByEmail})` : ''}
+          {' · '}Delivery contact: {approvalDetails.deliveryContactName}
+          {' · '}Communication: {approvalDetails.primaryCommunicationMethod}
+          {approvalDetails.paymentMethodStatus
+            ? ` · Payment: ${approvalDetails.paymentMethodStatus.replace(/_/g, ' ')}`
+            : ''}
         </div>
       )}
 

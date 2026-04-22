@@ -1,13 +1,16 @@
 import PDFDocument from 'pdfkit'
 import { storage } from '../admin'
 import { getCompanySettings, fetchLogoBuffer } from './companySettings'
-
-const OGS_ORANGE = '#E87722'
-const PAGE_W = 612
-const PAGE_H = 792
-const MARGIN_L = 58
-const RIGHT_EDGE = PAGE_W - 40
-const CONTENT_W = RIGHT_EDGE - MARGIN_L
+import { registerGeneratedFile } from '../files/registerGeneratedFile'
+import {
+  CONTENT_W,
+  FOOTER_Y,
+  MARGIN_L,
+  RIGHT_EDGE,
+  drawBrandedFooter,
+  drawBrandedHeader,
+  newBrandedPage,
+} from './layout'
 
 export interface BillOfLadingItem {
   description: string
@@ -61,6 +64,25 @@ export async function generateBillOfLadingPdf(
   const encodedPath = encodeURIComponent(storagePath)
   const url = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodedPath}?alt=media&token=${downloadToken}`
 
+  await registerGeneratedFile({
+    targets: [
+      { entityType: 'order', entityId: input.orderId },
+      { entityType: 'customer', entityId: input.customerId },
+    ],
+    fileType: 'receipt',
+    url,
+    storagePath,
+    fileName,
+    mimeType: 'application/pdf',
+    sizeBytes: buffer.length,
+    metadata: {
+      linkedEntityType: 'order',
+      linkedEntityId: input.orderId,
+      customerId: input.customerId,
+      documentKind: 'delivery-receipt',
+    },
+  })
+
   return { buffer, fileName, storagePath, url }
 }
 
@@ -83,52 +105,8 @@ async function buildBillOfLadingPdf(
       year: 'numeric',
     })
 
-    doc.rect(0, 0, 8, PAGE_H).fill(OGS_ORANGE)
-
-    if (logoBuf) {
-      try {
-        doc.image(logoBuf, MARGIN_L, 34, { fit: [120, 50] })
-      } catch {
-        // Ignore malformed logo assets and continue with text-only header.
-      }
-    }
-
-    const nameY = logoBuf ? 92 : 40
-    doc
-      .fontSize(logoBuf ? 13 : 17)
-      .font('Helvetica-Bold')
-      .fillColor('#111111')
-      .text(company.name || 'OGS Gas Services', MARGIN_L, nameY)
-
-    let headerY = nameY + (logoBuf ? 16 : 23)
-    const companyLine = [company.phone, company.email, company.website].filter(Boolean).join('  ·  ')
-    if (companyLine) {
-      doc.fontSize(8.5).font('Helvetica').fillColor('#666666').text(companyLine, MARGIN_L, headerY)
-      headerY += 12
-    }
-
-    doc
-      .fontSize(28)
-      .font('Helvetica-Bold')
-      .fillColor(OGS_ORANGE)
-      .text('BILL OF LADING', 0, 40, { align: 'right', width: RIGHT_EDGE })
-
-    doc
-      .fontSize(9)
-      .font('Helvetica')
-      .fillColor('#555555')
-      .text(`Order ${input.orderId.slice(-8).toUpperCase()}`, 0, 76, {
-        align: 'right',
-        width: RIGHT_EDGE,
-      })
-
-    const dividerY = Math.max(headerY + 12, 108)
-    doc
-      .moveTo(MARGIN_L, dividerY)
-      .lineTo(RIGHT_EDGE, dividerY)
-      .strokeColor(OGS_ORANGE)
-      .lineWidth(1.5)
-      .stroke()
+    const referenceText = `Order ${input.orderId.slice(-8).toUpperCase()}`
+    const dividerY = drawBrandedHeader(doc, company, logoBuf, 'BILL OF LADING', referenceText)
 
     doc
       .fontSize(7)
@@ -164,30 +142,49 @@ async function buildBillOfLadingPdf(
     const cUnit = 470
     const headerHeight = 20
 
-    doc.rect(cDesc, tableTop, CONTENT_W, headerHeight).fill('#F4F4F4')
-    doc
-      .fontSize(8)
-      .font('Helvetica-Bold')
-      .fillColor('#444444')
-      .text('ITEM', cDesc + 4, tableTop + 6, { width: cQty - cDesc - 8 })
-      .text('QTY', cQty, tableTop + 6, { width: cUnit - cQty - 6, align: 'right' })
-      .text('UNIT', cUnit, tableTop + 6, { width: RIGHT_EDGE - cUnit, align: 'right' })
+    const drawTableHeader = (top: number) => {
+      doc.rect(cDesc, top, CONTENT_W, headerHeight).fill('#F4F4F4')
+      doc
+        .fontSize(8)
+        .font('Helvetica-Bold')
+        .fillColor('#444444')
+        .text('ITEM', cDesc + 4, top + 6, { width: cQty - cDesc - 8 })
+        .text('QTY', cQty, top + 6, { width: cUnit - cQty - 6, align: 'right' })
+        .text('UNIT', cUnit, top + 6, { width: RIGHT_EDGE - cUnit, align: 'right' })
+    }
+
+    drawTableHeader(tableTop)
 
     let rowY = tableTop + headerHeight + 8
     for (const [index, item] of input.items.entries()) {
+      const descWidth = cQty - cDesc - 12
+      const descriptionHeight = doc.heightOfString(item.description, { width: descWidth })
+      const rowHeight = Math.max(18, descriptionHeight + 4)
+
+      if (rowY + rowHeight > FOOTER_Y - 120) {
+        const nextDividerY = newBrandedPage(doc, company, logoBuf, 'BILL OF LADING', referenceText)
+        doc
+          .fontSize(7)
+          .font('Helvetica-Bold')
+          .fillColor('#999999')
+          .text('DELIVERED ITEMS', MARGIN_L, nextDividerY + 10)
+        drawTableHeader(nextDividerY + 24)
+        rowY = nextDividerY + 24 + headerHeight + 8
+      }
+
       if (index % 2 === 1) {
-        doc.rect(cDesc, rowY - 3, CONTENT_W, 17).fill('#FAFAFA')
+        doc.rect(cDesc, rowY - 3, CONTENT_W, rowHeight).fill('#FAFAFA')
       }
 
       doc
         .fontSize(9)
         .font('Helvetica')
         .fillColor('#222222')
-        .text(item.description, cDesc + 4, rowY, { width: cQty - cDesc - 12 })
+        .text(item.description, cDesc + 4, rowY, { width: descWidth })
         .text(String(item.quantity), cQty, rowY, { width: cUnit - cQty - 6, align: 'right' })
         .text(item.unit, cUnit, rowY, { width: RIGHT_EDGE - cUnit, align: 'right' })
 
-      rowY += 18
+      rowY += rowHeight
     }
 
     rowY += 10
@@ -199,6 +196,10 @@ async function buildBillOfLadingPdf(
       .stroke()
 
     rowY += 24
+    if (rowY + 120 > FOOTER_Y - 8) {
+      const nextDividerY = newBrandedPage(doc, company, logoBuf, 'BILL OF LADING', referenceText)
+      rowY = nextDividerY + 18
+    }
     doc
       .fontSize(10)
       .font('Helvetica-Bold')
@@ -235,12 +236,14 @@ async function buildBillOfLadingPdf(
         .fontSize(7.5)
         .font('Helvetica')
         .fillColor('#888888')
-        .text(company.termsAndConditions, MARGIN_L, PAGE_H - 96, {
+        .text(company.termsAndConditions, MARGIN_L, FOOTER_Y - 86, {
           width: CONTENT_W,
           height: 60,
           ellipsis: true,
         })
     }
+
+    drawBrandedFooter(doc, company, 'Signed delivery record retained by Ohio Gas Supply.')
 
     doc.end()
   })

@@ -203,6 +203,7 @@ export default function DeliveryCapture() {
   // Step 4 — signature
   const sigCanvasRef       = useRef<HTMLCanvasElement>(null)
   const [hasSig,    setHasSig]    = useState(false)
+  const [receivedByName, setReceivedByName] = useState('')
 
   // Step 5 — confirm dialog
   const [showConfirm,    setShowConfirm]    = useState(false)
@@ -234,6 +235,7 @@ export default function DeliveryCapture() {
         : null
       setOrder(ord)
       setQtyDelivered(ord?.quantity ?? 0)
+      setReceivedByName(ord?.deliveryContactName ?? '')
 
       setCustomer(
         customerSnap.exists()
@@ -333,6 +335,9 @@ export default function DeliveryCapture() {
       if (!signatureDataUrl) {
         throw new Error('A signature is required before completing delivery.')
       }
+      if (!receivedByName.trim()) {
+        throw new Error('Received by name is required before completing delivery.')
+      }
 
       const deliveredLineItems = order.productId
         ? [{ productId: order.productId, qty: qtyDelivered }]
@@ -346,6 +351,7 @@ export default function DeliveryCapture() {
         runId,
         stopId: stop.id,
         qtyDelivered,
+        receivedByName: receivedByName.trim(),
         signatureDataUrl,
         deliveryNotes: deliveryNotes.trim() || undefined,
         photoUrls: photoUrl ? [photoUrl] : undefined,
@@ -644,6 +650,20 @@ export default function DeliveryCapture() {
             The customer must sign before we can finalize this delivery.
           </p>
 
+          <div className="dc-field">
+            <label className="dc-field__label" htmlFor="dc-received-by">
+              Received by <span className="dc-field__hint">(required)</span>
+            </label>
+            <input
+              id="dc-received-by"
+              className="dc-input"
+              type="text"
+              value={receivedByName}
+              onChange={(e) => setReceivedByName(e.target.value)}
+              placeholder="Customer name"
+            />
+          </div>
+
           <SignatureCanvas
             canvasRef={sigCanvasRef}
             onSigned={setHasSig}
@@ -697,6 +717,10 @@ export default function DeliveryCapture() {
               </div>
             )}
             <div className="dc-summary__row">
+              <span className="dc-summary__lbl">Received by</span>
+              <span className="dc-summary__val">{receivedByName || '—'}</span>
+            </div>
+            <div className="dc-summary__row">
               <span className="dc-summary__lbl">Photo</span>
               <span className="dc-summary__val">
                 {photoPreview ? (
@@ -737,7 +761,7 @@ export default function DeliveryCapture() {
           <button
             className="dc-cta dc-cta--deliver"
             onClick={() => setShowConfirm(true)}
-            disabled={submitting}
+            disabled={submitting || !receivedByName.trim()}
           >
             ✓ Mark as delivered
           </button>

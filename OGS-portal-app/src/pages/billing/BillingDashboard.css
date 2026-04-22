@@ -124,6 +124,42 @@
   background: var(--color-bg-2);
 }
 
+.bd__batch-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+  padding: 0.8rem 0.95rem;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(232, 119, 34, 0.06), rgba(232, 119, 34, 0.02));
+}
+
+.bd__batch-select-all,
+.bd__batch-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.bd__batch-select-all {
+  font-size: var(--font-size-13);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.bd__batch-select-all input,
+.bd__check-col input {
+  accent-color: var(--color-brand);
+}
+
+.bd__batch-meta {
+  margin-left: auto;
+  font-size: var(--font-size-12);
+  color: var(--color-text-3);
+}
+
 .bd__controls-left,
 .bd__controls-right,
 .bd__date-range {
@@ -262,6 +298,11 @@
   white-space: nowrap;
 }
 
+.bd__check-col {
+  width: 44px;
+  text-align: center !important;
+}
+
 .bd__table tbody tr {
   transition: background var(--transition-fast);
 }
@@ -275,6 +316,10 @@
   border-bottom: 1px solid var(--color-divider);
   color: var(--color-text-2);
   vertical-align: middle;
+}
+
+.bd__table tbody td.bd__check-col {
+  text-align: center;
 }
 
 .bd__table tbody tr:last-child td {
@@ -662,11 +707,13 @@
     gap: var(--space-3);
   }
 
+  .bd__batch-bar,
   .bd__controls {
     flex-direction: column;
     align-items: stretch;
   }
 
+  .bd__batch-meta,
   .bd__controls-right {
     margin-left: 0;
     width: 100%;
@@ -693,6 +740,8 @@
   }
 
   .bd__controls-right,
+  .bd__batch-bar,
+  .bd__batch-meta,
   .bd__date-range,
   .bd__export-range,
   .bd__export-range-inputs,

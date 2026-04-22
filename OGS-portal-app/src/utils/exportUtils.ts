@@ -9,6 +9,7 @@
 
 import type { Invoice, Payment } from '../types/billing'
 import type { Customer } from '../types/customer'
+import type { Order } from '../types/order'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -35,6 +36,13 @@ function tsToDateStr(ts: { toDate(): Date } | Date | null | undefined): string {
   if (!ts) return ''
   const d = 'toDate' in (ts as object) ? (ts as { toDate(): Date }).toDate() : (ts as Date)
   return d.toISOString().slice(0, 10)
+}
+
+function safeNumber(...values: unknown[]): number {
+  for (const value of values) {
+    if (typeof value === 'number' && Number.isFinite(value)) return value
+  }
+  return 0
 }
 
 function triggerDownload(content: string, filename: string): void {
@@ -163,6 +171,62 @@ export function exportInvoicesToCsv(invoices: Invoice[], customers: Customer[]):
   }
 
   triggerDownload(rows.join('\r\n'), `ogs-portal-invoices-${todayString()}.csv`)
+}
+
+export function exportSelectedInvoicesBatchCsv(args: {
+  invoices: Invoice[]
+  customers: Customer[]
+  ordersById?: Map<string, Order>
+  startDate?: string
+  endDate?: string
+}): void {
+  const { invoices, customers, ordersById, startDate, endDate } = args
+  const customerMap = new Map(customers.map((c) => [c.id, c.name]))
+  const header = csvRow([
+    'Invoice #',
+    'Customer Name',
+    'Order Date',
+    'Due Date',
+    'Line Items',
+    'Subtotal',
+    'Tax',
+    'Total',
+    'Status',
+  ])
+
+  const rows: string[] = [header]
+
+  for (const invoice of invoices) {
+    const customerName = customerMap.get(invoice.customerId) ?? invoice.customerId
+    const order = invoice.orderId ? ordersById?.get(invoice.orderId) : undefined
+    const orderDate = tsToDateStr((order?.requestedAt ?? order?.scheduledAt) as Date | { toDate(): Date } | undefined)
+    const dueDate = tsToDateStr(invoice.dueAt)
+    const lineSummary = invoice.lineItems.length
+      ? invoice.lineItems.map((item) => `${item.description} x${item.quantity}`).join(' | ')
+      : ''
+    const subtotal = safeNumber(invoice.subtotal)
+    const tax = safeNumber(invoice.tax, (invoice as Invoice & { taxAmount?: number }).taxAmount)
+    const total = safeNumber(invoice.total, (invoice as Invoice & { totalAmount?: number }).totalAmount, subtotal + tax)
+
+    rows.push(csvRow([
+      invoice.invoiceNumber,
+      customerName,
+      orderDate,
+      dueDate,
+      lineSummary,
+      subtotal,
+      tax,
+      total,
+      invoice.status,
+    ]))
+  }
+
+  const safeStart = startDate || 'all'
+  const safeEnd = endDate || 'all'
+  triggerDownload(
+    rows.join('\r\n'),
+    `OGS_Invoices_Export_${safeStart}_${safeEnd}.csv`,
+  )
 }
 
 // ── Payment export ────────────────────────────────────────────────────────────

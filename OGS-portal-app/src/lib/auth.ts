@@ -11,7 +11,6 @@
 import {
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
-  sendPasswordResetEmail,
   onIdTokenChanged,
   type Unsubscribe,
 } from 'firebase/auth'
@@ -62,7 +61,13 @@ export async function signOut(): Promise<void> {
  * Send a password-reset email to the given address.
  */
 export async function sendPasswordReset(email: string): Promise<void> {
-  await sendPasswordResetEmail(auth, email)
+  const { httpsCallable } = await import('firebase/functions')
+  const { functions }     = await import('./firebase')
+  const fn = httpsCallable<{ email: string }, { success: boolean; emailSent: boolean }>(
+    functions,
+    'sendUserPasswordResetEmail',
+  )
+  await fn({ email: email.trim().toLowerCase() })
 }
 
 /**

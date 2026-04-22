@@ -558,6 +558,31 @@
   color: var(--color-text);
 }
 
+.oh-detail__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: var(--space-4);
+}
+
+.oh-detail__doc-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid #fed7aa;
+  background: #fff7ed;
+  color: #c05621;
+  font-size: var(--font-size-13);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.oh-detail__doc-link:hover {
+  background: #ffedd5;
+}
+
 @media (max-width: 1023px) {
   .oh-header {
     align-items: flex-start;

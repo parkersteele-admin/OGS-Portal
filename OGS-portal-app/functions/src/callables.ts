@@ -14,6 +14,7 @@ import { generateQuotePdf as generateQuotePdfCore } from './pdf/generateQuotePdf
 import { getCompanySettings } from './pdf/companySettings';
 import { sendEmail } from './email/sendEmail';
 import { normalizeCompanyName, extractDomain } from './utils/companyName';
+import { completeQuoteAcceptance, validateQuoteApprovalInput, type QuoteApprovalInput } from './quotes/approvalWorkflow';
 
 // ── Shared: resolveOrCreateCustomer ──────────────────────────────────────────
 
@@ -730,108 +731,58 @@ export const respondToQuote = onCall({ secrets: [SENDGRID_API_KEY] }, async (req
   const now = FieldValue.serverTimestamp();
 
   if (data.response === 'accepted') {
-    // Update the quote — link customerId if it was previously a lead-only quote
-    await db.collection('quotes').doc(data.quoteId).update({
-      status: 'accepted',
-      acceptedAt: now,
-      updatedAt: now,
-      customerId: effectiveCustomerId,
-    });
-
-    // Activate the customer in the CRM (move from inactive/pending to active)
+    let approval: QuoteApprovalInput
     try {
-      await db.collection('customers').doc(effectiveCustomerId).update({
-        status: 'active',
-        updatedAt: now,
-      });
-    } catch (statusErr) {
-      console.warn('[respondToQuote] failed to activate customer —', statusErr);
-    }
-
-    // Apply quoted prices to customer's productPricing subcollection
-    const lineItems = (quote.lineItems ?? []) as Array<{
-      productId: string;
-      description: string;
-      quantity: number;
-      unitPrice: number;
-      amount: number;
-    }>;
-    const eligible = lineItems.filter(
-      (i) =>
-        i.productId && i.productId !== 'delivery' && i.productId !== 'rental' && i.unitPrice > 0
-    );
-    if (eligible.length > 0) {
-      const batch = db.batch();
-      for (const item of eligible) {
-        const ref = db
-          .collection('customers')
-          .doc(effectiveCustomerId)
-          .collection('productPricing')
-          .doc(item.productId);
-        batch.set(ref, {
-          productId: item.productId,
-          price: item.unitPrice,
-          source: 'quote',
-          quoteId: data.quoteId,
-          setBy: request.auth.uid,
-          setAt: now,
-        });
+      if (data.approval && typeof data.approval === 'object') {
+        approval = validateQuoteApprovalInput(data.approval as Record<string, unknown>)
+      } else {
+        const customerSnap = await db.collection('customers').doc(effectiveCustomerId).get()
+        const customer = customerSnap.data() ?? {}
+        approval = {
+          approvedByName:
+            (request.auth.token.name as string | undefined)
+            || (request.auth.token.email as string | undefined)
+            || 'Portal User',
+          approvedByEmail: request.auth.token.email as string | undefined,
+          acceptedTerms: true,
+          deliveryContactName:
+            (customer.deliveryContactName as string | undefined)
+            || (customer.billingContactName as string | undefined)
+            || (customer.name as string | undefined)
+            || 'Primary Contact',
+          deliveryContactPhone:
+            (customer.deliveryContactPhone as string | undefined)
+            || (customer.phone as string | undefined),
+          deliveryContactEmail:
+            (customer.deliveryContactEmail as string | undefined)
+            || (customer.billingEmail as string | undefined)
+            || (customer.email as string | undefined)
+            || (request.auth.token.email as string | undefined),
+          primaryCommunicationMethod: 'email',
+          quoteProvidedTo:
+            (customer.quoteProvidedTo as string | undefined)
+            || (request.auth.token.name as string | undefined),
+          paymentChoice: customer.autopayStripePaymentMethodId ? 'card_on_file' : 'undecided',
+          requestPaymentSetup: false,
+        }
       }
-      await batch.commit();
-    }
-
-    // Create a 'sent' invoice from the accepted quote so it appears as an open invoice on the customer record.
-    let quoteInvoiceId: string | null = null;
-    try {
-      const invoiceNumber = `INV-${Date.now().toString().slice(-8)}`;
-      const dueAt = new Date();
-      dueAt.setDate(dueAt.getDate() + 30);
-      const rawLineItems = (quote.lineItems ?? []) as Array<{
-        description: string;
-        quantity: number;
-        unitPrice: number;
-        amount: number;
-      }>;
-      const invoiceLineItems = rawLineItems.map(({ description, quantity, unitPrice, amount }) => ({
-        description,
-        quantity,
-        unitPrice,
-        amount,
-      }));
-      const invoiceDoc: Record<string, unknown> = {
-        invoiceNumber,
-        customerId: effectiveCustomerId,
-        quoteId: data.quoteId as string,
-        status: 'sent',
-        lineItems: invoiceLineItems,
-        subtotal: (quote.subtotal as number) ?? 0,
-        tax: (quote.tax as number) ?? 0,
-        total: (quote.total as number) ?? 0,
-        issuedAt: now,
-        dueAt,
-        createdAt: now,
-        updatedAt: now,
-      };
-      if (quote.quoteNumber) invoiceDoc.quoteNumber = quote.quoteNumber as string;
-      if (quote.leadId) invoiceDoc.leadId = quote.leadId as string;
-      const invoiceRef = await db.collection('invoices').add(invoiceDoc);
-      quoteInvoiceId = invoiceRef.id;
-      console.log(
-        `[respondToQuote] invoice ${quoteInvoiceId} created for quote ${data.quoteId as string}`
+    } catch (approvalErr) {
+      throw new HttpsError(
+        'invalid-argument',
+        approvalErr instanceof Error ? approvalErr.message : 'Approval details are invalid.',
       );
-    } catch (invoiceErr) {
-      console.warn('[respondToQuote] failed to create invoice from accepted quote —', invoiceErr);
     }
 
-    // Flag the quote so staff know to set up a standing order, and link the new invoice.
-    const quoteUpdate: Record<string, unknown> = { needsOrderSetup: true, updatedAt: now };
-    if (quoteInvoiceId) quoteUpdate.invoiceId = quoteInvoiceId;
-    await db
-      .collection('quotes')
-      .doc(data.quoteId as string)
-      .update(quoteUpdate);
+    const { orderId, paymentMethodStatus } = await completeQuoteAcceptance({
+      quoteId: data.quoteId as string,
+      quote,
+      customerId: effectiveCustomerId,
+      approval,
+      acceptedByUid: request.auth.uid,
+      acceptedVia: 'portal',
+    });
     console.log(
-      `[respondToQuote] quote ${data.quoteId as string} accepted — invoice ${quoteInvoiceId ?? 'n/a'} created, needs order setup`
+      `[respondToQuote] quote ${data.quoteId as string} accepted — order ${orderId} created, payment=${paymentMethodStatus}`
     );
 
     // Generate a portal setup link so staff can share a QR code with the customer.
@@ -851,82 +802,6 @@ export const respondToQuote = onCall({ secrets: [SENDGRID_API_KEY] }, async (req
       }
     }
 
-    // Notify the sales rep of the acceptance
-    try {
-      const createdBy = quote.createdBy as string | undefined;
-      if (createdBy) {
-        const repAuthUser = await adminAuth.getUser(createdBy).catch(() => null);
-        const repEmail = repAuthUser?.email;
-        const quoteNum = (quote.quoteNumber as string) || (data.quoteId as string);
-        const total = `$${((quote.total as number) ?? 0).toFixed(2)}`;
-
-        let entityName = 'the customer';
-        if (effectiveCustomerId) {
-          const cSnap = await db.collection('customers').doc(effectiveCustomerId).get();
-          if (cSnap.exists) entityName = (cSnap.data()!.name as string) || entityName;
-        } else if (quote.leadId) {
-          const lSnap = await db
-            .collection('leads')
-            .doc(quote.leadId as string)
-            .get();
-          if (lSnap.exists) {
-            const l = lSnap.data()!;
-            entityName = (l.company as string) || (l.name as string) || entityName;
-          }
-        }
-
-        // In-app notification
-        await db.collection('notifications').add({
-          userId: createdBy,
-          type: 'quote_accepted',
-          title: `Quote #${quoteNum} accepted`,
-          body: `${entityName} accepted Quote #${quoteNum} (${total}). Set up their standing order.`,
-          link: `/crm/quotes/${data.quoteId as string}`,
-          entityId: data.quoteId,
-          priority: 'high',
-          read: false,
-          createdAt: now,
-        });
-
-        // Email notification
-        if (repEmail) {
-          requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY');
-          const company = await getCompanySettings();
-          const quoteLink = `https://app.ohiogassupply.com/crm/quotes/${data.quoteId as string}`;
-          await sendEmail({
-            to: repEmail,
-            subject: `✓ Quote #${quoteNum} was ACCEPTED by ${entityName}`,
-            html: `
-<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#333">
-  <div style="background:#16a34a;padding:24px 32px 16px">
-    <h1 style="margin:0;color:#fff;font-size:20px">${company.name || 'Ohio Gas Supply'}</h1>
-    <p style="margin:6px 0 0;color:#bbf7d0;font-size:13px">Quote Accepted</p>
-  </div>
-  <div style="padding:28px 32px 24px;border:1px solid #e8e8e8;border-top:none">
-    <p style="margin:0 0 16px;font-size:15px">
-      <strong>${entityName}</strong> has <strong style="color:#16a34a">accepted</strong> Quote #${quoteNum} (${total}).
-    </p>
-    <p style="margin:0 0 20px;font-size:14px;color:#555">
-      Next step: set up their standing delivery order in the portal.
-    </p>
-    <a href="${quoteLink}" clicktracking="off"
-       style="display:inline-block;background:#E87722;color:#fff;padding:11px 26px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:14px">
-      Open Quote in CRM
-    </a>
-  </div>
-  <div style="padding:12px 32px;background:#f9f9f9;border:1px solid #e8e8e8;border-top:none;text-align:center;font-size:11px;color:#aaa">
-    ${company.name || 'Ohio Gas Supply'}${company.website ? ` &nbsp;·&nbsp; ${company.website}` : ''}
-  </div>
-</div>`,
-          });
-          console.log(
-            `[respondToQuote] acceptance notification sent to ${repEmail} for quote ${data.quoteId as string}`
-          );
-        }
-      }
-    } catch (notifyErr) {
-      console.warn('[respondToQuote] failed to send acceptance notification —', notifyErr);
-    }
   } else {
     await db.collection('quotes').doc(data.quoteId).update({
       status: 'declined',
@@ -1239,25 +1114,6 @@ export const getPublicQuote = onCall(async (request) => {
     tpl.quoteDiscussNote ||
     "We want to ensure you're completely happy with our service. Please reach out to discuss any adjustments.";
 
-  // If already accepted, return the setup URL so the page can show the QR code
-  let setupUrl: string | null = null;
-  if (quote.status === 'accepted' && quote.customerId) {
-    try {
-      const custSnap = await db
-        .collection('customers')
-        .doc(quote.customerId as string)
-        .get();
-      if (custSnap.exists) {
-        const cd = custSnap.data()!;
-        if (cd.setupToken && !cd.setupComplete) {
-          setupUrl = `https://app.ohiogassupply.com/join/${cd.setupToken as string}`;
-        }
-      }
-    } catch {
-      /* non-fatal */
-    }
-  }
-
   return {
     quote: {
       id: quoteId,
@@ -1273,6 +1129,12 @@ export const getPublicQuote = onCall(async (request) => {
       subtotal: (quote.subtotal as number) ?? 0,
       total: (quote.total as number) ?? 0,
       notes: (quote.notes as string) || '',
+      approval: (quote.approval as Record<string, unknown> | undefined)
+        ? {
+            paymentChoice: (quote.approval as Record<string, unknown>).paymentChoice as string | undefined,
+            requestPaymentSetup: (quote.approval as Record<string, unknown>).requestPaymentSetup as boolean | undefined,
+          }
+        : undefined,
     },
     company: {
       name: company.name || '',
@@ -1284,7 +1146,6 @@ export const getPublicQuote = onCall(async (request) => {
     },
     rep,
     discussNote,
-    setupUrl,
   };
 });
 
@@ -1338,288 +1199,30 @@ export const respondToQuotePublic = onCall({ secrets: [SENDGRID_API_KEY] }, asyn
     }
   }
 
-  const quoteAcceptanceUpdate: Record<string, unknown> = {
-    status: 'accepted',
-    acceptedAt: now,
-    updatedAt: now,
+  if (!effectiveCustomerId) {
+    throw new HttpsError('failed-precondition', 'Unable to link this accepted quote to a customer record.');
+  }
+
+  let approval: QuoteApprovalInput
+  try {
+    approval = validateQuoteApprovalInput(data.approval as Record<string, unknown>)
+  } catch (approvalErr) {
+    throw new HttpsError(
+      'invalid-argument',
+      approvalErr instanceof Error ? approvalErr.message : 'Approval details are invalid.',
+    );
+  }
+
+  const { orderId, paymentMethodStatus } = await completeQuoteAcceptance({
+    quoteId,
+    quote,
+    customerId: effectiveCustomerId,
+    approval,
     acceptedVia: 'public-link',
-    needsOrderSetup: true,
-  };
-  if (effectiveCustomerId) {
-    quoteAcceptanceUpdate.customerId = effectiveCustomerId;
-  }
-  await db.collection('quotes').doc(quoteId).update(quoteAcceptanceUpdate);
-
-  // Activate the customer in the CRM now that they've accepted a quote
-  if (effectiveCustomerId) {
-    try {
-      await db.collection('customers').doc(effectiveCustomerId).update({
-        status: 'active',
-        updatedAt: now,
-      });
-    } catch (statusErr) {
-      console.warn('[respondToQuotePublic] failed to activate customer —', statusErr);
-    }
-  }
-
-  // Apply quoted prices to customer's productPricing subcollection
-  // (same logic as respondToQuote — needed so portal shows correct pricing)
-  if (effectiveCustomerId) {
-    try {
-      const lineItems = (quote.lineItems ?? []) as Array<{
-        productId: string;
-        description: string;
-        quantity: number;
-        unitPrice: number;
-        amount: number;
-      }>;
-      const eligible = lineItems.filter(
-        (i) =>
-          i.productId && i.productId !== 'delivery' && i.productId !== 'rental' && i.unitPrice > 0
-      );
-      if (eligible.length > 0) {
-        const pricingBatch = db.batch();
-        for (const item of eligible) {
-          const ref = db
-            .collection('customers')
-            .doc(effectiveCustomerId)
-            .collection('productPricing')
-            .doc(item.productId);
-          pricingBatch.set(ref, {
-            productId: item.productId,
-            price: item.unitPrice,
-            source: 'quote',
-            quoteId,
-            setAt: now,
-          });
-        }
-        await pricingBatch.commit();
-      }
-    } catch (pricingErr) {
-      console.warn('[respondToQuotePublic] failed to write productPricing —', pricingErr);
-    }
-  }
-
-  // Create a 'sent' invoice from the accepted quote so it appears as an open invoice on the customer record.
-  let quoteInvoiceId: string | null = null;
-  if (effectiveCustomerId) {
-    try {
-      const invoiceNumber = `INV-${Date.now().toString().slice(-8)}`;
-      const dueAt = new Date();
-      dueAt.setDate(dueAt.getDate() + 30);
-      const rawLineItems = (quote.lineItems ?? []) as Array<{
-        description: string;
-        quantity: number;
-        unitPrice: number;
-        amount: number;
-      }>;
-      const invoiceLineItems = rawLineItems.map(({ description, quantity, unitPrice, amount }) => ({
-        description,
-        quantity,
-        unitPrice,
-        amount,
-      }));
-      const invoiceDoc: Record<string, unknown> = {
-        invoiceNumber,
-        customerId: effectiveCustomerId,
-        quoteId,
-        status: 'sent',
-        lineItems: invoiceLineItems,
-        subtotal: (quote.subtotal as number) ?? 0,
-        tax: (quote.tax as number) ?? 0,
-        total: (quote.total as number) ?? 0,
-        issuedAt: now,
-        dueAt,
-        createdAt: now,
-        updatedAt: now,
-      };
-      if (quote.quoteNumber) invoiceDoc.quoteNumber = quote.quoteNumber as string;
-      if (quote.leadId) invoiceDoc.leadId = quote.leadId as string;
-      const invoiceRef = await db.collection('invoices').add(invoiceDoc);
-      quoteInvoiceId = invoiceRef.id;
-      console.log(`[respondToQuotePublic] invoice ${quoteInvoiceId} created for quote ${quoteId}`);
-    } catch (invoiceErr) {
-      console.warn(
-        '[respondToQuotePublic] failed to create invoice from accepted quote —',
-        invoiceErr
-      );
-    }
-  }
-
-  // Flag the quote so staff know to set up a standing order, and link the new invoice.
-  const quoteUpdate: Record<string, unknown> = { needsOrderSetup: true, updatedAt: now };
-  if (quoteInvoiceId) quoteUpdate.invoiceId = quoteInvoiceId;
-  await db.collection('quotes').doc(quoteId).update(quoteUpdate);
+  });
   console.log(
-    `[respondToQuotePublic] quote ${quoteId} accepted via public link — invoice ${quoteInvoiceId ?? 'n/a'} created, needs order setup`
+    `[respondToQuotePublic] quote ${quoteId} accepted via public link — order ${orderId} created, payment=${paymentMethodStatus}`
   );
 
-  // Generate a portal setup link and return it so the public quote page can
-  // immediately show the QR code + button to the customer.
-  let setupUrl: string | null = null;
-  if (effectiveCustomerId) {
-    try {
-      const custSnap = await db.collection('customers').doc(effectiveCustomerId).get();
-      if (custSnap.exists) {
-        const cd = custSnap.data()!;
-        let finalToken: string;
-        if (cd.setupToken && !cd.setupComplete) {
-          finalToken = cd.setupToken as string;
-        } else if (!cd.setupComplete) {
-          finalToken = crypto.randomUUID();
-          const setupTokenExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-          await custSnap.ref.update({ setupToken: finalToken, setupTokenExpiry, updatedAt: now });
-        } else {
-          finalToken = '';
-        }
-        if (finalToken) {
-          setupUrl = `https://app.ohiogassupply.com/join/${finalToken}`;
-        }
-      }
-      if (setupUrl)
-        console.log(`[respondToQuotePublic] setup link ready for customers/${effectiveCustomerId}`);
-    } catch (setupErr) {
-      console.warn('[respondToQuotePublic] failed to generate setup token —', setupErr);
-    }
-  }
-
-  // Notify the sales rep (email + in-app)
-  try {
-    const repUid = quote.createdBy as string | undefined;
-    if (repUid) {
-      const repAuthUser = await adminAuth.getUser(repUid).catch(() => null);
-      const repEmail = repAuthUser?.email;
-      const quoteNum = (quote.quoteNumber as string) || quoteId;
-      const total = `$${((quote.total as number) ?? 0).toFixed(2)}`;
-
-      let entityName = 'the customer';
-      if (effectiveCustomerId) {
-        const cSnap = await db.collection('customers').doc(effectiveCustomerId).get();
-        if (cSnap.exists)
-          entityName =
-            (cSnap.data()!.name as string) || (cSnap.data()!.companyName as string) || entityName;
-      } else if (quote.leadId) {
-        const lSnap = await db
-          .collection('leads')
-          .doc(quote.leadId as string)
-          .get();
-        if (lSnap.exists) {
-          const l = lSnap.data()!;
-          entityName = (l.company as string) || (l.name as string) || entityName;
-        }
-      }
-
-      // In-app notification
-      await db.collection('notifications').add({
-        userId: repUid,
-        type: 'quote_accepted',
-        title: `Quote #${quoteNum} accepted`,
-        body: `${entityName} accepted Quote #${quoteNum} (${total}) via email link. Set up their standing order.`,
-        link: `/crm/quotes/${quoteId}`,
-        entityId: quoteId,
-        priority: 'high',
-        read: false,
-        createdAt: now,
-      });
-
-      // Email notification
-      if (repEmail) {
-        requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY');
-        const company = await getCompanySettings();
-        const quoteLink = `https://app.ohiogassupply.com/crm/quotes/${quoteId}`;
-        await sendEmail({
-          to: repEmail,
-          subject: `✓ Quote #${quoteNum} was ACCEPTED by ${entityName}`,
-          html: `
-<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#333">
-  <div style="background:#16a34a;padding:24px 32px 16px">
-    <h1 style="margin:0;color:#fff;font-size:20px">${company.name || 'Ohio Gas Supply'}</h1>
-    <p style="margin:6px 0 0;color:#bbf7d0;font-size:13px">Quote Accepted</p>
-  </div>
-  <div style="padding:28px 32px 24px;border:1px solid #e8e8e8;border-top:none">
-    <p style="margin:0 0 16px;font-size:15px">
-      <strong>${entityName}</strong> has <strong style="color:#16a34a">accepted</strong> Quote #${quoteNum} (${total}).
-    </p>
-    <p style="margin:0 0 20px;font-size:14px;color:#555">
-      This acceptance was submitted via the email link (no portal login required). Next step: set up their standing delivery order.
-    </p>
-    <a href="${quoteLink}" clicktracking="off"
-       style="display:inline-block;background:#E87722;color:#fff;padding:11px 26px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:14px">
-      Open Quote in CRM
-    </a>
-  </div>
-  <div style="padding:12px 32px;background:#f9f9f9;border:1px solid #e8e8e8;border-top:none;text-align:center;font-size:11px;color:#aaa">
-    ${company.name || 'Ohio Gas Supply'}${company.website ? ` &nbsp;·&nbsp; ${company.website}` : ''}
-  </div>
-</div>`,
-        });
-        console.log(
-          `[respondToQuotePublic] acceptance notification sent to ${repEmail} for quote ${quoteId}`
-        );
-      }
-    }
-  } catch (notifyErr) {
-    console.warn('[respondToQuotePublic] failed to send notification —', notifyErr);
-  }
-
-  // Send confirmation email to the customer with setup link + QR code
-  if (setupUrl) {
-    try {
-      let recipientEmail = '';
-      if (effectiveCustomerId) {
-        const cSnap = await db.collection('customers').doc(effectiveCustomerId).get();
-        if (cSnap.exists) recipientEmail = (cSnap.data()!.email as string) || '';
-      } else if (quote.leadId) {
-        const lSnap = await db
-          .collection('leads')
-          .doc(quote.leadId as string)
-          .get();
-        if (lSnap.exists) recipientEmail = (lSnap.data()!.email as string) || '';
-      }
-      if (recipientEmail) {
-        requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY');
-        const company = await getCompanySettings();
-        const quoteNum = (quote.quoteNumber as string) || quoteId;
-        const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(setupUrl)}&color=1e293b&bgcolor=ffffff`;
-        await sendEmail({
-          to: recipientEmail,
-          subject: `You're confirmed — set up your ${company.name || 'OGS'} portal account`,
-          html: `
-<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#333">
-  <div style="background:#E87722;padding:24px 32px 16px">
-    <h1 style="margin:0;color:#fff;font-size:20px">${company.name || 'Ohio Gas Supply'}</h1>
-    <p style="margin:6px 0 0;color:#fde8d0;font-size:13px">Quote #${quoteNum} Accepted</p>
-  </div>
-  <div style="padding:28px 32px 24px;border:1px solid #e8e8e8;border-top:none">
-    <p style="margin:0 0 8px;font-size:16px;font-weight:bold">Thank you!</p>
-    <p style="margin:0 0 20px;font-size:14px;color:#555">
-      Your quote has been accepted. To manage your orders, view invoices, and track deliveries,
-      create your free portal account using the button or QR code below.
-    </p>
-    <div style="text-align:center;margin:28px 0">
-      <a href="${setupUrl}" clicktracking="off"
-         style="display:inline-block;background:#E87722;color:#fff;padding:13px 32px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:15px">
-        Set Up My Portal Account
-      </a>
-    </div>
-    <div style="text-align:center;margin:24px 0 8px">
-      <p style="margin:0 0 12px;font-size:12px;color:#888">Or scan this QR code on your phone</p>
-      <img src="${qrImgUrl}" alt="Account setup QR code" width="180" height="180"
-           style="display:block;margin:0 auto;border:1px solid #e2e8f0;border-radius:6px;padding:6px" />
-    </div>
-    <p style="margin:20px 0 0;font-size:12px;color:#aaa;text-align:center">This link is valid for 30 days.</p>
-  </div>
-  <div style="padding:12px 32px;background:#f9f9f9;border:1px solid #e8e8e8;border-top:none;text-align:center;font-size:11px;color:#aaa">
-    ${company.name || 'Ohio Gas Supply'}${company.website ? ` &nbsp;·&nbsp; ${company.website}` : ''}
-  </div>
-</div>`,
-        });
-        console.log(`[respondToQuotePublic] customer setup email sent to ${recipientEmail}`);
-      }
-    } catch (custEmailErr) {
-      console.warn('[respondToQuotePublic] failed to send customer setup email —', custEmailErr);
-    }
-  }
-
-  return { success: true, setupUrl: setupUrl ?? null };
+  return { success: true };
 });

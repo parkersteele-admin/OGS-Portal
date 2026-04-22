@@ -10,7 +10,7 @@
  * Input:  {} (no params — caller identity from request.auth)
  * Output: { clientSecret: string }
  *
- * Auth:   customer role only (admin/dispatch may call on behalf of a customer
+ * Auth:   portal customer roles (admin/dispatch may call on behalf of a customer
  *         by passing an optional { customerId } override)
  */
 
@@ -35,20 +35,29 @@ export const createSetupIntent = onCall(
 
     if (['admin', 'dispatch'].includes(callerRole) && data.customerId) {
       customerId = data.customerId
-    } else if (callerRole === 'customer') {
-      const uid = request.auth.uid
-      const userSnap = await db.collection('users').doc(uid).get()
-      if (!userSnap.exists) {
-        throw new HttpsError('not-found', 'User document not found.')
-      }
-      const linkedId = userSnap.data()?.customerId as string | undefined
+    } else if (['customer', 'owner', 'manager', 'billing', 'delivery', 'viewer'].includes(callerRole)) {
+      const linkedId =
+        (request.auth.token.companyId as string | undefined)
+        || (request.auth.token.customerId as string | undefined)
       if (!linkedId) {
-        throw new HttpsError(
-          'failed-precondition',
-          'Your account is not linked to a customer record.',
-        )
+        const uid = request.auth.uid
+        const userSnap = await db.collection('users').doc(uid).get()
+        if (!userSnap.exists) {
+          throw new HttpsError('not-found', 'User document not found.')
+        }
+        const fallbackId =
+          (userSnap.data()?.companyId as string | undefined)
+          || (userSnap.data()?.customerId as string | undefined)
+        if (!fallbackId) {
+          throw new HttpsError(
+            'failed-precondition',
+            'Your account is not linked to a customer record.',
+          )
+        }
+        customerId = fallbackId
+      } else {
+        customerId = linkedId
       }
-      customerId = linkedId
     } else {
       throw new HttpsError('permission-denied', 'Insufficient permissions.')
     }

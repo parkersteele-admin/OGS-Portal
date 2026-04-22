@@ -13,8 +13,10 @@ export type FileEntityType =
 
 /** Category of file content. */
 export type FileType =
+  | 'quote'
   | 'contract'
   | 'invoice'
+  | 'receipt'
   | 'signature'
   | 'photo'
   | 'id-document'

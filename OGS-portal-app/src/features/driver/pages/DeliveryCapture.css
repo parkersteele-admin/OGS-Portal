@@ -489,6 +489,7 @@
   font-size: var(--font-size-12);
 }
 
+.dc-input,
 .dc-textarea {
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--color-border);
@@ -501,6 +502,10 @@
   outline: none;
   transition: border-color 150ms;
 }
+.dc-input {
+  min-height: 48px;
+}
+.dc-input:focus,
 .dc-textarea:focus { border-color: var(--color-brand); }
 
 /* ── Delivery summary ──────────────────────────────────────────────────────── */

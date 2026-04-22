@@ -40,13 +40,22 @@ export const removePaymentMethod = onCall(
 
     if (['admin', 'dispatch'].includes(callerRole) && data.customerId) {
       customerId = data.customerId
-    } else if (callerRole === 'customer') {
-      const userSnap = await db.collection('users').doc(request.auth.uid).get()
-      const linkedId = userSnap.data()?.customerId as string | undefined
-      if (!linkedId) {
-        throw new HttpsError('failed-precondition', 'User not linked to a customer.')
+    } else if (['customer', 'owner', 'manager', 'billing', 'delivery', 'viewer'].includes(callerRole)) {
+      const linkedId =
+        (request.auth.token.companyId as string | undefined)
+        || (request.auth.token.customerId as string | undefined)
+      if (linkedId) {
+        customerId = linkedId
+      } else {
+        const userSnap = await db.collection('users').doc(request.auth.uid).get()
+        const fallbackId =
+          (userSnap.data()?.companyId as string | undefined)
+          || (userSnap.data()?.customerId as string | undefined)
+        if (!fallbackId) {
+          throw new HttpsError('failed-precondition', 'User not linked to a customer.')
+        }
+        customerId = fallbackId
       }
-      customerId = linkedId
     } else {
       throw new HttpsError('permission-denied', 'Insufficient permissions.')
     }

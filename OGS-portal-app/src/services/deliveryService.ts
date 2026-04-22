@@ -6,6 +6,7 @@ export interface FinalizeSignedDeliveryInput {
   runId: string
   stopId: string
   qtyDelivered: number
+  receivedByName: string
   signatureDataUrl: string
   deliveryNotes?: string
   photoUrls?: string[]

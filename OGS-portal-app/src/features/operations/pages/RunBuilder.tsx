@@ -22,9 +22,10 @@ import { runStopsCol, customersCol, productsCol } from '../../../lib/firestore'
 import { usePendingOrders } from '../../../hooks/usePendingOrders'
 import { createRun } from '../../../services/runService'
 import { updateOrder } from '../../../services/orderService'
-import { getUsersByRole } from '../../../services/userService'
+import { getActiveUsers } from '../../../services/userService'
 import { Badge } from '../../../components/ui/Badge'
 import { Button } from '../../../components/ui/Button'
+import { Modal } from '../../../components/ui/Modal'
 import type { Order, DeliveryTier } from '../../../types/order'
 import type { Customer } from '../../../types/customer'
 import type { Product } from '../../../types/product'
@@ -408,15 +409,33 @@ const Step2Orders: React.FC<Step2Props> = ({
 interface Step3Props {
   stops: StopItem[]
   setStops: (stops: StopItem[]) => void
+  availableOrders: Order[]
+  customerMap: Record<string, Customer>
+  productMap: Record<string, Product>
+  onAddOrders: (orderIds: string[]) => void
+  onRemoveOrder: (orderId: string) => void
   onBack: () => void
   onNext: () => void
 }
 
-const Step3Route: React.FC<Step3Props> = ({ stops, setStops, onBack, onNext }) => {
+const Step3Route: React.FC<Step3Props> = ({
+  stops,
+  setStops,
+  availableOrders,
+  customerMap,
+  productMap,
+  onAddOrders,
+  onRemoveOrder,
+  onBack,
+  onNext,
+}) => {
   const [optimized,  setOptimized]  = useState(false)
   const [optimizing, setOptimizing] = useState(false)
   const [dragIdx,    setDragIdx]    = useState<number | null>(null)
   const [dragOver,   setDragOver]   = useState<number | null>(null)
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [orderSearch, setOrderSearch] = useState('')
+  const [modalSelected, setModalSelected] = useState<Set<string>>(new Set())
 
   function handleOptimize() {
     setOptimizing(true)
@@ -446,6 +465,42 @@ const Step3Route: React.FC<Step3Props> = ({ stops, setStops, onBack, onNext }) =
   }
   function handleDragEnd() { setDragIdx(null); setDragOver(null) }
 
+  const filteredAvailableOrders = availableOrders.filter((order) => {
+    const customer = customerMap[order.customerId]
+    const product = productMap[order.productId]
+    const haystack = [
+      customer?.name,
+      customer?.address,
+      customer?.city,
+      customer?.zip,
+      product?.name,
+      order.id,
+      order.groupId,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase()
+    return haystack.includes(orderSearch.trim().toLowerCase())
+  })
+
+  function toggleModalOrder(orderId: string) {
+    setModalSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(orderId)) next.delete(orderId)
+      else next.add(orderId)
+      return next
+    })
+  }
+
+  function handleAddSelectedOrders() {
+    const ids = [...modalSelected]
+    if (ids.length === 0) return
+    onAddOrders(ids)
+    setModalSelected(new Set())
+    setOrderSearch('')
+    setShowAddModal(false)
+  }
+
   return (
     <div className="rb-body">
       <div className="rb-body__header">
@@ -453,15 +508,20 @@ const Step3Route: React.FC<Step3Props> = ({ stops, setStops, onBack, onNext }) =
           <h2 className="rb-body__title">Optimize route</h2>
           <p className="rb-body__sub">{stops.length} stops · drag rows to reorder manually</p>
         </div>
-        <Button
-          variant="secondary"
-          size="sm"
-          loading={optimizing}
-          disabled={optimizing}
-          onClick={handleOptimize}
-        >
-          {optimizing ? 'Calculating…' : optimized ? '↻ Re-optimize' : '✦ Optimize route'}
-        </Button>
+        <div className="rb-body__actions">
+          <Button variant="secondary" size="sm" onClick={() => setShowAddModal(true)}>
+            + Add order
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            loading={optimizing}
+            disabled={optimizing}
+            onClick={handleOptimize}
+          >
+            {optimizing ? 'Calculating…' : optimized ? '↻ Re-optimize' : '✦ Optimize route'}
+          </Button>
+        </div>
       </div>
 
       {optimizing && (
@@ -545,6 +605,13 @@ const Step3Route: React.FC<Step3Props> = ({ stops, setStops, onBack, onNext }) =
               <div className="rb-stop-item__meta">
                 <span className="rb-stop-item__product">{stop.productName} × {stop.quantity}</span>
                 <Badge variant={tierVariant(stop.tier)}>{stop.tier}</Badge>
+                <button
+                  type="button"
+                  className="rb-stop-item__remove"
+                  onClick={() => onRemoveOrder(stop.orderId)}
+                >
+                  Remove
+                </button>
               </div>
             </li>
           ))}
@@ -555,6 +622,58 @@ const Step3Route: React.FC<Step3Props> = ({ stops, setStops, onBack, onNext }) =
         <Button variant="ghost" onClick={onBack}>← Back</Button>
         <Button variant="primary" onClick={onNext}>Looks good →</Button>
       </div>
+
+      <Modal open={showAddModal} onClose={() => setShowAddModal(false)} title="Add Pending Orders" size="lg">
+        <div className="rb-add-order-modal">
+          <input
+            type="search"
+            className="rb-input"
+            value={orderSearch}
+            onChange={(e) => setOrderSearch(e.target.value)}
+            placeholder="Search customer, order #, address, or product"
+          />
+          <div className="rb-add-order-list">
+            {filteredAvailableOrders.length === 0 ? (
+              <div className="rb-table-empty">No pending orders match the current search.</div>
+            ) : (
+              filteredAvailableOrders.map((order) => {
+                const customer = customerMap[order.customerId]
+                const product = productMap[order.productId]
+                const summary = order.quotedLineItems?.length
+                  ? order.quotedLineItems.map((item) => `${item.description} x${item.quantity}`).join(' | ')
+                  : `${product?.name ?? order.productId} x ${order.quantity}`
+                return (
+                  <label key={order.id} className="rb-add-order-row">
+                    <input
+                      type="checkbox"
+                      checked={modalSelected.has(order.id)}
+                      onChange={() => toggleModalOrder(order.id)}
+                    />
+                    <div className="rb-add-order-row__main">
+                      <div className="rb-add-order-row__title">
+                        <span>{customer?.name ?? order.customerId}</span>
+                        <span className="rb-add-order-row__order">#{order.id.slice(0, 8).toUpperCase()}</span>
+                      </div>
+                      <div className="rb-add-order-row__sub">
+                        {[customer?.address, customer?.city, customer?.state, customer?.zip].filter(Boolean).join(', ')}
+                      </div>
+                      <div className="rb-add-order-row__meta">{summary}</div>
+                    </div>
+                  </label>
+                )
+              })
+            )}
+          </div>
+          <div className="rb-add-order-actions">
+            <Button variant="secondary" onClick={() => setShowAddModal(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleAddSelectedOrders} disabled={modalSelected.size === 0}>
+              Add Selected
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }
@@ -688,8 +807,8 @@ export default function RunBuilder() {
   // ── Data loading ────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    getUsersByRole('driver')
-      .then(ds => { setDrivers(ds.filter(d => d.active)); setDriversLoading(false) })
+    getActiveUsers()
+      .then(ds => { setDrivers(ds); setDriversLoading(false) })
       .catch(() => setDriversLoading(false))
 
     getDocs(customersCol).then(snap => {
@@ -762,6 +881,43 @@ export default function RunBuilder() {
   function goToStep3() { setStops(buildStops()); setStep(3) }
   function goToStep4() { setStep(4) }
 
+  function addOrdersToRun(orderIds: string[]) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      orderIds.forEach((id) => next.add(id))
+      return next
+    })
+    const stopMap = new Map(stops.map((stop) => [stop.orderId, stop]))
+    const additions = pendingOrders
+      .filter((order) => orderIds.includes(order.id) && !stopMap.has(order.id))
+      .map((order) => {
+        const customer = customerMap[order.customerId]
+        const product = productMap[order.productId]
+        return {
+          orderId: order.id,
+          customerId: order.customerId,
+          tankId: order.tankId,
+          customerName: customer?.name ?? order.customerId,
+          address: customer?.address ?? '',
+          city: customer?.city ?? '',
+          zip: customer?.zip ?? '',
+          productName: product?.name ?? order.productId,
+          quantity: order.quantity,
+          tier: order.deliveryTier,
+        } satisfies StopItem
+      })
+    setStops([...stops, ...additions])
+  }
+
+  function removeOrderFromRun(orderId: string) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      next.delete(orderId)
+      return next
+    })
+    setStops((prev) => prev.filter((stop) => stop.orderId !== orderId))
+  }
+
   // ── Create ──────────────────────────────────────────────────────────────────
 
   async function handleCreate() {
@@ -802,10 +958,12 @@ export default function RunBuilder() {
 
       // 3. Mark each order as scheduled
       await Promise.all(
-        stops.map(stop =>
+        stops.map((stop, index) =>
           updateOrder(stop.orderId, {
             status:      'scheduled',
             scheduledAt: serverTimestamp() as never,
+            runId,
+            runStopId: stopRefs[index].id,
           })
         )
       )
@@ -864,6 +1022,11 @@ export default function RunBuilder() {
           <Step3Route
             stops={stops}
             setStops={setStops}
+            availableOrders={pendingOrders.filter((order) => !selected.has(order.id))}
+            customerMap={customerMap}
+            productMap={productMap}
+            onAddOrders={addOrdersToRun}
+            onRemoveOrder={removeOrderFromRun}
             onBack={() => setStep(2)}
             onNext={goToStep4}
           />

@@ -14,7 +14,7 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore'
 import { db } from '../lib/firebase'
-import { quotesCol } from '../lib/firestore'
+import { quotesCol, ordersCol } from '../lib/firestore'
 import type { Quote, QuoteStatus, QuoteItem } from '../types/crm'
 import { getInternalProductPricingGuards } from './productService'
 import { serviceCall, fromSnap, paginate, type Page, type PageOptions, OgsValidationError } from './base'
@@ -266,26 +266,51 @@ export async function convertQuoteToOrder(
       throw new OgsValidationError('Quote customer does not match provided customerId')
     }
 
-    const firstItem = quote.lineItems[0]
-    if (!firstItem) throw new OgsValidationError('Quote has no line items')
-
-    const { createOrder } = await import('./orderService')
-    const orderId = await createOrder(
-      {
-        customerId,
-        productId: firstItem.productId,
-        quantity:  firstItem.quantity,
-        deliveryTier: 'standard',
-        notes: quote.notes,
-      },
-      unitPrice,
+    const eligibleItems = quote.lineItems.filter(
+      (item) => item.productId !== 'delivery' && item.productId !== 'rental' && item.quantity > 0,
     )
+    const [primaryItem, ...restItems] = eligibleItems.length > 0 ? eligibleItems : quote.lineItems
+    if (!primaryItem) throw new OgsValidationError('Quote has no line items')
+
+    const pricedItems = eligibleItems.length > 0 ? eligibleItems : [primaryItem]
+    const subtotal = pricedItems.reduce((sum, item) => sum + item.amount, 0)
+    const orderRef = await addDoc(ordersCol, {
+      customerId,
+      productId: primaryItem.productId,
+      quantity: primaryItem.quantity,
+      deliveryTier: 'standard',
+      unitPrice: primaryItem.unitPrice || unitPrice,
+      upchargePercent: 0,
+      subtotal,
+      deliveryFee: 35,
+      total: parseFloat((subtotal + 35).toFixed(2)),
+      status: 'pending',
+      orderType: 'offRoute',
+      quoteId,
+      quoteNumber: quote.quoteNumber,
+      quotedLineItems: eligibleItems,
+      addOns: restItems.map((item) => ({
+        productId: item.productId,
+        productName: item.description,
+        qty: item.quantity,
+        unitPrice: item.unitPrice,
+        addedBy: convertedBy ?? 'system',
+        addedAt: serverTimestamp(),
+      })),
+      notes: quote.notes,
+      requestedAt: serverTimestamp(),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    } as unknown as Omit<import('../types/order').Order, 'id'>)
+    const orderId = orderRef.id
 
     // Mark quote accepted and record the order ID
     await updateDoc(doc(db, 'quotes', quoteId), {
       status:           'accepted' as QuoteStatus,
       acceptedAt:       serverTimestamp(),
       convertedOrderId: orderId,
+      convertedOrderIds: [orderId],
+      needsOrderSetup: false,
       updatedAt:        serverTimestamp(),
     })
 

@@ -14,15 +14,17 @@ import * as http from 'http'
 import { db, storage, FieldValue } from '../admin'
 import { getCompanySettings, fetchLogoBuffer } from './companySettings'
 import type { CompanySettings } from './companySettings'
-
-// ── Brand constants (shared with invoice PDF) ─────────────────────────────────
-
-const OGS_ORANGE  = '#E87722'
-const PAGE_W      = 612
-const PAGE_H      = 792
-const MARGIN_L    = 58
-const RIGHT_EDGE  = PAGE_W - 40
-const CONTENT_W   = RIGHT_EDGE - MARGIN_L
+import { registerGeneratedFile } from '../files/registerGeneratedFile'
+import {
+  CONTENT_W,
+  FOOTER_Y,
+  MARGIN_L,
+  OGS_ORANGE,
+  RIGHT_EDGE,
+  drawBrandedFooter,
+  drawBrandedHeader,
+  newBrandedPage,
+} from './layout'
 
 // ── Public entry-point ────────────────────────────────────────────────────────
 
@@ -104,6 +106,25 @@ export async function generateQuotePdf(quoteId: string): Promise<string> {
     updatedAt: FieldValue.serverTimestamp(),
   })
 
+  const customerId = quote.customerId as string | undefined
+  await registerGeneratedFile({
+    targets: [
+      { entityType: 'quote', entityId: quoteId },
+      ...(customerId ? [{ entityType: 'customer' as const, entityId: customerId }] : []),
+    ],
+    fileType: 'quote',
+    url: downloadUrl,
+    storagePath,
+    fileName: `Quote-${(quote.quoteNumber as string | undefined) || quoteId}.pdf`,
+    mimeType: 'application/pdf',
+    sizeBytes: pdfBuffer.length,
+    metadata: {
+      linkedEntityType: 'quote',
+      linkedEntityId: quoteId,
+      customerId: customerId ?? null,
+    },
+  })
+
   return downloadUrl
 }
 
@@ -164,64 +185,9 @@ function buildQuotePdf(
       return `$${((val as number) ?? 0).toFixed(2)}`
     }
 
-    // ── Left accent bar ────────────────────────────────────────────────────
-    doc.rect(0, 0, 8, PAGE_H).fill(OGS_ORANGE)
-
-    // ── Company header ──────────────────────────────────────────────────
-    // Logo (top-left, max 120 × 50 pt) — placed before text so text renders on top if needed
-    if (logoBuf) {
-      try {
-        doc.image(logoBuf, MARGIN_L, 34, { fit: [120, 50] })
-      } catch { /* ignore malformed image */ }
-    }
-
-    const nameY = logoBuf ? 92 : 40
-    doc
-      .fontSize(logoBuf ? 13 : 17)
-      .font('Helvetica-Bold')
-      .fillColor('#111111')
-      .text(company.name || 'OGS Gas Services', MARGIN_L, nameY)
-
-    let headerY = nameY + (logoBuf ? 16 : 23)
-    if (company.tagline) {
-      doc.fontSize(8.5).font('Helvetica').fillColor('#666666').text(company.tagline, MARGIN_L, headerY)
-      headerY += 11
-    }
-    const contactLine = [company.phone, company.email].filter(Boolean).join('  ·  ')
-    if (contactLine) {
-      doc.fontSize(8.5).font('Helvetica').fillColor('#666666').text(contactLine, MARGIN_L, headerY)
-      headerY += 11
-    }
-    if (company.website) {
-      doc.fontSize(8.5).font('Helvetica').fillColor('#666666').text(company.website, MARGIN_L, headerY)
-      headerY += 11
-    }
-
-    // ── "QUOTE" title ──────────────────────────────────────────────────────
-    doc
-      .fontSize(30)
-      .font('Helvetica-Bold')
-      .fillColor(OGS_ORANGE)
-      .text('QUOTE', 0, 40, { align: 'right', width: RIGHT_EDGE })
-
     const quoteNum = (quote.quoteNumber as string) || quoteId.slice(-8).toUpperCase()
-
-    doc
-      .fontSize(9)
-      .font('Helvetica')
-      .fillColor('#555555')
-      .text(`#${quoteNum}`, 0, 78, { align: 'right', width: RIGHT_EDGE })
-
-    // Divider sits below whichever side is tallest (company info left, title+num right)
-    const DIVIDER_Y = Math.max(headerY + 12, 108)
-
-    // ── Orange divider ─────────────────────────────────────────────────────
-    doc
-      .moveTo(MARGIN_L, DIVIDER_Y)
-      .lineTo(RIGHT_EDGE, DIVIDER_Y)
-      .strokeColor(OGS_ORANGE)
-      .lineWidth(1.5)
-      .stroke()
+    const referenceText = `#${quoteNum}`
+    const DIVIDER_Y = drawBrandedHeader(doc, company, logoBuf, 'QUOTE', referenceText)
 
     // ── Section labels ─────────────────────────────────────────────────────
     const META_X = 380
@@ -305,23 +271,27 @@ function buildQuotePdf(
     const AMT_W     = RIGHT_EDGE - C_AMT
     const HDR_H     = 20
 
-    doc.rect(C_DESC, TABLE_TOP, CONTENT_W, HDR_H).fill('#F4F4F4')
+    const drawTableHeader = (tableTop: number) => {
+      doc.rect(C_DESC, tableTop, CONTENT_W, HDR_H).fill('#F4F4F4')
 
-    doc
-      .fontSize(8)
-      .font('Helvetica-Bold')
-      .fillColor('#444444')
-      .text('DESCRIPTION', C_DESC + 4, TABLE_TOP + 6, { width: C_QTY - C_DESC - 8 })
-      .text('QTY',         C_QTY,      TABLE_TOP + 6, { width: C_RATE - C_QTY - 4,  align: 'right' })
-      .text('UNIT PRICE',  C_RATE,     TABLE_TOP + 6, { width: C_AMT  - C_RATE - 4, align: 'right' })
-      .text('AMOUNT',      C_AMT,      TABLE_TOP + 6, { width: AMT_W,               align: 'right' })
+      doc
+        .fontSize(8)
+        .font('Helvetica-Bold')
+        .fillColor('#444444')
+        .text('DESCRIPTION', C_DESC + 4, tableTop + 6, { width: C_QTY - C_DESC - 8 })
+        .text('QTY',         C_QTY,      tableTop + 6, { width: C_RATE - C_QTY - 4,  align: 'right' })
+        .text('UNIT PRICE',  C_RATE,     tableTop + 6, { width: C_AMT  - C_RATE - 4, align: 'right' })
+        .text('AMOUNT',      C_AMT,      tableTop + 6, { width: AMT_W,               align: 'right' })
 
-    doc
-      .moveTo(C_DESC, TABLE_TOP + HDR_H)
-      .lineTo(RIGHT_EDGE, TABLE_TOP + HDR_H)
-      .strokeColor('#DDDDDD')
-      .lineWidth(0.5)
-      .stroke()
+      doc
+        .moveTo(C_DESC, tableTop + HDR_H)
+        .lineTo(RIGHT_EDGE, tableTop + HDR_H)
+        .strokeColor('#DDDDDD')
+        .lineWidth(0.5)
+        .stroke()
+    }
+
+    drawTableHeader(TABLE_TOP)
 
     const lineItems = (quote.lineItems as Array<{
       description: string
@@ -334,21 +304,35 @@ function buildQuotePdf(
 
     for (let i = 0; i < lineItems.length; i++) {
       const item = lineItems[i]
+      const descWidth = C_QTY - C_DESC - 12
+      const descriptionHeight = doc.heightOfString(item.description, { width: descWidth })
+      const rowHeight = Math.max(18, descriptionHeight + 4)
+
+      if (rowY + rowHeight > FOOTER_Y - 170) {
+        const nextDividerY = newBrandedPage(doc, company, logoBuf, 'QUOTE', referenceText)
+        doc
+          .fontSize(7)
+          .font('Helvetica-Bold')
+          .fillColor('#999999')
+          .text('LINE ITEMS', MARGIN_L, nextDividerY + 10)
+        drawTableHeader(nextDividerY + 24)
+        rowY = nextDividerY + 24 + HDR_H + 8
+      }
 
       if (i % 2 === 1) {
-        doc.rect(C_DESC, rowY - 3, CONTENT_W, 17).fill('#FAFAFA')
+        doc.rect(C_DESC, rowY - 3, CONTENT_W, rowHeight).fill('#FAFAFA')
       }
 
       doc
         .fontSize(9)
         .font('Helvetica')
         .fillColor('#222222')
-        .text(item.description,         C_DESC + 4, rowY, { width: C_QTY - C_DESC - 12 })
+        .text(item.description,         C_DESC + 4, rowY, { width: descWidth })
         .text(String(item.quantity),     C_QTY,      rowY, { width: C_RATE - C_QTY - 4,  align: 'right' })
         .text(fmtMoney(item.unitPrice),  C_RATE,     rowY, { width: C_AMT  - C_RATE - 4, align: 'right' })
         .text(fmtMoney(item.amount),     C_AMT,      rowY, { width: AMT_W,               align: 'right' })
 
-      rowY += 18
+      rowY += rowHeight
     }
 
     rowY += 4
@@ -397,6 +381,11 @@ function buildQuotePdf(
     // ── Notes box (if present) ─────────────────────────────────────────────
     const notesText = (quote.notes as string | undefined) || ''
     if (notesText) {
+      const notesHeight = doc.heightOfString(notesText, { width: CONTENT_W })
+      if (rowY + 30 + notesHeight > FOOTER_Y - 140) {
+        const nextDividerY = newBrandedPage(doc, company, logoBuf, 'QUOTE', referenceText)
+        rowY = nextDividerY + 18
+      }
       doc
         .fontSize(8)
         .font('Helvetica-Bold')
@@ -424,6 +413,11 @@ function buildQuotePdf(
     const QR_BLOCK_W = hasQr ? 96 : 0
     // Height: base rows + optional rep block, same as before
     const BOX_H = hasRep ? 148 : 66
+
+    if (rowY + BOX_H + 24 > FOOTER_Y - 10) {
+      const nextDividerY = newBrandedPage(doc, company, logoBuf, 'QUOTE', referenceText)
+      rowY = nextDividerY + 18
+    }
 
     doc
       .rect(C_DESC, rowY, CONTENT_W, BOX_H)
@@ -529,104 +523,24 @@ function buildQuotePdf(
     }
 
     // ── Footer (Page 1) ────────────────────────────────────────────────────
-    const FOOTER_Y = 748
-
-    doc
-      .moveTo(C_DESC, FOOTER_Y)
-      .lineTo(RIGHT_EDGE, FOOTER_Y)
-      .strokeColor('#DDDDDD')
-      .lineWidth(0.5)
-      .stroke()
-
-    doc
-      .fontSize(9)
-      .font('Helvetica-Bold')
-      .fillColor('#111111')
-      .text(`Thank you for considering ${company.name || 'us'}.`, C_DESC, FOOTER_Y + 8, {
-        align: 'center',
-        width: CONTENT_W,
-      })
-
-    const footerLine = [
-      company.name,
-      company.website,
-      company.phone,
-    ].filter(Boolean).join('  ·  ')
-    doc
-      .fontSize(7.5)
-      .font('Helvetica')
-      .fillColor('#888888')
-      .text(footerLine || ' ', C_DESC, FOOTER_Y + 22, { align: 'center', width: CONTENT_W })
+    drawBrandedFooter(doc, company, `Thank you for considering ${company.name || 'us'}.`)
 
     // ── Page 2: Terms & Conditions ──────────────────────────────────────────
     if (company.termsAndConditions) {
-      doc.addPage({ margin: 0, size: 'LETTER' })
-
-      // Accent bar on page 2
-      doc.rect(0, 0, 8, PAGE_H).fill(OGS_ORANGE)
-
-      // Page 2 header: company name
-      doc
-        .fontSize(11)
-        .font('Helvetica-Bold')
-        .fillColor('#111111')
-        .text(company.name || 'OGS Gas Services', MARGIN_L, 40)
-
-      // Orange divider
-      doc
-        .moveTo(MARGIN_L, 56)
-        .lineTo(RIGHT_EDGE, 56)
-        .strokeColor(OGS_ORANGE)
-        .lineWidth(1.5)
-        .stroke()
-
-      // Title
-      doc
-        .fontSize(16)
-        .font('Helvetica-Bold')
-        .fillColor(OGS_ORANGE)
-        .text('Terms & Conditions', MARGIN_L, 68)
-
-      // Quote reference line
-      const quoteNum2 = (quote.quoteNumber as string) || quoteId.slice(-8).toUpperCase()
-      doc
-        .fontSize(8.5)
-        .font('Helvetica')
-        .fillColor('#888888')
-        .text(`Quote #${quoteNum2}`, MARGIN_L, 94)
-
-      // Thin separator
-      doc
-        .moveTo(MARGIN_L, 106)
-        .lineTo(RIGHT_EDGE, 106)
-        .strokeColor('#DDDDDD')
-        .lineWidth(0.5)
-        .stroke()
+      const pageTwoDividerY = newBrandedPage(doc, company, logoBuf, 'TERMS & CONDITIONS', referenceText)
 
       // T&C body text
       doc
         .fontSize(8.5)
         .font('Helvetica')
         .fillColor('#333333')
-        .text(company.termsAndConditions, MARGIN_L, 118, {
+        .text(company.termsAndConditions, MARGIN_L, pageTwoDividerY + 16, {
           width: CONTENT_W,
           lineGap: 2,
         })
 
       // Page 2 footer
-      doc
-        .moveTo(MARGIN_L, 748)
-        .lineTo(RIGHT_EDGE, 748)
-        .strokeColor('#DDDDDD')
-        .lineWidth(0.5)
-        .stroke()
-
-      const footerLine2 = [company.name, company.website, company.phone].filter(Boolean).join('  ·  ')
-      doc
-        .fontSize(7.5)
-        .font('Helvetica')
-        .fillColor('#888888')
-        .text(footerLine2 || ' ', MARGIN_L, 758, { align: 'center', width: CONTENT_W })
+      drawBrandedFooter(doc, company, 'Terms & conditions for this quote.')
     }
 
     doc.end()

@@ -20,7 +20,7 @@ import {
   where,
   Timestamp,
 } from 'firebase/firestore'
-import { invoicesCol, paymentsCol, customersCol } from '../../lib/firestore'
+import { invoicesCol, paymentsCol, customersCol, ordersCol } from '../../lib/firestore'
 import { Card } from '../../components/ui/Card'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
@@ -31,11 +31,12 @@ import {
   voidInvoice,
   generateInvoicePdf,
 } from '../../services/invoiceService'
-import { exportInvoicesToCsv, exportPaymentsToCsv } from '../../utils/exportUtils'
+import { exportPaymentsToCsv, exportSelectedInvoicesBatchCsv } from '../../utils/exportUtils'
 import { generateAgingReport } from '../../utils/reportUtils'
 import { formatCurrency, formatDate } from '../../utils/format'
-import type { Invoice, InvoiceStatus, Payment } from '../../types/billing'
+import type { Invoice, Payment } from '../../types/billing'
 import type { Customer } from '../../types/customer'
+import type { Order } from '../../types/order'
 import './BillingDashboard.css'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -51,6 +52,24 @@ function defaultExportRange() {
 }
 
 const DAY_MS = 86_400_000
+type BatchStatusFilter = 'all' | 'paid' | 'unpaid' | 'overdue'
+
+function invoiceAmounts(invoice: Invoice & { taxAmount?: number; totalAmount?: number }) {
+  const subtotal = typeof invoice.subtotal === 'number'
+    ? invoice.subtotal
+    : invoice.lineItems.reduce((sum, item) => sum + item.amount, 0)
+  const tax = typeof invoice.tax === 'number'
+    ? invoice.tax
+    : typeof invoice.taxAmount === 'number'
+      ? invoice.taxAmount
+      : 0
+  const total = typeof invoice.total === 'number'
+    ? invoice.total
+    : typeof invoice.totalAmount === 'number'
+      ? invoice.totalAmount
+      : subtotal + tax
+  return { subtotal, tax, total }
+}
 
 // ── Firestore fetch helpers ───────────────────────────────────────────────────
 
@@ -62,6 +81,11 @@ async function fetchAllInvoices(): Promise<Invoice[]> {
 async function fetchAllCustomers(): Promise<Customer[]> {
   const snap = await getDocs(query(customersCol, orderBy('name')))
   return snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Customer)
+}
+
+async function fetchAllOrders(): Promise<Order[]> {
+  const snap = await getDocs(query(ordersCol, orderBy('requestedAt', 'desc')))
+  return snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Order)
 }
 
 async function fetchPaymentsInRange(start: Date, end: Date): Promise<Payment[]> {
@@ -153,6 +177,7 @@ const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
 }) => {
   if (!invoice) return null
   const customer = customerMap.get(invoice.customerId)
+  const amounts = invoiceAmounts(invoice)
 
   return (
     <Modal open={!!invoice} onClose={onClose} title={`Invoice ${invoice.invoiceNumber}`} size="lg">
@@ -212,17 +237,17 @@ const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
           <tfoot>
             <tr>
               <td colSpan={3}>Subtotal</td>
-              <td className="bd-inv-detail__num">{formatCurrency(invoice.subtotal)}</td>
+              <td className="bd-inv-detail__num">{formatCurrency(amounts.subtotal)}</td>
             </tr>
-            {invoice.tax > 0 && (
+            {amounts.tax > 0 && (
               <tr>
                 <td colSpan={3}>Tax</td>
-                <td className="bd-inv-detail__num">{formatCurrency(invoice.tax)}</td>
+                <td className="bd-inv-detail__num">{formatCurrency(amounts.tax)}</td>
               </tr>
             )}
             <tr className="bd-inv-detail__total-row">
               <td colSpan={3}><strong>Total</strong></td>
-              <td className="bd-inv-detail__num"><strong>{formatCurrency(invoice.total)}</strong></td>
+              <td className="bd-inv-detail__num"><strong>{formatCurrency(amounts.total)}</strong></td>
             </tr>
           </tfoot>
         </table>
@@ -238,11 +263,12 @@ export const BillingDashboard: React.FC = () => {
   const exportDef   = defaultExportRange()
 
   // ── Filter state ────────────────────────────────────────────────────────
-  const [filterStatus,    setFilterStatus]    = useState<InvoiceStatus | 'all'>('all')
+  const [filterStatus,    setFilterStatus]    = useState<BatchStatusFilter>('unpaid')
   const [filterDateStart, setFilterDateStart] = useState('')
   const [filterDateEnd,   setFilterDateEnd]   = useState('')
   const [filterCustomer,  setFilterCustomer]  = useState('')
   const [agingFilter,     setAgingFilter]     = useState<number | null>(null)
+  const [selectedIds,     setSelectedIds]     = useState<Set<string>>(new Set())
 
   // ── Modal / action state ─────────────────────────────────────────────────
   const [viewInvoice, setViewInvoice] = useState<Invoice | null>(null)
@@ -268,13 +294,24 @@ export const BillingDashboard: React.FC = () => {
     staleTime: 5 * 60 * 1000,
   })
 
+  const ordersQuery = useQuery({
+    queryKey: ['billing', 'allOrders'],
+    queryFn: fetchAllOrders,
+    staleTime: 5 * 60 * 1000,
+  })
+
   const invoices  = invoicesQuery.data  ?? []
   const customers = customersQuery.data ?? []
-  const isLoading = invoicesQuery.isPending || customersQuery.isPending
+  const orders = ordersQuery.data ?? []
+  const isLoading = invoicesQuery.isPending || customersQuery.isPending || ordersQuery.isPending
 
   const customerMap = useMemo(
     () => new Map(customers.map((c) => [c.id, c])),
     [customers],
+  )
+  const ordersById = useMemo(
+    () => new Map(orders.map((order) => [order.id, order])),
+    [orders],
   )
 
   // ── Mutations ────────────────────────────────────────────────────────────
@@ -311,17 +348,18 @@ export const BillingDashboard: React.FC = () => {
     let paidCount        = 0
 
     for (const inv of invoices) {
+      const amounts = invoiceAmounts(inv)
       if (inv.status === 'paid') {
         const paidMs = inv.paidAt?.toDate?.().getTime() ?? 0
-        if (paidMs >= monthStartMs) revenueThisMonth += inv.total
+        if (paidMs >= monthStartMs) revenueThisMonth += amounts.total
         if (inv.paidAt && inv.issuedAt) {
           const days = (inv.paidAt.toDate().getTime() - inv.issuedAt.toDate().getTime()) / DAY_MS
           if (days >= 0) { paidDaysTotal += days; paidCount++ }
         }
       } else if (inv.status !== 'void') {
-        outstanding += inv.total
+        outstanding += amounts.total
         const dueMs = inv.dueAt?.toDate?.().getTime() ?? Infinity
-        if (dueMs < now) overdue += inv.total
+        if (dueMs < now) overdue += amounts.total
       }
     }
 
@@ -352,7 +390,12 @@ export const BillingDashboard: React.FC = () => {
   const filteredInvoices = useMemo(() => {
     const now = Date.now()
     return invoices.filter((inv) => {
-      if (filterStatus !== 'all' && inv.status !== filterStatus) return false
+      const dueMs = inv.dueAt?.toDate?.().getTime() ?? Infinity
+      const derivedOverdue = inv.status !== 'paid' && inv.status !== 'void' && dueMs < now
+
+      if (filterStatus === 'paid' && inv.status !== 'paid') return false
+      if (filterStatus === 'unpaid' && (inv.status === 'paid' || inv.status === 'void')) return false
+      if (filterStatus === 'overdue' && !derivedOverdue) return false
 
       const issuedMs = inv.issuedAt?.toDate?.().getTime() ?? 0
       if (filterDateStart) {
@@ -369,8 +412,7 @@ export const BillingDashboard: React.FC = () => {
 
       if (agingFilter !== null) {
         if (inv.status === 'paid' || inv.status === 'void') return false
-        const dueMs = inv.dueAt?.toDate?.().getTime()
-        if (!dueMs) return false
+        if (!Number.isFinite(dueMs)) return false
         const daysOverdue = Math.floor((now - dueMs) / DAY_MS)
         if (agingFilter === 0 && daysOverdue > 0)                        return false // Current
         if (agingFilter === 1 && (daysOverdue < 1  || daysOverdue > 30)) return false
@@ -382,6 +424,19 @@ export const BillingDashboard: React.FC = () => {
     })
   }, [invoices, filterStatus, filterDateStart, filterDateEnd, filterCustomer, agingFilter, customerMap])
 
+  const visibleIds = useMemo(() => filteredInvoices.map((inv) => inv.id), [filteredInvoices])
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id))
+
+  React.useEffect(() => {
+    setSelectedIds((prev) => {
+      const next = new Set<string>()
+      for (const id of prev) {
+        if (invoices.some((invoice) => invoice.id === id)) next.add(id)
+      }
+      return next
+    })
+  }, [invoices])
+
   // ── Credit holds ─────────────────────────────────────────────────────────
   const holdAccounts = useMemo(() =>
     customers
@@ -389,7 +444,7 @@ export const BillingDashboard: React.FC = () => {
       .map((c) => {
         const balance = invoices
           .filter((i) => i.customerId === c.id && i.status !== 'paid' && i.status !== 'void')
-          .reduce((sum, i) => sum + i.total, 0)
+          .reduce((sum, i) => sum + invoiceAmounts(i).total, 0)
         return { customer: c, balance: parseFloat(balance.toFixed(2)) }
       }),
     [customers, invoices],
@@ -408,20 +463,20 @@ export const BillingDashboard: React.FC = () => {
     }
   }, [])
 
-  const handleExportInvoices = useCallback(() => {
+  const handleExportSelected = useCallback(() => {
     setExportingInv(true)
     try {
-      const startMs = exportStart ? new Date(exportStart + 'T00:00:00').getTime() : 0
-      const endMs   = exportEnd   ? new Date(exportEnd   + 'T23:59:59').getTime() : Infinity
-      const ranged  = invoices.filter((inv) => {
-        const ms = inv.issuedAt?.toDate?.().getTime() ?? 0
-        return ms >= startMs && ms <= endMs
+      exportSelectedInvoicesBatchCsv({
+        invoices: filteredInvoices.filter((invoice) => selectedIds.has(invoice.id)),
+        customers,
+        ordersById,
+        startDate: filterDateStart || exportStart,
+        endDate: filterDateEnd || exportEnd,
       })
-      exportInvoicesToCsv(ranged, customers)
     } finally {
       setExportingInv(false)
     }
-  }, [exportStart, exportEnd, invoices, customers])
+  }, [customers, exportEnd, exportStart, filterDateEnd, filterDateStart, filteredInvoices, ordersById, selectedIds])
 
   const handleExportPayments = useCallback(async () => {
     if (!exportStart || !exportEnd) return
@@ -441,15 +496,36 @@ export const BillingDashboard: React.FC = () => {
   }, [])
 
   const clearFilters = useCallback(() => {
-    setFilterStatus('all')
+    setFilterStatus('unpaid')
     setFilterDateStart('')
     setFilterDateEnd('')
     setFilterCustomer('')
     setAgingFilter(null)
   }, [])
 
+  const toggleSelectInvoice = useCallback((invoiceId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(invoiceId)) next.delete(invoiceId)
+      else next.add(invoiceId)
+      return next
+    })
+  }, [])
+
+  const toggleSelectAllVisible = useCallback(() => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (visibleIds.every((id) => next.has(id))) {
+        visibleIds.forEach((id) => next.delete(id))
+      } else {
+        visibleIds.forEach((id) => next.add(id))
+      }
+      return next
+    })
+  }, [visibleIds])
+
   const hasActiveFilters =
-    filterStatus !== 'all' || filterDateStart || filterDateEnd ||
+    filterStatus !== 'unpaid' || filterDateStart || filterDateEnd ||
     filterCustomer || agingFilter !== null
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -508,20 +584,41 @@ export const BillingDashboard: React.FC = () => {
           </span>
         </div>
 
+        <div className="bd__batch-bar">
+          <label className="bd__batch-select-all">
+            <input
+              type="checkbox"
+              checked={allVisibleSelected}
+              onChange={toggleSelectAllVisible}
+            />
+            <span>Select All</span>
+          </label>
+          <div className="bd__batch-meta">
+            <span>{selectedIds.size} selected</span>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleExportSelected}
+              loading={exportingInv}
+              disabled={selectedIds.size === 0}
+            >
+              Export Selected
+            </Button>
+          </div>
+        </div>
+
         <div className="bd__controls">
           <div className="bd__controls-left">
             <select
               className="bd__filter-select"
               value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value as InvoiceStatus | 'all')}
+              onChange={(e) => setFilterStatus(e.target.value as BatchStatusFilter)}
               aria-label="Filter by status"
             >
-              <option value="all">All statuses</option>
-              <option value="draft">Draft</option>
-              <option value="sent">Sent</option>
+              <option value="unpaid">Unpaid</option>
+              <option value="all">All</option>
               <option value="paid">Paid</option>
               <option value="overdue">Overdue</option>
-              <option value="void">Void</option>
             </select>
           </div>
 
@@ -579,6 +676,14 @@ export const BillingDashboard: React.FC = () => {
             <table className="bd__table">
               <thead>
                 <tr>
+                  <th className="bd__check-col">
+                    <input
+                      type="checkbox"
+                      checked={allVisibleSelected}
+                      onChange={toggleSelectAllVisible}
+                      aria-label="Select all visible invoices"
+                    />
+                  </th>
                   <th>Invoice #</th>
                   <th>Customer</th>
                   <th>Quote #</th>
@@ -593,7 +698,7 @@ export const BillingDashboard: React.FC = () => {
               <tbody>
                 {!isLoading && filteredInvoices.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="bd__empty-cell">
+                    <td colSpan={10} className="bd__empty-cell">
                       <div className="bd__empty-state">
                         <p className="bd__empty">No invoices match the current filters.</p>
                       </div>
@@ -603,15 +708,24 @@ export const BillingDashboard: React.FC = () => {
 
                 {!isLoading && filteredInvoices.map((inv) => {
                   const cust = customerMap.get(inv.customerId)
+                  const amounts = invoiceAmounts(inv)
                   return (
                     <tr key={inv.id}>
+                      <td className="bd__check-col">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(inv.id)}
+                          onChange={() => toggleSelectInvoice(inv.id)}
+                          aria-label={`Select invoice ${inv.invoiceNumber}`}
+                        />
+                      </td>
                       <td className="bd__inv-num">{inv.invoiceNumber}</td>
                       <td>{cust?.name ?? (inv.customerId && inv.customerId !== 'null' ? inv.customerId : (inv.quoteNumber ? `Quote ${inv.quoteNumber}` : '—'))}</td>
                       <td className="bd__order-id">{inv.quoteNumber ? inv.quoteNumber : '—'}</td>
                       <td className="bd__order-id">{inv.orderId ?? '—'}</td>
                       <td className="bd__date">{formatDate(inv.issuedAt)}</td>
                       <td className="bd__date">{formatDate(inv.dueAt)}</td>
-                      <td className="bd__col-r">{formatCurrency(inv.total)}</td>
+                      <td className="bd__col-r">{formatCurrency(amounts.total)}</td>
                       <td><InvoiceStatusBadge invoice={inv} /></td>
                       <td>
                         <div className="bd__actions">
@@ -718,14 +832,6 @@ export const BillingDashboard: React.FC = () => {
           </div>
         </div>
         <div className="bd__export-btns">
-          <Button
-            variant="secondary"
-            onClick={handleExportInvoices}
-            loading={exportingInv}
-            disabled={isLoading}
-          >
-            Export Invoices CSV
-          </Button>
           <Button
             variant="secondary"
             onClick={handleExportPayments}

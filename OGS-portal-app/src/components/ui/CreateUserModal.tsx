@@ -7,8 +7,6 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { sendPasswordResetEmail } from 'firebase/auth'
-import { auth } from '../../lib/firebase'
 import {
   createAppUser,
   type CreateUserInput,
@@ -179,12 +177,6 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
     onSuccess: (result) => {
       const linked = (result as unknown as { linked?: boolean })?.linked
       setSuccess(linked ? 'linked' : 'created')
-      // Only send password email for brand-new accounts
-      if (!linked) {
-        sendPasswordResetEmail(auth, email.trim().toLowerCase()).catch(() => {
-          console.warn('[CreateUserModal] sendPasswordResetEmail: CF may have already sent it')
-        })
-      }
       setTimeout(() => { onCreated() }, 1500)
     },
     onError: (err: Error) => {

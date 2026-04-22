@@ -35,6 +35,15 @@ export async function getUsersByRole(role: UserRole): Promise<AppUser[]> {
   })
 }
 
+export async function getActiveUsers(): Promise<AppUser[]> {
+  return serviceCall(async () => {
+    const snap = await getDocs(
+      query(usersCol, where('active', '==', true), orderBy('name')),
+    )
+    return snap.docs.map((d) => ({ ...d.data(), id: d.id }) as AppUser)
+  })
+}
+
 /**
  * Fetches all users belonging to a company (either via `companyId` or the
  * legacy `customerId` field). Sorts by name client-side to avoid composite
@@ -137,9 +146,13 @@ export async function hardDeleteUser(uid: string): Promise<void> {
 /** Sends a password-reset email to the given address via Firebase Auth client SDK. */
 export async function sendPasswordReset(email: string): Promise<void> {
   return serviceCall(async () => {
-    const { sendPasswordResetEmail } = await import('firebase/auth')
-    const { auth }                   = await import('../lib/firebase')
-    await sendPasswordResetEmail(auth, email)
+    const { httpsCallable } = await import('firebase/functions')
+    const { functions }     = await import('../lib/firebase')
+    const fn = httpsCallable<{ email: string }, { success: boolean; emailSent: boolean }>(
+      functions,
+      'sendUserPasswordResetEmail',
+    )
+    await fn({ email: email.trim().toLowerCase() })
   })
 }
 
@@ -170,11 +183,11 @@ export interface CreateUserInput {
   companyId?:  string
 }
 
-export async function createAppUser(data: CreateUserInput): Promise<{ uid: string; linked: boolean }> {
+export async function createAppUser(data: CreateUserInput): Promise<{ uid: string; linked: boolean; emailSent: boolean }> {
   return serviceCall(async () => {
     const { httpsCallable } = await import('firebase/functions')
     const { functions }     = await import('../lib/firebase')
-    const fn = httpsCallable<CreateUserInput, { uid: string; linked: boolean }>(
+    const fn = httpsCallable<CreateUserInput, { uid: string; linked: boolean; emailSent: boolean }>(
       functions,
       'adminCreateUser',
     )
