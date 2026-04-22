@@ -396,6 +396,7 @@ export const generateQuotePdf = onCall({ secrets: [SENDGRID_API_KEY] }, async (r
         const footerParts = [company.name, company.website, company.phone].filter(Boolean);
         const footerLine = footerParts.join(' &nbsp;·&nbsp; ');
 
+        console.log(`[generateQuotePdf] Sending quote email to ${recipientEmail}`);
         await sendEmail({
           to: recipientEmail,
           subject: `Quote #${quoteNum} from ${company.name || 'Ohio Gas Supply'}`,
@@ -457,10 +458,11 @@ export const generateQuotePdf = onCall({ secrets: [SENDGRID_API_KEY] }, async (r
   </div>
 </div>`,
         });
-        console.log(`generateQuotePdf: quote email sent to ${recipientEmail}`);
+        console.log(`[generateQuotePdf] quote email sent to ${recipientEmail}`);
       } catch (emailErr) {
         // Log but don't fail the callable — the PDF URL is the primary output
-        console.warn('generateQuotePdf: email send failed —', emailErr);
+        const msg = emailErr instanceof Error ? emailErr.message : String(emailErr);
+        console.error(`[generateQuotePdf] email send failed for ${recipientEmail} — ${msg}`, emailErr);
       }
     } else {
       console.warn(
@@ -1119,7 +1121,17 @@ export const getPublicQuote = onCall(async (request) => {
       id: quoteId,
       quoteNumber: (quote.quoteNumber as string) ?? '',
       status: (quote.status as string) ?? 'sent',
-      validUntil: quote.validUntil ?? null,
+      // Convert Firestore Timestamp to ISO string — Timestamps lose their .toDate()
+      // method when serialized across the callable boundary, causing "Invalid Date"
+      // on the client. The client formatDate() handles ISO strings correctly.
+      validUntil: quote.validUntil
+        ? (() => {
+            const v = quote.validUntil as { toDate?: () => Date; seconds?: number } | null
+            if (typeof v?.toDate === 'function') return v.toDate().toISOString()
+            if (typeof v?.seconds === 'number') return new Date(v.seconds * 1000).toISOString()
+            return null
+          })()
+        : null,
       lineItems: (quote.lineItems ?? []) as Array<{
         description: string;
         quantity: number;
@@ -1205,7 +1217,11 @@ export const respondToQuotePublic = onCall({ secrets: [SENDGRID_API_KEY] }, asyn
 
   let approval: QuoteApprovalInput
   try {
-    approval = validateQuoteApprovalInput(data.approval as Record<string, unknown>)
+    const rawApproval = data.approval
+    if (!rawApproval || typeof rawApproval !== 'object') {
+      throw new Error('Approval details are required. Please fill in the acceptance form.')
+    }
+    approval = validateQuoteApprovalInput(rawApproval as Record<string, unknown>)
   } catch (approvalErr) {
     throw new HttpsError(
       'invalid-argument',

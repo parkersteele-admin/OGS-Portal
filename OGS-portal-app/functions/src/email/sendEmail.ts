@@ -23,7 +23,7 @@
 
 import sgMail from '@sendgrid/mail'
 import { db, FieldValue } from '../admin'
-import { SENDGRID_API_KEY, requireSecret } from '../config'
+import { SENDGRID_API_KEY } from '../config'
 
 const FROM_ADDRESS   = 'noreply@ohiogassupply.com'
 const FROM_NAME      = 'Ohio Gas Supply'
@@ -71,7 +71,10 @@ async function logEmail(entry: {
 // ── Internal: initialise SDK ───────────────────────────────────────────────────
 
 function initSg(): void {
-  const apiKey = requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY')
+  const apiKey = SENDGRID_API_KEY.value()
+  if (!apiKey || apiKey === '') {
+    throw new Error('SENDGRID_API_KEY is not configured. Set it via: firebase functions:secrets:set SENDGRID_API_KEY')
+  }
   sgMail.setApiKey(apiKey)
 }
 
@@ -82,7 +85,14 @@ function initSg(): void {
  * Maintains API compatibility with the previous nodemailer-based implementation.
  */
 export async function sendEmail(opts: MailOptions): Promise<void> {
-  initSg()
+  try {
+    initSg()
+  } catch (initErr) {
+    const message = initErr instanceof Error ? initErr.message : String(initErr)
+    console.error(`sendEmail: SDK initialization failed — ${message}`)
+    await logEmail({ to: opts.to, subject: opts.subject, status: 'failed', error: message })
+    throw initErr
+  }
 
   const msg: Parameters<typeof sgMail.send>[0] = {
     to:      opts.to,
@@ -95,10 +105,11 @@ export async function sendEmail(opts: MailOptions): Promise<void> {
 
   try {
     await sgMail.send(msg)
+    console.log(`[sendEmail] Successfully sent email to ${opts.to}`)
     await logEmail({ to: opts.to, subject: opts.subject, status: 'sent' })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    console.error(`sendEmail: failed to ${opts.to} — ${message}`)
+    console.error(`[sendEmail] Failed to send to ${opts.to} — ${message}`)
     await logEmail({ to: opts.to, subject: opts.subject, status: 'failed', error: message })
     throw err
   }
@@ -126,7 +137,14 @@ export async function sendTemplateEmail(
   templateId:  string,
   dynamicData: Record<string, unknown>,
 ): Promise<void> {
-  initSg()
+  const apiKey = SENDGRID_API_KEY.value()
+  if (!apiKey || apiKey === '') {
+    const message = 'SENDGRID_API_KEY is not configured.'
+    console.error(`[sendTemplateEmail] ${message}`)
+    await logEmail({ to, templateId, status: 'failed', error: message })
+    throw new Error(message)
+  }
+  sgMail.setApiKey(apiKey)
 
   const msg = {
     to,

@@ -808,8 +808,14 @@ export default function RunBuilder() {
 
   useEffect(() => {
     getActiveUsers()
-      .then(ds => { setDrivers(ds); setDriversLoading(false) })
-      .catch(() => setDriversLoading(false))
+      .then(ds => { 
+        setDrivers(ds); 
+        setDriversLoading(false) 
+      })
+      .catch((err) => {
+        console.error('[RunBuilder] Failed to load users:', err);
+        setDriversLoading(false);
+      })
 
     getDocs(customersCol).then(snap => {
       const m: Record<string, Customer> = {}

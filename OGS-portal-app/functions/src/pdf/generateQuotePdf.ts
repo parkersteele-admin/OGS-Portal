@@ -465,9 +465,11 @@ function buildQuotePdf(
 
     if (hasRep) {
       // Thin divider separating acceptance text from rep section
+      // Stop divider before QR code block if present to avoid crossing it
+      const dividerEndX = hasQr ? RIGHT_EDGE - QR_BLOCK_W - 8 : RIGHT_EDGE - 12
       doc
         .moveTo(C_DESC + 12, rowY + 58)
-        .lineTo(RIGHT_EDGE - 12, rowY + 58)
+        .lineTo(dividerEndX, rowY + 58)
         .strokeColor(OGS_ORANGE)
         .lineWidth(0.4)
         .stroke()
@@ -505,21 +507,6 @@ function buildQuotePdf(
           C_DESC + 12, rowY + 112,
           { width: CONTENT_W - 24 },
         )
-    }
-
-    // ── Portal links below info box ────────────────────────────────────────
-    rowY += BOX_H + 12
-    if (company.portalLoginUrl || company.portalSignupUrl) {
-      if (company.portalLoginUrl) {
-        doc.fontSize(8).font('Helvetica').fillColor('#555555')
-          .text(`Log in to your account:  ${company.portalLoginUrl}`, C_DESC, rowY)
-        rowY += 13
-      }
-      if (company.portalSignupUrl) {
-        doc.fontSize(8).font('Helvetica').fillColor('#555555')
-          .text(`Create an account:  ${company.portalSignupUrl}`, C_DESC, rowY)
-        rowY += 13
-      }
     }
 
     // ── Footer (Page 1) ────────────────────────────────────────────────────

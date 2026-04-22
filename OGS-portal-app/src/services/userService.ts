@@ -37,10 +37,12 @@ export async function getUsersByRole(role: UserRole): Promise<AppUser[]> {
 
 export async function getActiveUsers(): Promise<AppUser[]> {
   return serviceCall(async () => {
-    const snap = await getDocs(
-      query(usersCol, where('active', '==', true), orderBy('name')),
-    )
-    return snap.docs.map((d) => ({ ...d.data(), id: d.id }) as AppUser)
+    // Fetch all users and filter client-side — avoids needing a composite index
+    // on (active, name) and also handles users where the `active` field is absent.
+    const snap = await getDocs(query(usersCol, orderBy('name')))
+    const users = snap.docs.map((d) => ({ ...d.data(), id: d.id }) as AppUser)
+    // Exclude users where active is explicitly false (treat missing field as active)
+    return users.filter((u) => u.active !== false)
   })
 }
 

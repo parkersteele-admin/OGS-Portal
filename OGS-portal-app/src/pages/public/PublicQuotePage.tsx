@@ -85,13 +85,27 @@ function formatDate(val: unknown): string {
   if (!val) return '—'
   try {
     let d: Date
-    if (typeof val === 'object' && val !== null && 'toDate' in (val as object)) {
-      d = (val as { toDate(): Date }).toDate()
+    if (typeof val === 'object' && val !== null) {
+      if ('toDate' in (val as object) && typeof (val as any).toDate === 'function') {
+        // Firestore Timestamp
+        d = (val as { toDate(): Date }).toDate()
+      } else if ('seconds' in (val as object)) {
+        // Firestore Timestamp object with seconds property
+        const ts = val as { seconds: number; nanoseconds?: number }
+        d = new Date(ts.seconds * 1000)
+      } else {
+        d = new Date(val as unknown as string)
+      }
     } else {
-      d = new Date(val as string)
+      d = new Date(val as string | number)
+    }
+    if (isNaN(d.getTime())) {
+      console.warn('[formatDate] Invalid date:', val)
+      return '—'
     }
     return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-  } catch {
+  } catch (err) {
+    console.warn('[formatDate] Error formatting date:', val, err)
     return '—'
   }
 }
@@ -134,6 +148,10 @@ const PublicQuotePage: React.FC = () => {
     )
     fn({ quoteId, token })
       .then((res) => {
+        console.log('[PublicQuotePage] Loaded quote data:', res.data);
+        if (!res.data || !res.data.quote) {
+          throw new Error('Invalid response from server');
+        }
         setData(res.data)
         setLoading(false)
         // If quote was already accepted from a prior click, show success state
@@ -143,6 +161,7 @@ const PublicQuotePage: React.FC = () => {
       })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : 'Unable to load this quote.'
+        console.error('[PublicQuotePage] Error loading quote:', err);
         setError(msg)
         setLoading(false)
       })
@@ -232,7 +251,27 @@ const PublicQuotePage: React.FC = () => {
     )
   }
 
-  const { quote, company, rep, discussNote } = data
+  const { quote, company, rep, discussNote } = data ?? {}
+  
+  // Ensure required fields exist before rendering
+  if (!data || !quote || !company) {
+    if (loading) {
+      return (
+        <div className="pqp-shell">
+          <div className="pqp-loading">Loading quote...</div>
+        </div>
+      )
+    }
+    if (error) {
+      return (
+        <div className="pqp-shell">
+          <div className="pqp-error">{error}</div>
+        </div>
+      )
+    }
+    return null
+  }
+  
   const paymentPreference =
     (accepted || quote.status === 'accepted'
       ? quote.approval?.paymentChoice
