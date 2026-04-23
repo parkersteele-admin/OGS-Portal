@@ -183,7 +183,7 @@ jobs:
       - name: Set SendGrid API key in Firebase secrets
         working-directory: OGS-portal-app
         run: |
-          echo "${{ secrets.SENDGRID_API_KEY }}" | firebase functions:secrets:set SENDGRID_API_KEY --data-stdin --project "$FIREBASE_PROJECT_ID" --non-interactive
+          printf '%s' "${{ secrets.SENDGRID_API_KEY }}" | firebase functions:secrets:set SENDGRID_API_KEY --project "$FIREBASE_PROJECT_ID" --non-interactive
 
       - name: Deploy Firebase Functions
         working-directory: OGS-portal-app
