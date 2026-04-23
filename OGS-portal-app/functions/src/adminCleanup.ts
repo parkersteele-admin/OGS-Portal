@@ -1,5 +1,12 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https'
-import { db, storage } from './admin'
+import admin from 'firebase-admin'
+
+if (!admin.apps.length) {
+  admin.initializeApp()
+}
+
+const db = admin.firestore()
+const storage = admin.storage()
 
 const TEST_DATA_COLLECTIONS = ['contacts', 'runs', 'orders', 'quotes', 'invoices', 'customers', 'payments', 'leads'] as const
 const FILE_ENTITY_TYPES = new Set(['customer', 'quote', 'invoice', 'order', 'run'])
@@ -19,12 +26,25 @@ function assertAdmin(request: { auth?: { token?: Record<string, unknown> } }) {
 }
 
 /**
- * Delete all documents in a collection using the Admin SDK.
- * db.recursiveDelete handles subcollections automatically.
+ * Delete documents by recursively deleting each document ref.
+ * This guarantees subcollections are removed for every top-level doc.
  */
-async function deleteCollectionWithLogging(collectionName: string): Promise<void> {
-  await db.recursiveDelete(db.collection(collectionName))
-  console.log(`[clearAllTestData] recursiveDelete complete for: ${collectionName}`)
+async function deleteCollectionDocsRecursively(collectionName: string): Promise<number> {
+  let deleted = 0
+
+  while (true) {
+    const snap = await db.collection(collectionName).limit(400).get()
+    if (snap.empty) break
+
+    for (const docSnap of snap.docs) {
+      await db.recursiveDelete(docSnap.ref)
+      deleted += 1
+    }
+
+    if (snap.docs.length < 400) break
+  }
+
+  return deleted
 }
 
 async function clearFilesCollection(): Promise<number> {
@@ -56,6 +76,7 @@ async function clearFilesCollection(): Promise<number> {
 }
 
 export const clearAllTestData = onCall(async (request) => {
+  console.log('clearAllTestData callable invoked')
   assertAdmin(request)
 
   const confirmText = String(request.data?.confirmText ?? '')
@@ -69,7 +90,8 @@ export const clearAllTestData = onCall(async (request) => {
     for (const collectionName of TEST_DATA_COLLECTIONS) {
       console.log(`[clearAllTestData] Deleting collection: ${collectionName}`)
       try {
-        await deleteCollectionWithLogging(collectionName)
+        const deleted = await deleteCollectionDocsRecursively(collectionName)
+        console.log(`[clearAllTestData] Deleted ${deleted} top-level docs from ${collectionName}`)
       } catch (colErr) {
         console.error(`[clearAllTestData] Failed on collection ${collectionName}:`, colErr)
         throw colErr

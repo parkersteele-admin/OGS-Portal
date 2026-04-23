@@ -81,6 +81,7 @@ const CompanySettingsPage: React.FC = () => {
 
   async function handleClearAllTestData() {
     setClearing(true)
+    setError(null)
     setClearStatus(null)
     try {
       const result = await clearAllTestData(clearConfirmText)
@@ -88,7 +89,9 @@ const CompanySettingsPage: React.FC = () => {
       setShowClearModal(false)
       setClearConfirmText('')
     } catch (err) {
-      setClearStatus(err instanceof Error ? err.message : 'Failed to clear test data.')
+      const message = err instanceof Error ? err.message : 'Failed to clear test data.'
+      setClearStatus(message)
+      setError(`Clear test data failed: ${message}`)
     } finally {
       setClearing(false)
     }
