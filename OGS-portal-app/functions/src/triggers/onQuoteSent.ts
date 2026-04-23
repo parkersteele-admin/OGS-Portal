@@ -11,6 +11,9 @@
 
 import { onDocumentWritten } from 'firebase-functions/v2/firestore'
 import { db, FieldValue } from '../admin'
+import { sendEmail } from '../email/sendEmail'
+
+const PORTAL_URL = 'https://app.ohiogassupply.com'
 
 export const onQuoteSent = onDocumentWritten(
   { document: 'quotes/{quoteId}' },
@@ -30,14 +33,43 @@ export const onQuoteSent = onDocumentWritten(
     const customerId = after.customerId as string | undefined
     if (!customerId) return
 
-    try {
-      await db.collection('customers').doc(customerId).update({
-        pricingUnlocked: true,
-        updatedAt: FieldValue.serverTimestamp(),
-      })
-      console.log(`[onQuoteSent] Pricing unlocked for customer ${customerId} via quote ${event.params.quoteId}`)
-    } catch (err) {
-      console.error(`[onQuoteSent] Failed to unlock pricing for customer ${customerId}:`, err)
-    }
+    const customerSnap = await db.collection('customers').doc(customerId).get()
+    const customerData = customerSnap.data() ?? {}
+
+    const recipientEmail =
+      ((customerData.billingEmail as string | undefined)
+        || (customerData.email as string | undefined)
+        || '')
+        .trim()
+
+    const recipientName =
+      (customerData.billingContactName as string | undefined)
+      || (customerData.name as string | undefined)
+      || (customerData.companyName as string | undefined)
+      || 'Customer'
+
+    const quoteNumber = (after.quoteNumber as string | undefined) || event.params.quoteId
+
+    await db.collection('customers').doc(customerId).update({
+      pricingUnlocked: true,
+      updatedAt: FieldValue.serverTimestamp(),
+    })
+
+    if (!recipientEmail) return
+
+    await sendEmail({
+      to: recipientEmail,
+      subject: `Quote #${quoteNumber} is ready in OGS Portal`,
+      html: `
+        <p>Hi ${recipientName},</p>
+        <p>Your quote is now available and your pricing has been unlocked in the OGS Portal.</p>
+        <p>
+          <a href="${PORTAL_URL}/portal/quotes" style="display:inline-block;padding:10px 16px;background:#E87722;color:#fff;text-decoration:none;border-radius:6px;">
+            View Quote
+          </a>
+        </p>
+        <p style="margin-top:20px;color:#777;">Ohio Gas Supply Portal</p>
+      `,
+    })
   },
 )
