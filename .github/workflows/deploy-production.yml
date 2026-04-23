@@ -180,18 +180,13 @@ jobs:
             firebase deploy --only hosting --project "$FIREBASE_PROJECT_ID" --non-interactive
           fi
 
-      - name: Write functions env file
-        run: |
-          mkdir -p OGS-portal-app/functions
-          echo "SENDGRID_API_KEY=${{ secrets.SENDGRID_API_KEY }}" > OGS-portal-app/functions/.env.production
-
       - name: Deploy Firebase Functions
         working-directory: OGS-portal-app
         run: |
           if [ -n "$FIREBASE_CLI_TOKEN" ]; then
-            firebase deploy --only functions --project "$FIREBASE_PROJECT_ID" --token "$FIREBASE_CLI_TOKEN" --non-interactive
+            firebase deploy --only functions --project "$FIREBASE_PROJECT_ID" --token "$FIREBASE_CLI_TOKEN" --set-env-vars SENDGRID_API_KEY="${{ secrets.SENDGRID_API_KEY }}" --non-interactive
           else
-            firebase deploy --only functions --project "$FIREBASE_PROJECT_ID" --non-interactive
+            firebase deploy --only functions --project "$FIREBASE_PROJECT_ID" --set-env-vars SENDGRID_API_KEY="${{ secrets.SENDGRID_API_KEY }}" --non-interactive
           fi
 
       - name: Deploy Firestore security rules
