@@ -203,7 +203,7 @@ jobs:
           for service in onquotesent admincreatuser senduserpasswordresetemail onordercomplete ondeliverycomplete; do
             gcloud run services update $service \
               --region us-central1 \
-              --update-env-vars SENDGRID_API_KEY="${{ secrets.SENDGRID_API_KEY }}" \
+              --update-env-vars SENDGRID_API_KEY="$(echo '${{ secrets.SENDGRID_API_KEY }}' | tr -d '[:space:]')" \
               --project "$FIREBASE_PROJECT_ID" \
               --quiet || true
           done

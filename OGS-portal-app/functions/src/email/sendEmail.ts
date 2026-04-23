@@ -70,8 +70,8 @@ async function logEmail(entry: {
 // ── Internal: initialise SDK ───────────────────────────────────────────────────
 
 function initSg(): void {
-  const apiKey = process.env.SENDGRID_API_KEY
-  if (!apiKey || apiKey === '') {
+  const apiKey = (process.env.SENDGRID_API_KEY || '').trim()
+  if (!apiKey) {
     throw new Error('SendGrid API key not configured.')
   }
   sgMail.setApiKey(apiKey)
