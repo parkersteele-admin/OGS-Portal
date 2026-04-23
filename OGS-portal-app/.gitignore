@@ -26,6 +26,7 @@ dist-ssr
 .env.local
 .env.staging
 .env.production
+functions/.env.production
 
 # Firebase service account keys — NEVER commit these
 *firebase-adminsdk*.json

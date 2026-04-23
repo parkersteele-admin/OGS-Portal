@@ -180,10 +180,12 @@ jobs:
             firebase deploy --only hosting --project "$FIREBASE_PROJECT_ID" --non-interactive
           fi
 
+      - name: Write functions env file
+        run: |
+          echo "SENDGRID_API_KEY=${{ secrets.SENDGRID_API_KEY }}" > OGS-portal-app/functions/.env.production
+
       - name: Deploy Firebase Functions
         working-directory: OGS-portal-app
-        env:
-          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
         run: |
           if [ -n "$FIREBASE_CLI_TOKEN" ]; then
             firebase deploy --only functions --project "$FIREBASE_PROJECT_ID" --token "$FIREBASE_CLI_TOKEN" --non-interactive
