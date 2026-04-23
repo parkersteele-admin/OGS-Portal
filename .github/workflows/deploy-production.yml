@@ -184,9 +184,9 @@ jobs:
         working-directory: OGS-portal-app
         run: |
           if [ -n "$FIREBASE_CLI_TOKEN" ]; then
-            firebase deploy --only functions --project "$FIREBASE_PROJECT_ID" --token "$FIREBASE_CLI_TOKEN" --set-env-vars SENDGRID_API_KEY="${{ secrets.SENDGRID_API_KEY }}" --non-interactive
+            firebase deploy --only functions --project "$FIREBASE_PROJECT_ID" --token "$FIREBASE_CLI_TOKEN" --non-interactive
           else
-            firebase deploy --only functions --project "$FIREBASE_PROJECT_ID" --set-env-vars SENDGRID_API_KEY="${{ secrets.SENDGRID_API_KEY }}" --non-interactive
+            firebase deploy --only functions --project "$FIREBASE_PROJECT_ID" --non-interactive
           fi
 
       - name: Deploy Firestore security rules
@@ -197,6 +197,16 @@ jobs:
           else
             firebase deploy --only firestore:rules --project "$FIREBASE_PROJECT_ID" --non-interactive
           fi
+
+      - name: Set SendGrid env var on Cloud Run functions
+        run: |
+          for service in onquotesent admincreatuser senduserpasswordresetemail onordercomplete ondeliverycomplete; do
+            gcloud run services update $service \
+              --region us-central1 \
+              --update-env-vars SENDGRID_API_KEY="${{ secrets.SENDGRID_API_KEY }}" \
+              --project "$FIREBASE_PROJECT_ID" \
+              --quiet || true
+          done
 
       - name: Notify on success/failure
         uses: actions/github-script@v8
