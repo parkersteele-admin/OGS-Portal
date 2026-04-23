@@ -94,9 +94,12 @@ export async function sendEmail(opts: MailOptions): Promise<void> {
     throw initErr
   }
 
+  const fromEmail = opts.from ?? FROM_ADDRESS
+  console.log('Sending from:', fromEmail)
+
   const msg: Parameters<typeof sgMail.send>[0] = {
     to:      opts.to,
-    from:    { email: opts.from ?? FROM_ADDRESS, name: FROM_NAME },
+    from:    { email: fromEmail, name: FROM_NAME },
     replyTo: opts.replyTo ?? REPLY_TO,
     subject: opts.subject,
     html:    opts.html,
@@ -104,13 +107,16 @@ export async function sendEmail(opts: MailOptions): Promise<void> {
   }
 
   try {
-    await sgMail.send(msg)
+    const result = await sgMail.send(msg)
+    console.log('SendGrid send success:', JSON.stringify(result[0]?.statusCode))
     console.log(`[sendEmail] Successfully sent email to ${opts.to}`)
     await logEmail({ to: opts.to, subject: opts.subject, status: 'sent' })
-  } catch (err) {
+  } catch (err: any) {
+    const sendgridError = err?.response?.body ?? err?.message ?? err
+    console.error('SendGrid send error:', sendgridError)
     const message = err instanceof Error ? err.message : String(err)
     console.error(`[sendEmail] Failed to send to ${opts.to} — ${message}`)
-    await logEmail({ to: opts.to, subject: opts.subject, status: 'failed', error: message })
+    await logEmail({ to: opts.to, subject: opts.subject, status: 'failed', error: typeof sendgridError === 'string' ? sendgridError : JSON.stringify(sendgridError) })
     throw err
   }
 }
@@ -146,6 +152,8 @@ export async function sendTemplateEmail(
   }
   sgMail.setApiKey(apiKey)
 
+  console.log('Sending from:', FROM_ADDRESS)
+
   const msg = {
     to,
     from:             { email: FROM_ADDRESS, name: FROM_NAME },
@@ -155,9 +163,11 @@ export async function sendTemplateEmail(
   }
 
   try {
-    await sgMail.send(msg)
+    const result = await sgMail.send(msg)
+    console.log('SendGrid send success:', JSON.stringify(result[0]?.statusCode))
     await logEmail({ to, templateId, status: 'sent' })
-  } catch (err) {
+  } catch (err: any) {
+    console.error('SendGrid send error:', err?.response?.body ?? err?.message ?? err)
     const message = err instanceof Error ? err.message : String(err)
     console.error(`sendTemplateEmail [${templateId}]: failed to ${to} — ${message}`)
     await logEmail({ to, templateId, status: 'failed', error: message })

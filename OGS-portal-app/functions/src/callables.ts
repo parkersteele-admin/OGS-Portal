@@ -199,6 +199,15 @@ export const generateInvoicePdf = onCall(async (request) => {
   const callerRole = request.auth.token.role as string;
   const isOwner = request.auth.token.customerId === invoice.customerId;
 
+  let recipientEmail = '';
+  if (invoice.customerId) {
+    const customerSnap = await db.collection('customers').doc(invoice.customerId as string).get();
+    if (customerSnap.exists) {
+      recipientEmail = (customerSnap.data()?.email as string | undefined) || '';
+    }
+  }
+  console.log('Sending invoice email to:', recipientEmail || '[empty]');
+
   if (!isOwner && !['admin', 'dispatch'].includes(callerRole)) {
     throw new HttpsError('permission-denied', 'You are not authorised to access this invoice.');
   }
@@ -396,7 +405,7 @@ export const generateQuotePdf = onCall({ secrets: [SENDGRID_API_KEY] }, async (r
         const footerParts = [company.name, company.website, company.phone].filter(Boolean);
         const footerLine = footerParts.join(' &nbsp;·&nbsp; ');
 
-        console.log(`[generateQuotePdf] Sending quote email to ${recipientEmail}`);
+        console.log('Sending quote email to:', recipientEmail);
         await sendEmail({
           to: recipientEmail,
           subject: `Quote #${quoteNum} from ${company.name || 'Ohio Gas Supply'}`,
