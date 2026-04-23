@@ -182,6 +182,7 @@ jobs:
 
       - name: Write functions env file
         run: |
+          mkdir -p OGS-portal-app/functions
           echo "SENDGRID_API_KEY=${{ secrets.SENDGRID_API_KEY }}" > OGS-portal-app/functions/.env.production
 
       - name: Deploy Firebase Functions

@@ -72,7 +72,7 @@ async function logEmail(entry: {
 function initSg(): void {
   const apiKey = process.env.SENDGRID_API_KEY
   if (!apiKey || apiKey === '') {
-    throw new Error('SENDGRID_API_KEY environment variable is not set.')
+    throw new Error('SendGrid API key not configured.')
   }
   sgMail.setApiKey(apiKey)
 }
@@ -144,7 +144,7 @@ export async function sendTemplateEmail(
 ): Promise<void> {
   const apiKey = process.env.SENDGRID_API_KEY
   if (!apiKey || apiKey === '') {
-    const message = 'SENDGRID_API_KEY environment variable is not set.'
+    const message = 'SendGrid API key not configured.'
     console.error(`[sendTemplateEmail] ${message}`)
     await logEmail({ to, templateId, status: 'failed', error: message })
     throw new Error(message)
