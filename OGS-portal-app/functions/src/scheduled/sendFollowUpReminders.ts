@@ -7,20 +7,17 @@
 import { onSchedule } from 'firebase-functions/v2/scheduler'
 import { Timestamp } from 'firebase-admin/firestore'
 import { db } from '../admin'
-import { SENDGRID_API_KEY, requireSecret } from '../config'
 import { sendEmail } from '../email/sendEmail'
 
 export const sendFollowUpReminders = onSchedule(
   {
     schedule:       '0 7 * * *',
     timeZone:       'America/New_York',
-    secrets:        [SENDGRID_API_KEY],
+    secrets:        [],
     memory:         '256MiB',
     timeoutSeconds: 300,
   },
   async () => {
-    requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY')
-
     const todayStart = new Date()
     todayStart.setHours(0, 0, 0, 0)
     const todayEnd = new Date()

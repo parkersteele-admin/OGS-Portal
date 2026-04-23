@@ -23,7 +23,6 @@
 
 import sgMail from '@sendgrid/mail'
 import { db, FieldValue } from '../admin'
-import { SENDGRID_API_KEY } from '../config'
 
 const FROM_ADDRESS   = 'noreply@ohiogassupply.com'
 const FROM_NAME      = 'Ohio Gas Supply'
@@ -71,9 +70,9 @@ async function logEmail(entry: {
 // ── Internal: initialise SDK ───────────────────────────────────────────────────
 
 function initSg(): void {
-  const apiKey = SENDGRID_API_KEY.value()
+  const apiKey = process.env.SENDGRID_API_KEY
   if (!apiKey || apiKey === '') {
-    throw new Error('SENDGRID_API_KEY is not configured. Set it via: firebase functions:secrets:set SENDGRID_API_KEY')
+    throw new Error('SENDGRID_API_KEY environment variable is not set.')
   }
   sgMail.setApiKey(apiKey)
 }
@@ -143,9 +142,9 @@ export async function sendTemplateEmail(
   templateId:  string,
   dynamicData: Record<string, unknown>,
 ): Promise<void> {
-  const apiKey = SENDGRID_API_KEY.value()
+  const apiKey = process.env.SENDGRID_API_KEY
   if (!apiKey || apiKey === '') {
-    const message = 'SENDGRID_API_KEY is not configured.'
+    const message = 'SENDGRID_API_KEY environment variable is not set.'
     console.error(`[sendTemplateEmail] ${message}`)
     await logEmail({ to, templateId, status: 'failed', error: message })
     throw new Error(message)

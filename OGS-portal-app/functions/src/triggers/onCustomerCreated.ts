@@ -8,13 +8,12 @@
 
 import { onDocumentCreated } from 'firebase-functions/v2/firestore'
 import { db, FieldValue } from '../admin'
-import { SENDGRID_API_KEY } from '../config'
 import { sendEmail } from '../email/sendEmail'
 
 const SALES_INBOX = 'sales@ohiogassupply.com'
 
 export const onCustomerCreated = onDocumentCreated(
-  { document: 'customers/{companyId}', secrets: [SENDGRID_API_KEY] },
+  { document: 'customers/{companyId}' },
   async (event) => {
     const data = event.data?.data()
     if (!data) return

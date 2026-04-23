@@ -10,7 +10,6 @@
 
 import { onDocumentUpdated } from 'firebase-functions/v2/firestore'
 import { db, FieldValue } from '../admin'
-import { SENDGRID_API_KEY } from '../config'
 import { sendEmail } from '../email/sendEmail'
 import { calculateEstimatedValue } from '../lib/leadValue'
 
@@ -54,7 +53,7 @@ async function advanceStage(
 }
 
 export const onCustomerUpdatedPipeline = onDocumentUpdated(
-  { document: 'customers/{companyId}', secrets: [SENDGRID_API_KEY] },
+  { document: 'customers/{companyId}' },
   async (event) => {
     const before = event.data?.before.data()
     const after  = event.data?.after.data()

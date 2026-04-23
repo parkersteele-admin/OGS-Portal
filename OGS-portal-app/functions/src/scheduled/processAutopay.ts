@@ -19,7 +19,7 @@
 import { onSchedule } from 'firebase-functions/v2/scheduler'
 import Stripe from 'stripe'
 import { db, FieldValue } from '../admin'
-import { STRIPE_SECRET_KEY, SENDGRID_API_KEY, requireSecret } from '../config'
+import { STRIPE_SECRET_KEY, requireSecret } from '../config'
 import { sendEmail } from '../mail'
 import { createNotification } from '../notifications/createNotification'
 
@@ -27,13 +27,12 @@ export const processAutopay = onSchedule(
   {
     schedule:       '0 6 * * *',
     timeZone:       'America/New_York',
-    secrets:        [STRIPE_SECRET_KEY, SENDGRID_API_KEY],
+    secrets:        [STRIPE_SECRET_KEY],
     memory:         '256MiB',
     timeoutSeconds: 540,
   },
   async () => {
     const stripeKey = requireSecret(STRIPE_SECRET_KEY.value(), 'STRIPE_SECRET_KEY')
-    requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY')
     const stripe = new Stripe(stripeKey)
 
     const now = new Date()

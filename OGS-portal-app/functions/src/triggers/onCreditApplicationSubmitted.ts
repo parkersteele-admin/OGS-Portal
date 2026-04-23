@@ -7,13 +7,12 @@
 
 import { onDocumentCreated } from 'firebase-functions/v2/firestore'
 import { db } from '../admin'
-import { SENDGRID_API_KEY } from '../config'
 import { sendEmail } from '../email/sendEmail'
 
 const OGS_ADMIN_EMAIL = 'admin@ohiogassupply.com'
 
 export const onCreditApplicationSubmitted = onDocumentCreated(
-  { document: 'creditApplications/{companyId}', secrets: [SENDGRID_API_KEY] },
+  { document: 'creditApplications/{companyId}' },
   async (event) => {
     const data      = event.data?.data()
     const companyId = event.params.companyId

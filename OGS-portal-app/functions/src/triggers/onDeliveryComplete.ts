@@ -23,7 +23,7 @@
 import { onDocumentUpdated } from 'firebase-functions/v2/firestore'
 import Stripe from 'stripe'
 import { db, FieldValue } from '../admin'
-import { STRIPE_SECRET_KEY, SENDGRID_API_KEY, requireSecret } from '../config'
+import { STRIPE_SECRET_KEY, requireSecret } from '../config'
 import { sendEmail } from '../mail'
 import { createNotification } from '../notifications/createNotification'
 import { generateInvoicePdf } from '../pdf/generateInvoicePdf'
@@ -47,7 +47,7 @@ const LOW_LEVEL_THRESHOLD_PCT = 25     // clear alerts above this
 export const onDeliveryComplete = onDocumentUpdated(
   {
     document: 'runs/{runId}/stops/{stopId}',
-    secrets:  [STRIPE_SECRET_KEY, SENDGRID_API_KEY],
+    secrets:  [STRIPE_SECRET_KEY],
   },
   async (event) => {
     const before = event.data?.before.data()

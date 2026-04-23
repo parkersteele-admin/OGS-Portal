@@ -20,7 +20,6 @@
 
 import { onSchedule } from 'firebase-functions/v2/scheduler'
 import { db, FieldValue, Timestamp } from '../admin'
-import { SENDGRID_API_KEY, requireSecret } from '../config'
 import { sendEmail } from '../mail'
 import { createNotification } from '../notifications/createNotification'
 
@@ -36,13 +35,11 @@ export const overdueInvoiceCheck = onSchedule(
   {
     schedule:       '0 9 * * *',
     timeZone:       'America/New_York',
-    secrets:        [SENDGRID_API_KEY],
+    secrets:        [],
     memory:         '256MiB',
     timeoutSeconds: 540,
   },
   async () => {
-    requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY')
-
     const now = new Date()
 
     // Invoices that are pending and past due

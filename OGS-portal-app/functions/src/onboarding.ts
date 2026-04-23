@@ -16,7 +16,6 @@
 
 import { onCall, HttpsError } from 'firebase-functions/v2/https'
 import { db, adminAuth, FieldValue } from './admin'
-import { SENDGRID_API_KEY } from './config'
 import { sendEmail } from './email/sendEmail'
 import { normalizeCompanyName, extractDomain } from './utils/companyName'
 
@@ -159,7 +158,6 @@ export const revokeCompanyClaim = onCall(async (request) => {
  * Output: { requestId: string }
  */
 export const requestToJoinCompany = onCall(
-  { secrets: [SENDGRID_API_KEY] },
   async (request) => {
     assertAuth(request)
 
@@ -221,7 +219,6 @@ export const requestToJoinCompany = onCall(
  * Output: { success: true }
  */
 export const approveJoinRequest = onCall(
-  { secrets: [SENDGRID_API_KEY] },
   async (request) => {
     assertAuth(request)
 
@@ -286,7 +283,6 @@ export const approveJoinRequest = onCall(
  * Output: { success: true }
  */
 export const denyJoinRequest = onCall(
-  { secrets: [SENDGRID_API_KEY] },
   async (request) => {
     assertAuth(request)
 
@@ -343,7 +339,6 @@ export const denyJoinRequest = onCall(
  * Output: { inviteId: string }
  */
 export const inviteTeamMember = onCall(
-  { secrets: [SENDGRID_API_KEY] },
   async (request) => {
     assertAuth(request)
 

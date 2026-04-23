@@ -17,7 +17,6 @@
 
 import { onCall, HttpsError } from 'firebase-functions/v2/https'
 import { db, adminAuth, FieldValue } from './admin'
-import { SENDGRID_API_KEY, requireSecret } from './config'
 import { sendEmail } from './email/sendEmail'
 
 const VALID_ROLES = [
@@ -71,7 +70,6 @@ async function sendPasswordResetLinkEmail(email: string, name: string): Promise<
       url: `${APP_URL}/login`,
     })
 
-    requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY')
     await sendEmail({
       to: normalizedEmail,
       subject: 'Set your Ohio Gas Supply Portal password',
@@ -85,7 +83,7 @@ async function sendPasswordResetLinkEmail(email: string, name: string): Promise<
   }
 }
 
-export const adminCreateUser = onCall({ secrets: [SENDGRID_API_KEY] }, async (request) => {
+export const adminCreateUser = onCall(async (request) => {
   // ── Auth guard ─────────────────────────────────────────────────────────────
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'You must be signed in.')
@@ -198,7 +196,7 @@ export const adminCreateUser = onCall({ secrets: [SENDGRID_API_KEY] }, async (re
  *  - Can be called unauthenticated from the public reset-password screen
  *  - Uses the same email provider/logging path as the rest of the app
  */
-export const sendUserPasswordResetEmail = onCall({ secrets: [SENDGRID_API_KEY] }, async (request) => {
+export const sendUserPasswordResetEmail = onCall(async (request) => {
   const data = request.data as Record<string, unknown>
   const email = typeof data.email === 'string' ? data.email.trim().toLowerCase() : ''
 

@@ -180,13 +180,10 @@ jobs:
             firebase deploy --only hosting --project "$FIREBASE_PROJECT_ID" --non-interactive
           fi
 
-      - name: Set SendGrid API key in Firebase secrets
-        working-directory: OGS-portal-app
-        run: |
-          printf '%s' "${{ secrets.SENDGRID_API_KEY }}" | firebase functions:secrets:set SENDGRID_API_KEY --project "$FIREBASE_PROJECT_ID" --non-interactive
-
       - name: Deploy Firebase Functions
         working-directory: OGS-portal-app
+        env:
+          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
         run: |
           if [ -n "$FIREBASE_CLI_TOKEN" ]; then
             firebase deploy --only functions --project "$FIREBASE_PROJECT_ID" --token "$FIREBASE_CLI_TOKEN" --non-interactive

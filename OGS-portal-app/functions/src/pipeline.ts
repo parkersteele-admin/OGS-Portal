@@ -13,7 +13,6 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https'
 import { db, FieldValue, adminAuth } from './admin'
 import { calculateEstimatedValue } from './lib/leadValue'
-import { SENDGRID_API_KEY } from './config'
 import { v4 as uuid } from 'uuid'
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
@@ -190,7 +189,6 @@ export const markLeadWon = onCall(async (request) => {
 // ── markLeadLost ──────────────────────────────────────────────────────────────
 
 export const markLeadLost = onCall(
-  { secrets: [SENDGRID_API_KEY] },
   async (request) => {
     assertSalesOrAdmin(request)
     const { companyId, lostReason, note } = request.data as {

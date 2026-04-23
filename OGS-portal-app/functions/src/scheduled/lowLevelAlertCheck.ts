@@ -15,7 +15,6 @@
 
 import { onSchedule } from 'firebase-functions/v2/scheduler'
 import { db, FieldValue } from '../admin'
-import { SENDGRID_API_KEY, requireSecret } from '../config'
 import { sendEmail } from '../mail'
 
 const LOW_LEVEL_PCT = 25       // alert threshold (%)
@@ -26,13 +25,11 @@ export const lowLevelAlertCheck = onSchedule(
   {
     schedule:       '0 8 * * *',
     timeZone:       'America/New_York',
-    secrets:        [SENDGRID_API_KEY],
+    secrets:        [],
     memory:         '256MiB',
     timeoutSeconds: 540,
   },
   async () => {
-    requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY')
-
     // ── Query low tanks ───────────────────────────────────────────────────────
     const tanksSnap = await db
       .collection('tanks')

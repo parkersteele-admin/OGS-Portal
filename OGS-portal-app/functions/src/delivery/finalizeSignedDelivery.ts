@@ -1,5 +1,4 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https'
-import { SENDGRID_API_KEY } from '../config'
 import { db, FieldValue, storage, Timestamp } from '../admin'
 import { sendEmail, type MailAttachment } from '../email/sendEmail'
 import { generateInvoicePdf } from '../pdf/generateInvoicePdf'
@@ -34,7 +33,6 @@ interface InvoiceRecord {
 }
 
 export const finalizeSignedDelivery = onCall(
-  { secrets: [SENDGRID_API_KEY] },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'You must be signed in.')

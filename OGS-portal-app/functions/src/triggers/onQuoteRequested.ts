@@ -8,13 +8,12 @@
 
 import { onDocumentWritten } from 'firebase-functions/v2/firestore'
 import { db } from '../admin'
-import { SENDGRID_API_KEY } from '../config'
 import { sendEmail } from '../email/sendEmail'
 
 const OGS_DISPATCH_EMAIL = 'dispatch@ohiogassupply.com'
 
 export const onQuoteRequested = onDocumentWritten(
-  { document: 'quoteRequests/{quoteId}', secrets: [SENDGRID_API_KEY] },
+  { document: 'quoteRequests/{quoteId}' },
   async (event) => {
     const before = event.data?.before.data()
     const after  = event.data?.after.data()

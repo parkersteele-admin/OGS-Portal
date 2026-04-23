@@ -7,7 +7,7 @@
 
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { db, FieldValue, adminAuth } from './admin';
-import { GOOGLE_MAPS_KEY, SENDGRID_API_KEY, requireSecret } from './config';
+import { GOOGLE_MAPS_KEY, requireSecret } from './config';
 import { performGeocode } from './triggers/geocodeCustomer';
 import { generateInvoicePdf as generatePdf } from './pdf/generateInvoicePdf';
 import { generateQuotePdf as generateQuotePdfCore } from './pdf/generateQuotePdf';
@@ -233,7 +233,7 @@ export const generateInvoicePdf = onCall(async (request) => {
  * Input:  { quoteId: string }
  * Output: { url: string }
  */
-export const generateQuotePdf = onCall({ secrets: [SENDGRID_API_KEY] }, async (request) => {
+export const generateQuotePdf = onCall(async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'You must be signed in.');
   }
@@ -354,7 +354,6 @@ export const generateQuotePdf = onCall({ secrets: [SENDGRID_API_KEY] }, async (r
 
     if (recipientEmail) {
       try {
-        requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY');
         const total = `$${((quote.total as number) ?? 0).toFixed(2)}`;
         const publicLink = `https://app.ohiogassupply.com/quote/${data.quoteId as string}?token=${publicToken}`;
 
@@ -644,7 +643,7 @@ export const backfillGeocodeCustomers = onCall({ secrets: [GOOGLE_MAPS_KEY] }, a
  * Input:  { quoteId: string, response: 'accepted' | 'declined' }
  * Output: { success: true }
  */
-export const respondToQuote = onCall({ secrets: [SENDGRID_API_KEY] }, async (request) => {
+export const respondToQuote = onCall(async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'You must be signed in.');
   }
@@ -826,7 +825,6 @@ export const respondToQuote = onCall({ secrets: [SENDGRID_API_KEY] }, async (req
         const repAuthUser = await adminAuth.getUser(createdBy).catch(() => null);
         const repEmail = repAuthUser?.email;
         if (repEmail) {
-          requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY');
           const quoteNum = (quote.quoteNumber as string) || (data.quoteId as string);
           const total = `$${((quote.total as number) ?? 0).toFixed(2)}`;
 
@@ -1179,7 +1177,7 @@ export const getPublicQuote = onCall(async (request) => {
  * Input:  { quoteId: string, token: string, response: 'accepted' }
  * Output: { success: true }
  */
-export const respondToQuotePublic = onCall({ secrets: [SENDGRID_API_KEY] }, async (request) => {
+export const respondToQuotePublic = onCall(async (request) => {
   const data = request.data as Record<string, unknown>;
   const quoteId = data.quoteId as string | undefined;
   const token = data.token as string | undefined;

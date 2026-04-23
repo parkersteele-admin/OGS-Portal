@@ -7,7 +7,6 @@
 
 import { onDocumentUpdated } from 'firebase-functions/v2/firestore'
 import { db, FieldValue } from './admin'
-import { SENDGRID_API_KEY } from './config'
 import { sendTemplateEmail } from './email/sendEmail'
 import { TEMPLATE_ORDER_CONFIRMATION } from './email/templates'
 
@@ -21,7 +20,7 @@ import { TEMPLATE_ORDER_CONFIRMATION } from './email/templates'
  *  2. Send an order-completion confirmation email to the customer.
  */
 export const onOrderComplete = onDocumentUpdated(
-  { document: 'orders/{orderId}', secrets: [SENDGRID_API_KEY] },
+  { document: 'orders/{orderId}' },
   async (event) => {
     const before = event.data?.before.data()
     const after  = event.data?.after.data()

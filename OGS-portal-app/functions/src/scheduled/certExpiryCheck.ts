@@ -17,7 +17,6 @@
 
 import { onSchedule } from 'firebase-functions/v2/scheduler'
 import { db, FieldValue, Timestamp } from '../admin'
-import { SENDGRID_API_KEY, requireSecret } from '../config'
 import { sendEmail } from '../mail'
 import { createNotification } from '../notifications/createNotification'
 
@@ -28,13 +27,11 @@ export const certExpiryCheck = onSchedule(
   {
     schedule:       '0 7 * * 1', // every Monday at 07:00
     timeZone:       'America/New_York',
-    secrets:        [SENDGRID_API_KEY],
+    secrets:        [],
     memory:         '256MiB',
     timeoutSeconds: 540,
   },
   async () => {
-    requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY')
-
     const now    = new Date()
     const cutoff = new Date(now)
     cutoff.setDate(cutoff.getDate() + WARN_DAYS)

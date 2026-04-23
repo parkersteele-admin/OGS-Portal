@@ -7,7 +7,6 @@
 
 import { onSchedule } from 'firebase-functions/v2/scheduler'
 import { db, FieldValue } from '../admin'
-import { SENDGRID_API_KEY, requireSecret } from '../config'
 import { sendEmail } from '../email/sendEmail'
 import { v4 as uuid } from 'uuid'
 
@@ -17,13 +16,11 @@ export const checkStaleLeads = onSchedule(
   {
     schedule:  '0 8 * * *',
     timeZone:  'America/New_York',
-    secrets:   [SENDGRID_API_KEY],
+    secrets:   [],
     memory:    '256MiB',
     timeoutSeconds: 300,
   },
   async () => {
-    requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY')
-
     const cutoff = new Date()
     cutoff.setDate(cutoff.getDate() - STALE_THRESHOLD_DAYS)
 

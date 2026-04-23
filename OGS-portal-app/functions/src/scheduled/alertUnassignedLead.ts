@@ -8,7 +8,6 @@
 import { onSchedule } from 'firebase-functions/v2/scheduler'
 import { Timestamp } from 'firebase-admin/firestore'
 import { db } from '../admin'
-import { SENDGRID_API_KEY, requireSecret } from '../config'
 import { sendEmail } from '../email/sendEmail'
 
 const ALERT_AFTER_HOURS = 4
@@ -18,13 +17,11 @@ export const alertUnassignedLead = onSchedule(
   {
     schedule:       '0 * * * *',   // every hour
     timeZone:       'America/New_York',
-    secrets:        [SENDGRID_API_KEY],
+    secrets:        [],
     memory:         '256MiB',
     timeoutSeconds: 120,
   },
   async () => {
-    requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY')
-
     const cutoff = new Date()
     cutoff.setHours(cutoff.getHours() - ALERT_AFTER_HOURS)
 

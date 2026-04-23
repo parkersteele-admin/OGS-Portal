@@ -1,5 +1,4 @@
 import { db, FieldValue, adminAuth } from '../admin'
-import { SENDGRID_API_KEY, requireSecret } from '../config'
 import { sendEmail } from '../email/sendEmail'
 import { getCompanySettings } from '../pdf/companySettings'
 import { registerGeneratedFile } from '../files/registerGeneratedFile'
@@ -278,7 +277,7 @@ async function notifyInternalTeam(args: {
   const total = `$${safeNumber(args.quote.total).toFixed(2)}`
   const body = `${customerName} accepted Quote #${quoteNum} (${total}). Dispatch can now schedule order ${args.orderId.slice(0, 8).toUpperCase()}.`
   const company = await getCompanySettings()
-  const sendgridConfigured = Boolean(SENDGRID_API_KEY.value())
+  const sendgridConfigured = Boolean(process.env.SENDGRID_API_KEY)
 
   await Promise.all(
     recipients.map(async (recipient) => {
@@ -297,7 +296,6 @@ async function notifyInternalTeam(args: {
       if (!recipient.email || !sendgridConfigured) return
 
       try {
-        requireSecret(SENDGRID_API_KEY.value(), 'SENDGRID_API_KEY')
         await sendEmail({
           to: recipient.email,
           subject: `Quote accepted — ${customerName} — ${quoteNum}`,
