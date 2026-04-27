@@ -849,12 +849,13 @@ interface QuoteTableProps {
   loading:     boolean
   nameMap:     Record<string, string>
   onEdit:      (quote: Quote) => void
-  onDelete:    (id: string) => void
+  onDelete:    (quote: Quote) => void
   deletingId:  string | null
+  canDelete:   boolean
 }
 
 const QuoteTable: React.FC<QuoteTableProps> = ({
-  quotes, loading, nameMap, onEdit, onDelete, deletingId,
+  quotes, loading, nameMap, onEdit, onDelete, deletingId, canDelete,
 }) => {
   if (loading) {
     return (
@@ -910,12 +911,12 @@ const QuoteTable: React.FC<QuoteTableProps> = ({
                 <td className="qb-td">{q.validUntil ? formatDate(q.validUntil) : '—'}</td>
                 <td className="qb-td qb-td--actions" onClick={e => e.stopPropagation()}>
                   <Button variant="ghost" size="sm" onClick={() => onEdit(q)}>Edit</Button>
-                  {q.status === 'draft' && (
+                  {canDelete && q.status === 'draft' && (
                     <Button
                       variant="danger"
                       size="sm"
                       loading={deletingId === q.id}
-                      onClick={() => onDelete(q.id)}
+                      onClick={() => onDelete(q)}
                     >
                       Delete
                     </Button>
@@ -937,10 +938,13 @@ const QuoteBuilder: React.FC = () => {
   const location          = useLocation()
   const crmBase           = location.pathname.startsWith('/admin') ? '/admin/crm' : '/crm'
   const queryClient       = useQueryClient()
+  const { user }          = useAuth()
 
   const [statusFilter,setStatusFilter]= useState<QuoteStatus | 'all'>('all')
   const [deletingId,  setDeletingId]  = useState<string | null>(null)
   const [nameMap,     setNameMap]     = useState<Record<string, string>>({})
+  const [quoteToDelete, setQuoteToDelete] = useState<Quote | null>(null)
+  const [quotes, setQuotes] = useState<Quote[]>([])
 
   // Build ID → display name map from customers + leads
   useEffect(() => {
@@ -966,16 +970,30 @@ const QuoteBuilder: React.FC = () => {
     ),
     staleTime: 60_000,
   })
-  const quotes = quotesPage?.data ?? []
+  useEffect(() => {
+    setQuotes(quotesPage?.data ?? [])
+  }, [quotesPage?.data])
+
+  const canDeleteQuotes = user?.role === 'admin' || user?.role === 'sales'
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({ id }: { id: string }) => {
       setDeletingId(id)
       await deleteQuote(id)
     },
-    onSuccess: () => {
+    onSuccess: (_result, vars) => {
       setDeletingId(null)
-      queryClient.invalidateQueries({ queryKey: ['quotes'] })
+      setQuoteToDelete(null)
+      setQuotes(prev => prev.filter(q => q.id !== vars.id))
+      queryClient.setQueriesData({ queryKey: ['quotes'] }, (old: unknown) => {
+        if (!old || typeof old !== 'object') return old
+        const maybePage = old as { data?: unknown }
+        if (!Array.isArray(maybePage.data)) return old
+        return {
+          ...(old as Record<string, unknown>),
+          data: (maybePage.data as Quote[]).filter(q => q.id !== vars.id),
+        }
+      })
     },
     onError: () => setDeletingId(null),
   })
@@ -1013,10 +1031,47 @@ const QuoteBuilder: React.FC = () => {
           loading={isLoading}
           nameMap={nameMap}
           onEdit={handleEdit}
-          onDelete={id => deleteMutation.mutate(id)}
+          onDelete={setQuoteToDelete}
           deletingId={deletingId}
+          canDelete={canDeleteQuotes}
         />
       </div>
+
+      <Modal
+        open={!!quoteToDelete}
+        onClose={() => {
+          if (deleteMutation.isPending) return
+          setQuoteToDelete(null)
+        }}
+        title="Delete Quote"
+        size="sm"
+      >
+        {quoteToDelete && (
+          <div>
+            <p>
+              Are you sure you want to delete quote {quoteToDelete.quoteNumber}? This cannot be undone.
+            </p>
+            <div className="qb-delete-confirm-actions">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setQuoteToDelete(null)}
+                disabled={deleteMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                loading={deleteMutation.isPending}
+                onClick={() => deleteMutation.mutate({ id: quoteToDelete.id })}
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
     </div>
   )
