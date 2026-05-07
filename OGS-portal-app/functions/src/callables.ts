@@ -368,10 +368,10 @@ export const generateQuotePdf = onCall(async (request) => {
           .map(
             (item) =>
               `<tr>
-              <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0">${item.description}</td>
-              <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;text-align:right">${item.quantity}</td>
-              <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;text-align:right">$${item.unitPrice.toFixed(2)}</td>
-              <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;text-align:right">$${item.amount.toFixed(2)}</td>
+              <td style="padding:11px 14px;border-bottom:1px solid #eeeeee;font-size:14px;color:#333333;">${item.description}</td>
+              <td style="padding:11px 14px;border-bottom:1px solid #eeeeee;font-size:14px;color:#333333;text-align:right;">${item.quantity}</td>
+              <td style="padding:11px 14px;border-bottom:1px solid #eeeeee;font-size:14px;color:#333333;text-align:right;">$${item.unitPrice.toFixed(2)}</td>
+              <td style="padding:11px 14px;border-bottom:1px solid #eeeeee;font-size:14px;color:#333333;text-align:right;">$${item.amount.toFixed(2)}</td>
             </tr>`
           )
           .join('');
@@ -410,61 +410,121 @@ export const generateQuotePdf = onCall(async (request) => {
           subject: `Quote #${quoteNum} from ${company.name || 'Ohio Gas Supply'}`,
           attachments: pdfAttachment ? [pdfAttachment] : undefined,
           html: `
-<div style="font-family:Arial,sans-serif;max-width:620px;margin:auto;color:#333">
-  <div style="background:#E87722;padding:24px 32px 16px">
-    <h1 style="margin:0;color:#fff;font-size:22px">${company.name || 'Ohio Gas Supply'}</h1>
-    ${company.tagline ? `<p style="margin:6px 0 0;color:#ffe0c0;font-size:13px">${company.tagline}</p>` : ''}
-  </div>
-  <div style="padding:28px 32px 8px;border:1px solid #e8e8e8;border-top:none">
-    <p style="margin:0 0 16px">Dear ${recipientName},</p>
-    <p style="margin:0 0 20px">${emailIntro}</p>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
+<table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color:#f4f4f4;">
+  <tr><td align="center" style="padding:32px 16px;">
+    <table border="0" cellpadding="0" cellspacing="0" width="600" style="max-width:600px;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
 
-    <!-- Quote summary -->
-    <table style="width:100%;border-collapse:collapse;margin:0 0 4px">
-      <tr style="background:#f5f5f5">
-        <td style="padding:8px 12px;font-weight:bold">Quote #</td>
-        <td style="padding:8px 12px">${quoteNum}</td>
+      <!-- Header -->
+      <tr>
+        <td style="background:#111111;padding:28px 36px;">
+          <table width="100%" border="0" cellpadding="0" cellspacing="0">
+            <tr>
+              <td>
+                <div style="font-size:22px;font-weight:700;color:#ffffff;letter-spacing:-0.3px;">${company.name || 'Ohio Gas Supply'}</div>
+                ${company.tagline ? `<div style="font-size:12px;color:#999999;margin-top:4px;letter-spacing:0.5px;text-transform:uppercase;">${company.tagline}</div>` : ''}
+              </td>
+              <td align="right" valign="middle">
+                <div style="background:#E87722;color:#ffffff;font-size:11px;font-weight:700;padding:6px 12px;border-radius:4px;letter-spacing:0.5px;text-transform:uppercase;white-space:nowrap;">New Quote</div>
+              </td>
+            </tr>
+          </table>
+        </td>
       </tr>
-      ${validUntil ? `<tr><td style="padding:8px 12px;font-weight:bold">Valid Until</td><td style="padding:8px 12px">${validUntil}</td></tr>` : ''}
+
+      <!-- Orange accent bar -->
+      <tr><td style="background:#E87722;height:4px;font-size:0;line-height:0;">&nbsp;</td></tr>
+
+      <!-- Body -->
+      <tr>
+        <td style="padding:36px 36px 28px;">
+
+          <p style="margin:0 0 6px;font-size:13px;color:#888888;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Quote #${quoteNum}</p>
+          <h1 style="margin:0 0 20px;font-size:26px;color:#111111;font-weight:700;line-height:1.2;">Your quote is ready to review</h1>
+
+          <p style="margin:0 0 28px;font-size:15px;color:#444444;line-height:1.6;">Hi ${recipientName},</p>
+          <p style="margin:0 0 28px;font-size:15px;color:#444444;line-height:1.6;">${emailIntro}</p>
+
+          <!-- Quote meta chips -->
+          <table border="0" cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
+            <tr>
+              <td style="padding-right:12px;">
+                <table border="0" cellpadding="0" cellspacing="0" style="background:#f8f8f8;border-radius:6px;">
+                  <tr>
+                    <td style="padding:10px 16px;">
+                      <div style="font-size:11px;color:#999999;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:3px;">Quote Number</div>
+                      <div style="font-size:15px;color:#111111;font-weight:700;">#${quoteNum}</div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+              ${validUntil ? `<td>
+                <table border="0" cellpadding="0" cellspacing="0" style="background:#f8f8f8;border-radius:6px;">
+                  <tr>
+                    <td style="padding:10px 16px;">
+                      <div style="font-size:11px;color:#999999;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:3px;">Valid Until</div>
+                      <div style="font-size:15px;color:#111111;font-weight:700;">${validUntil}</div>
+                    </td>
+                  </tr>
+                </table>
+              </td>` : ''}
+            </tr>
+          </table>
+
+          <!-- Line items table -->
+          <table border="0" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;margin-bottom:28px;border:1px solid #eeeeee;border-radius:6px;overflow:hidden;">
+            <tr style="background:#f8f8f8;">
+              <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:#888888;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #eeeeee;">Description</th>
+              <th style="padding:10px 14px;text-align:right;font-size:11px;font-weight:700;color:#888888;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #eeeeee;white-space:nowrap;">Qty</th>
+              <th style="padding:10px 14px;text-align:right;font-size:11px;font-weight:700;color:#888888;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #eeeeee;white-space:nowrap;">Unit Price</th>
+              <th style="padding:10px 14px;text-align:right;font-size:11px;font-weight:700;color:#888888;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #eeeeee;white-space:nowrap;">Amount</th>
+            </tr>
+            ${lineItemRows}
+            <tr style="background:#111111;">
+              <td colspan="3" style="padding:12px 14px;font-size:13px;font-weight:700;color:#ffffff;text-align:right;">Total</td>
+              <td style="padding:12px 14px;font-size:16px;font-weight:700;color:#E87722;text-align:right;">${total}</td>
+            </tr>
+          </table>
+
+          <!-- CTA button -->
+          <table border="0" cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
+            <tr>
+              <td style="border-radius:6px;background:#E87722;">
+                <a href="${publicLink}" clicktracking="off"
+                   style="display:inline-block;padding:15px 36px;font-size:16px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:6px;letter-spacing:0.2px;">
+                  Review &amp; Accept Quote &rarr;
+                </a>
+              </td>
+            </tr>
+          </table>
+
+          <p style="margin:0 0 28px;font-size:13px;color:#888888;line-height:1.5;">
+            No login required &mdash; the button above gives you direct access to review and accept your quote. The quote PDF is also attached to this email for your records.
+          </p>
+
+          ${repBlockHtml}
+
+        </td>
+      </tr>
+
+      <!-- Footer -->
+      <tr>
+        <td style="background:#f8f8f8;border-top:1px solid #eeeeee;padding:20px 36px;text-align:center;">
+          <p style="margin:0;font-size:11px;color:#aaaaaa;line-height:1.6;">${footerLine}</p>
+        </td>
+      </tr>
+
     </table>
-
-    <!-- Line items -->
-    <table style="width:100%;border-collapse:collapse;margin:0 0 20px">
-      <thead>
-        <tr style="background:#f0f0f0">
-          <th style="padding:8px 12px;text-align:left;font-size:12px;color:#555">Description</th>
-          <th style="padding:8px 12px;text-align:right;font-size:12px;color:#555">Qty</th>
-          <th style="padding:8px 12px;text-align:right;font-size:12px;color:#555">Unit Price</th>
-          <th style="padding:8px 12px;text-align:right;font-size:12px;color:#555">Amount</th>
-        </tr>
-      </thead>
-      <tbody>${lineItemRows}</tbody>
-      <tfoot>
-        <tr style="background:#f9f9f9">
-          <td colspan="3" style="padding:10px 12px;font-weight:bold;text-align:right">Total</td>
-          <td style="padding:10px 12px;font-weight:bold;color:#E87722;text-align:right">${total}</td>
-        </tr>
-      </tfoot>
-    </table>
-
-    <!-- Accept button only — no Decline button -->
-    <div style="margin:0 0 4px">
-      <a href="${publicLink}" clicktracking="off"
-         style="display:inline-block;background:#E87722;color:#fff;padding:13px 30px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:15px">
-        ✓ Accept This Quote
-      </a>
-    </div>
-
-    ${repBlockHtml}
-
-    <p style="margin:16px 0 8px;font-size:13px;color:#666">
-      The full quote PDF is attached to this email for your records.
-    </p>
-  </div>
-  <div style="padding:14px 32px;background:#f9f9f9;border:1px solid #e8e8e8;border-top:none;text-align:center;font-size:11px;color:#aaa">
-    ${footerLine}
-  </div>
-</div>`,
+  </td></tr>
+</table>
+</body>
+</html>`,
         });
         console.log(`[generateQuotePdf] quote email sent to ${recipientEmail}`);
       } catch (emailErr) {
