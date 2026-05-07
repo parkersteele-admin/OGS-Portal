@@ -23,6 +23,7 @@ import { defineSecret } from 'firebase-functions/params'
 
 export const STRIPE_SECRET_KEY     = defineSecret('STRIPE_SECRET_KEY')
 export const STRIPE_WEBHOOK_SECRET = defineSecret('STRIPE_WEBHOOK_SECRET')
+export const RESEND_API_KEY        = defineSecret('RESEND_API_KEY')
 export const GOOGLE_MAPS_KEY       = defineSecret('GOOGLE_MAPS_SERVER_KEY')
 
 /**

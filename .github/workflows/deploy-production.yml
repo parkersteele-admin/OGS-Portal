@@ -171,6 +171,21 @@ jobs:
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
 
+      - name: Sync Firebase Functions RESEND_API_KEY secret
+        working-directory: OGS-portal-app
+        run: |
+          RESEND_SECRET="$(echo '${{ secrets.RESEND_API_KEY }}' | tr -d '[:space:]')"
+          if [ -z "$RESEND_SECRET" ]; then
+            echo "RESEND_API_KEY is empty or missing." >&2
+            exit 1
+          fi
+
+          if [ -n "$FIREBASE_CLI_TOKEN" ]; then
+            printf '%s' "$RESEND_SECRET" | firebase functions:secrets:set RESEND_API_KEY --project "$FIREBASE_PROJECT_ID" --token "$FIREBASE_CLI_TOKEN" --data-file=- --force
+          else
+            printf '%s' "$RESEND_SECRET" | firebase functions:secrets:set RESEND_API_KEY --project "$FIREBASE_PROJECT_ID" --data-file=- --force
+          fi
+
       - name: Deploy to Firebase Hosting live channel
         working-directory: OGS-portal-app
         run: |

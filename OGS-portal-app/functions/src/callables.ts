@@ -7,7 +7,7 @@
 
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { db, FieldValue, adminAuth } from './admin';
-import { GOOGLE_MAPS_KEY, requireSecret } from './config';
+import { GOOGLE_MAPS_KEY, RESEND_API_KEY, requireSecret } from './config';
 import { performGeocode } from './triggers/geocodeCustomer';
 import { generateInvoicePdf as generatePdf } from './pdf/generateInvoicePdf';
 import { generateQuotePdf as generateQuotePdfCore } from './pdf/generateQuotePdf';
@@ -233,7 +233,7 @@ export const generateInvoicePdf = onCall(async (request) => {
  * Input:  { quoteId: string }
  * Output: { url: string }
  */
-export const generateQuotePdf = onCall(async (request) => {
+export const generateQuotePdf = onCall({ secrets: [RESEND_API_KEY] }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'You must be signed in.');
   }
