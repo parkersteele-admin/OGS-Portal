@@ -222,8 +222,22 @@ jobs:
             exit 1
           fi
 
-          for service in onquotesent admincreateuser senduserpasswordresetemail onordercomplete ondeliverycomplete generatequotepdf; do
-            gcloud run services update $service \
+          mapfile -t FUNCTION_SERVICES < <(
+            gcloud run services list \
+              --region us-central1 \
+              --project "$FIREBASE_PROJECT_ID" \
+              --filter="metadata.labels.goog-managed-by=cloudfunctions" \
+              --format="value(metadata.name)"
+          )
+
+          if [ "${#FUNCTION_SERVICES[@]}" -eq 0 ]; then
+            echo "No Cloud Functions services found in us-central1." >&2
+            exit 1
+          fi
+
+          for service in "${FUNCTION_SERVICES[@]}"; do
+            echo "Updating RESEND_API_KEY on $service"
+            gcloud run services update "$service" \
               --region us-central1 \
               --update-env-vars RESEND_API_KEY="$RESEND_SECRET" \
               --project "$FIREBASE_PROJECT_ID" \
