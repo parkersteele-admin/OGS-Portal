@@ -337,8 +337,12 @@ export const generateQuotePdf = onCall(async (request) => {
         .get();
       if (cSnap.exists) {
         const c = cSnap.data()!;
-        recipientEmail = (c.email as string) || '';
-        recipientName = (c.name as string) || recipientName;
+        recipientEmail = ((c.billingEmail as string) || (c.email as string) || '').trim();
+        recipientName =
+          (c.billingContactName as string)
+          || (c.name as string)
+          || (c.companyName as string)
+          || recipientName;
       }
     } else if (quote.leadId) {
       const lSnap = await db
@@ -347,7 +351,7 @@ export const generateQuotePdf = onCall(async (request) => {
         .get();
       if (lSnap.exists) {
         const l = lSnap.data()!;
-        recipientEmail = (l.email as string) || '';
+        recipientEmail = ((l.email as string) || '').trim();
         recipientName = (l.name as string) || (l.company as string) || recipientName;
       }
     }
