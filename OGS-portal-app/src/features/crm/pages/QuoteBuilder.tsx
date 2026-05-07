@@ -29,8 +29,8 @@ import {
   convertQuoteToOrder,
   deleteQuote,
 } from '../../../services/quoteService'
-import { subscribeToCustomers, searchCustomers } from '../../../services/customerService'
-import { getLeads } from '../../../services/leadService'
+import { subscribeToCustomers, searchCustomers, getCustomer } from '../../../services/customerService'
+import { getLeads, getLead } from '../../../services/leadService'
 import { useAuth } from '../../../hooks/useAuth'
 import { formatCurrency, formatDate, formatRelative } from '../../../utils/format'
 import { Badge } from '../../../components/ui/Badge'
@@ -913,7 +913,7 @@ const QuoteTable: React.FC<QuoteTableProps> = ({
                 <td className="qb-td">{q.validUntil ? formatDate(q.validUntil) : '—'}</td>
                 <td className="qb-td qb-td--actions" onClick={e => e.stopPropagation()}>
                   <Button variant="ghost" size="sm" onClick={() => onEdit(q)}>Edit</Button>
-                  {(q.status === 'sent' || q.status === 'declined') && (
+                  {q.status !== 'draft' && (
                     <Button
                       variant="secondary"
                       size="sm"
@@ -988,6 +988,57 @@ const QuoteBuilder: React.FC = () => {
   useEffect(() => {
     setQuotes(quotesPage?.data ?? [])
   }, [quotesPage?.data])
+
+  // Backfill missing customer/lead display names for quotes that reference
+  // records outside the current preloaded customer/lead lists.
+  useEffect(() => {
+    let cancelled = false
+
+    const unresolvedCustomerIds = [...new Set(
+      quotes
+        .map((q) => q.customerId)
+        .filter((id): id is string => Boolean(id) && !nameMap[id as string]),
+    )]
+    const unresolvedLeadIds = [...new Set(
+      quotes
+        .map((q) => q.leadId)
+        .filter((id): id is string => Boolean(id) && !nameMap[id as string]),
+    )]
+
+    if (unresolvedCustomerIds.length === 0 && unresolvedLeadIds.length === 0) return
+
+    void (async () => {
+      const updates: Record<string, string> = {}
+
+      await Promise.all(
+        unresolvedCustomerIds.map(async (id) => {
+          try {
+            const customer = await getCustomer(id)
+            updates[id] = customer.name || id
+          } catch {
+            updates[id] = id
+          }
+        }),
+      )
+
+      await Promise.all(
+        unresolvedLeadIds.map(async (id) => {
+          try {
+            const lead = await getLead(id)
+            updates[id] = lead.company || lead.name || id
+          } catch {
+            updates[id] = id
+          }
+        }),
+      )
+
+      if (!cancelled && Object.keys(updates).length > 0) {
+        setNameMap((prev) => ({ ...prev, ...updates }))
+      }
+    })()
+
+    return () => { cancelled = true }
+  }, [quotes, nameMap])
 
   const canDeleteQuotes = user?.role === 'admin' || user?.role === 'sales'
 
