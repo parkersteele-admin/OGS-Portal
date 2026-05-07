@@ -772,9 +772,9 @@ const QuoteEditorPage: React.FC = () => {
                 onClick={() => previewMutation.mutate()}>
                 <span className="qep-action-label"><span className="qep-icon" aria-hidden="true"><FlatIcon name="preview" /></span>Preview PDF</span>
               </Button>
-              <Button variant="primary" size="sm" loading={sendMutation.isPending} disabled={isBusy || (status === 'sent')}
+              <Button variant="primary" size="sm" loading={sendMutation.isPending} disabled={isBusy}
                 onClick={() => sendMutation.mutate()}>
-                <span className="qep-action-label"><span className="qep-icon" aria-hidden="true"><FlatIcon name="send" /></span>{isDeclinedRevision ? 'Save & Re-send' : 'Send'}</span>
+                <span className="qep-action-label"><span className="qep-icon" aria-hidden="true"><FlatIcon name="send" /></span>{status === 'sent' || isDeclinedRevision ? 'Re-send' : 'Send'}</span>
               </Button>
             </>
           )}

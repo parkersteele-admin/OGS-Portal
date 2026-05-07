@@ -849,13 +849,15 @@ interface QuoteTableProps {
   loading:     boolean
   nameMap:     Record<string, string>
   onEdit:      (quote: Quote) => void
+  onResend:    (quote: Quote) => void
   onDelete:    (quote: Quote) => void
   deletingId:  string | null
+  resendingId: string | null
   canDelete:   boolean
 }
 
 const QuoteTable: React.FC<QuoteTableProps> = ({
-  quotes, loading, nameMap, onEdit, onDelete, deletingId, canDelete,
+  quotes, loading, nameMap, onEdit, onResend, onDelete, deletingId, resendingId, canDelete,
 }) => {
   if (loading) {
     return (
@@ -911,6 +913,16 @@ const QuoteTable: React.FC<QuoteTableProps> = ({
                 <td className="qb-td">{q.validUntil ? formatDate(q.validUntil) : '—'}</td>
                 <td className="qb-td qb-td--actions" onClick={e => e.stopPropagation()}>
                   <Button variant="ghost" size="sm" onClick={() => onEdit(q)}>Edit</Button>
+                  {(q.status === 'sent' || q.status === 'declined') && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      loading={resendingId === q.id}
+                      onClick={() => onResend(q)}
+                    >
+                      Re-send
+                    </Button>
+                  )}
                   {canDelete && q.status === 'draft' && (
                     <Button
                       variant="danger"
@@ -942,14 +954,17 @@ const QuoteBuilder: React.FC = () => {
 
   const [statusFilter,setStatusFilter]= useState<QuoteStatus | 'all'>('all')
   const [deletingId,  setDeletingId]  = useState<string | null>(null)
+  const [resendingId, setResendingId] = useState<string | null>(null)
   const [nameMap,     setNameMap]     = useState<Record<string, string>>({})
   const [quoteToDelete, setQuoteToDelete] = useState<Quote | null>(null)
   const [quotes, setQuotes] = useState<Quote[]>([])
+  const [listToast, setListToast] = useState<string | null>(null)
+  const [listError, setListError] = useState<string | null>(null)
 
   // Build ID → display name map from customers + leads
   useEffect(() => {
     let mounted = true
-    const unsub = subscribeToCustomers({ status: 'active' }, (customers) => {
+    const unsub = subscribeToCustomers({}, (customers) => {
       if (!mounted) return
       const map: Record<string, string> = {}
       customers.forEach((c: Customer) => { map[c.id] = c.name })
@@ -998,6 +1013,26 @@ const QuoteBuilder: React.FC = () => {
     onError: () => setDeletingId(null),
   })
 
+  const resendMutation = useMutation({
+    mutationFn: async (quote: Quote) => {
+      setResendingId(quote.id)
+      setListError(null)
+      await sendQuote(quote.id)
+      await generateQuotePdf(quote.id)
+      return quote
+    },
+    onSuccess: (quote) => {
+      setResendingId(null)
+      setListToast(`Quote ${quote.quoteNumber} re-sent successfully.`)
+      setTimeout(() => setListToast(null), 5000)
+      queryClient.invalidateQueries({ queryKey: ['quotes'] })
+    },
+    onError: (err: Error) => {
+      setResendingId(null)
+      setListError(err.message || 'Failed to re-send quote.')
+    },
+  })
+
   const handleNew  = () => navigate(`${crmBase}/quotes/new`)
   const handleEdit = (quote: Quote) => navigate(`${crmBase}/quotes/${quote.id}`)
 
@@ -1026,13 +1061,17 @@ const QuoteBuilder: React.FC = () => {
 
       {/* ── Table ───────────────────────────────────────────────────────────── */}
       <div className="qb-body">
+        {listError && <div className="qb-error" role="alert">{listError}</div>}
+        {listToast && <div className="qb-toast" role="status">{listToast}</div>}
         <QuoteTable
           quotes={quotes}
           loading={isLoading}
           nameMap={nameMap}
           onEdit={handleEdit}
+          onResend={(quote) => resendMutation.mutate(quote)}
           onDelete={setQuoteToDelete}
           deletingId={deletingId}
+          resendingId={resendingId}
           canDelete={canDeleteQuotes}
         />
       </div>

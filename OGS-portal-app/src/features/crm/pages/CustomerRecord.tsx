@@ -11,7 +11,7 @@
  *   4. Documents   — contracts, signed agreements, upload
  */
 
-import React, { useState, useRef, useCallback } from 'react'
+import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import {
   useQuery,
@@ -47,7 +47,7 @@ import { setCustomerProductPrice, removeCustomerProductPrice } from '../../../se
 import { useCustomerProductPricing } from '../../../hooks/useCustomerProductPricing'
 import { getOrders, getRouteSchedule, updateRouteSchedule } from '../../../services/orderService'
 import type { Order, RouteSchedule, RouteCadence } from '../../../types/order'
-import { getFilesForEntity, uploadFile, deleteFile } from '../../../services/fileService'
+import { getFilesForEntity, uploadFile, deleteFile, getFileUrl } from '../../../services/fileService'
 import { formatCurrency, formatDate, formatRelative } from '../../../utils/format'
 import { formatAddress, getGoogleMapsUrl } from '../../../utils/addressUtils'
 import { Card, CardHeader, CardBody } from '../../../components/ui/Card'
@@ -2510,6 +2510,25 @@ function FileRow({
   onDelete: (id: string) => void
   deleting: boolean
 }) {
+  const [resolvedUrl, setResolvedUrl] = useState<string>(
+    file.url || (file.metadata?.pdfUrl as string | undefined) || (file.metadata?.downloadUrl as string | undefined) || '',
+  )
+
+  useEffect(() => {
+    let cancelled = false
+    if (resolvedUrl || !file.storagePath) return () => { cancelled = true }
+
+    void getFileUrl(file.storagePath)
+      .then((url) => {
+        if (!cancelled) setResolvedUrl(url)
+      })
+      .catch(() => {
+        if (!cancelled) setResolvedUrl('')
+      })
+
+    return () => { cancelled = true }
+  }, [resolvedUrl, file.storagePath])
+
   const docuSealStatus = file.metadata?.docuSealStatus as string | undefined
   const isContract = ['contract', 'quote', 'invoice', 'receipt'].includes(file.fileType)
   const isSigned   = file.fileType === 'signature' || docuSealStatus === 'completed'
@@ -2536,14 +2555,20 @@ function FileRow({
             </span>
           </div>
           <div className="cr-file-row__actions">
-            <a
-              href={file.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="ui-btn ui-btn--ghost ui-btn--sm"
-            >
-              Download
-            </a>
+            {resolvedUrl ? (
+              <a
+                href={resolvedUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ui-btn ui-btn--ghost ui-btn--sm"
+              >
+                View
+              </a>
+            ) : (
+              <span className="ui-btn ui-btn--ghost ui-btn--sm" aria-disabled="true">
+                Unavailable
+              </span>
+            )}
             <Button
               variant="danger"
               size="sm"
