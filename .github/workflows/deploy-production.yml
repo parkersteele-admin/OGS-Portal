@@ -198,14 +198,21 @@ jobs:
             firebase deploy --only firestore:rules --project "$FIREBASE_PROJECT_ID" --non-interactive
           fi
 
-      - name: Set SendGrid env var on Cloud Run functions
+      - name: Set Resend env var on Cloud Run functions
+        if: steps.firebase-auth.outputs.has_service_account == 'true'
         run: |
-          for service in onquotesent admincreatuser senduserpasswordresetemail onordercomplete ondeliverycomplete; do
+          RESEND_SECRET="$(echo '${{ secrets.RESEND_API_KEY }}' | tr -d '[:space:]')"
+          if [ -z "$RESEND_SECRET" ]; then
+            echo "RESEND_API_KEY is empty or missing." >&2
+            exit 1
+          fi
+
+          for service in onquotesent admincreateuser senduserpasswordresetemail onordercomplete ondeliverycomplete; do
             gcloud run services update $service \
               --region us-central1 \
-              --update-env-vars SENDGRID_API_KEY="$(echo '${{ secrets.SENDGRID_API_KEY }}' | tr -d '[:space:]')" \
+              --update-env-vars RESEND_API_KEY="$RESEND_SECRET" \
               --project "$FIREBASE_PROJECT_ID" \
-              --quiet || true
+              --quiet
           done
 
       - name: Notify on success/failure

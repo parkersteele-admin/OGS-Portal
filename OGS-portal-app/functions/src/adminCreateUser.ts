@@ -189,7 +189,7 @@ export const adminCreateUser = onCall(async (request) => {
 })
 
 /**
- * sendUserPasswordResetEmail — sends a SendGrid-backed password-reset email.
+ * sendUserPasswordResetEmail — sends a Resend-backed password-reset email.
  *
  * Behavior intentionally mirrors Firebase Auth reset semantics:
  *  - Returns success even if the email does not exist, to avoid enumeration

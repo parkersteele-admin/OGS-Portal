@@ -7,7 +7,7 @@
  * that is missing from the truck or otherwise problematic.
  *
  * TODO: notify dispatch via push notification or email
- *       (use existing mail module: src/mail.ts + sendgrid template)
+ *       (use existing mail module: src/mail.ts + resend template)
  * TODO: write a summary doc to /alerts/{alertId} for the dispatch dashboard
  *       e.g. { type: 'cylinderFlag', runId, cylinderId, notes, createdAt }
  * TODO: optionally page on-call via Cloud Scheduler if flag is unresolved > N min

@@ -277,7 +277,7 @@ async function notifyInternalTeam(args: {
   const total = `$${safeNumber(args.quote.total).toFixed(2)}`
   const body = `${customerName} accepted Quote #${quoteNum} (${total}). Dispatch can now schedule order ${args.orderId.slice(0, 8).toUpperCase()}.`
   const company = await getCompanySettings()
-  const sendgridConfigured = Boolean(process.env.SENDGRID_API_KEY)
+  const resendConfigured = Boolean(process.env.RESEND_API_KEY)
 
   await Promise.all(
     recipients.map(async (recipient) => {
@@ -293,7 +293,7 @@ async function notifyInternalTeam(args: {
         createdAt: FieldValue.serverTimestamp(),
       })
 
-      if (!recipient.email || !sendgridConfigured) return
+      if (!recipient.email || !resendConfigured) return
 
       try {
         await sendEmail({

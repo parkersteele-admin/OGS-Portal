@@ -6,7 +6,7 @@
  * Before deploying, set each secret once:
  *   firebase functions:secrets:set STRIPE_SECRET_KEY
  *   firebase functions:secrets:set STRIPE_WEBHOOK_SECRET
- *   firebase functions:secrets:set SENDGRID_API_KEY
+ *   firebase functions:secrets:set RESEND_API_KEY
  *   firebase functions:secrets:set GOOGLE_MAPS_SERVER_KEY
  *
  * Useful commands:
