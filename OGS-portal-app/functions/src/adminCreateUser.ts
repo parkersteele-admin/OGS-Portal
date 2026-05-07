@@ -66,9 +66,11 @@ async function sendPasswordResetLinkEmail(email: string, name: string): Promise<
   const normalizedEmail = email.trim().toLowerCase()
 
   try {
-    const resetLink = await adminAuth.generatePasswordResetLink(normalizedEmail, {
-      url: `${APP_URL}/login`,
-    })
+    // Do not pass a continueUrl here — the domain must be allowlisted in
+    // Firebase Console > Auth > Authorized Domains, or the call throws
+    // auth/unauthorized-continue-uri.  We send users to Firebase's hosted
+    // reset page and they are redirected on completion.
+    const resetLink = await adminAuth.generatePasswordResetLink(normalizedEmail)
 
     await sendEmail({
       to: normalizedEmail,

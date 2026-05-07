@@ -46,8 +46,10 @@ const LOW_LEVEL_THRESHOLD_PCT = 25     // clear alerts above this
 
 export const onDeliveryComplete = onDocumentUpdated(
   {
-    document: 'runs/{runId}/stops/{stopId}',
-    secrets:  [STRIPE_SECRET_KEY],
+    document:      'runs/{runId}/stops/{stopId}',
+    secrets:       [STRIPE_SECRET_KEY],
+    memory:        '512MiB',
+    timeoutSeconds: 300,
   },
   async (event) => {
     const before = event.data?.before.data()
