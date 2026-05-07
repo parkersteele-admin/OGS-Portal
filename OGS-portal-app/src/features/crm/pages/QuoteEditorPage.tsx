@@ -703,8 +703,9 @@ const QuoteEditorPage: React.FC = () => {
       setError(null)
       let id = savedId; if (!id) id = await saveMutation.mutateAsync()
       await sendQuote(id!)
-      // Generate PDF + email to customer — best-effort so network issues don't block the status update
-      await generateQuotePdf(id!).catch((err) => console.warn('PDF/email step failed:', err))
+      // Generate PDF + email to customer. If this fails, surface it clearly so
+      // staff can retry instead of assuming the customer was notified.
+      await generateQuotePdf(id!)
       setStatus('sent')
       queryClient.invalidateQueries({ queryKey: ['quotes'] })
     },

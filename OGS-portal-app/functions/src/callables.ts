@@ -537,9 +537,12 @@ export const generateQuotePdf = onCall(async (request) => {
         console.error(`[generateQuotePdf] email send failed for ${recipientEmail} — ${msg}`, emailErr);
       }
     } else {
-      console.warn(
-        `generateQuotePdf: no recipient email found for quote ${data.quoteId as string}`
-      );
+      const quoteId = data.quoteId as string
+      const msg =
+        `No recipient email found for quote ${quoteId}. ` +
+        `Set customer.billingEmail/customer.email or lead.email before sending.`
+      console.warn(`generateQuotePdf: ${msg}`)
+      throw new HttpsError('failed-precondition', msg)
     }
   }
 
