@@ -359,7 +359,10 @@ export const generateQuotePdf = onCall(async (request) => {
     if (recipientEmail) {
       try {
         const total = `$${((quote.total as number) ?? 0).toFixed(2)}`;
-        const publicLink = `https://app.ohiogassupply.com/quote/${data.quoteId as string}?token=${publicToken}`;
+        const setupToken = freshData.setupToken as string | undefined;
+        const approvalLink = setupToken
+          ? `https://app.ohiogassupply.com/join/${setupToken}`
+          : `https://app.ohiogassupply.com/quote/${data.quoteId as string}?token=${publicToken}`;
 
         // Build line items rows for the estimate table
         const lineItems = (quote.lineItems ?? []) as Array<{
@@ -500,7 +503,7 @@ export const generateQuotePdf = onCall(async (request) => {
           <table border="0" cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
             <tr>
               <td style="border-radius:6px;background:#E87722;">
-                <a href="${publicLink}" clicktracking="off"
+                <a href="${approvalLink}" clicktracking="off"
                    style="display:inline-block;padding:15px 36px;font-size:16px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:6px;letter-spacing:0.2px;">
                   Review &amp; Accept Quote &rarr;
                 </a>
