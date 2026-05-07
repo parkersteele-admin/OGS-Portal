@@ -535,9 +535,11 @@ export const generateQuotePdf = onCall(async (request) => {
         });
         console.log(`[generateQuotePdf] quote email sent to ${recipientEmail}`);
       } catch (emailErr) {
-        // Log but don't fail the callable — the PDF URL is the primary output
+        // Surface email delivery failures so CRM users can retry and support can
+        // diagnose quickly from function errors.
         const msg = emailErr instanceof Error ? emailErr.message : String(emailErr);
         console.error(`[generateQuotePdf] email send failed for ${recipientEmail} — ${msg}`, emailErr);
+        throw new HttpsError('internal', `Quote email delivery failed: ${msg}`);
       }
     } else {
       const quoteId = data.quoteId as string

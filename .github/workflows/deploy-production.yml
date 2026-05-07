@@ -207,7 +207,7 @@ jobs:
             exit 1
           fi
 
-          for service in onquotesent admincreateuser senduserpasswordresetemail onordercomplete ondeliverycomplete; do
+          for service in onquotesent admincreateuser senduserpasswordresetemail onordercomplete ondeliverycomplete generatequotepdf; do
             gcloud run services update $service \
               --region us-central1 \
               --update-env-vars RESEND_API_KEY="$RESEND_SECRET" \
