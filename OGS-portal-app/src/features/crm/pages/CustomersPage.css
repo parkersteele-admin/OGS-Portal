@@ -195,7 +195,81 @@
   }
 }
 
-@media (max-width: 767px) {
+@media (max-width: 768px) {
+  .layout__content:has(.cp-page) {
+    background: #111111;
+  }
+
+  .cp-page {
+    background: #111111;
+    margin: 0 -16px;
+    padding: 0 16px;
+  }
+
+  .cp-page .page-header__eyebrow {
+    color: #999;
+  }
+
+  .cp-page .page-header__title {
+    color: #ffffff;
+  }
+
+  .cp-page .page-header__description {
+    color: #999;
+  }
+
+  .cp-page .page-header__actions {
+    width: 100%;
+  }
+
+  .cp-page .page-header__actions .ui-btn {
+    width: 100%;
+  }
+
+  .cp-filters.page-filters {
+    background: #1a1a1a;
+    border: 0.5px solid #2a2a2a;
+    border-radius: 12px;
+    box-shadow: none;
+  }
+
+  .cp-filters .page-filters__title {
+    color: #ffffff;
+  }
+
+  .cp-filters .page-filters__preset {
+    background: #1a1a1a;
+    border: 0.5px solid #333;
+    color: #999;
+  }
+
+  .cp-filters .page-filters__preset--active {
+    background: #FF6B1A;
+    border-color: #FF6B1A;
+    color: #ffffff;
+  }
+
+  .cp-search .ui-input,
+  .cp-search input {
+    background: #1e1e1e;
+    border: 0.5px solid #333;
+    color: #ffffff;
+    border-radius: 10px;
+  }
+
+  .cp-table-card {
+    background: #111111;
+    border: 0.5px solid #2a2a2a;
+  }
+
+  .cp-table-card__title {
+    color: #ffffff;
+  }
+
+  .cp-table-card__count {
+    color: #555;
+  }
+
   .cp-table-wrap {
     display: none;
   }

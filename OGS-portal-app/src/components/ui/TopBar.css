@@ -73,6 +73,30 @@
   }
 }
 
+@media (max-width: 768px) {
+  .layout__main:has(.adash) .topbar,
+  .layout__main:has(.cp-page) .topbar {
+    background: #111111;
+    border-bottom: 1px solid #222;
+  }
+
+  .layout__main:has(.adash) .topbar__title,
+  .layout__main:has(.cp-page) .topbar__title {
+    color: #ffffff;
+  }
+
+  .layout__main:has(.adash) .topbar__menu-btn,
+  .layout__main:has(.cp-page) .topbar__menu-btn {
+    background: transparent;
+    border: none;
+    border-radius: 10px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 11px;
+    box-shadow: none;
+  }
+}
+
 .topbar__avatar {
   width: 30px;
   height: 30px;

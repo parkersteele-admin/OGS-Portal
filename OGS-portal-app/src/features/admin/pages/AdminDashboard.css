@@ -170,3 +170,68 @@
   0%, 100% { opacity: 1; }
   50%       { opacity: 0.4; }
 }
+
+@media (max-width: 768px) {
+  .adash {
+    background: #111111;
+    padding: 16px;
+    gap: 16px;
+    max-width: none;
+    border-radius: 0;
+  }
+
+  .adash__title {
+    color: #ffffff;
+  }
+
+  .adash__subtitle {
+    color: #999;
+  }
+
+  .adash-section__head {
+    border-bottom: 1px solid #222;
+    padding-bottom: 12px;
+  }
+
+  .adash-section__title {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: #555;
+    text-transform: uppercase;
+  }
+
+  .adash-section__subtitle {
+    color: #555;
+  }
+
+  .adash-section__link {
+    color: #FF6B1A;
+  }
+
+  .adash-stat {
+    background: #1a1a1a;
+    border: 0.5px solid #2a2a2a;
+    border-left: none !important;
+    border-radius: 12px;
+    padding: 14px 16px;
+    gap: 6px;
+  }
+
+  .adash-stat__label {
+    font-size: 11px;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .adash-stat__value {
+    font-size: 20px;
+    color: #ffffff;
+    font-weight: 500;
+  }
+
+  .adash-stat__sub {
+    font-size: 12px;
+    color: #555;
+  }
+}
