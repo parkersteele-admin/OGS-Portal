@@ -72,6 +72,7 @@ import CustomerDetailPage from '../../pages/ops/CustomerDetail'
 
 // Public quote acceptance (no auth required)
 import PublicQuotePage from '../../pages/public/PublicQuotePage'
+import QuickActionsPage from '../../pages/quick-actions/QuickActionsPage'
 
 
 
@@ -112,6 +113,15 @@ export const AppRouter: React.FC = () => (
       >
         <Route index element={<OnboardingPage />} />
       </Route>
+
+      <Route
+        path="/quick-actions"
+        element={
+          <ProtectedRoute role={['admin', 'sales', 'driver', 'dispatch']}>
+            <QuickActionsPage />
+          </ProtectedRoute>
+        }
+      />
 
       <Route
         path="/portal"

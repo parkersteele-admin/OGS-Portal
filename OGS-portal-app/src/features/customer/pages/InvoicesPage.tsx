@@ -11,9 +11,11 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { doc, getDoc } from 'firebase/firestore'
 import { useAuth } from '../../../hooks/useAuth'
 import { subscribeToCustomerInvoices, generateInvoicePdf } from '../../../services/invoiceService'
 import { getPaymentsForInvoice } from '../../../services/paymentService'
+import { db } from '../../../lib/firebase'
 import { Badge } from '../../../components/ui/Badge'
 import { Button } from '../../../components/ui/Button'
 import type { Invoice, InvoiceStatus, Payment } from '../../../types/billing'
@@ -39,6 +41,10 @@ function effectiveStatus(inv: Invoice): InvoiceStatus {
 
 function isOutstanding(inv: Invoice): boolean {
   return OUTSTANDING_STATUSES.includes(effectiveStatus(inv))
+}
+
+function isOverdue(inv: Invoice): boolean {
+  return effectiveStatus(inv) === 'overdue'
 }
 
 type BadgeVariant = 'success' | 'warning' | 'danger' | 'neutral' | 'info' | 'brand'
@@ -307,6 +313,7 @@ const InvoicesPage: React.FC = () => {
   const [tab, setTab]             = useState<FilterTab>('all')
   const [selected, setSelected]   = useState<Invoice | null>(null)
   const [dlSet, setDlSet]         = useState<Set<string>>(new Set())
+  const [customerNameMap, setCustomerNameMap] = useState<Record<string, string>>({})
 
   // Track selected ID separately to avoid stale-closure loops in the sync effect
   const selectedIdRef = useRef<string | null>(null)
@@ -338,6 +345,33 @@ const InvoicesPage: React.FC = () => {
       default:            return invoices
     }
   }, [invoices, tab])
+
+  useEffect(() => {
+    const ids = [...new Set(invoices.map((inv) => inv.customerId).filter(Boolean))]
+    const unresolved = ids.filter((id) => !customerNameMap[id])
+    if (unresolved.length === 0) return
+
+    let cancelled = false
+    void (async () => {
+      const updates: Record<string, string> = {}
+      await Promise.all(
+        unresolved.map(async (customerId) => {
+          try {
+            const snap = await getDoc(doc(db, 'customers', customerId))
+            const data = snap.data() as { name?: string; companyName?: string } | undefined
+            updates[customerId] = data?.name ?? data?.companyName ?? customerId
+          } catch {
+            updates[customerId] = customerId
+          }
+        }),
+      )
+      if (!cancelled) setCustomerNameMap((prev) => ({ ...prev, ...updates }))
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [invoices, customerNameMap])
 
   // Summary bar data
   const outstandingList  = useMemo(() => invoices.filter(isOutstanding), [invoices])
@@ -433,17 +467,47 @@ const InvoicesPage: React.FC = () => {
               <p>No invoices yet.</p>
             </div>
           ) : (
-            filtered.map((inv) => (
-              <InvoiceRow
-                key={inv.id}
-                invoice={inv}
-                selected={selected?.id === inv.id}
-                onClick={() => toggleSelected(inv)}
-                onPay={() => navigate(`/portal/invoices/${inv.id}/pay`)}
-                onDownload={() => handleDownload(inv)}
-                dlBusy={dlSet.has(inv.id)}
-              />
-            ))
+            <>
+              {filtered.map((inv) => (
+                <InvoiceRow
+                  key={inv.id}
+                  invoice={inv}
+                  selected={selected?.id === inv.id}
+                  onClick={() => toggleSelected(inv)}
+                  onPay={() => navigate(`/portal/invoices/${inv.id}/pay`)}
+                  onDownload={() => handleDownload(inv)}
+                  dlBusy={dlSet.has(inv.id)}
+                />
+              ))}
+
+              <div className="inv-mobile-cards">
+                {filtered.map((inv) => {
+                  const customerName = customerNameMap[inv.customerId] ?? user?.name ?? 'Customer'
+                  return (
+                    <article
+                      key={`mobile-${inv.id}`}
+                      className={`inv-mobile-card${isOverdue(inv) ? ' inv-mobile-card--overdue' : ''}`}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => toggleSelected(inv)}
+                      onKeyDown={(e) => e.key === 'Enter' && toggleSelected(inv)}
+                    >
+                      <div className="inv-mobile-card__title-row">
+                        <h3>{inv.invoiceNumber} · {customerName}</h3>
+                        <span className="inv-mobile-card__amount">{formatCurrency(inv.total)}</span>
+                      </div>
+                      <div className="inv-mobile-card__meta-row">
+                        <span>Issued {formatDate(inv.issuedAt)}</span>
+                      </div>
+                      <div className="inv-mobile-card__meta-row">
+                        <span>Due {formatDate(inv.dueAt)}</span>
+                        <StatusBadge inv={inv} />
+                      </div>
+                    </article>
+                  )
+                })}
+              </div>
+            </>
           )}
         </div>
 

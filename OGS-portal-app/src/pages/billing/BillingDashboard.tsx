@@ -71,6 +71,11 @@ function invoiceAmounts(invoice: Invoice & { taxAmount?: number; totalAmount?: n
   return { subtotal, tax, total }
 }
 
+function isInvoiceOverdue(invoice: Invoice): boolean {
+  const dueDate = invoice.dueAt?.toDate?.()
+  return invoice.status !== 'paid' && invoice.status !== 'void' && !!dueDate && dueDate.getTime() < Date.now()
+}
+
 // ── Firestore fetch helpers ───────────────────────────────────────────────────
 
 async function fetchAllInvoices(): Promise<Invoice[]> {
@@ -781,6 +786,34 @@ export const BillingDashboard: React.FC = () => {
               </tbody>
             </table>
           </div>
+
+          {!isLoading && filteredInvoices.length > 0 && (
+            <div className="bd__mobile-cards">
+              {filteredInvoices.map((inv) => {
+                const cust = customerMap.get(inv.customerId)
+                const amounts = invoiceAmounts(inv)
+                return (
+                  <article
+                    key={`mobile-${inv.id}`}
+                    className={`bd__mobile-card${isInvoiceOverdue(inv) ? ' bd__mobile-card--overdue' : ''}`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setViewInvoice(inv)}
+                    onKeyDown={(e) => e.key === 'Enter' && setViewInvoice(inv)}
+                  >
+                    <div className="bd__mobile-card-title-row">
+                      <h3>{inv.invoiceNumber} · {cust?.name ?? 'Customer'}</h3>
+                      <span className="bd__mobile-card-amount">{formatCurrency(amounts.total)}</span>
+                    </div>
+                    <div className="bd__mobile-card-meta-row">
+                      <span>Due {formatDate(inv.dueAt)}</span>
+                      <InvoiceStatusBadge invoice={inv} />
+                    </div>
+                  </article>
+                )
+              })}
+            </div>
+          )}
         </div>
       </Card>
 

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Sidebar } from '../ui/Sidebar'
 import { TopBar } from '../ui/TopBar'
@@ -56,18 +56,38 @@ const MOBILE_ITEMS: MobileNavItem[] = [
   { to: '/admin/users',             label: 'Users',       icon: '◎' },
 ]
 
-export const AdminLayout: React.FC = () => (
-  <div className="layout">
-    <Sidebar title="Admin" items={OVERVIEW_ITEMS} groups={NAV_GROUPS} />
-    <div className="layout__main">
-      <ViewAsBanner />
-      <TopBar title="Admin" />
-      <main className="layout__content">
-        <Outlet />
-      </main>
-      <MobileNav items={MOBILE_ITEMS} />
+const MORE_ITEMS: MobileNavItem[] = [
+  { to: '/admin/crm/leads', label: 'Leads', icon: '▷' },
+  { to: '/admin/crm/quotes', label: 'Quotes', icon: '◈' },
+  { to: '/admin/ops/dispatch', label: 'Dispatch', icon: '⊕' },
+  { to: '/admin/ops/runs', label: 'Runs', icon: '↗' },
+  { to: '/admin/ops/tanks', label: 'Tanks', icon: '⊙' },
+  { to: '/admin/users', label: 'User Management', icon: '◎' },
+  { to: '/admin/company-settings', label: 'Company Settings', icon: '⊟' },
+]
+
+export const AdminLayout: React.FC = () => {
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+
+  return (
+    <div className="layout">
+      <Sidebar
+        title="Admin"
+        items={OVERVIEW_ITEMS}
+        groups={NAV_GROUPS}
+        mobileOpen={mobileNavOpen}
+        onMobileClose={() => setMobileNavOpen(false)}
+      />
+      <div className="layout__main">
+        <ViewAsBanner />
+        <TopBar title="Admin" onMenuClick={() => setMobileNavOpen(true)} />
+        <main className="layout__content">
+          <Outlet />
+        </main>
+        <MobileNav role="admin" items={MOBILE_ITEMS} moreItems={MORE_ITEMS} />
+      </div>
     </div>
-  </div>
-)
+  )
+}
 
 export default AdminLayout

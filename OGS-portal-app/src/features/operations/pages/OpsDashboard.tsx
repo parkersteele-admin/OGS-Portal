@@ -435,6 +435,27 @@ const PendingOrdersTable: React.FC<PendingOrdersTableProps> = ({ orders, loading
           </tbody>
         </table>
       </div>
+
+      <div className="od-mobile-cards">
+        {sorted.map((order) => (
+          <article key={`mobile-${order.id}`} className="od-mobile-card">
+            <div className="od-mobile-card__head">
+              <h3>{customerNames[order.customerId] ?? order.customerId}</h3>
+              <Badge variant={tierVariant(order.deliveryTier)}>{order.deliveryTier}</Badge>
+            </div>
+            <p><strong>Product:</strong> {order.productId}</p>
+            <p><strong>Quantity:</strong> {order.quantity}</p>
+            <p><strong>Requested:</strong> {fmtDate(order.requestedAt as never)}</p>
+            <button
+              type="button"
+              className="od-mobile-card__view"
+              onClick={() => navigate(`${opsBase}/runs/new`, { state: { selectedOrderIds: [order.id] } })}
+            >
+              View
+            </button>
+          </article>
+        ))}
+      </div>
     </div>
   )
 }
@@ -491,7 +512,7 @@ const OpsDashboard: React.FC = () => {
             <span className="od-stat-card__value">
               {pendingLoading ? '—' : pendingOrders.length}
             </span>
-            <span className="od-stat-card__label">Pending orders</span>
+            <span className="od-stat-card__label">Pending dispatch</span>
             {rushCount > 0 && (
               <span className="od-stat-card__sub od-stat-card__sub--rush">
                 {rushCount} rush
@@ -506,7 +527,7 @@ const OpsDashboard: React.FC = () => {
             <span className="od-stat-card__value">
               {runsLoading ? '—' : runIds.length}
             </span>
-            <span className="od-stat-card__label">Active runs today</span>
+            <span className="od-stat-card__label">Active drivers</span>
             {!runsLoading && runIds.length > 0 && (
               <ActiveRunDriverNames runIds={runIds} driverNames={driverNames} />
             )}
@@ -517,7 +538,7 @@ const OpsDashboard: React.FC = () => {
         <div className="od-stat-card">
           <div className="od-stat-card__body">
             <span className="od-stat-card__value">{lowTanks.length}</span>
-            <span className="od-stat-card__label">Tanks low level</span>
+            <span className="od-stat-card__label">Tank alerts</span>
             {lowTanks.length > 0 && (
               <button
                 className="od-stat-card__link"

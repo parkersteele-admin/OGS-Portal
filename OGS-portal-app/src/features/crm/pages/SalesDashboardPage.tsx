@@ -69,6 +69,25 @@ const SalesDashboardPage: React.FC = () => {
     setEndDate(range.endDate)
   }
 
+  const applyMobileDateFilter = (value: 'today' | 'week' | 'month' | 'custom') => {
+    if (value === 'today') {
+      const today = new Date().toISOString().slice(0, 10)
+      setPreset('custom')
+      setStartDate(today)
+      setEndDate(today)
+      return
+    }
+    if (value === 'week') {
+      applyPreset('last7')
+      return
+    }
+    if (value === 'month') {
+      applyPreset('month')
+      return
+    }
+    setPreset('custom')
+  }
+
   if (dashboardQuery.isLoading) {
     return (
       <div className="sdash-page sdash-page--loading">
@@ -121,6 +140,18 @@ const SalesDashboardPage: React.FC = () => {
             <p className="sdash-section__eyebrow">Global filters</p>
             <h2 className="sdash-section__title">Performance window</h2>
           </div>
+          <label className="sdash-mobile-date-filter">
+            <span>Date range</span>
+            <select
+              value={preset === 'custom' ? 'custom' : preset === 'month' ? 'month' : 'week'}
+              onChange={(event) => applyMobileDateFilter(event.target.value as 'today' | 'week' | 'month' | 'custom')}
+            >
+              <option value="today">Today</option>
+              <option value="week">This Week</option>
+              <option value="month">This Month</option>
+              <option value="custom">Custom</option>
+            </select>
+          </label>
           <div className="sdash-presets">
             {PRESET_OPTIONS.map((option) => (
               <button

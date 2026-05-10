@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Sidebar } from '../ui/Sidebar'
 import { TopBar } from '../ui/TopBar'
@@ -23,7 +23,8 @@ const MOBILE_ITEMS: MobileNavItem[] = BASE_NAV_ITEMS.slice(0, 4).map(
 )
 
 export const OpsLayout: React.FC = () => {
-  const { isAdmin } = useAuth()
+  const { isAdmin, role } = useAuth()
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   const navItems = useMemo<SidebarItem[]>(() => {
     if (!isAdmin) return BASE_NAV_ITEMS
@@ -35,14 +36,19 @@ export const OpsLayout: React.FC = () => {
 
   return (
     <div className="layout">
-      <Sidebar title="Operations" items={navItems} />
+      <Sidebar
+        title="Operations"
+        items={navItems}
+        mobileOpen={mobileNavOpen}
+        onMobileClose={() => setMobileNavOpen(false)}
+      />
       <div className="layout__main">
         <ViewAsBanner />
-        <TopBar title="Operations" />
+        <TopBar title="Operations" onMenuClick={() => setMobileNavOpen(true)} />
         <main className="layout__content">
           <Outlet />
         </main>
-        <MobileNav items={MOBILE_ITEMS} />
+        <MobileNav role={role} items={MOBILE_ITEMS} moreItems={navItems.map(({ to, label, icon }) => ({ to, label, icon }))} />
       </div>
     </div>
   )

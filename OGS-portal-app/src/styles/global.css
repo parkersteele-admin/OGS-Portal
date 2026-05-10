@@ -77,6 +77,41 @@ button, input, textarea, select {
   font-family: inherit;
 }
 
+* {
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 767px) {
+  body {
+    overflow-x: hidden;
+    font-size: 14px;
+  }
+
+  button,
+  a,
+  [role='button'],
+  [role='tab'],
+  [role='link'],
+  input[type='button'],
+  input[type='submit'],
+  input[type='reset'] {
+    min-height: var(--touch-target-min, 44px);
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+    min-height: var(--touch-target-min, 44px);
+  }
+
+  table,
+  pre,
+  code {
+    max-width: 100%;
+  }
+}
+
 /* ── Scrollbar ─────────────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar {
   width: 6px;

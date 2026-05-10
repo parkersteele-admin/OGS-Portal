@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
+import { Menu } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { getDocs, query, orderBy } from 'firebase/firestore'
 import { useAuth } from '../../hooks/useAuth'
@@ -15,6 +16,7 @@ import './CreateUserModal.css'
 
 interface TopBarProps {
   title: string
+  onMenuClick?: () => void
 }
 
 // ── View-as user picker modal ──────────────────────────────────────────────────
@@ -149,7 +151,7 @@ function ViewAsModal({
 
 // ── TopBar ─────────────────────────────────────────────────────────────────────
 
-export const TopBar: React.FC<TopBarProps> = ({ title }) => {
+export const TopBar: React.FC<TopBarProps> = ({ title, onMenuClick }) => {
   const { user, realUser } = useAuth()
   const navigate  = useNavigate()
   const { viewAsUser, setViewAsUser, exitViewAs } = useViewAsStore()
@@ -231,7 +233,19 @@ export const TopBar: React.FC<TopBarProps> = ({ title }) => {
   return (
     <>
       <header className="topbar">
-        <h1 className="topbar__title">{title}</h1>
+        <div className="topbar__title-wrap">
+          {onMenuClick && (
+            <button
+              type="button"
+              className="topbar__menu-btn"
+              onClick={onMenuClick}
+              aria-label="Open navigation"
+            >
+              <Menu size={22} color="#ffffff" />
+            </button>
+          )}
+          <h1 className="topbar__title">{title}</h1>
+        </div>
         <div className="topbar__actions">
           <NotificationBell />
           <div className="topbar__avatar-wrap" ref={containerRef}>

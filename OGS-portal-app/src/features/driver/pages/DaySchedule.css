@@ -194,6 +194,43 @@
   min-width: 0;
 }
 
+.ds-mobile-kpis {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.ds-mobile-kpi {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  padding: 12px;
+}
+
+.ds-mobile-kpi--wide {
+  grid-column: 1 / -1;
+}
+
+.ds-mobile-kpi__value {
+  margin: 0;
+  font-size: var(--font-size-20);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.ds-mobile-kpi__value--sm {
+  font-size: var(--font-size-14);
+  line-height: 1.4;
+}
+
+.ds-mobile-kpi__label {
+  margin: 4px 0 0;
+  font-size: var(--font-size-11);
+  color: var(--color-text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
 /* ── All done banner ───────────────────────────────────────────────────────── */
 
 .ds-all-done {

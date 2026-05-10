@@ -14,6 +14,8 @@ interface SidebarProps {
   title: string
   items?: SidebarItem[]
   groups?: SidebarGroup[]
+  mobileOpen?: boolean
+  onMobileClose?: () => void
 }
 
 export interface SidebarGroup {
@@ -25,7 +27,13 @@ function isRouteMatch(pathname: string, to: string): boolean {
   return pathname === to || pathname.startsWith(`${to}/`)
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ title, items = [], groups = [] }) => {
+export const Sidebar: React.FC<SidebarProps> = ({
+  title,
+  items = [],
+  groups = [],
+  mobileOpen = false,
+  onMobileClose,
+}) => {
   const location = useLocation()
   const hasAccordionGroups = groups.length > 0
 
@@ -47,79 +55,87 @@ export const Sidebar: React.FC<SidebarProps> = ({ title, items = [], groups = []
   }
 
   return (
-    <nav className="sidebar" aria-label="Main navigation">
-      <div className="sidebar__logo-bar">
-        <span className="sidebar__logo-mark" aria-hidden="true">OGS</span>
-        <span className="sidebar__logo-sep" aria-hidden="true">·</span>
-        <span className="sidebar__logo-text">Portal</span>
-      </div>
+    <>
+      <button
+        type="button"
+        className={`sidebar__backdrop${mobileOpen ? ' sidebar__backdrop--open' : ''}`}
+        aria-label="Close navigation"
+        onClick={onMobileClose}
+      />
+      <nav className={`sidebar${mobileOpen ? ' sidebar--mobile-open' : ''}`} aria-label="Main navigation">
+        <div className="sidebar__logo-bar">
+          <span className="sidebar__logo-mark" aria-hidden="true">OGS</span>
+          <span className="sidebar__logo-sep" aria-hidden="true">·</span>
+          <span className="sidebar__logo-text">Portal</span>
+        </div>
 
-      <p className="sidebar__portal-label">{title}</p>
+        <p className="sidebar__portal-label">{title}</p>
 
-      <ul className="sidebar__nav" role="list">
-        {!hasAccordionGroups && items.map(({ label, to, icon, sectionLabel }) => (
-          <React.Fragment key={to}>
-            {sectionLabel && (
-              <li className="sidebar__section-label" aria-hidden="true">
-                {sectionLabel}
-              </li>
-            )}
-          <li key={to}>
-            <NavLink
-              to={to}
-              className={({ isActive }) =>
-                `sidebar__link${isActive ? ' sidebar__link--active' : ''}`
-              }
-            >
-              <span className="sidebar__icon" aria-hidden="true">{icon}</span>
-              <span className="sidebar__label">{label}</span>
-            </NavLink>
-          </li>
-          </React.Fragment>
-        ))}
-
-        {hasAccordionGroups && groups.map((group) => {
-          const isOpen = openGroupLabel === group.label
-          const hasActiveItem = group.items.some((item) => isRouteMatch(location.pathname, item.to))
-
-          return (
-            <li
-              key={group.label}
-              className={`sidebar__group${isOpen ? ' sidebar__group--open' : ''}`}
-            >
-              <button
-                type="button"
-                className={`sidebar__section-toggle${hasActiveItem ? ' sidebar__section-toggle--active' : ''}`}
-                onClick={() => toggleGroup(group.label)}
-                aria-expanded={isOpen}
-              >
-                <span className="sidebar__section-toggle-label">{group.label}</span>
-                <span className="sidebar__section-toggle-icon" aria-hidden="true">
-                  {isOpen ? '−' : '+'}
-                </span>
-              </button>
-
-              {isOpen && (
-                <ul className="sidebar__group-list" role="list">
-                  {group.items.map(({ label, to, icon }) => (
-                    <li key={to}>
-                      <NavLink
-                        to={to}
-                        className={({ isActive }) =>
-                          `sidebar__link${isActive ? ' sidebar__link--active' : ''}`
-                        }
-                      >
-                        <span className="sidebar__icon" aria-hidden="true">{icon}</span>
-                        <span className="sidebar__label">{label}</span>
-                      </NavLink>
-                    </li>
-                  ))}
-                </ul>
+        <ul className="sidebar__nav" role="list" onClick={onMobileClose}>
+          {!hasAccordionGroups && items.map(({ label, to, icon, sectionLabel }) => (
+            <React.Fragment key={to}>
+              {sectionLabel && (
+                <li className="sidebar__section-label" aria-hidden="true">
+                  {sectionLabel}
+                </li>
               )}
+            <li key={to}>
+              <NavLink
+                to={to}
+                className={({ isActive }) =>
+                  `sidebar__link${isActive ? ' sidebar__link--active' : ''}`
+                }
+              >
+                <span className="sidebar__icon" aria-hidden="true">{icon}</span>
+                <span className="sidebar__label">{label}</span>
+              </NavLink>
             </li>
-          )
-        })}
-      </ul>
-    </nav>
+            </React.Fragment>
+          ))}
+
+          {hasAccordionGroups && groups.map((group) => {
+            const isOpen = openGroupLabel === group.label
+            const hasActiveItem = group.items.some((item) => isRouteMatch(location.pathname, item.to))
+
+            return (
+              <li
+                key={group.label}
+                className={`sidebar__group${isOpen ? ' sidebar__group--open' : ''}`}
+              >
+                <button
+                  type="button"
+                  className={`sidebar__section-toggle${hasActiveItem ? ' sidebar__section-toggle--active' : ''}`}
+                  onClick={() => toggleGroup(group.label)}
+                  aria-expanded={isOpen}
+                >
+                  <span className="sidebar__section-toggle-label">{group.label}</span>
+                  <span className="sidebar__section-toggle-icon" aria-hidden="true">
+                    {isOpen ? '−' : '+'}
+                  </span>
+                </button>
+
+                {isOpen && (
+                  <ul className="sidebar__group-list" role="list">
+                    {group.items.map(({ label, to, icon }) => (
+                      <li key={to}>
+                        <NavLink
+                          to={to}
+                          className={({ isActive }) =>
+                            `sidebar__link${isActive ? ' sidebar__link--active' : ''}`
+                          }
+                        >
+                          <span className="sidebar__icon" aria-hidden="true">{icon}</span>
+                          <span className="sidebar__label">{label}</span>
+                        </NavLink>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      </nav>
+    </>
   )
 }

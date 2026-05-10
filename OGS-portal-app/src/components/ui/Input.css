@@ -24,6 +24,7 @@
   width: 100%;
   transition: border-color var(--transition), box-shadow var(--transition);
   outline: none;
+  min-height: var(--touch-target-min, 44px);
 }
 
 .ui-input::placeholder {
@@ -59,4 +60,14 @@
   font-size: var(--font-size-12);
   color: var(--color-danger);
   line-height: 1.4;
+}
+
+@media (max-width: 767px) {
+  .ui-input {
+    font-size: 16px;
+  }
+
+  .ui-field {
+    width: 100%;
+  }
 }

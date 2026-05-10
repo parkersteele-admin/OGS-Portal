@@ -13,3 +13,11 @@ body {
   min-height: 100svh;
   display: block;
 }
+
+@media (max-width: 767px) {
+  html,
+  body,
+  #root {
+    overflow-x: hidden;
+  }
+}

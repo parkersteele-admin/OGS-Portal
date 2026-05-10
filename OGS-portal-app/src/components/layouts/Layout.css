@@ -32,8 +32,14 @@
 /* Mobile: tight padding (≤767px) */
 @media (max-width: 767px) {
   .layout__content {
-    padding: 16px 12px;
+    padding: 16px;
     padding-bottom: calc(64px + env(safe-area-inset-bottom, 0) + 18px);
+  }
+
+  .layout,
+  .layout__main,
+  .layout__content {
+    overflow-x: hidden;
   }
 }
 

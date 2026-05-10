@@ -5,19 +5,23 @@
  * Route: /crm/customers
  */
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { getDocs, orderBy, query } from 'firebase/firestore'
 import {
   subscribeToCustomers,
   createCustomer,
   type CreateCustomerInput,
 } from '../../../services/customerService'
+import { ordersCol } from '../../../lib/firestore'
 import { Badge } from '../../../components/ui/Badge'
 import { Button } from '../../../components/ui/Button'
 import { Card } from '../../../components/ui/Card'
 import { Input } from '../../../components/ui/Input'
 import { Modal } from '../../../components/ui/Modal'
 import type { Customer, CustomerStatus } from '../../../types/customer'
+import type { Order } from '../../../types/order'
+import { formatDate } from '../../../utils/format'
 import './CustomersPage.css'
 
 // ── Status badge ──────────────────────────────────────────────────────────────
@@ -181,6 +185,7 @@ const CustomersPage: React.FC = () => {
   const [search, setSearch]             = useState('')
   const [statusFilter, setStatusFilter] = useState<CustomerStatus | 'All'>('All')
   const [showAdd, setShowAdd]           = useState(false)
+  const [lastOrderMap, setLastOrderMap] = useState<Record<string, string>>({})
 
   useEffect(() => {
     setLoading(true)
@@ -192,6 +197,30 @@ const CustomersPage: React.FC = () => {
     })
     return unsub
   }, [])
+
+  useEffect(() => {
+    void (async () => {
+      const snap = await getDocs(query(ordersCol, orderBy('requestedAt', 'desc')))
+      const map: Record<string, string> = {}
+      snap.docs.forEach((doc) => {
+        const order = { ...doc.data(), id: doc.id } as Order
+        if (!map[order.customerId]) {
+          map[order.customerId] = formatDate(order.requestedAt ?? order.createdAt)
+        }
+      })
+      setLastOrderMap(map)
+    })()
+  }, [])
+
+  const getAccountType = useMemo(
+    () => (customer: Customer) => {
+      const notes = (customer.notes ?? '').toLowerCase()
+      if (notes.includes('residential')) return 'Residential'
+      if (notes.includes('industrial')) return 'Industrial'
+      return 'Commercial'
+    },
+    [],
+  )
 
   const filtered = customers.filter((c) => {
     if (statusFilter !== 'All' && c.status !== statusFilter) return false
@@ -279,44 +308,66 @@ const CustomersPage: React.FC = () => {
             </p>
           </div>
         ) : (
-          <div className="page-table-wrap">
-            <table className="page-table cp-table">
-              <thead className="page-table__head">
-                <tr>
-                  <th className="page-table__th">Company</th>
-                  <th className="page-table__th">City</th>
-                  <th className="page-table__th">Phone</th>
-                  <th className="page-table__th">Email</th>
-                  <th className="page-table__th">Status</th>
-                  <th className="page-table__th page-table__th--right">Credit Limit</th>
-                </tr>
-              </thead>
-              <tbody className="page-table__tbody">
-                {filtered.map((c) => (
-                  <tr
-                    key={c.id}
-                    className="page-table__tr cp-row"
-                    onClick={() => navigate(`${crmBase}/customers/${c.id}`)}
-                    tabIndex={0}
-                    onKeyDown={(e) => e.key === 'Enter' && navigate(`${crmBase}/customers/${c.id}`)}
-                  >
-                    <td className="page-table__td page-table__td--strong cp-cell--name">{c.name}</td>
-                    <td className="page-table__td">{c.city}{c.state ? `, ${c.state}` : ''}</td>
-                    <td className="page-table__td">{c.phone || '-'}</td>
-                    <td className="page-table__td cp-cell--email">{c.email || '-'}</td>
-                    <td className="page-table__td">
-                      <Badge variant={STATUS_VARIANT[c.status] ?? 'neutral'}>
-                        {c.status}
-                      </Badge>
-                    </td>
-                    <td className="page-table__td page-table__td--right">
-                      ${(c.creditLimit ?? 0).toLocaleString()}
-                    </td>
+          <>
+            <div className="page-table-wrap cp-table-wrap">
+              <table className="page-table cp-table">
+                <thead className="page-table__head">
+                  <tr>
+                    <th className="page-table__th">Company</th>
+                    <th className="page-table__th">City</th>
+                    <th className="page-table__th">Phone</th>
+                    <th className="page-table__th">Email</th>
+                    <th className="page-table__th">Status</th>
+                    <th className="page-table__th page-table__th--right">Credit Limit</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="page-table__tbody">
+                  {filtered.map((c) => (
+                    <tr
+                      key={c.id}
+                      className="page-table__tr cp-row"
+                      onClick={() => navigate(`${crmBase}/customers/${c.id}`)}
+                      tabIndex={0}
+                      onKeyDown={(e) => e.key === 'Enter' && navigate(`${crmBase}/customers/${c.id}`)}
+                    >
+                      <td className="page-table__td page-table__td--strong cp-cell--name">{c.name}</td>
+                      <td className="page-table__td">{c.city}{c.state ? `, ${c.state}` : ''}</td>
+                      <td className="page-table__td">{c.phone || '-'}</td>
+                      <td className="page-table__td cp-cell--email">{c.email || '-'}</td>
+                      <td className="page-table__td">
+                        <Badge variant={STATUS_VARIANT[c.status] ?? 'neutral'}>
+                          {c.status}
+                        </Badge>
+                      </td>
+                      <td className="page-table__td page-table__td--right">
+                        ${(c.creditLimit ?? 0).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="cp-mobile-cards">
+              {filtered.map((c) => (
+                <article
+                  key={`mobile-${c.id}`}
+                  className="cp-mobile-card"
+                  onClick={() => navigate(`${crmBase}/customers/${c.id}`)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === 'Enter' && navigate(`${crmBase}/customers/${c.id}`)}
+                >
+                  <h3>{c.name}</h3>
+                  <div className="cp-mobile-card__meta">{c.phone || 'No phone'} · {getAccountType(c)}</div>
+                  <div className="cp-mobile-card__footer">
+                    <span>Last order: {lastOrderMap[c.id] ?? '—'}</span>
+                    <span className="cp-mobile-card__view">View →</span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </>
         )}
       </Card>
 

@@ -270,58 +270,65 @@
 
 /* ── Mobile: card layout ──────────────────────────────────────────────────── */
 
+.inv-mobile-cards {
+  display: none;
+}
+
+.inv-mobile-card {
+  border: 0.5px solid #2a2a2a;
+  background: #1a1a1a;
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: grid;
+  gap: 10px;
+  color: #f3f4f6;
+  cursor: pointer;
+}
+
+.inv-mobile-card--overdue {
+  border-left: 3px solid #E24B4A;
+}
+
+.inv-mobile-card__title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.inv-mobile-card__title-row h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #ffffff;
+}
+
+.inv-mobile-card__amount {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #ffffff;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.inv-mobile-card__meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  color: #d1d5db;
+  font-size: 0.82rem;
+}
+
 @media (max-width: 767px) {
   .inv-row {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    padding: var(--space-4);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-    margin-bottom: var(--space-3);
-    border-bottom-width: 1px; /* override the desktop override */
+    display: none;
   }
 
-  .inv-row--selected {
-    border-color: var(--color-brand);
-  }
-
-  /* Top row: number + amount */
-  .inv-row__num,
-  .inv-row__total {
-    display: inline;
-  }
-
-  .inv-row__num {
-    font-size: var(--font-size-14);
-  }
-
-  .inv-row__total {
-    text-align: left;
-    font-size: var(--font-size-18);
-    font-weight: 700;
-    order: 4;
-  }
-
-  .inv-row__dates {
-    order: 2;
-    font-size: var(--font-size-12);
-    color: var(--color-text-3);
-  }
-
-  .inv-row__badge {
-    order: 3;
-  }
-
-  .inv-row__actions {
-    order: 5;
-    justify-content: stretch;
-    flex-wrap: nowrap;
-  }
-
-  /* Pay now button full-width on mobile */
-  .inv-row__actions .ui-btn--primary {
-    flex: 1;
+  .inv-mobile-cards {
+    display: grid;
+    gap: 10px;
   }
 }
 
@@ -393,7 +400,8 @@
     left: 0;
     right: 0;
     width: 100%;
-    max-height: 85dvh;
+    max-height: 100dvh;
+    min-height: 100dvh;
     border-left: none;
     border-top: 1px solid var(--color-border);
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
@@ -553,6 +561,10 @@
 }
 
 @media (max-width: 767px) {
+  .inv-panel__actions {
+    padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0));
+  }
+
   .inv-panel__actions .ui-btn--primary {
     flex: 1;
   }

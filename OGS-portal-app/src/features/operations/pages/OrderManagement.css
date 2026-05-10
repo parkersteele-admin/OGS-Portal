@@ -225,6 +225,56 @@
   font-size: var(--font-size-13);
 }
 
+.om-mobile-cards {
+  display: none;
+}
+
+.om-mobile-card {
+  border: 0.5px solid #2a2a2a;
+  background: #1a1a1a;
+  border-radius: 12px;
+  padding: 14px 16px;
+  color: #f3f4f6;
+  display: grid;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.om-mobile-card__title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.om-mobile-card__title-row h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.35;
+}
+
+.om-mobile-card__meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  color: #d1d5db;
+  font-size: 0.82rem;
+}
+
+.om-mobile-card__view {
+  border: none;
+  background: transparent;
+  color: #f59e0b;
+  font-size: 0.82rem;
+  font-weight: 700;
+  min-height: 44px;
+  padding: 0;
+  cursor: pointer;
+}
+
 .om-table__th {
   padding: var(--space-3) var(--space-4);
   text-align: left;
@@ -851,6 +901,44 @@
   margin-top: var(--space-2);
 }
 
+.om-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.om-sheet__row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: var(--space-2);
+  font-size: var(--font-size-13);
+  color: var(--color-text-2);
+}
+
+.om-sheet__row strong {
+  color: var(--color-text);
+  text-align: right;
+}
+
+.om-sheet__notes {
+  margin: 0;
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: var(--space-3);
+  color: var(--color-text-2);
+  font-size: var(--font-size-13);
+}
+
+.om-sheet__actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  padding-top: var(--space-2);
+}
+
 /* ── Mobile ────────────────────────────────────────────────────────────────── */
 
 @media (max-width: 900px) {
@@ -874,5 +962,21 @@
 
   .om-filters__dates {
     display: none;
+  }
+
+  .om-table {
+    display: none;
+  }
+
+  .om-mobile-cards {
+    display: grid;
+    gap: 10px;
+  }
+
+  .om-empty {
+    min-height: 160px;
+    display: grid;
+    place-items: center;
+    text-align: center;
   }
 }

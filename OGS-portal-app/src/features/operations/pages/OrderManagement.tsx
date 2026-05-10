@@ -37,6 +37,7 @@ import {
 import { subscribeToCustomers } from '../../../services/customerService'
 import { Button } from '../../../components/ui/Button'
 import { Input } from '../../../components/ui/Input'
+import { Modal } from '../../../components/ui/Modal'
 import type { Order, OrderStatus, DeliveryTier } from '../../../types/order'
 import type { Customer } from '../../../types/customer'
 import type { Product } from '../../../types/product'
@@ -139,6 +140,83 @@ interface OrderDetailPanelProps {
   onClose: () => void
   onCancelOrder: (id: string) => void
   onReschedule: (order: Order) => void
+}
+
+interface OrderDetailSheetProps {
+  order: Order
+  customer?: Customer
+  product?: Product
+  onClose: () => void
+  onCancelOrder: (id: string) => void
+  onReschedule: (order: Order) => void
+}
+
+function OrderDetailSheet({
+  order,
+  customer,
+  product,
+  onClose,
+  onCancelOrder,
+  onReschedule,
+}: OrderDetailSheetProps) {
+  const canCancel = canTransition(order.status, 'cancelled')
+  const canEdit = order.status === 'pending' || order.status === 'scheduled'
+
+  return (
+    <Modal open onClose={onClose} title={`Order ${order.id.slice(0, 8).toUpperCase()}`} size="lg">
+      <div className="om-sheet">
+        <div className="om-sheet__row">
+          <span>Customer</span>
+          <strong>{customer?.name ?? '—'}</strong>
+        </div>
+        <div className="om-sheet__row">
+          <span>Address</span>
+          <strong>
+            {customer
+              ? `${customer.address}, ${customer.city}, ${customer.state} ${customer.zip}`
+              : '—'}
+          </strong>
+        </div>
+        <div className="om-sheet__row">
+          <span>Product</span>
+          <strong>{product?.name ?? '—'} · {order.quantity} {product?.unit ?? 'gal'}</strong>
+        </div>
+        <div className="om-sheet__row">
+          <span>Status</span>
+          <StatusBadge order={order} />
+        </div>
+        <div className="om-sheet__row">
+          <span>Scheduled</span>
+          <strong>{fmtDate(order.scheduledAt)}</strong>
+        </div>
+        <div className="om-sheet__row">
+          <span>Total</span>
+          <strong>{fmtCurrency(order.total)}</strong>
+        </div>
+
+        {order.notes && <p className="om-sheet__notes">{order.notes}</p>}
+
+        <div className="om-sheet__actions">
+          {canEdit && (
+            <Button
+              variant="secondary"
+              onClick={() => onReschedule(order)}
+            >
+              Reschedule
+            </Button>
+          )}
+          {canCancel && (
+            <Button
+              variant="danger"
+              onClick={() => onCancelOrder(order.id)}
+            >
+              Cancel Order
+            </Button>
+          )}
+        </div>
+      </div>
+    </Modal>
+  )
 }
 
 function OrderDetailPanel({
@@ -903,6 +981,17 @@ export default function OrderManagement() {
   const [detailOrder, setDetailOrder] = useState<Order | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [rescheduleOrder, setRescheduleOrder] = useState<Order | null>(null)
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(max-width: 767px)').matches : false,
+  )
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 767px)')
+    const onChange = (event: MediaQueryListEvent) => setIsMobile(event.matches)
+    setIsMobile(media.matches)
+    media.addEventListener('change', onChange)
+    return () => media.removeEventListener('change', onChange)
+  }, [])
 
   // ── Subscribe to all orders ───────────────────────────────────────────────────
   useEffect(() => {
@@ -1241,144 +1330,117 @@ export default function OrderManagement() {
         ) : filtered.length === 0 ? (
           <div className="om-empty">No orders match the current filters.</div>
         ) : (
-          <table className="om-table">
-            <thead>
-              <tr>
-                <th className="om-table__th om-table__th--check">
-                  <input
-                    type="checkbox"
-                    checked={allSelectableSelected}
-                    onChange={toggleAll}
-                    title="Select all"
-                    aria-label="Select all orders"
-                    disabled={selectableFiltered.length === 0}
-                  />
-                </th>
-                <th className="om-table__th">Order #</th>
-                <th className="om-table__th">Customer</th>
-                <th className="om-table__th">Product / Qty</th>
-                <th className="om-table__th">Tier</th>
-                <th className="om-table__th">Scheduled</th>
-                <th className="om-table__th">Status</th>
-                <th className="om-table__th om-table__th--right">Total</th>
-                <th className="om-table__th om-table__th--actions">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((order) => {
-                const rush = isRush(order)
-                const isCancelled = order.status === 'cancelled'
-                const canSel = order.status !== 'archived'
-                const cust = customerMap[order.customerId]
-                const prod = productMap[order.productId]
-                const isSelected = selected.has(order.id)
+          <>
+            <table className="om-table">
+              <thead>
+                <tr>
+                  <th className="om-table__th om-table__th--check">
+                    <input
+                      type="checkbox"
+                      checked={allSelectableSelected}
+                      onChange={toggleAll}
+                      title="Select all"
+                      aria-label="Select all orders"
+                      disabled={selectableFiltered.length === 0}
+                    />
+                  </th>
+                  <th className="om-table__th">Order #</th>
+                  <th className="om-table__th">Customer</th>
+                  <th className="om-table__th">Product / Qty</th>
+                  <th className="om-table__th">Tier</th>
+                  <th className="om-table__th">Scheduled</th>
+                  <th className="om-table__th">Status</th>
+                  <th className="om-table__th om-table__th--right">Total</th>
+                  <th className="om-table__th om-table__th--actions">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((order) => {
+                  const rush = isRush(order)
+                  const isCancelled = order.status === 'cancelled'
+                  const canSel = order.status !== 'archived'
+                  const cust = customerMap[order.customerId]
+                  const prod = productMap[order.productId]
+                  const isSelected = selected.has(order.id)
 
-                return (
-                  <tr
-                    key={order.id}
-                    className={[
-                      'om-table__row',
-                      rush ? 'om-table__row--rush' : '',
-                      isCancelled ? 'om-table__row--cancelled' : '',
-                      isSelected ? 'om-table__row--selected' : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')}
-                    onClick={() => setDetailOrder(order)}
-                  >
-                    <td
-                      className="om-table__td om-table__td--check"
-                      onClick={(e) => e.stopPropagation()}
+                  return (
+                    <tr
+                      key={order.id}
+                      className={[
+                        'om-table__row',
+                        rush ? 'om-table__row--rush' : '',
+                        isCancelled ? 'om-table__row--cancelled' : '',
+                        isSelected ? 'om-table__row--selected' : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                      onClick={() => setDetailOrder(order)}
                     >
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleRow(order.id, order.status)}
-                        disabled={!canSel}
-                        aria-label={`Select order ${order.id.slice(0, 8)}`}
-                      />
-                    </td>
-
-                    <td className="om-table__td">
-                      <span className="om-order-num">
-                        {order.id.slice(0, 8).toUpperCase()}
-                      </span>
-                      {rush && !isCancelled && (
-                        <span className="om-rush-pip" title="Rush order" />
-                      )}
-                    </td>
-
-                    <td className="om-table__td">
-                      <div className="om-customer-name">
-                        {cust?.name ?? order.customerId.slice(0, 10) + '…'}
-                      </div>
-                      {cust && (
-                        <div className="om-customer-city">
-                          {cust.city}, {cust.state}
-                        </div>
-                      )}
-                    </td>
-
-                    <td className="om-table__td">
-                      <div>{prod?.name ?? '—'}</div>
-                      <div className="om-qty">
-                        {order.quantity} {prod?.unit ?? 'gal'}
-                      </div>
-                    </td>
-
-                    <td className="om-table__td">
-                      <TierBadge tier={order.deliveryTier} />
-                    </td>
-
-                    <td className="om-table__td">
-                      {fmtDate(order.scheduledAt)}
-                    </td>
-
-                    <td className="om-table__td">
-                      <StatusBadge order={order} />
-                    </td>
-
-                    <td className="om-table__td om-table__td--right om-total">
-                      {fmtCurrency(order.total)}
-                    </td>
-
-                    <td
-                      className="om-table__td om-table__td--actions"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {/* View */}
-                      <button
-                        className="om-action-btn"
-                        title="View detail"
-                        onClick={() => setDetailOrder(order)}
-                        aria-label="View order detail"
+                      <td
+                        className="om-table__td om-table__td--check"
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        <svg
-                          width="15"
-                          height="15"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                        >
-                          <path
-                            d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                          />
-                          <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
-                        </svg>
-                      </button>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleRow(order.id, order.status)}
+                          disabled={!canSel}
+                          aria-label={`Select order ${order.id.slice(0, 8)}`}
+                        />
+                      </td>
 
-                      {/* Edit / reschedule */}
-                      {(order.status === 'pending' ||
-                        order.status === 'scheduled') && (
+                      <td className="om-table__td">
+                        <span className="om-order-num">
+                          {order.id.slice(0, 8).toUpperCase()}
+                        </span>
+                        {rush && !isCancelled && (
+                          <span className="om-rush-pip" title="Rush order" />
+                        )}
+                      </td>
+
+                      <td className="om-table__td">
+                        <div className="om-customer-name">
+                          {cust?.name ?? order.customerId.slice(0, 10) + '…'}
+                        </div>
+                        {cust && (
+                          <div className="om-customer-city">
+                            {cust.city}, {cust.state}
+                          </div>
+                        )}
+                      </td>
+
+                      <td className="om-table__td">
+                        <div>{prod?.name ?? '—'}</div>
+                        <div className="om-qty">
+                          {order.quantity} {prod?.unit ?? 'gal'}
+                        </div>
+                      </td>
+
+                      <td className="om-table__td">
+                        <TierBadge tier={order.deliveryTier} />
+                      </td>
+
+                      <td className="om-table__td">
+                        {fmtDate(order.scheduledAt)}
+                      </td>
+
+                      <td className="om-table__td">
+                        <StatusBadge order={order} />
+                      </td>
+
+                      <td className="om-table__td om-table__td--right om-total">
+                        {fmtCurrency(order.total)}
+                      </td>
+
+                      <td
+                        className="om-table__td om-table__td--actions"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <button
                           className="om-action-btn"
-                          title="Reschedule"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setRescheduleOrder(order)
-                          }}
-                          aria-label="Reschedule order"
+                          title="View detail"
+                          onClick={() => setDetailOrder(order)}
+                          aria-label="View order detail"
                         >
                           <svg
                             width="15"
@@ -1387,68 +1449,140 @@ export default function OrderManagement() {
                             fill="none"
                           >
                             <path
-                              d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"
+                              d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
                               stroke="currentColor"
                               strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
                             />
-                            <path
-                              d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
+                            <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
                           </svg>
                         </button>
-                      )}
 
-                      {/* Cancel */}
-                      {order.status === 'pending' && (
-                        <button
-                          className="om-action-btn om-action-btn--danger"
-                          title="Cancel order"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleCancel(order.id)
-                          }}
-                          aria-label="Cancel order"
-                        >
-                          <svg
-                            width="15"
-                            height="15"
-                            viewBox="0 0 24 24"
-                            fill="none"
+                        {(order.status === 'pending' ||
+                          order.status === 'scheduled') && (
+                          <button
+                            className="om-action-btn"
+                            title="Reschedule"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setRescheduleOrder(order)
+                            }}
+                            aria-label="Reschedule order"
                           >
-                            <circle
-                              cx="12"
-                              cy="12"
-                              r="10"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                            />
-                            <path
-                              d="M15 9l-6 6M9 9l6 6"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                            />
-                          </svg>
-                        </button>
-                      )}
-                    </td>
-                  </tr>
+                            <svg
+                              width="15"
+                              height="15"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                            >
+                              <path
+                                d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                              <path
+                                d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                          </button>
+                        )}
+
+                        {order.status === 'pending' && (
+                          <button
+                            className="om-action-btn om-action-btn--danger"
+                            title="Cancel order"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleCancel(order.id)
+                            }}
+                            aria-label="Cancel order"
+                          >
+                            <svg
+                              width="15"
+                              height="15"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                            >
+                              <circle
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                              />
+                              <path
+                                d="M15 9l-6 6M9 9l6 6"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                              />
+                            </svg>
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+
+            <div className="om-mobile-cards">
+              {filtered.map((order) => {
+                const cust = customerMap[order.customerId]
+                const prod = productMap[order.productId]
+                return (
+                  <article
+                    key={`mobile-${order.id}`}
+                    className="om-mobile-card"
+                    onClick={() => setDetailOrder(order)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(event) => event.key === 'Enter' && setDetailOrder(order)}
+                  >
+                    <div className="om-mobile-card__title-row">
+                      <h3>{order.id.slice(0, 8).toUpperCase()} · {cust?.name ?? 'Customer'}</h3>
+                      <button type="button" className="om-mobile-card__view">View →</button>
+                    </div>
+                    <div className="om-mobile-card__meta-row">
+                      <span>{prod?.name ?? '—'} · {order.quantity} {prod?.unit ?? 'gal'}</span>
+                    </div>
+                    <div className="om-mobile-card__meta-row">
+                      <StatusBadge order={order} />
+                      <span>{fmtDate(order.scheduledAt)}</span>
+                    </div>
+                  </article>
                 )
               })}
-            </tbody>
-          </table>
+            </div>
+          </>
         )}
       </div>
 
       {/* ── Order detail panel ── */}
-      {detailOrder && (
+      {detailOrder && !isMobile && (
         <OrderDetailPanel
+          order={detailOrder}
+          customer={customerMap[detailOrder.customerId]}
+          product={productMap[detailOrder.productId]}
+          onClose={() => setDetailOrder(null)}
+          onCancelOrder={(id) => {
+            handleCancel(id)
+            setDetailOrder(null)
+          }}
+          onReschedule={(order) => {
+            setDetailOrder(null)
+            setRescheduleOrder(order)
+          }}
+        />
+      )}
+
+      {detailOrder && isMobile && (
+        <OrderDetailSheet
           order={detailOrder}
           customer={customerMap[detailOrder.customerId]}
           product={productMap[detailOrder.productId]}

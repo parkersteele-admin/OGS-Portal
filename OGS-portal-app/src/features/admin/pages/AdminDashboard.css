@@ -110,12 +110,7 @@
   .adash-grid--3 { grid-template-columns: repeat(3, 1fr); }
 }
 
-@media (max-width: 640px) {
-  .adash-grid--4,
-  .adash-grid--3 { grid-template-columns: 1fr 1fr; }
-}
-
-@media (max-width: 400px) {
+@media (max-width: 767px) {
   .adash-grid--4,
   .adash-grid--3 { grid-template-columns: 1fr; }
 }

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Sidebar } from '../ui/Sidebar'
 import { TopBar } from '../ui/TopBar'
@@ -84,16 +84,20 @@ const MOBILE_ITEMS: MobileNavItem[] = NAV_ITEMS.slice(0, 4).map(
   ({ to, label, icon }) => ({ to, label, icon }),
 )
 
-export const CustomerLayout: React.FC = () => (
-  <div className="layout">
-    <Sidebar title="Customer Portal" items={NAV_ITEMS} />
-    <div className="layout__main">
-      <ViewAsBanner />
-      <TopBar title="Customer Portal" />
-      <main className="layout__content">
-        <Outlet />
-      </main>
-      <MobileNav items={MOBILE_ITEMS} />
+export const CustomerLayout: React.FC = () => {
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+
+  return (
+    <div className="layout">
+      <Sidebar title="Customer Portal" items={NAV_ITEMS} mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />
+      <div className="layout__main">
+        <ViewAsBanner />
+        <TopBar title="Customer Portal" onMenuClick={() => setMobileNavOpen(true)} />
+        <main className="layout__content">
+          <Outlet />
+        </main>
+        <MobileNav items={MOBILE_ITEMS} />
+      </div>
     </div>
-  </div>
-)
+  )
+}

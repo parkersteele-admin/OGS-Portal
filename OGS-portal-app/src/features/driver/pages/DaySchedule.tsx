@@ -323,6 +323,12 @@ export default function DaySchedule() {
     ? Math.round((completedCount / stops.length) * 100)
     : 0
 
+  const nextPendingStop = useMemo(
+    () => stops.find((stop) => stop.status === 'pending') ?? null,
+    [stops],
+  )
+  const nextStopCustomer = nextPendingStop ? customers.get(nextPendingStop.customerId) : undefined
+
   // ── Render ─────────────────────────────────────────────────────────────────────
 
   const overallLoading = findingRun || runLoading
@@ -394,6 +400,25 @@ export default function DaySchedule() {
           />
         </div>
       </div>
+
+      <section className="ds-mobile-kpis" aria-label="Driver status">
+        <article className="ds-mobile-kpi">
+          <p className="ds-mobile-kpi__value">{stops.length}</p>
+          <p className="ds-mobile-kpi__label">Deliveries today</p>
+        </article>
+        <article className="ds-mobile-kpi">
+          <p className="ds-mobile-kpi__value">{completedCount}</p>
+          <p className="ds-mobile-kpi__label">Completed</p>
+        </article>
+        <article className="ds-mobile-kpi ds-mobile-kpi--wide">
+          <p className="ds-mobile-kpi__value ds-mobile-kpi__value--sm">
+            {nextStopCustomer?.address ?? 'No pending stops'}
+          </p>
+          <p className="ds-mobile-kpi__label">
+            Next delivery {nextPendingStop?.arrivedAt ? `· ETA ${fmtTime(nextPendingStop.arrivedAt as unknown as Timestamp)}` : ''}
+          </p>
+        </article>
+      </section>
 
       {/* ── All complete banner ── */}
       {allDone && (

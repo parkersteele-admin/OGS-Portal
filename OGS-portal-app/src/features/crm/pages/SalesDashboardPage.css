@@ -129,6 +129,28 @@
   gap: var(--space-2);
 }
 
+.sdash-mobile-date-filter {
+  display: none;
+}
+
+.sdash-mobile-date-filter span {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-3);
+}
+
+.sdash-mobile-date-filter select {
+  min-height: 44px;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  background: #fff;
+  padding: 0 12px;
+  font-size: 16px;
+}
+
 @media (max-width: 1023px) {
   .sdash-presets {
     justify-content: flex-start;
@@ -269,6 +291,10 @@
   gap: var(--space-4);
 }
 
+.sdash-panel {
+  min-width: 0;
+}
+
 .sdash-panel--wide {
   min-width: 0;
 }
@@ -281,6 +307,7 @@
 .sdash-linechart__svg {
   width: 100%;
   height: auto;
+  min-width: 320px;
 }
 
 .sdash-linechart__grid {
@@ -416,6 +443,56 @@
 .sdash-pipeline__copy span {
   font-size: var(--font-size-12);
   color: var(--color-text-3);
+}
+
+@media (max-width: 767px) {
+  .sdash-presets {
+    display: none;
+  }
+
+  .sdash-mobile-date-filter {
+    display: block;
+    width: 100%;
+  }
+
+  .sdash-chartgrid {
+    display: flex;
+    overflow-x: auto;
+    gap: 12px;
+    padding-bottom: 4px;
+  }
+
+  .sdash-chartgrid .sdash-panel {
+    min-width: 320px;
+    flex: 0 0 320px;
+  }
+
+  .sdash-table__head {
+    display: none;
+  }
+
+  .sdash-table__row {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 6px 10px;
+    border: 1px solid rgba(17, 17, 17, 0.08);
+    border-radius: 12px;
+    padding: 10px;
+    margin-bottom: 8px;
+  }
+
+  .sdash-table__row > span:first-child {
+    grid-column: 1 / -1;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  .sdash-table__row > span:not(:first-child) {
+    font-size: 13px;
+    color: var(--color-text-2);
+    text-align: right;
+  }
 }
 
 .sdash-pipeline__track {

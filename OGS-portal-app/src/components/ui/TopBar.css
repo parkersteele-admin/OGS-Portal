@@ -21,6 +21,25 @@
   margin: 0;
 }
 
+.topbar__title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.topbar__menu-btn {
+  display: none;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 10px;
+  border: 0.5px solid #333;
+  background: #1e1e1e;
+  color: #ffffff;
+  padding: 10px;
+  align-items: center;
+  justify-content: center;
+}
+
 .topbar__actions {
   display: flex;
   align-items: center;
@@ -47,6 +66,10 @@
   .topbar__avatar {
     width: 34px;
     height: 34px;
+  }
+
+  .topbar__menu-btn {
+    display: inline-flex;
   }
 }
 
