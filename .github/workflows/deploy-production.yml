@@ -201,6 +201,8 @@ jobs:
       - name: Set Resend env var on Cloud Run functions
         if: steps.firebase-auth.outputs.has_service_account == 'true'
         run: |
+          set -uo pipefail
+
           RESEND_SECRET="$(echo '${{ secrets.RESEND_API_KEY }}' | tr -d '[:space:]')"
           if [ -z "$RESEND_SECRET" ]; then
             echo "RESEND_API_KEY is empty or missing." >&2
@@ -220,14 +222,42 @@ jobs:
             exit 1
           fi
 
+          UPDATED_COUNT=0
+          SKIPPED_COUNT=0
+          FAILED_COUNT=0
+
           for service in "${FUNCTION_SERVICES[@]}"; do
             echo "Updating RESEND_API_KEY on $service"
-            gcloud run services update "$service" \
+            if output=$(gcloud run services update "$service" \
               --region us-central1 \
               --update-env-vars RESEND_API_KEY="$RESEND_SECRET" \
               --project "$FIREBASE_PROJECT_ID" \
-              --quiet
+              --quiet 2>&1); then
+              UPDATED_COUNT=$((UPDATED_COUNT + 1))
+              echo "$output"
+              continue
+            fi
+
+            echo "$output" >&2
+
+            # Stale gen2 function services can reference GC'd images.
+            # Skip those services instead of failing the entire deploy.
+            if echo "$output" | grep -qiE "Image .+ not found"; then
+              SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
+              echo "Skipping $service because its backing image is missing." >&2
+              continue
+            fi
+
+            FAILED_COUNT=$((FAILED_COUNT + 1))
+            echo "Failed to update RESEND_API_KEY on $service" >&2
           done
+
+          echo "RESEND_API_KEY update summary: updated=$UPDATED_COUNT skipped=$SKIPPED_COUNT failed=$FAILED_COUNT"
+
+          if [ "$FAILED_COUNT" -gt 0 ]; then
+            echo "One or more Cloud Run services failed to update for reasons other than missing image." >&2
+            exit 1
+          fi
 
       - name: Notify on success/failure
         uses: actions/github-script@v8
