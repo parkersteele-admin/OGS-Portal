@@ -47,6 +47,7 @@ import { getProductDropdown, getVisibleProducts, type ProductDropdownItem } from
 import { setCustomerProductPrice, removeCustomerProductPrice } from '../../../services/customerPricingService'
 import { useCustomerProductPricing } from '../../../hooks/useCustomerProductPricing'
 import { getOrders, getRouteSchedule, updateRouteSchedule } from '../../../services/orderService'
+import { getQuotes, duplicateQuote, convertQuoteToOrder } from '../../../services/quoteService'
 import type { Order, RouteSchedule, RouteCadence } from '../../../types/order'
 import { getFilesForEntity, uploadFile, deleteFile, getFileUrl } from '../../../services/fileService'
 import { formatCurrency, formatDate, formatRelative } from '../../../utils/format'
@@ -59,6 +60,7 @@ import { Input } from '../../../components/ui/Input'
 import { CreateUserModal } from '../../../components/ui/CreateUserModal'
 import type { Customer, CustomerStatus } from '../../../types/customer'
 import type { ContactLog, ContactMethod } from '../../../types/crm'
+import type { Quote } from '../../../types/crm'
 import type { AppFile } from '../../../types/file'
 import type { AppUser } from '../../../types/user'
 import type { UserRole } from '../../../types/user'
@@ -455,6 +457,11 @@ const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
     [products],
   )
 
+  const deliveryFeeProduct = React.useMemo(
+    () => products.find((p) => p.category === 'Fees' && /delivery/i.test(p.name)),
+    [products],
+  )
+
   // Track which add-on IDs are already in the line items
   const addedAddOnIds = new Set(rows.map(r => r.productId))
 
@@ -498,6 +505,23 @@ const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
     ])
   }
 
+  const addDeliveryFee = () => {
+    if (deliveryFeeProduct) {
+      addAddOn(deliveryFeeProduct)
+      return
+    }
+    setRows(prev => [
+      ...prev,
+      {
+        productId: '',
+        description: 'Delivery Fee',
+        quantity: '1',
+        unitPrice: '',
+        unit: '',
+      },
+    ])
+  }
+
   const lineItems = rows.map(r => {
     const qty   = parseFloat(r.quantity)  || 0
     const price = parseFloat(r.unitPrice) || 0
@@ -508,7 +532,16 @@ const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
       amount:      parseFloat((qty * price).toFixed(2)),
     }
   })
-  const subtotal = lineItems.reduce((s, li) => s + li.amount, 0)
+  const deliveryFeeTotal = lineItems.reduce(
+    (sum, li) => /delivery\s*fee/i.test(li.description) ? sum + li.amount : sum,
+    0,
+  )
+  const hasDeliveryFeeLine = lineItems.some((li) => /delivery\s*fee/i.test(li.description))
+  const lineSubtotal = lineItems.reduce(
+    (sum, li) => /delivery\s*fee/i.test(li.description) ? sum : sum + li.amount,
+    0,
+  )
+  const subtotal = lineSubtotal + deliveryFeeTotal
   const parsedSalesTaxRatePercent = Number.parseFloat(salesTaxRatePercent)
   const safeSalesTaxRatePercent = Number.isFinite(parsedSalesTaxRatePercent) ? parsedSalesTaxRatePercent : 0
   const taxAmount = applySalesTax ? subtotal * (safeSalesTaxRatePercent / 100) : 0
@@ -633,6 +666,18 @@ const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
           <div className="cr-inv-addons">
             <p className="cr-inv-addons__label">Quick add-ons:</p>
             <div className="cr-inv-addons__chips">
+              <button
+                type="button"
+                className={`cr-inv-addon-chip${hasDeliveryFeeLine ? ' cr-inv-addon-chip--added' : ''}`}
+                onClick={() => !hasDeliveryFeeLine && addDeliveryFee()}
+                disabled={hasDeliveryFeeLine}
+                title={deliveryFeeProduct ? `$${deliveryFeeProduct.basePrice.toFixed(2)} / ${deliveryFeeProduct.unit}` : 'Add custom delivery fee line item'}
+              >
+                {hasDeliveryFeeLine ? '✓ ' : '+ '}Delivery Fee
+                {deliveryFeeProduct && (
+                  <span className="cr-inv-addon-chip__price">${deliveryFeeProduct.basePrice.toFixed(2)}</span>
+                )}
+              </button>
               {addOns.map(a => (
                 <button
                   key={a.id}
@@ -652,7 +697,9 @@ const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
 
         {/* ── Totals ── */}
         <div className="cr-inv-total-row">
-          <strong>Subtotal: ${subtotal.toFixed(2)} · Sales Tax: ${taxAmount.toFixed(2)} · Total: ${total.toFixed(2)}</strong>
+          <strong>
+            Line Subtotal: ${lineSubtotal.toFixed(2)} · Delivery Fee: ${deliveryFeeTotal.toFixed(2)} · {applySalesTax ? 'Sales Tax' : 'Sales Tax Omitted'}: ${(applySalesTax ? taxAmount : 0).toFixed(2)} · Total: ${total.toFixed(2)}
+          </strong>
         </div>
 
         <div className="cr-form-row">
@@ -1159,6 +1206,14 @@ const CustomerRecord: React.FC = () => {
   const { data: invoicesPage } = useCustomerInvoices(customerId, 5)
   const recentInvoices = invoicesPage?.data ?? []
 
+  const { data: quotesPage } = useQuery({
+    queryKey: ['quotes', 'customer', customerId],
+    queryFn: () => getQuotes({ customerId: customerId! }, { pageSize: 100 }),
+    enabled: !!customerId && (activeTab === 'overview' || activeTab === 'orderHistory'),
+    staleTime: 60_000,
+  })
+  const recentQuotes = (quotesPage?.data ?? []).slice(0, 5)
+
   // Outstanding balance — fetch all sent + overdue
   const { data: outstandingInvoices } = useQuery({
     queryKey: ['invoices', 'outstanding', customerId],
@@ -1199,6 +1254,7 @@ const CustomerRecord: React.FC = () => {
     staleTime: 60_000,
   })
   const orderHistoryOrders = orderHistoryPage?.data ?? []
+  const orderHistoryQuotes = quotesPage?.data ?? []
 
   const { data: invoiceHistoryPage } = useQuery({
     queryKey: ['invoices', 'history', customerId],
@@ -1453,6 +1509,106 @@ const CustomerRecord: React.FC = () => {
       setEditingDraftInvoice(null)
       setInvoiceError(null)
       setInvoiceSuccess('Draft invoice saved.')
+    },
+    onError: (e: Error) => {
+      setInvoiceSuccess(null)
+      setInvoiceError(e.message)
+    },
+  })
+
+  const createInvoiceFromOrderMutation = useMutation({
+    mutationFn: async (order: Order) => {
+      const orderLineItems = (order.quotedLineItems?.length
+        ? order.quotedLineItems
+        : [{
+            productId: order.productId,
+            description: order.productId,
+            quantity: order.quantity,
+            unitPrice: order.unitPrice,
+            amount: parseFloat((order.quantity * order.unitPrice).toFixed(2)),
+          }]
+      ).map((li) => ({
+        description: li.description,
+        quantity: li.quantity,
+        unitPrice: li.unitPrice,
+        amount: li.amount,
+      }))
+
+      const addOnItems = (order.addOns ?? []).map((a) => ({
+        description: a.productName,
+        quantity: a.qty,
+        unitPrice: a.unitPrice ?? 0,
+        amount: parseFloat((a.qty * (a.unitPrice ?? 0)).toFixed(2)),
+      }))
+
+      const lineItems = [...orderLineItems, ...addOnItems]
+
+      if (order.deliveryFee > 0 && !lineItems.some((li) => /delivery\s*fee/i.test(li.description))) {
+        lineItems.push({
+          description: 'Delivery Fee',
+          quantity: 1,
+          unitPrice: order.deliveryFee,
+          amount: parseFloat(order.deliveryFee.toFixed(2)),
+        })
+      }
+
+      const dueDate = new Date()
+      dueDate.setDate(dueDate.getDate() + 30)
+
+      return createInvoice({
+        customerId: customerId!,
+        orderId: order.id,
+        quoteId: order.quoteId,
+        quoteNumber: order.quoteNumber,
+        lineItems,
+        dueAt: dueDate,
+        notes: order.notes,
+        applySalesTax: order.applySalesTax ?? ((order.salesTaxRate ?? order.taxRate ?? 0) > 0 || (order.salesTaxAmount ?? 0) > 0),
+        salesTaxRate: order.salesTaxRate ?? order.taxRate ?? 0,
+        taxRate: order.salesTaxRate ?? order.taxRate ?? 0,
+      } as Parameters<typeof createInvoice>[0])
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices', customerId] })
+      queryClient.invalidateQueries({ queryKey: ['invoices', 'history', customerId] })
+      queryClient.invalidateQueries({ queryKey: ['invoices', 'outstanding', customerId] })
+      setInvoiceError(null)
+      setInvoiceSuccess('Invoice created from order.')
+    },
+    onError: (e: Error) => {
+      setInvoiceSuccess(null)
+      setInvoiceError(e.message)
+    },
+  })
+
+  const duplicateQuoteMutation = useMutation({
+    mutationFn: async (quote: Quote) => {
+      if (!user?.id) throw new Error('You must be signed in to duplicate a quote.')
+      return duplicateQuote(quote.id, user.id)
+    },
+    onSuccess: (newQuoteId) => {
+      setInvoiceError(null)
+      setInvoiceSuccess('Quote duplicated.')
+      navigate(`${crmBase}/quotes/${newQuoteId}`)
+    },
+    onError: (e: Error) => {
+      setInvoiceSuccess(null)
+      setInvoiceError(e.message)
+    },
+  })
+
+  const convertQuoteMutation = useMutation({
+    mutationFn: async (quote: Quote) => {
+      if (!customerId) throw new Error('Missing customer context.')
+      const firstPriced = quote.lineItems.find((li) => li.unitPrice > 0)
+      if (!firstPriced) throw new Error('Quote has no priced line items.')
+      return convertQuoteToOrder(quote.id, customerId, firstPriced.unitPrice, user?.id)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['quotes', 'customer', customerId] })
+      queryClient.invalidateQueries({ queryKey: ['orders', 'history', customerId] })
+      setInvoiceError(null)
+      setInvoiceSuccess('Quote converted to order.')
     },
     onError: (e: Error) => {
       setInvoiceSuccess(null)
@@ -1867,6 +2023,7 @@ const CustomerRecord: React.FC = () => {
                       <th>Qty</th>
                       <th>Total</th>
                       <th>Status</th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1880,6 +2037,89 @@ const CustomerRecord: React.FC = () => {
                           <Badge variant={ORDER_BADGE[order.status] ?? 'neutral'}>
                             {getOrderStatusLabel(order)}
                           </Badge>
+                        </td>
+                        <td>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            loading={createInvoiceFromOrderMutation.isPending && (createInvoiceFromOrderMutation.variables as Order | undefined)?.id === order.id}
+                            onClick={() => createInvoiceFromOrderMutation.mutate(order)}
+                            disabled={order.status === 'cancelled' || order.status === 'archived' || order.status === 'paid'}
+                          >
+                            Create Invoice
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </CardBody>
+          </Card>
+
+          {/* Recent quotes */}
+          <Card>
+            <CardHeader>
+              <h3 className="cr-section-title">Recent quotes</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate(`${crmBase}/quotes`)}
+              >
+                View all
+              </Button>
+            </CardHeader>
+            <CardBody>
+              {recentQuotes.length === 0 ? (
+                <p className="cr-empty">No quotes yet.</p>
+              ) : (
+                <table className="cr-table">
+                  <thead>
+                    <tr>
+                      <th>Quote #</th>
+                      <th>Status</th>
+                      <th>Total</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentQuotes.map((quote) => (
+                      <tr key={quote.id}>
+                        <td className="cr-table__mono">{quote.quoteNumber}</td>
+                        <td>
+                          <Badge variant={
+                            quote.status === 'accepted' ? 'success' :
+                            quote.status === 'sent' ? 'info' :
+                            quote.status === 'declined' ? 'danger' : 'neutral'
+                          }>
+                            {quote.status}
+                          </Badge>
+                        </td>
+                        <td>{formatCurrency(quote.total)}</td>
+                        <td>
+                          <div className="cr-table__actions">
+                            <Button variant="ghost" size="sm" onClick={() => navigate(`${crmBase}/quotes/${quote.id}`)}>
+                              Open
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              loading={duplicateQuoteMutation.isPending && (duplicateQuoteMutation.variables as Quote | undefined)?.id === quote.id}
+                              onClick={() => duplicateQuoteMutation.mutate(quote)}
+                            >
+                              Duplicate
+                            </Button>
+                            {quote.status === 'accepted' && (
+                              <Button
+                                variant="primary"
+                                size="sm"
+                                loading={convertQuoteMutation.isPending && (convertQuoteMutation.variables as Quote | undefined)?.id === quote.id}
+                                onClick={() => convertQuoteMutation.mutate(quote)}
+                              >
+                                Convert to Order
+                              </Button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1977,6 +2217,70 @@ const CustomerRecord: React.FC = () => {
         <div className="cr-tab-panel" role="tabpanel">
           <Card>
             <CardHeader>
+              <h3 className="cr-section-title">Quotes</h3>
+            </CardHeader>
+            <CardBody>
+              {orderHistoryQuotes.length === 0 ? (
+                <p className="cr-empty">No quotes found for this customer.</p>
+              ) : (
+                <table className="cr-table">
+                  <thead>
+                    <tr>
+                      <th>Quote #</th>
+                      <th>Status</th>
+                      <th>Total</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orderHistoryQuotes.map((quote) => (
+                      <tr key={quote.id}>
+                        <td className="cr-table__mono">{quote.quoteNumber || quote.id}</td>
+                        <td>
+                          <Badge variant={
+                            quote.status === 'accepted' ? 'success' :
+                            quote.status === 'sent' ? 'info' :
+                            quote.status === 'declined' ? 'danger' : 'neutral'
+                          }>
+                            {quote.status}
+                          </Badge>
+                        </td>
+                        <td>{formatCurrency(quote.total)}</td>
+                        <td>
+                          <div className="cr-table__actions">
+                            <Button variant="ghost" size="sm" onClick={() => navigate(`${crmBase}/quotes/${quote.id}`)}>
+                              Open
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              loading={duplicateQuoteMutation.isPending && (duplicateQuoteMutation.variables as Quote | undefined)?.id === quote.id}
+                              onClick={() => duplicateQuoteMutation.mutate(quote)}
+                            >
+                              Duplicate
+                            </Button>
+                            {quote.status === 'accepted' && (
+                              <Button
+                                variant="primary"
+                                size="sm"
+                                loading={convertQuoteMutation.isPending && (convertQuoteMutation.variables as Quote | undefined)?.id === quote.id}
+                                onClick={() => convertQuoteMutation.mutate(quote)}
+                              >
+                                Convert to Order
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <h3 className="cr-section-title">Orders</h3>
             </CardHeader>
             <CardBody>
@@ -1987,16 +2291,19 @@ const CustomerRecord: React.FC = () => {
                   <thead>
                     <tr>
                       <th>Requested</th>
+                      <th>Quote Ref</th>
                       <th>Status</th>
                       <th>Quantity</th>
                       <th>Total</th>
                       <th>Docs</th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {orderHistoryOrders.map((order) => (
                       <tr key={order.id}>
                         <td>{order.requestedAt ? formatDate(order.requestedAt) : '—'}</td>
+                        <td className="cr-table__mono">{order.quoteNumber || order.quoteId || '—'}</td>
                         <td>
                           <Badge variant={ORDER_BADGE[order.status] ?? 'neutral'}>
                             {getOrderStatusLabel(order)}
@@ -2017,6 +2324,17 @@ const CustomerRecord: React.FC = () => {
                             )}
                             {!order.billOfLadingUrl && !order.invoicePdfUrl && !order.signatureUrl && '—'}
                           </div>
+                        </td>
+                        <td>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            loading={createInvoiceFromOrderMutation.isPending && (createInvoiceFromOrderMutation.variables as Order | undefined)?.id === order.id}
+                            onClick={() => createInvoiceFromOrderMutation.mutate(order)}
+                            disabled={order.status === 'cancelled' || order.status === 'archived' || order.status === 'paid'}
+                          >
+                            Create Invoice
+                          </Button>
                         </td>
                       </tr>
                     ))}

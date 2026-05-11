@@ -351,6 +351,11 @@ function buildQuotePdf(
     const TOT_VAL_W = RIGHT_EDGE - TOT_VAL_X
 
     const subtotal = (quote.subtotal as number) ?? 0
+    const taxRate = (quote.salesTaxRate as number | undefined) ?? (quote.taxRate as number | undefined) ?? 0
+    const taxAmount = (quote.salesTaxAmount as number | undefined) ?? (quote.tax as number | undefined) ?? 0
+    const applySalesTax = typeof quote.applySalesTax === 'boolean'
+      ? quote.applySalesTax
+      : (taxRate > 0 || taxAmount > 0)
     const total    = (quote.total    as number) ?? 0
 
     doc
@@ -359,6 +364,21 @@ function buildQuotePdf(
       .fillColor('#444444')
       .text('Subtotal', TOT_LBL_X, rowY, { width: TOT_LBL_W, align: 'right' })
       .text(fmtMoney(subtotal), TOT_VAL_X, rowY, { width: TOT_VAL_W, align: 'right' })
+
+    rowY += 10
+    doc
+      .fontSize(9)
+      .font('Helvetica')
+      .fillColor('#444444')
+      .text(
+        applySalesTax
+          ? (taxRate > 0 ? `Sales Tax (${(taxRate * 100).toFixed(0)}%)` : 'Sales Tax')
+          : 'Sales Tax Omitted',
+        TOT_LBL_X,
+        rowY,
+        { width: TOT_LBL_W, align: 'right' },
+      )
+      .text(fmtMoney(applySalesTax ? taxAmount : 0), TOT_VAL_X, rowY, { width: TOT_VAL_W, align: 'right' })
 
     rowY += 10
     doc

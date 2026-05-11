@@ -1218,6 +1218,11 @@ export const getPublicQuote = onCall(async (request) => {
         amount: number;
       }>,
       subtotal: (quote.subtotal as number) ?? 0,
+      applySalesTax: (quote.applySalesTax as boolean | undefined)
+        ?? (((quote.salesTaxRate as number | undefined) ?? (quote.taxRate as number | undefined) ?? 0) > 0
+          || ((quote.salesTaxAmount as number | undefined) ?? (quote.tax as number | undefined) ?? 0) > 0),
+      salesTaxRate: (quote.salesTaxRate as number | undefined) ?? (quote.taxRate as number | undefined) ?? 0,
+      salesTaxAmount: (quote.salesTaxAmount as number | undefined) ?? (quote.tax as number | undefined) ?? 0,
       total: (quote.total as number) ?? 0,
       notes: (quote.notes as string) || '',
       approval: (quote.approval as Record<string, unknown> | undefined)

@@ -83,6 +83,13 @@ export interface Order {
   subtotal: number
   deliveryFee: number
   total: number
+  applySalesTax?: boolean
+  salesTaxRate?: number
+  salesTaxAmount?: number
+  taxRate?: number
+  quoteSubtotal?: number
+  quoteTax?: number
+  quoteTotal?: number
   status: OrderStatus
   notes?: string
   /** Links all items from a single customer checkout into one order reference. */

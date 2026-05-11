@@ -666,6 +666,39 @@
   gap: var(--space-3);
 }
 
+.qb-addon--tax {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-3);
+}
+
+.qb-addon__heading {
+  margin: 0 0 var(--space-2);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--color-text-2);
+}
+
+.qb-tax-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.qb-tax-option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: 0.86rem;
+  color: var(--color-text);
+}
+
+.qb-tax-note {
+  margin: var(--space-2) 0 0;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+
 /* ── Pricing summary ───────────────────────────────────────────────────────── */
 
 .qb-summary {

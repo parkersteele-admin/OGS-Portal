@@ -337,11 +337,30 @@ export async function convertQuoteToOrder(
     const eligibleItems = quote.lineItems.filter(
       (item) => item.productId !== 'delivery' && item.productId !== 'rental' && item.quantity > 0,
     )
+    const deliveryLine = quote.lineItems.find((item) =>
+      item.productId === 'delivery' || /delivery\s*fee/i.test(item.description || ''),
+    )
     const [primaryItem, ...restItems] = eligibleItems.length > 0 ? eligibleItems : quote.lineItems
     if (!primaryItem) throw new OgsValidationError('Quote has no line items')
 
     const pricedItems = eligibleItems.length > 0 ? eligibleItems : [primaryItem]
-    const subtotal = pricedItems.reduce((sum, item) => sum + item.amount, 0)
+    const sourceWithExtras = quote as Quote & {
+      applySalesTax?: boolean
+      salesTaxRate?: number
+      salesTaxAmount?: number
+      taxRate?: number
+    }
+    const quotedSubtotal = typeof quote.subtotal === 'number'
+      ? quote.subtotal
+      : pricedItems.reduce((sum, item) => sum + item.amount, 0)
+    const quotedTaxAmount = sourceWithExtras.salesTaxAmount ?? quote.tax ?? 0
+    const quotedTaxRate = sourceWithExtras.salesTaxRate ?? sourceWithExtras.taxRate ?? 0
+    const applySalesTax = sourceWithExtras.applySalesTax ?? (quotedTaxRate > 0 || quotedTaxAmount > 0)
+    const quotedDeliveryFee = deliveryLine?.amount ?? 0
+    const quotedTotal = typeof quote.total === 'number'
+      ? quote.total
+      : parseFloat((quotedSubtotal + (applySalesTax ? quotedTaxAmount : 0)).toFixed(2))
+
     const orderRef = await addDoc(ordersCol, {
       customerId,
       productId: primaryItem.productId,
@@ -349,14 +368,21 @@ export async function convertQuoteToOrder(
       deliveryTier: 'standard',
       unitPrice: primaryItem.unitPrice || unitPrice,
       upchargePercent: 0,
-      subtotal,
-      deliveryFee: 35,
-      total: parseFloat((subtotal + 35).toFixed(2)),
+      subtotal: quotedSubtotal,
+      deliveryFee: quotedDeliveryFee,
+      total: quotedTotal,
+      quoteSubtotal: quotedSubtotal,
+      quoteTax: applySalesTax ? quotedTaxAmount : 0,
+      quoteTotal: quotedTotal,
+      applySalesTax,
+      salesTaxRate: applySalesTax ? quotedTaxRate : 0,
+      salesTaxAmount: applySalesTax ? quotedTaxAmount : 0,
+      taxRate: applySalesTax ? quotedTaxRate : 0,
       status: 'pending',
       orderType: 'offRoute',
       quoteId,
       quoteNumber: quote.quoteNumber,
-      quotedLineItems: eligibleItems,
+      quotedLineItems: quote.lineItems,
       addOns: restItems.map((item) => ({
         productId: item.productId,
         productName: item.description,

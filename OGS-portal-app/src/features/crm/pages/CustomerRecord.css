@@ -895,6 +895,12 @@
   font-size: 1rem;
 }
 
+.cr-table__actions {
+  display: flex;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+}
+
 /* ── Responsive: stack columns on small screens ── */
 @media (max-width: 680px) {
   .cr-inv-header-row { display: none; }

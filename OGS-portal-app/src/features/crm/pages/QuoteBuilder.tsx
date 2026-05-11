@@ -32,6 +32,7 @@ import {
 } from '../../../services/quoteService'
 import { subscribeToCustomers, searchCustomers, getCustomer } from '../../../services/customerService'
 import { getLeads, getLead } from '../../../services/leadService'
+import { getCompanySettings } from '../../../services/companySettingsService'
 import { useAuth } from '../../../hooks/useAuth'
 import { formatCurrency, formatDate, formatRelative } from '../../../utils/format'
 import { Badge } from '../../../components/ui/Badge'
@@ -349,6 +350,8 @@ export const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
   const [rentalMonths,   setRentalMonths]   = useState(0)
   const [rentalRate,     setRentalRate]     = useState(0)
   const [includeRental,  setIncludeRental]  = useState(false)
+  const [applySalesTax, setApplySalesTax]   = useState(false)
+  const [salesTaxRatePercent, setSalesTaxRatePercent] = useState('0.00')
   const [notes,          setNotes]          = useState('')
   const [pdfUrl,         setPdfUrl]         = useState<string | null>(null)
   const [pdfLoading,     setPdfLoading]     = useState(false)
@@ -356,6 +359,29 @@ export const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
   const [status,         setStatus]         = useState<QuoteStatus>(editQuote?.status ?? 'draft')
   const [error,          setError]          = useState<string | null>(null)
   const [toast,          setToast]          = useState<string | null>(null)
+
+  useEffect(() => {
+    let mounted = true
+    if (editQuote) return () => { mounted = false }
+    getCompanySettings()
+      .then((settings) => {
+        if (!mounted) return
+        const configuredRate = Number(settings.defaultSalesTaxRate ?? 0)
+        if (!Number.isFinite(configuredRate) || configuredRate <= 0) {
+          setApplySalesTax(false)
+          setSalesTaxRatePercent('0.00')
+          return
+        }
+        setApplySalesTax(true)
+        setSalesTaxRatePercent(configuredRate.toFixed(2))
+      })
+      .catch(() => {
+        if (!mounted) return
+        setApplySalesTax(false)
+        setSalesTaxRatePercent('0.00')
+      })
+    return () => { mounted = false }
+  }, [editQuote])
 
   // Pre-fill from edit quote
   useEffect(() => {
@@ -378,6 +404,11 @@ export const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
       }))
     )
     setNotes(editQuote.notes ?? '')
+    const initialTaxAmount = editQuote.salesTaxAmount ?? editQuote.tax ?? 0
+    const initialTaxRate = editQuote.salesTaxRate ?? editQuote.taxRate ?? 0
+    const inferredApplySalesTax = editQuote.applySalesTax ?? (initialTaxRate > 0 || initialTaxAmount > 0)
+    setApplySalesTax(Boolean(inferredApplySalesTax))
+    setSalesTaxRatePercent((((inferredApplySalesTax ? initialTaxRate : 0) || 0) * 100).toFixed(2))
     setStatus(editQuote.status)
     if (editQuote.validUntil) {
       setValidUntil((editQuote.validUntil as { toDate(): Date }).toDate().toISOString().slice(0, 10))
@@ -402,7 +433,14 @@ export const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
     [includeRental, rentalRate, rentalMonths],
   )
   const effectiveDelivery = includeDelivery ? deliveryFee : 0
-  const total = parseFloat((subtotal + effectiveDelivery + rentalTotal).toFixed(2))
+  const preTaxTotal = parseFloat((subtotal + effectiveDelivery + rentalTotal).toFixed(2))
+  const parsedSalesTaxRatePercent = Number.parseFloat(salesTaxRatePercent)
+  const safeSalesTaxRatePercent = Number.isFinite(parsedSalesTaxRatePercent)
+    ? Math.max(parsedSalesTaxRatePercent, 0)
+    : 0
+  const salesTaxRate = applySalesTax ? (safeSalesTaxRatePercent / 100) : 0
+  const salesTaxAmount = parseFloat((preTaxTotal * salesTaxRate).toFixed(2))
+  const total = parseFloat((preTaxTotal + salesTaxAmount).toFixed(2))
 
   // ── Row helpers ───────────────────────────────────────────────────────────
 
@@ -489,6 +527,13 @@ export const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
         lineItems,
         validUntil: new Date(validUntil),
         notes:      notes.trim() || undefined,
+        applySalesTax,
+        salesTaxRate,
+        salesTaxAmount,
+        taxRate: salesTaxRate,
+        tax: salesTaxAmount,
+        subtotal: preTaxTotal,
+        total,
         createdBy:  user!.id,
         customerId: recipient!.type === 'customer' ? recipient!.id : undefined,
         leadId:     recipient!.type === 'lead'     ? recipient!.id : undefined,
@@ -743,6 +788,46 @@ export const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
               </div>
             )}
           </div>
+
+          <div className="qb-addon qb-addon--tax">
+            <p className="qb-addon__heading">Sales tax</p>
+            <div className="qb-tax-toggle" role="radiogroup" aria-label="Sales tax choice">
+              <label className="qb-tax-option">
+                <input
+                  type="radio"
+                  name="qb-tax-mode"
+                  checked={applySalesTax}
+                  onChange={() => setApplySalesTax(true)}
+                  disabled={isReadOnly}
+                />
+                <span>Apply sales tax</span>
+              </label>
+              <label className="qb-tax-option">
+                <input
+                  type="radio"
+                  name="qb-tax-mode"
+                  checked={!applySalesTax}
+                  onChange={() => setApplySalesTax(false)}
+                  disabled={isReadOnly}
+                />
+                <span>Omit sales tax</span>
+              </label>
+            </div>
+            <div className="qb-addon__fields">
+              <Input
+                label="Sales tax rate (%)"
+                type="number"
+                min="0"
+                step="0.01"
+                value={salesTaxRatePercent}
+                onChange={e => setSalesTaxRatePercent(e.target.value)}
+                disabled={isReadOnly || !applySalesTax}
+              />
+            </div>
+            {!applySalesTax && (
+              <p className="qb-tax-note">Sales tax is omitted for this quote.</p>
+            )}
+          </div>
         </section>
 
         {/* Pricing summary */}
@@ -764,6 +849,14 @@ export const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
                 <span>{formatCurrency(rentalTotal)}</span>
               </div>
             )}
+            <div className="qb-summary__row">
+              <span>Pre-tax total</span>
+              <span>{formatCurrency(preTaxTotal)}</span>
+            </div>
+            <div className="qb-summary__row">
+              <span>{applySalesTax ? `Sales tax (${safeSalesTaxRatePercent.toFixed(2)}%)` : 'Sales tax omitted'}</span>
+              <span>{formatCurrency(applySalesTax ? salesTaxAmount : 0)}</span>
+            </div>
             <div className="qb-summary__row qb-summary__row--total">
               <span>Total</span>
               <span>{formatCurrency(total)}</span>

@@ -34,6 +34,7 @@ import {
 } from '../../../services/quoteService'
 import { subscribeToCustomers, getCustomer } from '../../../services/customerService'
 import { getLeads } from '../../../services/leadService'
+import { getCompanySettings } from '../../../services/companySettingsService'
 import { useAuth } from '../../../hooks/useAuth'
 import { getDoc, doc } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
@@ -450,6 +451,8 @@ const QuoteEditorPage: React.FC = () => {
   const [rentalMonths,   setRentalMonths]   = useState(0)
   const [rentalRate,     setRentalRate]     = useState(0)
   const [includeRental,  setIncludeRental]  = useState(false)
+  const [applySalesTax, setApplySalesTax] = useState(false)
+  const [salesTaxRatePercent, setSalesTaxRatePercent] = useState('0.00')
   const [notes,          setNotes]          = useState('')
   const [pdfUrl,         setPdfUrl]         = useState<string | null>(null)
   const [pdfLoading,     setPdfLoading]     = useState(false)
@@ -465,6 +468,28 @@ const QuoteEditorPage: React.FC = () => {
   const [showDuplicateConfirm, setShowDuplicateConfirm] = useState(false)
   const [showCreateCustomer, setShowCreateCustomer] = useState(false)
   const summaryRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    let mounted = true
+    getCompanySettings()
+      .then((settings) => {
+        if (!mounted || !isNew) return
+        const configuredRate = Number(settings.defaultSalesTaxRate ?? 0)
+        if (!Number.isFinite(configuredRate) || configuredRate <= 0) {
+          setApplySalesTax(false)
+          setSalesTaxRatePercent('0.00')
+          return
+        }
+        setApplySalesTax(true)
+        setSalesTaxRatePercent(configuredRate.toFixed(2))
+      })
+      .catch(() => {
+        if (!mounted || !isNew) return
+        setApplySalesTax(false)
+        setSalesTaxRatePercent('0.00')
+      })
+    return () => { mounted = false }
+  }, [isNew])
 
   // Load existing quote into form
   useEffect(() => {
@@ -492,6 +517,11 @@ const QuoteEditorPage: React.FC = () => {
       })).map((row) => recalcRow(row, 'unitPrice')))
       setNotes(q.notes ?? '')
       setStatus(q.status)
+      const initialTaxAmount = q.salesTaxAmount ?? q.tax ?? 0
+      const initialTaxRate = q.salesTaxRate ?? q.taxRate ?? 0
+      const inferredApplySalesTax = q.applySalesTax ?? (initialTaxRate > 0 || initialTaxAmount > 0)
+      setApplySalesTax(Boolean(inferredApplySalesTax))
+      setSalesTaxRatePercent((((inferredApplySalesTax ? initialTaxRate : 0) || 0) * 100).toFixed(2))
       if (q.needsOrderSetup) setNeedsOrderSetup(true)
       setApprovalDetails(q.approval ?? null)
 
@@ -578,9 +608,16 @@ const QuoteEditorPage: React.FC = () => {
     [includeRental, rentalRate, rentalMonths],
   )
   const effectiveDelivery = includeDelivery ? deliveryFee : 0
-  const total = parseFloat((subtotal + effectiveDelivery + rentalTotal).toFixed(2))
+  const preTaxTotal = parseFloat((subtotal + effectiveDelivery + rentalTotal).toFixed(2))
+  const parsedSalesTaxRatePercent = Number.parseFloat(salesTaxRatePercent)
+  const safeSalesTaxRatePercent = Number.isFinite(parsedSalesTaxRatePercent)
+    ? Math.max(parsedSalesTaxRatePercent, 0)
+    : 0
+  const salesTaxRate = applySalesTax ? (safeSalesTaxRatePercent / 100) : 0
+  const salesTaxAmount = parseFloat((preTaxTotal * salesTaxRate).toFixed(2))
+  const total = parseFloat((preTaxTotal + salesTaxAmount).toFixed(2))
   const totalProfit = parseFloat((totalLineProfit + effectiveDelivery + rentalTotal).toFixed(2))
-  const overallMarginPercent = total > 0 ? totalProfit / total : 0
+  const overallMarginPercent = preTaxTotal > 0 ? totalProfit / preTaxTotal : 0
   const marginViolations = useMemo(
     () => rows.filter((r) => r.productId && r.marginPercent + 0.0001 < r.minMarginPercent),
     [rows],
@@ -704,6 +741,13 @@ const QuoteEditorPage: React.FC = () => {
         lineItems,
         validUntil: new Date(validUntil),
         notes:      notes.trim() || undefined,
+        applySalesTax,
+        salesTaxRate,
+        salesTaxAmount,
+        taxRate: salesTaxRate,
+        tax: salesTaxAmount,
+        subtotal: preTaxTotal,
+        total,
         createdBy:  user!.id,
         customerId: rec?.type === 'customer' ? rec.id : undefined,
         leadId:     rec?.type === 'lead'     ? rec.id : undefined,
@@ -1132,6 +1176,46 @@ const QuoteEditorPage: React.FC = () => {
                   </div>
                 )}
               </div>
+
+              <div className="qep-addon qep-addon--tax">
+                <p className="qep-addon__heading">Sales tax</p>
+                <div className="qep-tax-toggle" role="radiogroup" aria-label="Sales tax choice">
+                  <label className="qep-tax-option">
+                    <input
+                      type="radio"
+                      name="qep-tax-mode"
+                      checked={applySalesTax}
+                      onChange={() => setApplySalesTax(true)}
+                      disabled={isReadOnly}
+                    />
+                    <span>Apply sales tax</span>
+                  </label>
+                  <label className="qep-tax-option">
+                    <input
+                      type="radio"
+                      name="qep-tax-mode"
+                      checked={!applySalesTax}
+                      onChange={() => setApplySalesTax(false)}
+                      disabled={isReadOnly}
+                    />
+                    <span>Omit sales tax</span>
+                  </label>
+                </div>
+                <div className="qep-addon__fields">
+                  <Input
+                    label="Sales tax rate (%)"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={salesTaxRatePercent}
+                    onChange={e => setSalesTaxRatePercent(e.target.value)}
+                    disabled={isReadOnly || !applySalesTax}
+                  />
+                </div>
+                {!applySalesTax && (
+                  <p className="qep-tax-note">Sales tax is omitted for this quote.</p>
+                )}
+              </div>
             </section>
 
             {/* Notes */}
@@ -1165,6 +1249,14 @@ const QuoteEditorPage: React.FC = () => {
                     <span>{formatCurrency(rentalTotal)}</span>
                   </div>
                 )}
+                <div className="qep-summary__row">
+                  <span>Pre-tax total</span>
+                  <span>{formatCurrency(preTaxTotal)}</span>
+                </div>
+                <div className="qep-summary__row">
+                  <span>{applySalesTax ? `Sales tax (${safeSalesTaxRatePercent.toFixed(2)}%)` : 'Sales tax omitted'}</span>
+                  <span>{formatCurrency(applySalesTax ? salesTaxAmount : 0)}</span>
+                </div>
                 <div className="qep-summary__row qep-summary__row--total">
                   <span>Total revenue</span>
                   <span>{formatCurrency(total)}</span>

@@ -98,6 +98,13 @@ const QuotePage: React.FC = () => {
   const acceptedAt  = quote.acceptedAt?.toDate?.()
   const isExpired   = validUntil && validUntil < new Date() && quote.status === 'sent'
   const canRespond  = quote.status === 'sent' && !isExpired
+  const salesTaxAmount = quote.salesTaxAmount ?? quote.tax ?? 0
+  const salesTaxRate = quote.salesTaxRate ?? quote.taxRate ?? 0
+  const applySalesTax = quote.applySalesTax ?? (salesTaxRate > 0 || salesTaxAmount > 0)
+  const visibleTaxAmount = applySalesTax ? salesTaxAmount : 0
+  const taxLabel = applySalesTax
+    ? (salesTaxRate > 0 ? `Sales Tax (${(salesTaxRate * 100).toFixed(2)}%)` : 'Sales Tax')
+    : 'Sales Tax Omitted'
 
   return (
     <div className="qp">
@@ -141,12 +148,10 @@ const QuotePage: React.FC = () => {
               <td colSpan={3} className="qp__td qp__td--total-label">Subtotal</td>
               <td className="qp__td qp__td--num">{formatCurrency(quote.subtotal)}</td>
             </tr>
-            {quote.tax > 0 && (
-              <tr className="qp__tr-total">
-                <td colSpan={3} className="qp__td qp__td--total-label">Tax</td>
-                <td className="qp__td qp__td--num">{formatCurrency(quote.tax)}</td>
-              </tr>
-            )}
+            <tr className="qp__tr-total">
+              <td colSpan={3} className="qp__td qp__td--total-label">{taxLabel}</td>
+              <td className="qp__td qp__td--num">{formatCurrency(visibleTaxAmount)}</td>
+            </tr>
             <tr className="qp__tr-grand">
               <td colSpan={3} className="qp__td qp__td--grand-label">Total</td>
               <td className="qp__td qp__td--grand-num">{formatCurrency(quote.total)}</td>

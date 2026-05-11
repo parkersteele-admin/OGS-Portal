@@ -27,6 +27,9 @@ export interface InvoiceFilters {
 export interface CreateInvoiceInput {
   customerId: string
   orderId?: string
+  quoteId?: string
+  quoteNumber?: string
+  leadId?: string
   lineItems: InvoiceLineItem[]
   dueAt: Date
   notes?: string

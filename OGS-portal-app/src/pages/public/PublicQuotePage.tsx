@@ -30,6 +30,9 @@ interface PublicQuoteData {
   validUntil:  string | null
   lineItems:   PublicLineItem[]
   subtotal:    number
+  applySalesTax?: boolean
+  salesTaxRate?: number
+  salesTaxAmount?: number
   total:       number
   notes:       string
   approval?: {
@@ -252,6 +255,13 @@ const PublicQuotePage: React.FC = () => {
   }
 
   const { quote, company, rep, discussNote } = data ?? {}
+  const salesTaxAmount = quote.salesTaxAmount ?? 0
+  const salesTaxRate = quote.salesTaxRate ?? 0
+  const applySalesTax = quote.applySalesTax ?? (salesTaxRate > 0 || salesTaxAmount > 0)
+  const visibleTaxAmount = applySalesTax ? salesTaxAmount : 0
+  const taxLabel = applySalesTax
+    ? (salesTaxRate > 0 ? `Sales Tax (${(salesTaxRate * 100).toFixed(2)}%)` : 'Sales Tax')
+    : 'Sales Tax Omitted'
   
   // Ensure required fields exist before rendering
   if (!data || !quote || !company) {
@@ -272,10 +282,6 @@ const PublicQuotePage: React.FC = () => {
     return null
   }
   
-  const paymentPreference =
-    (accepted || quote.status === 'accepted'
-      ? quote.approval?.paymentChoice
-      : form.paymentChoice) ?? 'undecided'
   const termsUrl = company.website
     ? `${company.website.replace(/\/$/, '')}/terms`
     : 'https://www.ohiogassupply.com/terms'
@@ -301,19 +307,6 @@ const PublicQuotePage: React.FC = () => {
               <ul className="pqp-confirmation-list">
                 <li>Delivery point of contact has been saved with the order.</li>
                 <li>Terms & conditions acceptance has been recorded.</li>
-                <li>
-                  Payment preference:
-                  {' '}
-                  <strong>
-                    {paymentPreference === 'card_on_file'
-                      ? 'Credit card on file'
-                      : paymentPreference === 'net_terms'
-                        ? 'Net terms'
-                        : paymentPreference === 'cod'
-                          ? 'Cash on delivery'
-                          : 'To be decided'}
-                  </strong>
-                </li>
               </ul>
             </div>
 
@@ -407,6 +400,14 @@ const PublicQuotePage: React.FC = () => {
           </tbody>
           <tfoot>
             <tr>
+              <td colSpan={3} className="pqp-table__total-label">Subtotal</td>
+              <td className="pqp-table__total-val">{formatMoney(quote.subtotal)}</td>
+            </tr>
+            <tr>
+              <td colSpan={3} className="pqp-table__total-label">{taxLabel}</td>
+              <td className="pqp-table__total-val">{formatMoney(visibleTaxAmount)}</td>
+            </tr>
+            <tr>
               <td colSpan={3} className="pqp-table__total-label">Total</td>
               <td className="pqp-table__total-val">{formatMoney(quote.total)}</td>
             </tr>
@@ -495,23 +496,6 @@ const PublicQuotePage: React.FC = () => {
                 </label>
               ))}
             </div>
-          </div>
-
-          <div className="pqp-choice-group">
-            <p className="pqp-choice-group__label">Billing preference after delivery</p>
-            <label className="pqp-field">
-              <span className="pqp-field__label">Payment preference</span>
-              <select
-                className="pqp-input"
-                value={form.paymentChoice}
-                onChange={(e) => updateField('paymentChoice', e.target.value as PaymentChoice)}
-              >
-                <option value="net_terms">Net terms</option>
-                <option value="card_on_file">Credit card on file</option>
-                <option value="cod">Cash on delivery</option>
-                <option value="undecided">To be decided</option>
-              </select>
-            </label>
           </div>
 
           <label className="pqp-checkbox pqp-checkbox--terms">

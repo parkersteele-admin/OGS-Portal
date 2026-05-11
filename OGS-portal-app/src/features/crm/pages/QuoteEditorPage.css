@@ -607,6 +607,39 @@
   max-width: 420px;
 }
 
+.qep-addon--tax {
+  border-top: 1px solid #efefef;
+  padding-top: 0.7rem;
+}
+
+.qep-addon__heading {
+  margin: 0 0 0.45rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #4b5563;
+}
+
+.qep-tax-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.95rem;
+  margin-bottom: 0.55rem;
+}
+
+.qep-tax-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  font-size: 0.84rem;
+  color: #1f2937;
+}
+
+.qep-tax-note {
+  margin: 0.3rem 0 0;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
 .qep-textarea {
   width: 100%;
   resize: vertical;
