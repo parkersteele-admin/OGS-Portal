@@ -10,15 +10,13 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { getDocs, orderBy, query } from 'firebase/firestore'
 import {
   subscribeToCustomers,
-  createCustomer,
-  type CreateCustomerInput,
 } from '../../../services/customerService'
 import { ordersCol } from '../../../lib/firestore'
 import { Badge } from '../../../components/ui/Badge'
 import { Button } from '../../../components/ui/Button'
 import { Card } from '../../../components/ui/Card'
 import { Input } from '../../../components/ui/Input'
-import { Modal } from '../../../components/ui/Modal'
+import CustomerCreateModal from '../components/CustomerCreateModal'
 import type { Customer, CustomerStatus } from '../../../types/customer'
 import type { Order } from '../../../types/order'
 import { formatDate } from '../../../utils/format'
@@ -32,146 +30,6 @@ const STATUS_VARIANT: Record<CustomerStatus, 'success' | 'warning' | 'danger' | 
   inactive: 'danger',
   archived: 'neutral',
   deleted:  'neutral',
-}
-
-// ── Add-customer modal ────────────────────────────────────────────────────────
-
-interface AddCustomerModalProps {
-  onClose: () => void
-  onCreated: (id: string) => void
-}
-
-const EMPTY_FORM: CreateCustomerInput = {
-  name: '', email: '', phone: '',
-  address: '', city: '', state: 'OH', zip: '',
-  creditLimit: 5000, notes: '',
-}
-
-const AddCustomerModal: React.FC<AddCustomerModalProps> = ({ onClose, onCreated }) => {
-  const [form, setForm]       = useState<CreateCustomerInput>(EMPTY_FORM)
-  const [saving, setSaving]   = useState(false)
-  const [error, setError]     = useState('')
-
-  function set(field: keyof CreateCustomerInput, val: string | number) {
-    setForm((f) => ({ ...f, [field]: val }))
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!form.name.trim()) { setError('Company name is required.'); return }
-    setSaving(true)
-    setError('')
-    try {
-      const id = await createCustomer(form)
-      onCreated(id)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create customer.')
-      setSaving(false)
-    }
-  }
-
-  return (
-    <Modal open onClose={onClose} title="Add Customer" size="lg">
-      <form className="cp-modal-form" onSubmit={handleSubmit}>
-        <div className="cp-modal-form__section">
-          <p className="cp-modal-form__section-label">Company</p>
-          <div className="cp-modal-form__grid cp-modal-form__grid--1">
-            <Input
-              autoFocus
-              label="Company Name *"
-              value={form.name}
-              onChange={(e) => set('name', e.target.value)}
-              placeholder="e.g. Nocterra Brewing"
-            />
-          </div>
-        </div>
-
-        <div className="cp-modal-form__section">
-          <p className="cp-modal-form__section-label">Contact</p>
-          <div className="cp-modal-form__grid cp-modal-form__grid--2">
-            <Input
-              label="Email"
-              type="email"
-              value={form.email}
-              onChange={(e) => set('email', e.target.value)}
-              placeholder="billing@company.com"
-            />
-            <Input
-              label="Phone"
-              type="tel"
-              value={form.phone}
-              onChange={(e) => set('phone', e.target.value)}
-              placeholder="(614) 555-0100"
-            />
-          </div>
-        </div>
-
-        <div className="cp-modal-form__section">
-          <p className="cp-modal-form__section-label">Address</p>
-          <div className="cp-modal-form__grid cp-modal-form__grid--1">
-            <Input
-              label="Street"
-              value={form.address}
-              onChange={(e) => set('address', e.target.value)}
-              placeholder="123 Main St"
-            />
-          </div>
-          <div className="cp-modal-form__grid cp-modal-form__grid--3">
-            <Input
-              label="City"
-              value={form.city}
-              onChange={(e) => set('city', e.target.value)}
-              placeholder="Columbus"
-            />
-            <Input
-              label="State"
-              value={form.state}
-              onChange={(e) => set('state', e.target.value)}
-              placeholder="OH"
-            />
-            <Input
-              label="ZIP"
-              value={form.zip}
-              onChange={(e) => set('zip', e.target.value)}
-              placeholder="43215"
-            />
-          </div>
-        </div>
-
-        <div className="cp-modal-form__section">
-          <p className="cp-modal-form__section-label">Account</p>
-          <div className="cp-modal-form__grid cp-modal-form__grid--2">
-            <Input
-              label="Credit Limit ($)"
-              type="number"
-              value={String(form.creditLimit ?? 5000)}
-              onChange={(e) => set('creditLimit', Number(e.target.value))}
-            />
-          </div>
-          <label className="cp-modal-form__label" htmlFor="customer-notes">
-            Notes
-          </label>
-          <textarea
-            id="customer-notes"
-            className="cp-modal-form__textarea"
-            rows={3}
-            value={form.notes ?? ''}
-            onChange={(e) => set('notes', e.target.value)}
-            placeholder="Internal notes"
-          />
-        </div>
-
-        {error && <p className="cp-modal-form__error">{error}</p>}
-
-        <div className="cp-modal-form__actions">
-          <Button variant="ghost" type="button" onClick={onClose}>Cancel</Button>
-          <Button variant="primary" type="submit" disabled={saving}>
-            {saving ? 'Saving...' : 'Create Customer'}
-          </Button>
-        </div>
-      </form>
-    </Modal>
-  )
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
@@ -188,7 +46,6 @@ const CustomersPage: React.FC = () => {
   const [lastOrderMap, setLastOrderMap] = useState<Record<string, string>>({})
 
   useEffect(() => {
-    setLoading(true)
     const unsub = subscribeToCustomers({}, (cs) => {
       // Exclude hard-deleted documents from the customer list — they are only
       // visible on the individual CustomerRecord page during the 30-day grace window.
@@ -372,7 +229,9 @@ const CustomersPage: React.FC = () => {
       </Card>
 
       {showAdd && (
-        <AddCustomerModal
+        <CustomerCreateModal
+          open={showAdd}
+          title="Add Customer"
           onClose={() => setShowAdd(false)}
           onCreated={handleCreated}
         />

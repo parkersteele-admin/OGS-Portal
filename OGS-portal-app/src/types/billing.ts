@@ -15,12 +15,21 @@ export interface Invoice {
   id: string
   invoiceNumber: string
   customerId: string
+  customerContactName?: string
+  customerContactEmail?: string
   orderId?: string
   quoteId?: string
   quoteNumber?: string
   leadId?: string
   status: InvoiceStatus
   lineItems: InvoiceLineItem[]
+  notes?: string
+  terms?: string
+  paymentTermsDays?: number
+  applySalesTax?: boolean
+  salesTaxRate?: number
+  salesTaxAmount?: number
+  taxRate?: number
   subtotal: number
   tax: number
   total: number

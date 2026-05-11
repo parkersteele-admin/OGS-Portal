@@ -41,7 +41,8 @@ import { useCustomerTanks } from '../../../hooks/useCustomerTanks'
 import { useAuth } from '../../../hooks/useAuth'
 import { updateCustomer, archiveCustomer, deleteCustomer, restoreCustomer } from '../../../services/customerService'
 import { getUsersByCompany, assignUserRole, deactivateUser, reactivateUser, sendPasswordReset } from '../../../services/userService'
-import { getInvoices, createInvoice } from '../../../services/invoiceService'
+import { getInvoice, getInvoices, createInvoice, saveDraftInvoiceEdits } from '../../../services/invoiceService'
+import { getCompanySettings } from '../../../services/companySettingsService'
 import { getProductDropdown, getVisibleProducts, type ProductDropdownItem } from '../../../services/productService'
 import { setCustomerProductPrice, removeCustomerProductPrice } from '../../../services/customerPricingService'
 import { useCustomerProductPricing } from '../../../hooks/useCustomerProductPricing'
@@ -61,6 +62,7 @@ import type { ContactLog, ContactMethod } from '../../../types/crm'
 import type { AppFile } from '../../../types/file'
 import type { AppUser } from '../../../types/user'
 import type { UserRole } from '../../../types/user'
+import type { Invoice } from '../../../types/billing'
 import './CustomerRecord.css'
 
 // ── Extended types for CRM-specific Firestore fields ─────────────────────────
@@ -358,20 +360,57 @@ interface InvoiceLineRow {
 const EMPTY_ROW: InvoiceLineRow = { productId: '', description: '', quantity: '1', unitPrice: '', unit: '' }
 
 interface CreateInvoiceModalProps {
+  mode: 'create' | 'edit'
+  initialInvoice?: Invoice | null
   onClose:  () => void
   onSubmit: (
     lineItems: { description: string; quantity: number; unitPrice: number; amount: number }[],
     dueDate:   string,
     notes:     string,
+    terms:     string,
+    applySalesTax: boolean,
+    salesTaxRatePercent: number,
+    paymentTermsDays?: number,
+    customerContactName?: string,
+    customerContactEmail?: string,
   ) => Promise<void>
   saving: boolean
 }
 
-const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({ onClose, onSubmit, saving }) => {
-  const dueDefault = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
-  const [rows, setRows]       = useState<InvoiceLineRow[]>([{ ...EMPTY_ROW }])
+const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
+  mode,
+  initialInvoice,
+  onClose,
+  onSubmit,
+  saving,
+}) => {
+  const fallbackDueDate = new Date()
+  fallbackDueDate.setDate(fallbackDueDate.getDate() + 30)
+  const dueDefault = initialInvoice?.dueAt?.toDate?.().toISOString().slice(0, 10)
+    ?? fallbackDueDate.toISOString().slice(0, 10)
+  const initialRows = initialInvoice?.lineItems?.length
+    ? initialInvoice.lineItems.map((item) => ({
+        ...EMPTY_ROW,
+        description: item.description,
+        quantity: String(item.quantity),
+        unitPrice: String(item.unitPrice),
+      }))
+    : [{ ...EMPTY_ROW }]
+
+  const [rows, setRows]       = useState<InvoiceLineRow[]>(initialRows)
   const [dueDate, setDueDate] = useState(dueDefault)
-  const [notes, setNotes]     = useState('')
+  const [notes, setNotes]     = useState(initialInvoice?.notes ?? '')
+  const [terms, setTerms]     = useState(initialInvoice?.terms ?? '')
+  const [applySalesTax, setApplySalesTax] = useState(
+    initialInvoice?.applySalesTax
+      ?? ((initialInvoice?.salesTaxRate ?? initialInvoice?.taxRate ?? 0) > 0 || (initialInvoice?.salesTaxAmount ?? initialInvoice?.tax ?? 0) > 0),
+  )
+  const [salesTaxRatePercent, setSalesTaxRatePercent] = useState(
+    String((((initialInvoice?.salesTaxRate ?? initialInvoice?.taxRate) ?? 0) * 100).toFixed(2)),
+  )
+  const [paymentTermsDays, setPaymentTermsDays] = useState(initialInvoice?.paymentTermsDays ? String(initialInvoice.paymentTermsDays) : '')
+  const [customerContactName, setCustomerContactName] = useState(initialInvoice?.customerContactName ?? '')
+  const [customerContactEmail, setCustomerContactEmail] = useState(initialInvoice?.customerContactEmail ?? '')
   const [formError, setFormError] = useState('')
   const [products, setProducts]   = useState<ProductDropdownItem[]>([])
 
@@ -379,6 +418,26 @@ const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({ onClose, onSubm
   React.useEffect(() => {
     getProductDropdown().then(setProducts).catch(() => {/* non-blocking */})
   }, [])
+
+  React.useEffect(() => {
+    if (initialInvoice) return
+    let cancelled = false
+    getCompanySettings()
+      .then((settings) => {
+        if (cancelled) return
+        const configuredRate = Number(settings.defaultSalesTaxRate ?? 0)
+        if (!Number.isFinite(configuredRate) || configuredRate <= 0) {
+          setApplySalesTax(false)
+          return
+        }
+        setApplySalesTax(true)
+        setSalesTaxRatePercent(configuredRate.toFixed(2))
+      })
+      .catch(() => {
+        // Non-blocking: leave UI defaults intact when settings fetch fails.
+      })
+    return () => { cancelled = true }
+  }, [initialInvoice])
 
   // Group products by category for <optgroup>
   const productsByCategory = React.useMemo(() => {
@@ -449,18 +508,38 @@ const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({ onClose, onSubm
       amount:      parseFloat((qty * price).toFixed(2)),
     }
   })
-  const total = lineItems.reduce((s, li) => s + li.amount, 0)
+  const subtotal = lineItems.reduce((s, li) => s + li.amount, 0)
+  const parsedSalesTaxRatePercent = Number.parseFloat(salesTaxRatePercent)
+  const safeSalesTaxRatePercent = Number.isFinite(parsedSalesTaxRatePercent) ? parsedSalesTaxRatePercent : 0
+  const taxAmount = applySalesTax ? subtotal * (safeSalesTaxRatePercent / 100) : 0
+  const total = subtotal + taxAmount
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setFormError('')
     if (lineItems.some(li => !li.description)) { setFormError('All line items need a description.'); return }
+    if (safeSalesTaxRatePercent < 0) { setFormError('Sales tax rate cannot be negative.'); return }
     if (!dueDate) { setFormError('Due date is required.'); return }
-    await onSubmit(lineItems, dueDate, notes)
+    const parsedTermsDays = paymentTermsDays.trim() ? Number.parseInt(paymentTermsDays, 10) : undefined
+    if (parsedTermsDays !== undefined && (!Number.isFinite(parsedTermsDays) || parsedTermsDays < 0)) {
+      setFormError('Payment terms must be a non-negative number of days.')
+      return
+    }
+    await onSubmit(
+      lineItems,
+      dueDate,
+      notes,
+      terms,
+      applySalesTax,
+      safeSalesTaxRatePercent,
+      parsedTermsDays,
+      customerContactName.trim() || undefined,
+      customerContactEmail.trim() || undefined,
+    )
   }
 
   return (
-    <Modal open onClose={onClose} title="Create invoice" size="lg">
+    <Modal open onClose={onClose} title={mode === 'edit' ? 'Edit draft invoice' : 'Create invoice'} size="lg">
       <form className="cr-modal-form" onSubmit={handleSubmit}>
         {formError && <p className="cr-form-error">{formError}</p>}
 
@@ -573,12 +652,89 @@ const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({ onClose, onSubm
 
         {/* ── Totals ── */}
         <div className="cr-inv-total-row">
-          <strong>Total: ${total.toFixed(2)}</strong>
+          <strong>Subtotal: ${subtotal.toFixed(2)} · Sales Tax: ${taxAmount.toFixed(2)} · Total: ${total.toFixed(2)}</strong>
         </div>
+
+        <div className="cr-form-row">
+          <div className="ui-field">
+            <label className="ui-field__label">Sales tax</label>
+            <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <input
+                  type="radio"
+                  name="sales-tax-choice"
+                  checked={applySalesTax}
+                  onChange={() => setApplySalesTax(true)}
+                />
+                Apply sales tax
+              </label>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <input
+                  type="radio"
+                  name="sales-tax-choice"
+                  checked={!applySalesTax}
+                  onChange={() => setApplySalesTax(false)}
+                />
+                No sales tax
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div className="cr-form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <Input
+            label="Sales tax rate (%)"
+            type="number"
+            min="0"
+            step="0.01"
+            value={salesTaxRatePercent}
+            onChange={e => setSalesTaxRatePercent(e.target.value)}
+            disabled={!applySalesTax}
+          />
+          <Input
+            label="Payment terms (days)"
+            type="number"
+            min="0"
+            step="1"
+            value={paymentTermsDays}
+            onChange={e => setPaymentTermsDays(e.target.value)}
+            placeholder="e.g. 30"
+          />
+        </div>
+        {!applySalesTax && (
+          <p style={{ marginTop: -4, marginBottom: 4, color: 'var(--color-text-3)' }}>Sales tax omitted.</p>
+        )}
 
         {/* ── Due date ── */}
         <div className="cr-form-row">
           <Input label="Due date" type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} required />
+        </div>
+
+        <div className="cr-form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <Input
+            label="Customer contact"
+            value={customerContactName}
+            onChange={e => setCustomerContactName(e.target.value)}
+            placeholder="Optional"
+          />
+          <Input
+            label="Contact email"
+            type="email"
+            value={customerContactEmail}
+            onChange={e => setCustomerContactEmail(e.target.value)}
+            placeholder="Optional"
+          />
+        </div>
+
+        <div className="ui-field">
+          <label className="ui-field__label">Terms (optional)</label>
+          <textarea
+            className="ui-input cr-textarea"
+            rows={2}
+            value={terms}
+            onChange={e => setTerms(e.target.value)}
+            placeholder="Net terms, late fees, or invoice conditions…"
+          />
         </div>
 
         {/* ── Notes ── */}
@@ -595,7 +751,9 @@ const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({ onClose, onSubm
 
         <div className="cr-modal-actions">
           <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>Cancel</Button>
-          <Button type="submit" variant="primary" loading={saving}>Create invoice</Button>
+          <Button type="submit" variant="primary" loading={saving}>
+            {mode === 'edit' ? 'Save Draft Changes' : 'Create invoice'}
+          </Button>
         </div>
       </form>
     </Modal>
@@ -910,7 +1068,9 @@ const CustomerRecord: React.FC = () => {
   const [showEdit,          setShowEdit]          = useState(false)
   const [showLogModal,      setShowLogModal]      = useState(false)
   const [showCreateInvoice, setShowCreateInvoice] = useState(false)
+  const [editingDraftInvoice, setEditingDraftInvoice] = useState<Invoice | null>(null)
   const [invoiceError,      setInvoiceError]      = useState<string | null>(null)
+  const [invoiceSuccess,    setInvoiceSuccess]    = useState<string | null>(null)
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false)
   const [showDeleteConfirm,  setShowDeleteConfirm]  = useState(false)
   const [custActionLoading,  setCustActionLoading]  = useState(false)
@@ -1047,6 +1207,45 @@ const CustomerRecord: React.FC = () => {
     staleTime: 60_000,
   })
   const orderHistoryInvoices = invoiceHistoryPage?.data ?? []
+
+  const openDraftEditor = useCallback((invoice: Invoice) => {
+    if (invoice.status !== 'draft') return
+    setInvoiceError(null)
+    setInvoiceSuccess(null)
+    setEditingDraftInvoice(invoice)
+    setShowCreateInvoice(true)
+  }, [])
+
+  React.useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const editDraftId = params.get('editDraft')
+    const tabParam = params.get('tab')
+    if (tabParam && TABS.some((t) => t.key === tabParam)) {
+      setActiveTab(tabParam as TabKey)
+    }
+    if (!editDraftId || !customerId) return
+
+    let cancelled = false
+    void getInvoice(editDraftId)
+      .then((invoice) => {
+        if (cancelled) return
+        if (invoice.customerId !== customerId || invoice.status !== 'draft') {
+          setInvoiceError('Draft invoice not found for this customer.')
+          return
+        }
+        openDraftEditor(invoice)
+      })
+      .catch(() => {
+        if (!cancelled) setInvoiceError('Unable to load draft invoice for editing.')
+      })
+      .finally(() => {
+        if (cancelled) return
+        params.delete('editDraft')
+        navigate({ pathname: location.pathname, search: params.toString() ? `?${params.toString()}` : '' }, { replace: true })
+      })
+
+    return () => { cancelled = true }
+  }, [customerId, location.pathname, location.search, navigate, openDraftEditor])
 
   // Customer files (fetched when documents tab active)
   const { data: files = [], isLoading: filesLoading } = useQuery({
@@ -1217,23 +1416,100 @@ const CustomerRecord: React.FC = () => {
       lineItems,
       dueDate,
       notes: invNotes,
+      terms,
+      applySalesTax,
+      salesTaxRatePercent,
+      paymentTermsDays,
+      customerContactName,
+      customerContactEmail,
     }: {
       lineItems: { description: string; quantity: number; unitPrice: number; amount: number }[]
       dueDate:   string
       notes:     string
+      terms:     string
+      applySalesTax: boolean
+      salesTaxRatePercent: number
+      paymentTermsDays?: number
+      customerContactName?: string
+      customerContactEmail?: string
     }) => createInvoice({
       customerId: customerId!,
       lineItems,
       dueAt: new Date(dueDate),
       ...(invNotes ? { notes: invNotes } : {}),
+      ...(terms ? { terms } : {}),
+      ...(paymentTermsDays !== undefined ? { paymentTermsDays } : {}),
+      ...(customerContactName ? { customerContactName } : {}),
+      ...(customerContactEmail ? { customerContactEmail } : {}),
+      applySalesTax,
+      salesTaxRate: applySalesTax ? (salesTaxRatePercent / 100) : 0,
+      salesTaxAmount: undefined,
+      taxRate: applySalesTax ? (salesTaxRatePercent / 100) : 0,
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices', customerId] })
       queryClient.invalidateQueries({ queryKey: ['invoices', 'outstanding', customerId] })
       setShowCreateInvoice(false)
+      setEditingDraftInvoice(null)
       setInvoiceError(null)
+      setInvoiceSuccess('Draft invoice saved.')
     },
-    onError: (e: Error) => setInvoiceError(e.message),
+    onError: (e: Error) => {
+      setInvoiceSuccess(null)
+      setInvoiceError(e.message)
+    },
+  })
+
+  const editDraftInvoiceMutation = useMutation({
+    mutationFn: async ({
+      invoiceId,
+      lineItems,
+      dueDate,
+      notes: invNotes,
+      terms,
+      applySalesTax,
+      salesTaxRatePercent,
+      paymentTermsDays,
+      customerContactName,
+      customerContactEmail,
+    }: {
+      invoiceId: string
+      lineItems: { description: string; quantity: number; unitPrice: number; amount: number }[]
+      dueDate:   string
+      notes:     string
+      terms:     string
+      applySalesTax: boolean
+      salesTaxRatePercent: number
+      paymentTermsDays?: number
+      customerContactName?: string
+      customerContactEmail?: string
+    }) => saveDraftInvoiceEdits(invoiceId, {
+      customerId: customerId!,
+      lineItems,
+      dueAt: new Date(dueDate),
+      ...(invNotes ? { notes: invNotes } : {}),
+      ...(terms ? { terms } : {}),
+      ...(paymentTermsDays !== undefined ? { paymentTermsDays } : {}),
+      ...(customerContactName ? { customerContactName } : {}),
+      ...(customerContactEmail ? { customerContactEmail } : {}),
+      applySalesTax,
+      salesTaxRate: applySalesTax ? (salesTaxRatePercent / 100) : 0,
+      salesTaxAmount: undefined,
+      taxRate: applySalesTax ? (salesTaxRatePercent / 100) : 0,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices', customerId] })
+      queryClient.invalidateQueries({ queryKey: ['invoices', 'history', customerId] })
+      queryClient.invalidateQueries({ queryKey: ['billing'] })
+      setShowCreateInvoice(false)
+      setEditingDraftInvoice(null)
+      setInvoiceError(null)
+      setInvoiceSuccess('Draft invoice updated.')
+    },
+    onError: (e: Error) => {
+      setInvoiceSuccess(null)
+      setInvoiceError(e.message)
+    },
   })
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
@@ -1637,6 +1913,7 @@ const CustomerRecord: React.FC = () => {
                       <th>Due</th>
                       <th>Amount</th>
                       <th>Status</th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1650,6 +1927,13 @@ const CustomerRecord: React.FC = () => {
                           <Badge variant={INVOICE_BADGE[inv.status] ?? 'neutral'}>
                             {inv.status}
                           </Badge>
+                        </td>
+                        <td>
+                          {inv.status === 'draft' ? (
+                            <Button variant="secondary" size="sm" onClick={() => openDraftEditor(inv)}>
+                              Edit Draft
+                            </Button>
+                          ) : '—'}
                         </td>
                       </tr>
                     ))}
@@ -1669,13 +1953,21 @@ const CustomerRecord: React.FC = () => {
             </Button>
             <Button
               variant="secondary"
-              onClick={() => { setInvoiceError(null); setShowCreateInvoice(true) }}
+              onClick={() => {
+                setInvoiceError(null)
+                setInvoiceSuccess(null)
+                setEditingDraftInvoice(null)
+                setShowCreateInvoice(true)
+              }}
             >
               + New invoice
             </Button>
           </div>
           {invoiceError && (
             <p className="cr-form-error" style={{ marginTop: 8 }}>{invoiceError}</p>
+          )}
+          {invoiceSuccess && (
+            <p style={{ marginTop: 8, color: 'var(--color-success-700, #166534)' }}>{invoiceSuccess}</p>
           )}
         </div>
       )}
@@ -1750,6 +2042,7 @@ const CustomerRecord: React.FC = () => {
                       <th>Status</th>
                       <th>Amount</th>
                       <th>PDF</th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1766,6 +2059,13 @@ const CustomerRecord: React.FC = () => {
                         <td>
                           {invoice.pdfUrl ? (
                             <a href={invoice.pdfUrl} target="_blank" rel="noopener noreferrer">Download</a>
+                          ) : '—'}
+                        </td>
+                        <td>
+                          {invoice.status === 'draft' ? (
+                            <Button variant="secondary" size="sm" onClick={() => openDraftEditor(invoice)}>
+                              Edit Draft
+                            </Button>
                           ) : '—'}
                         </td>
                       </tr>
@@ -2449,11 +2749,51 @@ const CustomerRecord: React.FC = () => {
 
       {showCreateInvoice && (
         <CreateInvoiceModal
-          onClose={() => setShowCreateInvoice(false)}
-          onSubmit={async (lineItems, dueDate, notes) => {
-            await createInvoiceMutation.mutateAsync({ lineItems, dueDate, notes })
+          mode={editingDraftInvoice ? 'edit' : 'create'}
+          initialInvoice={editingDraftInvoice}
+          onClose={() => {
+            setShowCreateInvoice(false)
+            setEditingDraftInvoice(null)
           }}
-          saving={createInvoiceMutation.isPending}
+          onSubmit={async (
+            lineItems,
+            dueDate,
+            notes,
+            terms,
+            applySalesTax,
+            salesTaxRatePercent,
+            paymentTermsDays,
+            customerContactName,
+            customerContactEmail,
+          ) => {
+            if (editingDraftInvoice?.id) {
+              await editDraftInvoiceMutation.mutateAsync({
+                invoiceId: editingDraftInvoice.id,
+                lineItems,
+                dueDate,
+                notes,
+                terms,
+                applySalesTax,
+                salesTaxRatePercent,
+                paymentTermsDays,
+                customerContactName,
+                customerContactEmail,
+              })
+              return
+            }
+            await createInvoiceMutation.mutateAsync({
+              lineItems,
+              dueDate,
+              notes,
+              terms,
+              applySalesTax,
+              salesTaxRatePercent,
+              paymentTermsDays,
+              customerContactName,
+              customerContactEmail,
+            })
+          }}
+          saving={createInvoiceMutation.isPending || editDraftInvoiceMutation.isPending}
         />
       )}
 

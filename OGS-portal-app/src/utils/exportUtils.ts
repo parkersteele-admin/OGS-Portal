@@ -205,7 +205,11 @@ export function exportSelectedInvoicesBatchCsv(args: {
       ? invoice.lineItems.map((item) => `${item.description} x${item.quantity}`).join(' | ')
       : ''
     const subtotal = safeNumber(invoice.subtotal)
-    const tax = safeNumber(invoice.tax, (invoice as Invoice & { taxAmount?: number }).taxAmount)
+    const tax = safeNumber(
+      invoice.tax,
+      (invoice as Invoice & { salesTaxAmount?: number }).salesTaxAmount,
+      (invoice as Invoice & { taxAmount?: number }).taxAmount,
+    )
     const total = safeNumber(invoice.total, (invoice as Invoice & { totalAmount?: number }).totalAmount, subtotal + tax)
 
     rows.push(csvRow([

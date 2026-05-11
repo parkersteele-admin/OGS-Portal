@@ -324,10 +324,15 @@ function buildInvoicePdf(
 
     const computedSubtotal = lineItems.reduce((sum, item) => sum + item.amount, 0)
     const subtotal = toNumber(invoice.subtotal, computedSubtotal)
-    const taxRate = toNumber(invoice.taxRate)
-    const taxAmount = toNumber(invoice.tax, invoice.taxAmount)
+    const taxRate = toNumber(invoice.salesTaxRate, invoice.taxRate)
+    const taxAmount = toNumber(invoice.salesTaxAmount, invoice.tax, invoice.taxAmount)
+    const applySalesTax = typeof invoice.applySalesTax === 'boolean'
+      ? invoice.applySalesTax
+      : (taxRate > 0 || taxAmount > 0)
     const totalAmount = toNumber(invoice.total, invoice.totalAmount, subtotal + taxAmount)
-    const taxLabel    = taxRate > 0 ? `Tax (${(taxRate * 100).toFixed(0)}%)` : 'Tax'
+    const taxLabel = applySalesTax
+      ? (taxRate > 0 ? `Sales Tax (${(taxRate * 100).toFixed(0)}%)` : 'Sales Tax')
+      : 'Sales Tax Omitted'
 
     doc.fontSize(9).font('Helvetica').fillColor('#444444')
 
@@ -338,7 +343,7 @@ function buildInvoicePdf(
 
     doc
       .text(taxLabel, TOT_LBL_X, rowY, { width: TOT_LBL_W, align: 'right' })
-      .text(fmtMoney(taxAmount), TOT_VAL_X, rowY, { width: TOT_VAL_W, align: 'right' })
+      .text(fmtMoney(applySalesTax ? taxAmount : 0), TOT_VAL_X, rowY, { width: TOT_VAL_W, align: 'right' })
     rowY += 10
 
     doc

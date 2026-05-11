@@ -113,6 +113,12 @@ export interface Quote {
   /** UID of the sales rep who created the quote. */
   createdBy: string
   notes?: string
+  terms?: string
+  taxRate?: number
+  applySalesTax?: boolean
+  salesTaxRate?: number
+  salesTaxAmount?: number
+  sentAt?: Timestamp
   createdAt: Timestamp
   updatedAt: Timestamp
 }

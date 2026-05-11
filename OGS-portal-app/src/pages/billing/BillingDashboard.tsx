@@ -13,6 +13,7 @@
 
 import React, { useState, useMemo, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   getDocs,
   query,
@@ -60,6 +61,8 @@ function invoiceAmounts(invoice: Invoice & { taxAmount?: number; totalAmount?: n
     : invoice.lineItems.reduce((sum, item) => sum + item.amount, 0)
   const tax = typeof invoice.tax === 'number'
     ? invoice.tax
+    : typeof invoice.salesTaxAmount === 'number'
+      ? invoice.salesTaxAmount
     : typeof invoice.taxAmount === 'number'
       ? invoice.taxAmount
       : 0
@@ -174,11 +177,12 @@ const AgingCard: React.FC<AgingCardProps> = ({
 interface InvoiceDetailModalProps {
   invoice:     Invoice | null
   customerMap: Map<string, Customer>
+  onEditDraft: (invoice: Invoice) => void
   onClose:     () => void
 }
 
 const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
-  invoice, customerMap, onClose,
+  invoice, customerMap, onEditDraft, onClose,
 }) => {
   if (!invoice) return null
   const customer = customerMap.get(invoice.customerId)
@@ -256,6 +260,14 @@ const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
             </tr>
           </tfoot>
         </table>
+
+        {invoice.status === 'draft' && (
+          <div className="bd__void-actions" style={{ marginTop: 12 }}>
+            <Button variant="primary" onClick={() => onEditDraft(invoice)}>
+              Edit Draft
+            </Button>
+          </div>
+        )}
       </div>
     </Modal>
   )
@@ -264,6 +276,8 @@ const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
 // ── Main component ────────────────────────────────────────────────────────────
 
 export const BillingDashboard: React.FC = () => {
+  const navigate = useNavigate()
+  const location = useLocation()
   const queryClient = useQueryClient()
   const exportDef   = defaultExportRange()
 
@@ -533,6 +547,26 @@ export const BillingDashboard: React.FC = () => {
     filterStatus !== 'unpaid' || filterDateStart || filterDateEnd ||
     filterCustomer || agingFilter !== null
 
+  const editDraftPath = useCallback((invoice: Invoice): string | null => {
+    if (!invoice.customerId) return null
+    if (location.pathname.startsWith('/admin')) {
+      return `/admin/crm/customers/${invoice.customerId}?tab=overview&editDraft=${invoice.id}`
+    }
+    if (location.pathname.startsWith('/crm')) {
+      return `/crm/customers/${invoice.customerId}?tab=overview&editDraft=${invoice.id}`
+    }
+    return null
+  }, [location.pathname])
+
+  const handleEditDraft = useCallback((invoice: Invoice) => {
+    const path = editDraftPath(invoice)
+    if (!path) {
+      alert('Draft editing is available from CRM customer records.')
+      return
+    }
+    navigate(path)
+  }, [editDraftPath, navigate])
+
   // ── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="bd page-layout">
@@ -743,6 +777,15 @@ export const BillingDashboard: React.FC = () => {
                           </Button>
                           {inv.status === 'draft' && (
                             <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => handleEditDraft(inv)}
+                            >
+                              Edit Draft
+                            </Button>
+                          )}
+                          {inv.status === 'draft' && (
+                            <Button
                               variant="primary"
                               size="sm"
                               onClick={() => sentMutation.mutate(inv.id)}
@@ -915,6 +958,7 @@ export const BillingDashboard: React.FC = () => {
       <InvoiceDetailModal
         invoice={viewInvoice}
         customerMap={customerMap}
+        onEditDraft={handleEditDraft}
         onClose={() => setViewInvoice(null)}
       />
 

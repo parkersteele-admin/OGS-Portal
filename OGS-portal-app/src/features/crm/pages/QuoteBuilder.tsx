@@ -28,6 +28,7 @@ import {
   sendQuote,
   convertQuoteToOrder,
   deleteQuote,
+  duplicateQuote,
 } from '../../../services/quoteService'
 import { subscribeToCustomers, searchCustomers, getCustomer } from '../../../services/customerService'
 import { getLeads, getLead } from '../../../services/leadService'
@@ -850,15 +851,18 @@ interface QuoteTableProps {
   nameMap:     Record<string, string>
   currentUserId?: string
   onEdit:      (quote: Quote) => void
+  onDuplicate: (quote: Quote) => void
   onResend:    (quote: Quote) => void
   onDelete:    (quote: Quote) => void
   deletingId:  string | null
+  duplicatingId: string | null
   resendingId: string | null
   canDelete:   boolean
 }
 
 const QuoteTable: React.FC<QuoteTableProps> = ({
-  quotes, loading, nameMap, currentUserId, onEdit, onResend, onDelete, deletingId, resendingId, canDelete,
+  quotes, loading, nameMap, onEdit, onDuplicate, onResend, onDelete, deletingId, duplicatingId, resendingId, canDelete,
+  currentUserId,
 }) => {
   if (loading) {
     return (
@@ -880,108 +884,116 @@ const QuoteTable: React.FC<QuoteTableProps> = ({
 
   return (
     <>
-      <div className="qb-table-wrap">
-        <table className="qb-table">
-          <thead>
-            <tr>
-              <th className="qb-th">Quote #</th>
-              <th className="qb-th">Customer / Lead</th>
-              <th className="qb-th qb-th--right">Total</th>
-              <th className="qb-th">Status</th>
-              <th className="qb-th">Sent</th>
-              <th className="qb-th">Valid Until</th>
-              <th className="qb-th">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {quotes.map(q => {
-              const cfg = STATUS_BADGE[q.status]
-              return (
-                <tr key={q.id} className="qb-tr" onClick={() => onEdit(q)}>
-                  <td className="qb-td qb-td--mono">{q.quoteNumber}</td>
-                  <td className="qb-td">{nameMap[q.customerId ?? q.leadId ?? ''] ?? q.customerId ?? q.leadId ?? '—'}</td>
-                  <td className="qb-td qb-td--right qb-td--bold">{formatCurrency(q.total)}</td>
-                  <td className="qb-td">
-                    <Badge variant={cfg.variant}>{cfg.label}</Badge>
-                    {q.status === 'accepted' && (q as Quote & { needsOrderSetup?: boolean }).needsOrderSetup && (
-                      <span className="qb-needs-order" title="Standing order not yet set up">⚡ Needs order</span>
-                    )}
-                  </td>
-                  <td className="qb-td">
-                    {'sentAt' in q && q.sentAt
-                      ? formatRelative(q.sentAt as { toDate(): Date })
-                      : '—'}
-                  </td>
-                  <td className="qb-td">{q.validUntil ? formatDate(q.validUntil) : '—'}</td>
-                  <td className="qb-td qb-td--actions" onClick={e => e.stopPropagation()}>
-                    <Button variant="ghost" size="sm" onClick={() => onEdit(q)}>Edit</Button>
-                    {q.status !== 'draft' && (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        loading={resendingId === q.id}
-                        onClick={() => onResend(q)}
-                      >
-                        Re-send
-                      </Button>
-                    )}
-                    {canDelete && q.status === 'draft' && (
-                      <Button
-                        variant="danger"
-                        size="sm"
-                        loading={deletingId === q.id}
-                        onClick={() => onDelete(q)}
-                      >
-                        Delete
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+    <div className="qb-table-wrap">
+      <table className="qb-table">
+        <thead>
+          <tr>
+            <th className="qb-th">Quote #</th>
+            <th className="qb-th">Customer / Lead</th>
+            <th className="qb-th qb-th--right">Total</th>
+            <th className="qb-th">Status</th>
+            <th className="qb-th">Sent</th>
+            <th className="qb-th">Valid Until</th>
+            <th className="qb-th">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {quotes.map(q => {
+            const cfg = STATUS_BADGE[q.status]
+            return (
+              <tr key={q.id} className="qb-tr" onClick={() => onEdit(q)}>
+                <td className="qb-td qb-td--mono">{q.quoteNumber}</td>
+                <td className="qb-td">{nameMap[q.customerId ?? q.leadId ?? ''] ?? q.customerId ?? q.leadId ?? '—'}</td>
+                <td className="qb-td qb-td--right qb-td--bold">{formatCurrency(q.total)}</td>
+                <td className="qb-td">
+                  <Badge variant={cfg.variant}>{cfg.label}</Badge>
+                  {q.status === 'accepted' && (q as Quote & { needsOrderSetup?: boolean }).needsOrderSetup && (
+                    <span className="qb-needs-order" title="Standing order not yet set up">⚡ Needs order</span>
+                  )}
+                </td>
+                <td className="qb-td">
+                  {'sentAt' in q && q.sentAt
+                    ? formatRelative(q.sentAt as { toDate(): Date })
+                    : '—'}
+                </td>
+                <td className="qb-td">{q.validUntil ? formatDate(q.validUntil) : '—'}</td>
+                <td className="qb-td qb-td--actions" onClick={e => e.stopPropagation()}>
+                  <Button variant="ghost" size="sm" onClick={() => onEdit(q)}>Edit</Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    loading={duplicatingId === q.id}
+                    onClick={() => onDuplicate(q)}
+                  >
+                    Duplicate
+                  </Button>
+                  {q.status !== 'draft' && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      loading={resendingId === q.id}
+                      onClick={() => onResend(q)}
+                    >
+                      Re-send
+                    </Button>
+                  )}
+                  {canDelete && q.status === 'draft' && (
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      loading={deletingId === q.id}
+                      onClick={() => onDelete(q)}
+                    >
+                      Delete
+                    </Button>
+                  )}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
 
-      <div className="qb-mobile-cards">
-        {quotes.map((q) => {
-          const statusLabel =
-            q.status === 'accepted' ? 'Approved' :
-            q.status === 'expired' ? 'Expired' :
-            q.status === 'draft' || q.status === 'sent' ? 'Pending' :
-            STATUS_BADGE[q.status].label
-          const statusClass =
-            q.status === 'accepted' ? 'qb-mobile-card__status--approved' :
-            q.status === 'expired' ? 'qb-mobile-card__status--expired' :
-            q.status === 'draft' || q.status === 'sent' ? 'qb-mobile-card__status--pending' :
-            'qb-mobile-card__status--neutral'
-          const firstLine = q.lineItems[0]
-          const owner = nameMap[q.customerId ?? q.leadId ?? ''] ?? q.customerId ?? q.leadId ?? '—'
-          const mineLabel = currentUserId && q.createdBy === currentUserId ? 'Mine' : ''
+    <div className="qb-mobile-cards">
+      {quotes.map((q) => {
+        const statusLabel =
+          q.status === 'accepted' ? 'Approved' :
+          q.status === 'expired' ? 'Expired' :
+          q.status === 'draft' || q.status === 'sent' ? 'Pending' :
+          STATUS_BADGE[q.status].label
+        const statusClass =
+          q.status === 'accepted' ? 'qb-mobile-card__status--approved' :
+          q.status === 'expired' ? 'qb-mobile-card__status--expired' :
+          q.status === 'draft' || q.status === 'sent' ? 'qb-mobile-card__status--pending' :
+          'qb-mobile-card__status--neutral'
+        const firstLine = q.lineItems[0]
+        const owner = nameMap[q.customerId ?? q.leadId ?? ''] ?? q.customerId ?? q.leadId ?? '—'
+        const mineLabel = currentUserId && q.createdBy === currentUserId ? 'Mine' : ''
 
-          return (
-            <article
-              key={`mobile-${q.id}`}
-              className="qb-mobile-card"
-              role="button"
-              tabIndex={0}
-              onClick={() => onEdit(q)}
-              onKeyDown={(e) => e.key === 'Enter' && onEdit(q)}
-            >
-              <div className="qb-mobile-card__top">
-                <h3>{q.quoteNumber} · {owner}</h3>
-                <span className="qb-mobile-card__amount">{formatCurrency(q.total)}</span>
-              </div>
-              <div className="qb-mobile-card__meta">{firstLine?.description ?? 'No line items'}</div>
-              <div className="qb-mobile-card__bottom">
-                <span className={`qb-mobile-card__status ${statusClass}`}>{statusLabel}</span>
-                <span>{q.validUntil ? `Valid ${formatDate(q.validUntil)}` : 'No expiry'} {mineLabel && `· ${mineLabel}`}</span>
-              </div>
-            </article>
-          )
-        })}
-      </div>
-    </>
+        return (
+          <article
+            key={`mobile-${q.id}`}
+            className="qb-mobile-card"
+            role="button"
+            tabIndex={0}
+            onClick={() => onEdit(q)}
+            onKeyDown={(e) => e.key === 'Enter' && onEdit(q)}
+          >
+            <div className="qb-mobile-card__top">
+              <h3>{q.quoteNumber} · {owner}</h3>
+              <span className="qb-mobile-card__amount">{formatCurrency(q.total)}</span>
+            </div>
+            <div className="qb-mobile-card__meta">{firstLine?.description ?? 'No line items'}</div>
+            <div className="qb-mobile-card__bottom">
+              <span className={`qb-mobile-card__status ${statusClass}`}>{statusLabel}</span>
+              <span>{q.validUntil ? `Valid ${formatDate(q.validUntil)}` : 'No expiry'} {mineLabel && `· ${mineLabel}`}</span>
+            </div>
+          </article>
+        )
+      })}
+    </div>
+  </>
   )
 }
 
@@ -996,10 +1008,11 @@ const QuoteBuilder: React.FC = () => {
 
   const [listFilter, setListFilter] = useState<'all' | 'mine' | 'pending' | 'expired'>('all')
   const [deletingId,  setDeletingId]  = useState<string | null>(null)
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
   const [resendingId, setResendingId] = useState<string | null>(null)
   const [nameMap,     setNameMap]     = useState<Record<string, string>>({})
   const [quoteToDelete, setQuoteToDelete] = useState<Quote | null>(null)
-  const [quotes, setQuotes] = useState<Quote[]>([])
+  const [quoteToDuplicate, setQuoteToDuplicate] = useState<Quote | null>(null)
   const [listToast, setListToast] = useState<string | null>(null)
   const [listError, setListError] = useState<string | null>(null)
 
@@ -1024,9 +1037,7 @@ const QuoteBuilder: React.FC = () => {
     queryFn: () => getQuotes({}, { pageSize: 100 }),
     staleTime: 60_000,
   })
-  useEffect(() => {
-    setQuotes(quotesPage?.data ?? [])
-  }, [quotesPage?.data])
+  const quotes = useMemo(() => quotesPage?.data ?? [], [quotesPage?.data])
 
   // Backfill missing customer/lead display names for quotes that reference
   // records outside the current preloaded customer/lead lists.
@@ -1098,7 +1109,6 @@ const QuoteBuilder: React.FC = () => {
     onSuccess: (_result, vars) => {
       setDeletingId(null)
       setQuoteToDelete(null)
-      setQuotes(prev => prev.filter(q => q.id !== vars.id))
       queryClient.setQueriesData({ queryKey: ['quotes'] }, (old: unknown) => {
         if (!old || typeof old !== 'object') return old
         const maybePage = old as { data?: unknown }
@@ -1129,6 +1139,27 @@ const QuoteBuilder: React.FC = () => {
     onError: (err: Error) => {
       setResendingId(null)
       setListError(err.message || 'Failed to re-send quote.')
+    },
+  })
+
+  const duplicateMutation = useMutation({
+    mutationFn: async (quote: Quote) => {
+      if (!user?.id) throw new Error('You must be signed in to duplicate quotes.')
+      setDuplicatingId(quote.id)
+      setListError(null)
+      return duplicateQuote(quote.id, user.id)
+    },
+    onSuccess: (newQuoteId, sourceQuote) => {
+      setDuplicatingId(null)
+      setQuoteToDuplicate(null)
+      setListToast(`Quote ${sourceQuote.quoteNumber} duplicated.`)
+      setTimeout(() => setListToast(null), 5000)
+      queryClient.invalidateQueries({ queryKey: ['quotes'] })
+      navigate(`${crmBase}/quotes/${newQuoteId}`)
+    },
+    onError: (err: Error) => {
+      setDuplicatingId(null)
+      setListError(err.message || 'Failed to duplicate quote.')
     },
   })
 
@@ -1177,9 +1208,11 @@ const QuoteBuilder: React.FC = () => {
           nameMap={nameMap}
           currentUserId={user?.id}
           onEdit={handleEdit}
+          onDuplicate={setQuoteToDuplicate}
           onResend={(quote) => resendMutation.mutate(quote)}
           onDelete={setQuoteToDelete}
           deletingId={deletingId}
+          duplicatingId={duplicatingId}
           resendingId={resendingId}
           canDelete={canDeleteQuotes}
         />
@@ -1215,6 +1248,43 @@ const QuoteBuilder: React.FC = () => {
                 onClick={() => deleteMutation.mutate({ id: quoteToDelete.id })}
               >
                 Delete
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={!!quoteToDuplicate}
+        onClose={() => {
+          if (duplicateMutation.isPending) return
+          setQuoteToDuplicate(null)
+        }}
+        title="Duplicate Quote"
+        size="sm"
+      >
+        {quoteToDuplicate && (
+          <div>
+            <p>
+              Duplicate quote {quoteToDuplicate.quoteNumber} into a new draft?
+              The original quote will not be changed.
+            </p>
+            <div className="qb-delete-confirm-actions">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setQuoteToDuplicate(null)}
+                disabled={duplicateMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                loading={duplicateMutation.isPending}
+                onClick={() => duplicateMutation.mutate(quoteToDuplicate)}
+              >
+                Duplicate Quote
               </Button>
             </div>
           </div>

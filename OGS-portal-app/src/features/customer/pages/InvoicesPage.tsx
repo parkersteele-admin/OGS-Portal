@@ -138,6 +138,9 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ invoice, onClose }) => {
   const navigate      = useNavigate()
   const [dlBusy, setDlBusy] = useState(false)
   const outstanding   = isOutstanding(invoice)
+  const taxAmount = invoice.salesTaxAmount ?? invoice.tax
+  const shouldShowTax = invoice.applySalesTax
+    ?? ((invoice.salesTaxRate ?? invoice.taxRate ?? 0) > 0 || taxAmount > 0)
 
   const handleDownload = useCallback(async () => {
     setDlBusy(true)
@@ -195,10 +198,10 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ invoice, onClose }) => {
               <td colSpan={3} className="inv-col--right inv-panel__sub-label">Subtotal</td>
               <td className="inv-col--right">{formatCurrency(invoice.subtotal)}</td>
             </tr>
-            {invoice.tax > 0 && (
+            {shouldShowTax && (
               <tr>
-                <td colSpan={3} className="inv-col--right inv-panel__sub-label">Tax</td>
-                <td className="inv-col--right">{formatCurrency(invoice.tax)}</td>
+                <td colSpan={3} className="inv-col--right inv-panel__sub-label">Sales Tax</td>
+                <td className="inv-col--right">{formatCurrency(taxAmount)}</td>
               </tr>
             )}
             <tr className="inv-panel__total-row">
@@ -207,6 +210,9 @@ const DetailPanel: React.FC<DetailPanelProps> = ({ invoice, onClose }) => {
             </tr>
           </tfoot>
         </table>
+        {!shouldShowTax && (
+          <p className="inv-panel__sub-label" style={{ marginTop: 8 }}>Sales tax omitted.</p>
+        )}
       </div>
 
       {/* Payment history */}

@@ -13,6 +13,7 @@ export interface CompanySettings {
   portalLoginUrl:     string
   portalSignupUrl:    string
   termsAndConditions: string
+  defaultSalesTaxRate:number
 }
 
 export const DEFAULT_COMPANY_SETTINGS: CompanySettings = {
@@ -30,4 +31,5 @@ export const DEFAULT_COMPANY_SETTINGS: CompanySettings = {
   portalLoginUrl:     '',
   portalSignupUrl:    '',
   termsAndConditions: '',
+  defaultSalesTaxRate:0,
 }

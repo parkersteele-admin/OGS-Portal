@@ -30,8 +30,9 @@ import {
   generateQuotePdf,
   sendQuote,
   convertQuoteToOrder,
+  duplicateQuote,
 } from '../../../services/quoteService'
-import { subscribeToCustomers } from '../../../services/customerService'
+import { subscribeToCustomers, getCustomer } from '../../../services/customerService'
 import { getLeads } from '../../../services/leadService'
 import { useAuth } from '../../../hooks/useAuth'
 import { getDoc, doc } from 'firebase/firestore'
@@ -49,6 +50,7 @@ import type { Quote, QuoteItem, QuoteStatus } from '../../../types/crm'
 import type { Customer } from '../../../types/customer'
 import type { Lead } from '../../../types/crm'
 import type { ProductCategory } from '../../../types/product'
+import CustomerCreateModal from '../components/CustomerCreateModal'
 import './QuoteEditorPage.css'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -88,6 +90,8 @@ const STATUS_BADGE: Record<QuoteStatus, { label: string; variant: 'success' | 'w
   declined: { label: 'Declined', variant: 'danger'   },
   expired:  { label: 'Expired',  variant: 'warning'  },
 }
+
+const CREATE_CUSTOMER_OPTION = '__create_new_customer__'
 
 type FlatIconName = 'back' | 'save' | 'preview' | 'send' | 'convert' | 'remove' | 'summary'
 
@@ -458,6 +462,8 @@ const QuoteEditorPage: React.FC = () => {
   const [setupUrlLoading, setSetupUrlLoading] = useState(false)
   const [error,          setError]          = useState<string | null>(null)
   const [sendToast,      setSendToast]      = useState<string | null>(null)
+  const [showDuplicateConfirm, setShowDuplicateConfirm] = useState(false)
+  const [showCreateCustomer, setShowCreateCustomer] = useState(false)
   const summaryRef = useRef<HTMLDivElement | null>(null)
 
   // Load existing quote into form
@@ -518,6 +524,40 @@ const QuoteEditorPage: React.FC = () => {
     () => recipients.find(r => r.id === recipientId) ?? null,
     [recipients, recipientId],
   )
+
+  const handleRecipientChange = useCallback((value: string) => {
+    if (value === CREATE_CUSTOMER_OPTION) {
+      setShowCreateCustomer(true)
+      return
+    }
+    setRecipientId(value)
+  }, [])
+
+  const handleInlineCustomerCreated = useCallback(async (id: string) => {
+    try {
+      const customer = await getCustomer(id)
+      const nextOption: RecipientOption = {
+        type: 'customer',
+        id: customer.id,
+        label: customer.name ?? '',
+        email: customer.email ?? '',
+        phone: customer.phone ?? '',
+        address: [customer.address, customer.city, customer.state, customer.zip].filter(Boolean).join(', '),
+      }
+      setRecipients((prev) => {
+        const withoutExisting = prev.filter((r) => !(r.type === 'customer' && r.id === id))
+        return [...withoutExisting, nextOption]
+      })
+    } catch {
+      setRecipients((prev) => {
+        if (prev.some((r) => r.id === id)) return prev
+        return [...prev, { type: 'customer', id, label: 'New customer', email: '', phone: '', address: '' }]
+      })
+    }
+
+    setRecipientId(id)
+    setShowCreateCustomer(false)
+  }, [])
 
   // ── Computed totals ───────────────────────────────────────────────────────
 
@@ -735,7 +775,21 @@ const QuoteEditorPage: React.FC = () => {
     onError: (e: Error) => setError(e.message),
   })
 
-  const isBusy = saveMutation.isPending || previewMutation.isPending || sendMutation.isPending || convertMutation.isPending
+  const duplicateMutation = useMutation({
+    mutationFn: async () => {
+      if (!savedId) throw new Error('Save this quote before duplicating.')
+      if (!user?.id) throw new Error('You must be signed in to duplicate quotes.')
+      return duplicateQuote(savedId, user.id)
+    },
+    onSuccess: (newQuoteId) => {
+      setShowDuplicateConfirm(false)
+      queryClient.invalidateQueries({ queryKey: ['quotes'] })
+      navigate(`${crmBase}/quotes/${newQuoteId}`)
+    },
+    onError: (e: Error) => setError(e.message),
+  })
+
+  const isBusy = saveMutation.isPending || previewMutation.isPending || sendMutation.isPending || convertMutation.isPending || duplicateMutation.isPending
   const isReadOnly = status === 'accepted'
   const isDeclinedRevision = status === 'declined'
 
@@ -768,6 +822,17 @@ const QuoteEditorPage: React.FC = () => {
                 onClick={() => saveMutation.mutate()}>
                 <span className="qep-action-label"><span className="qep-icon" aria-hidden="true"><FlatIcon name="save" /></span>Save draft</span>
               </Button>
+              {!isNew && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  loading={duplicateMutation.isPending}
+                  disabled={isBusy || !savedId}
+                  onClick={() => setShowDuplicateConfirm(true)}
+                >
+                  <span className="qep-action-label">Duplicate Quote</span>
+                </Button>
+              )}
               <Button variant="secondary" size="sm" loading={pdfLoading || previewMutation.isPending} disabled={isBusy}
                 onClick={() => previewMutation.mutate()}>
                 <span className="qep-action-label"><span className="qep-icon" aria-hidden="true"><FlatIcon name="preview" /></span>Preview PDF</span>
@@ -925,35 +990,50 @@ const QuoteEditorPage: React.FC = () => {
               <div className="qep-recipient-row">
                 <div className="ui-field qep-recipient-select">
                   <label className="ui-field__label" htmlFor="qep-recipient">Customer / Lead *</label>
-                  <select
-                    id="qep-recipient"
-                    className="qep-select"
-                    value={recipientId}
-                    onChange={e => setRecipientId(e.target.value)}
-                    disabled={isReadOnly}
-                  >
-                    <option value="">— Select customer or lead —</option>
-                    {recipients.filter(r => r.type === 'customer').length > 0 && (
-                      <optgroup label="Customers">
-                        {recipients
-                          .filter(r => r.type === 'customer')
-                          .sort((a, b) => (a.label ?? '').localeCompare(b.label ?? ''))
-                          .map(r => (
-                            <option key={r.id} value={r.id}>{r.label}</option>
-                          ))}
-                      </optgroup>
+                  <div className="qep-recipient-picker">
+                    <select
+                      id="qep-recipient"
+                      className="qep-select"
+                      value={recipientId}
+                      onChange={e => handleRecipientChange(e.target.value)}
+                      disabled={isReadOnly}
+                    >
+                      <option value="">— Select customer or lead —</option>
+                      {recipients.filter(r => r.type === 'customer').length > 0 && (
+                        <optgroup label="Customers">
+                          <option value={CREATE_CUSTOMER_OPTION}>+ New Customer</option>
+                          {recipients
+                            .filter(r => r.type === 'customer')
+                            .sort((a, b) => (a.label ?? '').localeCompare(b.label ?? ''))
+                            .map(r => (
+                              <option key={r.id} value={r.id}>{r.label}</option>
+                            ))}
+                        </optgroup>
+                      )}
+                      {recipients.filter(r => r.type === 'customer').length === 0 && !isReadOnly && (
+                        <option value={CREATE_CUSTOMER_OPTION}>+ New Customer</option>
+                      )}
+                      {recipients.filter(r => r.type === 'lead').length > 0 && (
+                        <optgroup label="Leads">
+                          {recipients
+                            .filter(r => r.type === 'lead')
+                            .sort((a, b) => (a.label ?? '').localeCompare(b.label ?? ''))
+                            .map(r => (
+                              <option key={r.id} value={r.id}>{r.label}</option>
+                            ))}
+                        </optgroup>
+                      )}
+                    </select>
+                    {!isReadOnly && (
+                      <button
+                        type="button"
+                        className="qep-recipient-add"
+                        onClick={() => setShowCreateCustomer(true)}
+                      >
+                        + New Customer
+                      </button>
                     )}
-                    {recipients.filter(r => r.type === 'lead').length > 0 && (
-                      <optgroup label="Leads">
-                        {recipients
-                          .filter(r => r.type === 'lead')
-                          .sort((a, b) => (a.label ?? '').localeCompare(b.label ?? ''))
-                          .map(r => (
-                            <option key={r.id} value={r.id}>{r.label}</option>
-                          ))}
-                      </optgroup>
-                    )}
-                  </select>
+                  </div>
                 </div>
 
                 {/* Auto-filled details */}
@@ -1133,6 +1213,47 @@ const QuoteEditorPage: React.FC = () => {
           <span>Review summary</span>
         </button>
       </div>
+
+      <CustomerCreateModal
+        open={showCreateCustomer}
+        title="Create New Customer"
+        onClose={() => setShowCreateCustomer(false)}
+        onCreated={handleInlineCustomerCreated}
+      />
+
+      <Modal
+        open={showDuplicateConfirm}
+        onClose={() => {
+          if (duplicateMutation.isPending) return
+          setShowDuplicateConfirm(false)
+        }}
+        title="Duplicate Quote"
+        size="sm"
+      >
+        <div>
+          <p>
+            Create a duplicate draft from this quote? The original quote will remain unchanged.
+          </p>
+          <div className="qep-confirm-actions">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowDuplicateConfirm(false)}
+              disabled={duplicateMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              loading={duplicateMutation.isPending}
+              onClick={() => duplicateMutation.mutate()}
+            >
+              Duplicate Quote
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {pdfUrl && <PdfPreviewModal url={pdfUrl} onClose={() => setPdfUrl(null)} />}
     </div>

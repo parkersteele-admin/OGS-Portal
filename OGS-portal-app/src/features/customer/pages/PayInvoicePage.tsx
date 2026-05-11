@@ -269,6 +269,9 @@ export default function PayInvoicePage() {
   }
 
   const savedDefault = defaultMethod ?? methods[0]
+  const taxAmount = invoice.salesTaxAmount ?? invoice.tax
+  const shouldShowTax = invoice.applySalesTax
+    ?? ((invoice.salesTaxRate ?? invoice.taxRate ?? 0) > 0 || taxAmount > 0)
 
   return (
     <div style={{ maxWidth: 600, margin: '0 auto', padding: '32px 20px' }}>
@@ -317,11 +320,14 @@ export default function PayInvoicePage() {
             <span style={{ color: 'var(--color-text-3)' }}>Subtotal</span>
             <span>{formatCurrency(invoice.subtotal)}</span>
           </div>
-          {invoice.tax > 0 && (
+          {shouldShowTax && (
             <div style={{ display: 'flex', gap: 40 }}>
-              <span style={{ color: 'var(--color-text-3)' }}>Tax</span>
-              <span>{formatCurrency(invoice.tax)}</span>
+              <span style={{ color: 'var(--color-text-3)' }}>Sales Tax</span>
+              <span>{formatCurrency(taxAmount)}</span>
             </div>
+          )}
+          {!shouldShowTax && (
+            <div style={{ color: 'var(--color-text-3)', fontStyle: 'italic' }}>Sales tax omitted</div>
           )}
           <div style={{ display: 'flex', gap: 40, fontWeight: 700, fontSize: 16, borderTop: '1px solid var(--color-border)', paddingTop: 8, marginTop: 4 }}>
             <span>Total</span>

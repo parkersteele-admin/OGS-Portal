@@ -8,6 +8,7 @@ import {
   query,
   where,
   orderBy,
+  Timestamp,
   serverTimestamp,
   type QueryConstraint,
   type Unsubscribe,
@@ -29,6 +30,29 @@ export interface CreateInvoiceInput {
   lineItems: InvoiceLineItem[]
   dueAt: Date
   notes?: string
+  terms?: string
+  paymentTermsDays?: number
+  applySalesTax?: boolean
+  salesTaxRate?: number
+  salesTaxAmount?: number
+  taxRate?: number
+  customerContactName?: string
+  customerContactEmail?: string
+}
+
+export interface EditDraftInvoiceInput {
+  customerId: string
+  lineItems: InvoiceLineItem[]
+  dueAt: Date
+  notes?: string
+  terms?: string
+  paymentTermsDays?: number
+  applySalesTax?: boolean
+  salesTaxRate?: number
+  salesTaxAmount?: number
+  taxRate?: number
+  customerContactName?: string
+  customerContactEmail?: string
 }
 
 // ── Pricing ───────────────────────────────────────────────────────────────────
@@ -36,11 +60,12 @@ export interface CreateInvoiceInput {
 export function calculateInvoiceTotals(
   lineItems: InvoiceLineItem[],
   taxRate = 0,
+  applySalesTax = true,
 ): { subtotal: number; tax: number; total: number } {
   const subtotal = parseFloat(
     lineItems.reduce((sum, item) => sum + item.amount, 0).toFixed(2),
   )
-  const tax = parseFloat((subtotal * taxRate).toFixed(2))
+  const tax = applySalesTax ? parseFloat((subtotal * taxRate).toFixed(2)) : 0
   const total = parseFloat((subtotal + tax).toFixed(2))
   return { subtotal, tax, total }
 }
@@ -92,13 +117,21 @@ export function subscribeToCustomerInvoices(
 
 export async function createInvoice(data: CreateInvoiceInput, taxRate = 0): Promise<string> {
   return serviceCall(async () => {
-    const totals = calculateInvoiceTotals(data.lineItems, taxRate)
+    const applySalesTax = data.applySalesTax ?? true
+    const appliedTaxRate = applySalesTax
+      ? (data.salesTaxRate ?? data.taxRate ?? taxRate)
+      : 0
+    const totals = calculateInvoiceTotals(data.lineItems, appliedTaxRate, applySalesTax)
     const invoiceNumber = `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`
     const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined))
     const ref = await addDoc(invoicesCol, {
       invoiceNumber,
       ...clean,
       ...totals,
+      applySalesTax,
+      salesTaxRate: appliedTaxRate,
+      salesTaxAmount: totals.tax,
+      taxRate: appliedTaxRate,
       status: 'draft' as InvoiceStatus,
       issuedAt: serverTimestamp(),
       createdAt: serverTimestamp(),
@@ -115,6 +148,50 @@ export async function updateInvoice(
   return serviceCall(() =>
     updateDoc(doc(db, 'invoices', id), { ...data, updatedAt: serverTimestamp() }),
   )
+}
+
+/**
+ * Updates a draft invoice in-place while preserving immutable identity fields.
+ */
+export async function saveDraftInvoiceEdits(
+  id: string,
+  data: EditDraftInvoiceInput,
+): Promise<void> {
+  return serviceCall(async () => {
+    const snap = await getDoc(doc(db, 'invoices', id))
+    const current = fromSnap<Invoice>(snap, 'invoices')
+    if (current.status !== 'draft') {
+      throw new Error('Only draft invoices can be edited.')
+    }
+
+    const applySalesTax = data.applySalesTax ?? true
+    const appliedTaxRate = applySalesTax
+      ? (data.salesTaxRate ?? data.taxRate ?? 0)
+      : 0
+    const totals = calculateInvoiceTotals(data.lineItems, appliedTaxRate, applySalesTax)
+    const clean = Object.fromEntries(
+      Object.entries({
+        customerId: data.customerId,
+        lineItems: data.lineItems,
+        dueAt: Timestamp.fromDate(data.dueAt),
+        notes: data.notes,
+        terms: data.terms,
+        paymentTermsDays: data.paymentTermsDays,
+        applySalesTax,
+        salesTaxRate: appliedTaxRate,
+        salesTaxAmount: totals.tax,
+        taxRate: appliedTaxRate,
+        customerContactName: data.customerContactName,
+        customerContactEmail: data.customerContactEmail,
+      }).filter(([, v]) => v !== undefined),
+    )
+
+    await updateDoc(doc(db, 'invoices', id), {
+      ...clean,
+      ...totals,
+      updatedAt: serverTimestamp(),
+    })
+  })
 }
 
 export async function markInvoiceSent(id: string): Promise<void> {

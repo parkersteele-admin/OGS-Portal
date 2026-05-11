@@ -31,6 +31,11 @@ export interface CreateQuoteInput {
   lineItems: QuoteItem[]
   validUntil: Date
   notes?: string
+  terms?: string
+  taxRate?: number
+  applySalesTax?: boolean
+  salesTaxRate?: number
+  salesTaxAmount?: number
   createdBy: string
 }
 
@@ -135,13 +140,21 @@ export async function createQuote(data: CreateQuoteInput, taxRate = 0): Promise<
     const cleanLineItems = sanitizeQuoteLineItems(data.lineItems)
     await enforceQuoteMinimumMargins(cleanLineItems)
 
-    const totals = calculateQuoteTotals(cleanLineItems, taxRate)
+    const applySalesTax = data.applySalesTax ?? true
+    const appliedTaxRate = applySalesTax
+      ? (data.salesTaxRate ?? data.taxRate ?? taxRate)
+      : 0
+    const totals = calculateQuoteTotals(cleanLineItems, appliedTaxRate)
     const quoteNumber = `QT-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`
     // Strip undefined fields — Firestore rejects them
     const cleanData = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined))
     const ref = await addDoc(quotesCol, {
       quoteNumber,
       ...cleanData,
+      applySalesTax,
+      salesTaxRate: appliedTaxRate,
+      taxRate: appliedTaxRate,
+      salesTaxAmount: totals.tax,
       ...totals,
       lineItems: cleanLineItems,
       status: 'draft' as QuoteStatus,
@@ -149,6 +162,61 @@ export async function createQuote(data: CreateQuoteInput, taxRate = 0): Promise<
       updatedAt: serverTimestamp(),
     } as unknown as Omit<Quote, 'id'>)
     return ref.id
+  })
+}
+
+/**
+ * Create a new draft quote by cloning editable fields from an existing quote.
+ * This intentionally excludes approval/sent/accepted metadata.
+ */
+export async function duplicateQuote(sourceQuoteId: string, createdBy: string): Promise<string> {
+  return serviceCall(async () => {
+    if (!createdBy) throw new OgsValidationError('createdBy is required to duplicate a quote')
+
+    const source = await getQuote(sourceQuoteId)
+    const sourceWithExtras = source as Quote & {
+      taxRate?: number
+      applySalesTax?: boolean
+      salesTaxRate?: number
+      salesTaxAmount?: number
+      terms?: string
+    }
+
+    const validUntilDate = source.validUntil?.toDate?.()
+    const taxRateFromFields =
+      (typeof sourceWithExtras.salesTaxRate === 'number' ? sourceWithExtras.salesTaxRate : undefined)
+      ?? (typeof sourceWithExtras.taxRate === 'number' ? sourceWithExtras.taxRate : undefined)
+
+    const sourceApplySalesTax = sourceWithExtras.applySalesTax
+      ?? ((sourceWithExtras.salesTaxRate ?? sourceWithExtras.taxRate ?? 0) > 0 || source.tax > 0)
+
+    const derivedTaxRate = sourceApplySalesTax
+      ? (typeof taxRateFromFields === 'number'
+          ? taxRateFromFields
+          : (source.subtotal > 0 && source.tax > 0 ? source.tax / source.subtotal : 0))
+      : 0
+
+    const duplicateInput: CreateQuoteInput = {
+      customerId: source.customerId,
+      leadId: source.leadId,
+      lineItems: source.lineItems.map((item) => ({
+        productId: item.productId,
+        description: item.description,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        amount: item.amount,
+      })),
+      validUntil: validUntilDate ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      notes: source.notes,
+      terms: sourceWithExtras.terms,
+      taxRate: derivedTaxRate,
+      applySalesTax: sourceApplySalesTax,
+      salesTaxRate: sourceWithExtras.salesTaxRate,
+      salesTaxAmount: sourceWithExtras.salesTaxAmount,
+      createdBy,
+    }
+
+    return createQuote(duplicateInput, derivedTaxRate)
   })
 }
 

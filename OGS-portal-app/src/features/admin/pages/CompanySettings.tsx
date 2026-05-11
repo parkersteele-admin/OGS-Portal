@@ -43,8 +43,14 @@ const CompanySettingsPage: React.FC = () => {
       .finally(() => setLoading(false))
   }, [])
 
-  function set(field: keyof CompanySettings, value: string) {
-    setSettings((prev) => ({ ...prev, [field]: value }))
+  function set(field: keyof CompanySettings, value: string | number) {
+    setSettings((prev) => {
+      if (field === 'defaultSalesTaxRate') {
+        const parsed = typeof value === 'number' ? value : Number.parseFloat(value)
+        return { ...prev, defaultSalesTaxRate: Number.isFinite(parsed) ? parsed : 0 }
+      }
+      return { ...prev, [field]: value as string }
+    })
     setSaved(false)
   }
 
@@ -270,6 +276,15 @@ const CompanySettingsPage: React.FC = () => {
               value={settings.taxId}
               onChange={(e) => set('taxId', e.target.value)}
               placeholder="XX-XXXXXXX"
+            />
+            <Input
+              label="Default sales tax rate (%)"
+              type="number"
+              min="0"
+              step="0.01"
+              value={String(settings.defaultSalesTaxRate ?? 0)}
+              onChange={(e) => set('defaultSalesTaxRate', e.target.value)}
+              placeholder="8.00"
             />
           </div>
         </section>
