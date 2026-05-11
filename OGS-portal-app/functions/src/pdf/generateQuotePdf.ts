@@ -69,9 +69,9 @@ export async function generateQuotePdf(quoteId: string): Promise<string> {
     qrBuf = await fetchImageBuffer(`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(qrUrl)}&color=1e293b&bgcolor=ffffff`)
   }
 
-  // Fetch assigned sales rep (createdBy field holds the rep's UID)
+  // Fetch assigned sales rep (prefer explicit salesRep* fields, fallback legacy createdBy)
   let salesRep: { name: string; email: string; phone: string } | null = null
-  const repUid = (quote.createdBy ?? quote.assignedTo) as string | undefined
+  const repUid = (quote.salesRepId ?? quote.createdBy ?? quote.assignedTo) as string | undefined
   if (repUid) {
     const repSnap = await db.collection('users').doc(repUid).get()
     if (repSnap.exists) {
@@ -81,6 +81,14 @@ export async function generateQuotePdf(quoteId: string): Promise<string> {
         email: (d.email as string) || '',
         phone: (d.phone as string) || '',
       }
+    }
+  }
+  if (!salesRep) {
+    const repName = (quote.salesRepName as string | undefined) ?? ''
+    const repEmail = (quote.salesRepEmail as string | undefined) ?? ''
+    const repPhone = (quote.salesRepPhone as string | undefined) ?? ''
+    if (repName || repEmail || repPhone) {
+      salesRep = { name: repName, email: repEmail, phone: repPhone }
     }
   }
 

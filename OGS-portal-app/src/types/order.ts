@@ -12,7 +12,7 @@ export interface AddOnItem {
   qty: number
   unitPrice?: number
   addedBy: string
-  addedAt: Timestamp
+  addedAt: Timestamp | string
 }
 
 /** One product line in a recurring route schedule. */
@@ -105,6 +105,10 @@ export interface Order {
   quoteNumber?: string
   approvedByName?: string
   approvedByEmail?: string
+  salesRepId?: string
+  salesRepName?: string
+  salesRepEmail?: string
+  salesRepPhone?: string
   primaryCommunicationMethod?: 'email' | 'phone' | 'text'
   paymentPreference?: 'card_on_file' | 'net_terms' | 'cod' | 'send_invoice' | 'undecided'
   quoteProvidedTo?: string

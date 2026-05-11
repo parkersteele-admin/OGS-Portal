@@ -204,6 +204,9 @@ function buildInvoicePdf(
       ['Due Date',    fmtDate(invoice.dueAt)],
       ['Status',      ((invoice.status as string) || 'pending').toUpperCase()],
     ]
+    if (invoice.serviceDate) {
+      metaRows.splice(3, 0, ['Service Date', fmtDate(invoice.serviceDate)])
+    }
 
     let rightY = DIVIDER_Y + 23
     const META_LBL_W = 80
@@ -389,6 +392,22 @@ function buildInvoicePdf(
 
     // ── Portal links below payment box ─────────────────────────────────────
     rowY = BOX_Y + BOX_H + 12
+
+    const invoiceNotes = (invoice.notes as string | undefined)?.trim()
+    if (invoiceNotes) {
+      const notesHeight = doc.heightOfString(invoiceNotes, { width: CONTENT_W })
+      if (rowY + 24 + notesHeight > FOOTER_Y - 8) {
+        const nextDividerY = newBrandedPage(doc, company, logoBuf, 'INVOICE', referenceText)
+        rowY = nextDividerY + 18
+      }
+      doc.fontSize(7).font('Helvetica-Bold').fillColor('#999999')
+        .text('INVOICE NOTES', C_DESC, rowY)
+      rowY += 12
+      doc.fontSize(8).font('Helvetica').fillColor('#444444')
+        .text(invoiceNotes, C_DESC, rowY, { width: CONTENT_W })
+      rowY += notesHeight + 8
+    }
+
     if (company.portalLoginUrl || company.portalSignupUrl) {
       if (company.portalLoginUrl) {
         doc.fontSize(8).font('Helvetica').fillColor('#555555')

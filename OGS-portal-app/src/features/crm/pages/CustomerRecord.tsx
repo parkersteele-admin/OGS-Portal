@@ -367,7 +367,9 @@ interface CreateInvoiceModalProps {
   onClose:  () => void
   onSubmit: (
     lineItems: { description: string; quantity: number; unitPrice: number; amount: number }[],
+    invoiceDate: string,
     dueDate:   string,
+    serviceDate: string,
     notes:     string,
     terms:     string,
     applySalesTax: boolean,
@@ -386,10 +388,13 @@ const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
   onSubmit,
   saving,
 }) => {
+  const todayIso = new Date().toISOString().slice(0, 10)
   const fallbackDueDate = new Date()
   fallbackDueDate.setDate(fallbackDueDate.getDate() + 30)
+  const invoiceDateDefault = initialInvoice?.issuedAt?.toDate?.().toISOString().slice(0, 10) ?? todayIso
   const dueDefault = initialInvoice?.dueAt?.toDate?.().toISOString().slice(0, 10)
     ?? fallbackDueDate.toISOString().slice(0, 10)
+  const serviceDateDefault = initialInvoice?.serviceDate?.toDate?.().toISOString().slice(0, 10) ?? ''
   const initialRows = initialInvoice?.lineItems?.length
     ? initialInvoice.lineItems.map((item) => ({
         ...EMPTY_ROW,
@@ -400,7 +405,9 @@ const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
     : [{ ...EMPTY_ROW }]
 
   const [rows, setRows]       = useState<InvoiceLineRow[]>(initialRows)
+  const [invoiceDate, setInvoiceDate] = useState(invoiceDateDefault)
   const [dueDate, setDueDate] = useState(dueDefault)
+  const [serviceDate, setServiceDate] = useState(serviceDateDefault)
   const [notes, setNotes]     = useState(initialInvoice?.notes ?? '')
   const [terms, setTerms]     = useState(initialInvoice?.terms ?? '')
   const [applySalesTax, setApplySalesTax] = useState(
@@ -552,6 +559,7 @@ const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
     setFormError('')
     if (lineItems.some(li => !li.description)) { setFormError('All line items need a description.'); return }
     if (safeSalesTaxRatePercent < 0) { setFormError('Sales tax rate cannot be negative.'); return }
+    if (!invoiceDate) { setFormError('Invoice date is required.'); return }
     if (!dueDate) { setFormError('Due date is required.'); return }
     const parsedTermsDays = paymentTermsDays.trim() ? Number.parseInt(paymentTermsDays, 10) : undefined
     if (parsedTermsDays !== undefined && (!Number.isFinite(parsedTermsDays) || parsedTermsDays < 0)) {
@@ -560,7 +568,9 @@ const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
     }
     await onSubmit(
       lineItems,
+      invoiceDate,
       dueDate,
+      serviceDate,
       notes,
       terms,
       applySalesTax,
@@ -752,9 +762,16 @@ const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
           <p style={{ marginTop: -4, marginBottom: 4, color: 'var(--color-text-3)' }}>Sales tax omitted.</p>
         )}
 
-        {/* ── Due date ── */}
-        <div className="cr-form-row">
+        {/* ── Invoice dates ── */}
+        <div className="cr-form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+          <Input label="Invoice date" type="date" value={invoiceDate} onChange={e => setInvoiceDate(e.target.value)} required />
           <Input label="Due date" type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} required />
+          <Input
+            label="Service date (optional)"
+            type="date"
+            value={serviceDate}
+            onChange={e => setServiceDate(e.target.value)}
+          />
         </div>
 
         <div className="cr-form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -792,7 +809,7 @@ const CreateInvoiceModal: React.FC<CreateInvoiceModalProps> = ({
             rows={2}
             value={notes}
             onChange={e => setNotes(e.target.value)}
-            placeholder="Payment terms, special instructions…"
+            placeholder="Billing memo, service summary, or customer-facing notes…"
           />
         </div>
 
@@ -1470,7 +1487,9 @@ const CustomerRecord: React.FC = () => {
   const createInvoiceMutation = useMutation({
     mutationFn: async ({
       lineItems,
+      invoiceDate,
       dueDate,
+      serviceDate,
       notes: invNotes,
       terms,
       applySalesTax,
@@ -1480,7 +1499,9 @@ const CustomerRecord: React.FC = () => {
       customerContactEmail,
     }: {
       lineItems: { description: string; quantity: number; unitPrice: number; amount: number }[]
+      invoiceDate: string
       dueDate:   string
+      serviceDate: string
       notes:     string
       terms:     string
       applySalesTax: boolean
@@ -1491,7 +1512,9 @@ const CustomerRecord: React.FC = () => {
     }) => createInvoice({
       customerId: customerId!,
       lineItems,
+      issuedAt: new Date(invoiceDate),
       dueAt: new Date(dueDate),
+      ...(serviceDate ? { serviceDate: new Date(serviceDate) } : {}),
       ...(invNotes ? { notes: invNotes } : {}),
       ...(terms ? { terms } : {}),
       ...(paymentTermsDays !== undefined ? { paymentTermsDays } : {}),
@@ -1561,8 +1584,14 @@ const CustomerRecord: React.FC = () => {
         quoteId: order.quoteId,
         quoteNumber: order.quoteNumber,
         lineItems,
+        issuedAt: new Date(),
         dueAt: dueDate,
+        serviceDate: order.deliveredAt?.toDate?.() ?? undefined,
         notes: order.notes,
+        salesRepId: order.salesRepId,
+        salesRepName: order.salesRepName,
+        salesRepEmail: order.salesRepEmail,
+        salesRepPhone: order.salesRepPhone,
         applySalesTax: order.applySalesTax ?? ((order.salesTaxRate ?? order.taxRate ?? 0) > 0 || (order.salesTaxAmount ?? 0) > 0),
         salesTaxRate: order.salesTaxRate ?? order.taxRate ?? 0,
         taxRate: order.salesTaxRate ?? order.taxRate ?? 0,
@@ -1620,7 +1649,9 @@ const CustomerRecord: React.FC = () => {
     mutationFn: async ({
       invoiceId,
       lineItems,
+      invoiceDate,
       dueDate,
+      serviceDate,
       notes: invNotes,
       terms,
       applySalesTax,
@@ -1631,7 +1662,9 @@ const CustomerRecord: React.FC = () => {
     }: {
       invoiceId: string
       lineItems: { description: string; quantity: number; unitPrice: number; amount: number }[]
+      invoiceDate: string
       dueDate:   string
+      serviceDate: string
       notes:     string
       terms:     string
       applySalesTax: boolean
@@ -1642,7 +1675,9 @@ const CustomerRecord: React.FC = () => {
     }) => saveDraftInvoiceEdits(invoiceId, {
       customerId: customerId!,
       lineItems,
+      issuedAt: new Date(invoiceDate),
       dueAt: new Date(dueDate),
+      ...(serviceDate ? { serviceDate: new Date(serviceDate) } : {}),
       ...(invNotes ? { notes: invNotes } : {}),
       ...(terms ? { terms } : {}),
       ...(paymentTermsDays !== undefined ? { paymentTermsDays } : {}),
@@ -2077,6 +2112,7 @@ const CustomerRecord: React.FC = () => {
                   <thead>
                     <tr>
                       <th>Quote #</th>
+                      <th>Rep</th>
                       <th>Status</th>
                       <th>Total</th>
                       <th>Actions</th>
@@ -2086,6 +2122,7 @@ const CustomerRecord: React.FC = () => {
                     {recentQuotes.map((quote) => (
                       <tr key={quote.id}>
                         <td className="cr-table__mono">{quote.quoteNumber}</td>
+                        <td>{quote.salesRepName ?? '—'}</td>
                         <td>
                           <Badge variant={
                             quote.status === 'accepted' ? 'success' :
@@ -2227,6 +2264,7 @@ const CustomerRecord: React.FC = () => {
                   <thead>
                     <tr>
                       <th>Quote #</th>
+                      <th>Rep</th>
                       <th>Status</th>
                       <th>Total</th>
                       <th>Actions</th>
@@ -2236,6 +2274,7 @@ const CustomerRecord: React.FC = () => {
                     {orderHistoryQuotes.map((quote) => (
                       <tr key={quote.id}>
                         <td className="cr-table__mono">{quote.quoteNumber || quote.id}</td>
+                        <td>{quote.salesRepName ?? '—'}</td>
                         <td>
                           <Badge variant={
                             quote.status === 'accepted' ? 'success' :
@@ -3075,7 +3114,9 @@ const CustomerRecord: React.FC = () => {
           }}
           onSubmit={async (
             lineItems,
+            invoiceDate,
             dueDate,
+            serviceDate,
             notes,
             terms,
             applySalesTax,
@@ -3088,7 +3129,9 @@ const CustomerRecord: React.FC = () => {
               await editDraftInvoiceMutation.mutateAsync({
                 invoiceId: editingDraftInvoice.id,
                 lineItems,
+                invoiceDate,
                 dueDate,
+                serviceDate,
                 notes,
                 terms,
                 applySalesTax,
@@ -3101,7 +3144,9 @@ const CustomerRecord: React.FC = () => {
             }
             await createInvoiceMutation.mutateAsync({
               lineItems,
+              invoiceDate,
               dueDate,
+              serviceDate,
               notes,
               terms,
               applySalesTax,

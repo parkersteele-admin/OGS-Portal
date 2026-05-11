@@ -35,6 +35,7 @@ import {
 import { subscribeToCustomers, getCustomer } from '../../../services/customerService'
 import { getLeads } from '../../../services/leadService'
 import { getCompanySettings } from '../../../services/companySettingsService'
+import { getActiveUsers } from '../../../services/userService'
 import { useAuth } from '../../../hooks/useAuth'
 import { getDoc, doc } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
@@ -51,6 +52,7 @@ import type { Quote, QuoteItem, QuoteStatus } from '../../../types/crm'
 import type { Customer } from '../../../types/customer'
 import type { Lead } from '../../../types/crm'
 import type { ProductCategory } from '../../../types/product'
+import type { AppUser } from '../../../types/user'
 import CustomerCreateModal from '../components/CustomerCreateModal'
 import './QuoteEditorPage.css'
 
@@ -446,6 +448,15 @@ const QuoteEditorPage: React.FC = () => {
   })
   const [reference,      setReference]      = useState('')
   const [rows,           setRows]           = useState<DraftLineItem[]>([EMPTY_ROW()])
+  const [salesRepId,     setSalesRepId]     = useState('')
+  const [salesRepSnapshot, setSalesRepSnapshot] = useState<{
+    id?: string
+    name?: string
+    email?: string
+    phone?: string
+  } | null>(null)
+  const [salesRepOptions, setSalesRepOptions] = useState<AppUser[]>([])
+  const [fallbackRep, setFallbackRep] = useState({ name: '', email: '', phone: '' })
   const [deliveryFee,    setDeliveryFee]    = useState(0)
   const [includeDelivery,setIncludeDelivery]= useState(false)
   const [rentalMonths,   setRentalMonths]   = useState(0)
@@ -471,9 +482,33 @@ const QuoteEditorPage: React.FC = () => {
 
   useEffect(() => {
     let mounted = true
+    getActiveUsers()
+      .then((users) => {
+        if (!mounted) return
+        const internal = users.filter((u) => ['admin', 'dispatch', 'sales', 'driver'].includes(u.role))
+        const preferred = internal.filter((u) => u.role === 'sales' || u.role === 'admin')
+        const options = preferred.length > 0 ? preferred : internal
+        setSalesRepOptions(options)
+        if (!salesRepId && isNew) {
+          const defaultRep = options.find((u) => u.id === user?.id)
+          if (defaultRep) setSalesRepId(defaultRep.id)
+          else if (user?.id) setSalesRepId(user.id)
+        }
+      })
+      .catch(() => {
+        if (!mounted) return
+        setSalesRepOptions([])
+      })
+
     getCompanySettings()
       .then((settings) => {
-        if (!mounted || !isNew) return
+        if (!mounted) return
+        setFallbackRep({
+          name: settings.name ?? '',
+          email: settings.email ?? '',
+          phone: settings.phone ?? '',
+        })
+        if (!isNew) return
         const configuredRate = Number(settings.defaultSalesTaxRate ?? 0)
         if (!Number.isFinite(configuredRate) || configuredRate <= 0) {
           setApplySalesTax(false)
@@ -489,7 +524,7 @@ const QuoteEditorPage: React.FC = () => {
         setSalesTaxRatePercent('0.00')
       })
     return () => { mounted = false }
-  }, [isNew])
+  }, [isNew, salesRepId, user?.id])
 
   // Load existing quote into form
   useEffect(() => {
@@ -516,6 +551,13 @@ const QuoteEditorPage: React.FC = () => {
         amount:      item.amount,
       })).map((row) => recalcRow(row, 'unitPrice')))
       setNotes(q.notes ?? '')
+      setSalesRepSnapshot({
+        id: q.salesRepId,
+        name: q.salesRepName,
+        email: q.salesRepEmail,
+        phone: q.salesRepPhone,
+      })
+      setSalesRepId(q.salesRepId ?? q.createdBy ?? user?.id ?? '')
       setStatus(q.status)
       const initialTaxAmount = q.salesTaxAmount ?? q.tax ?? 0
       const initialTaxRate = q.salesTaxRate ?? q.taxRate ?? 0
@@ -546,7 +588,12 @@ const QuoteEditorPage: React.FC = () => {
       setLoadError(e.message)
       setLoadingQuote(false)
     })
-  }, [quoteId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [quoteId, user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!isNew || salesRepId || !user?.id) return
+    setSalesRepId(user.id)
+  }, [isNew, salesRepId, user?.id])
 
   // ── Selected recipient details (for auto-fill display) ───────────────────
 
@@ -554,6 +601,64 @@ const QuoteEditorPage: React.FC = () => {
     () => recipients.find(r => r.id === recipientId) ?? null,
     [recipients, recipientId],
   )
+
+  const selectedSalesRep = useMemo(
+    () => salesRepOptions.find((rep) => rep.id === salesRepId) ?? null,
+    [salesRepOptions, salesRepId],
+  )
+
+  const resolvedSalesRep = useMemo(() => {
+    if (selectedSalesRep) {
+      return {
+        salesRepId: selectedSalesRep.id,
+        salesRepName: selectedSalesRep.name,
+        salesRepEmail: selectedSalesRep.email,
+        salesRepPhone: selectedSalesRep.phone,
+      }
+    }
+    if (salesRepSnapshot && salesRepSnapshot.id && salesRepSnapshot.id === salesRepId) {
+      return {
+        salesRepId: salesRepSnapshot.id,
+        salesRepName: salesRepSnapshot.name,
+        salesRepEmail: salesRepSnapshot.email,
+        salesRepPhone: salesRepSnapshot.phone,
+      }
+    }
+    if (user?.id) {
+      return {
+        salesRepId: user.id,
+        salesRepName: user.name,
+        salesRepEmail: user.email,
+        salesRepPhone: user.phone,
+      }
+    }
+    return {
+      salesRepId: undefined,
+      salesRepName: fallbackRep.name || undefined,
+      salesRepEmail: fallbackRep.email || undefined,
+      salesRepPhone: fallbackRep.phone || undefined,
+    }
+  }, [selectedSalesRep, salesRepSnapshot, salesRepId, user, fallbackRep])
+
+  const salesRepSelectOptions = useMemo(() => {
+    const options = salesRepOptions.map((rep) => ({
+      id: rep.id,
+      name: rep.name,
+      email: rep.email,
+    }))
+    if (
+      salesRepSnapshot?.id
+      && !options.some((rep) => rep.id === salesRepSnapshot.id)
+      && (salesRepSnapshot.name || salesRepSnapshot.email)
+    ) {
+      options.push({
+        id: salesRepSnapshot.id,
+        name: salesRepSnapshot.name || salesRepSnapshot.email || 'Saved rep',
+        email: salesRepSnapshot.email || '',
+      })
+    }
+    return options
+  }, [salesRepOptions, salesRepSnapshot])
 
   const handleRecipientChange = useCallback((value: string) => {
     if (value === CREATE_CUSTOMER_OPTION) {
@@ -751,6 +856,7 @@ const QuoteEditorPage: React.FC = () => {
         createdBy:  user!.id,
         customerId: rec?.type === 'customer' ? rec.id : undefined,
         leadId:     rec?.type === 'lead'     ? rec.id : undefined,
+        ...resolvedSalesRep,
       }
       if (savedId) {
         // When re-editing a declined quote, reset it to draft so it can be re-sent
@@ -1103,6 +1209,22 @@ const QuoteEditorPage: React.FC = () => {
                   placeholder="e.g. Propane supply 2026" disabled={isReadOnly} />
                 <Input label="Valid until" type="date" value={validUntil}
                   onChange={e => setValidUntil(e.target.value)} disabled={isReadOnly} />
+                <div className="ui-field">
+                  <label className="ui-field__label">Sales rep</label>
+                  <select
+                    className="ui-input"
+                    value={salesRepId}
+                    onChange={(e) => setSalesRepId(e.target.value)}
+                    disabled={isReadOnly}
+                  >
+                    <option value="">Current user</option>
+                    {salesRepSelectOptions.map((rep) => (
+                      <option key={rep.id} value={rep.id}>
+                        {rep.name || rep.email}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </section>
 

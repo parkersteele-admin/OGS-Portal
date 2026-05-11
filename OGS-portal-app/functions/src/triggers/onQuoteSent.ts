@@ -95,6 +95,7 @@ export const onQuoteSent = onDocumentWritten(
     const subtotal = (eligible.length > 0 ? eligible : [primary]).reduce((sum, item) => sum + (Number.isFinite(item.amount) ? item.amount : item.quantity * item.unitPrice), 0)
     const deliveryFee = 35
     const total = subtotal + deliveryFee
+    const addOnAddedAt = new Date().toISOString()
 
     const orderRef = db.collection('orders').doc()
     await orderRef.set({
@@ -112,6 +113,10 @@ export const onQuoteSent = onDocumentWritten(
       orderType: 'offRoute',
       quoteId,
       quoteNumber: (after.quoteNumber as string | undefined) ?? null,
+      salesRepId: (after.salesRepId as string | undefined) ?? null,
+      salesRepName: (after.salesRepName as string | undefined) ?? null,
+      salesRepEmail: (after.salesRepEmail as string | undefined) ?? null,
+      salesRepPhone: (after.salesRepPhone as string | undefined) ?? null,
       approvedByName: (after.approval as Record<string, unknown> | undefined)?.approvedByName ?? null,
       approvedByEmail: (after.approval as Record<string, unknown> | undefined)?.approvedByEmail ?? null,
       primaryCommunicationMethod: (after.approval as Record<string, unknown> | undefined)?.primaryCommunicationMethod ?? 'email',
@@ -124,7 +129,8 @@ export const onQuoteSent = onDocumentWritten(
         qty: item.quantity,
         unitPrice: item.unitPrice,
         addedBy: 'quote_acceptance_trigger',
-        addedAt: FieldValue.serverTimestamp(),
+        // Firestore sentinels are not valid inside array elements.
+        addedAt: addOnAddedAt,
       })),
       notes: `Accepted quote ${(after.quoteNumber as string | undefined) ?? quoteId} auto-converted to order.`,
       deliveryContactName: (after.approval as Record<string, unknown> | undefined)?.deliveryContactName ?? null,

@@ -890,12 +890,13 @@ export const respondToQuote = onCall(async (request) => {
       updatedAt: now,
     });
 
-    // Notify the sales rep who created the quote
+    // Notify the selected sales rep (fallback to quote creator)
     try {
-      const createdBy = quote.createdBy as string | undefined;
-      if (createdBy) {
-        const repAuthUser = await adminAuth.getUser(createdBy).catch(() => null);
-        const repEmail = repAuthUser?.email;
+      const repUid = (quote.salesRepId ?? quote.createdBy) as string | undefined;
+      const repEmailFromQuote = (quote.salesRepEmail as string | undefined) ?? undefined;
+      if (repUid || repEmailFromQuote) {
+        const repAuthUser = repUid ? await adminAuth.getUser(repUid).catch(() => null) : null;
+        const repEmail = repAuthUser?.email ?? repEmailFromQuote;
         if (repEmail) {
           const quoteNum = (quote.quoteNumber as string) || (data.quoteId as string);
           const total = `$${((quote.total as number) ?? 0).toFixed(2)}`;
@@ -1176,7 +1177,7 @@ export const getPublicQuote = onCall(async (request) => {
 
   // Sales rep info
   let rep: { name: string; email: string; phone: string } | null = null;
-  const repUid = (quote.createdBy ?? quote.assignedTo) as string | undefined;
+  const repUid = (quote.salesRepId ?? quote.createdBy ?? quote.assignedTo) as string | undefined;
   if (repUid) {
     const repSnap = await db.collection('users').doc(repUid).get();
     if (repSnap.exists) {
@@ -1186,6 +1187,14 @@ export const getPublicQuote = onCall(async (request) => {
         email: (rd.email as string) || '',
         phone: (rd.phone as string) || '',
       };
+    }
+  }
+  if (!rep) {
+    const name = (quote.salesRepName as string | undefined) ?? '';
+    const email = (quote.salesRepEmail as string | undefined) ?? '';
+    const phone = (quote.salesRepPhone as string | undefined) ?? '';
+    if (name || email || phone) {
+      rep = { name, email, phone };
     }
   }
 

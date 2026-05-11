@@ -37,6 +37,10 @@ export interface CreateQuoteInput {
   salesTaxRate?: number
   salesTaxAmount?: number
   createdBy: string
+  salesRepId?: string
+  salesRepName?: string
+  salesRepEmail?: string
+  salesRepPhone?: string
 }
 
 function sanitizeQuoteLineItems(lineItems: QuoteItem[]): QuoteItem[] {
@@ -214,6 +218,10 @@ export async function duplicateQuote(sourceQuoteId: string, createdBy: string): 
       salesTaxRate: sourceWithExtras.salesTaxRate,
       salesTaxAmount: sourceWithExtras.salesTaxAmount,
       createdBy,
+      salesRepId: source.salesRepId,
+      salesRepName: source.salesRepName,
+      salesRepEmail: source.salesRepEmail,
+      salesRepPhone: source.salesRepPhone,
     }
 
     return createQuote(duplicateInput, derivedTaxRate)
@@ -360,6 +368,7 @@ export async function convertQuoteToOrder(
     const quotedTotal = typeof quote.total === 'number'
       ? quote.total
       : parseFloat((quotedSubtotal + (applySalesTax ? quotedTaxAmount : 0)).toFixed(2))
+    const addOnAddedAt = new Date().toISOString()
 
     const orderRef = await addDoc(ordersCol, {
       customerId,
@@ -382,6 +391,10 @@ export async function convertQuoteToOrder(
       orderType: 'offRoute',
       quoteId,
       quoteNumber: quote.quoteNumber,
+      salesRepId: quote.salesRepId,
+      salesRepName: quote.salesRepName,
+      salesRepEmail: quote.salesRepEmail,
+      salesRepPhone: quote.salesRepPhone,
       quotedLineItems: quote.lineItems,
       addOns: restItems.map((item) => ({
         productId: item.productId,
@@ -389,7 +402,8 @@ export async function convertQuoteToOrder(
         qty: item.quantity,
         unitPrice: item.unitPrice,
         addedBy: convertedBy ?? 'system',
-        addedAt: serverTimestamp(),
+        // Firestore sentinels are not valid inside array elements.
+        addedAt: addOnAddedAt,
       })),
       notes: quote.notes,
       requestedAt: serverTimestamp(),

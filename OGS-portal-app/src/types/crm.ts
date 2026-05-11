@@ -112,6 +112,10 @@ export interface Quote {
   orderGroupId?: string
   /** UID of the sales rep who created the quote. */
   createdBy: string
+  salesRepId?: string
+  salesRepName?: string
+  salesRepEmail?: string
+  salesRepPhone?: string
   notes?: string
   terms?: string
   taxRate?: number

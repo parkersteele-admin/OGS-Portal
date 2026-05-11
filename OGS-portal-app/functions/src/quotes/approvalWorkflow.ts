@@ -185,6 +185,7 @@ async function createOperationalOrder(args: {
   const subtotal = pricedItems.reduce((sum, item) => sum + safeNumber(item.amount), 0)
   const total = subtotal + deliveryFee
   const orderRef = db.collection('orders').doc()
+  const addOnAddedAt = new Date().toISOString()
 
   await orderRef.set({
     customerId: args.customerId,
@@ -201,6 +202,10 @@ async function createOperationalOrder(args: {
     orderType: 'offRoute',
     quoteId: args.quoteId,
     quoteNumber: (args.quote.quoteNumber as string | undefined) ?? null,
+    salesRepId: (args.quote.salesRepId as string | undefined) ?? null,
+    salesRepName: (args.quote.salesRepName as string | undefined) ?? null,
+    salesRepEmail: (args.quote.salesRepEmail as string | undefined) ?? null,
+    salesRepPhone: (args.quote.salesRepPhone as string | undefined) ?? null,
     approvedByName: args.approval.approvedByName,
     approvedByEmail: args.approval.approvedByEmail ?? null,
     primaryCommunicationMethod: args.approval.primaryCommunicationMethod,
@@ -213,7 +218,8 @@ async function createOperationalOrder(args: {
       qty: item.quantity,
       unitPrice: item.unitPrice,
       addedBy: 'quote_acceptance',
-      addedAt: FieldValue.serverTimestamp(),
+      // Firestore sentinels are not valid inside array elements.
+      addedAt: addOnAddedAt,
     })),
     notes: [
       `Accepted quote ${(args.quote.quoteNumber as string | undefined) ?? args.quoteId}.`,
@@ -231,14 +237,14 @@ async function createOperationalOrder(args: {
   return { orderId: orderRef.id, groupId }
 }
 
-async function getInternalRecipients(createdBy?: string): Promise<InternalRecipient[]> {
+async function getInternalRecipients(createdBy?: string, salesRepId?: string): Promise<InternalRecipient[]> {
   const usersSnap = await db.collection('users').get()
   const recipients = new Map<string, InternalRecipient>()
 
   for (const doc of usersSnap.docs) {
     const data = doc.data()
     const role = data.role as string | undefined
-    if (doc.id === createdBy || role === 'admin' || role === 'dispatch') {
+    if (doc.id === createdBy || doc.id === salesRepId || role === 'admin' || role === 'dispatch') {
       recipients.set(doc.id, {
         id: doc.id,
         email: data.email as string | undefined,
@@ -255,6 +261,14 @@ async function getInternalRecipients(createdBy?: string): Promise<InternalRecipi
       name: authUser?.displayName ?? undefined,
     })
   }
+  if (salesRepId && !recipients.has(salesRepId)) {
+    const authUser = await adminAuth.getUser(salesRepId).catch(() => null)
+    recipients.set(salesRepId, {
+      id: salesRepId,
+      email: authUser?.email,
+      name: authUser?.displayName ?? undefined,
+    })
+  }
 
   return [...recipients.values()]
 }
@@ -266,7 +280,10 @@ async function notifyInternalTeam(args: {
   approval: QuoteApprovalInput
   orderId: string
 }): Promise<void> {
-  const recipients = await getInternalRecipients(args.quote.createdBy as string | undefined)
+  const recipients = await getInternalRecipients(
+    args.quote.createdBy as string | undefined,
+    args.quote.salesRepId as string | undefined,
+  )
   if (recipients.length === 0) return
 
   const customerSnap = await db.collection('customers').doc(args.customerId).get()

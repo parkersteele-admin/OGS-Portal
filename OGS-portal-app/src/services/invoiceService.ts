@@ -31,7 +31,9 @@ export interface CreateInvoiceInput {
   quoteNumber?: string
   leadId?: string
   lineItems: InvoiceLineItem[]
+  issuedAt?: Date
   dueAt: Date
+  serviceDate?: Date
   notes?: string
   terms?: string
   paymentTermsDays?: number
@@ -41,12 +43,18 @@ export interface CreateInvoiceInput {
   taxRate?: number
   customerContactName?: string
   customerContactEmail?: string
+  salesRepId?: string
+  salesRepName?: string
+  salesRepEmail?: string
+  salesRepPhone?: string
 }
 
 export interface EditDraftInvoiceInput {
   customerId: string
   lineItems: InvoiceLineItem[]
+  issuedAt?: Date
   dueAt: Date
+  serviceDate?: Date
   notes?: string
   terms?: string
   paymentTermsDays?: number
@@ -56,6 +64,10 @@ export interface EditDraftInvoiceInput {
   taxRate?: number
   customerContactName?: string
   customerContactEmail?: string
+  salesRepId?: string
+  salesRepName?: string
+  salesRepEmail?: string
+  salesRepPhone?: string
 }
 
 // ── Pricing ───────────────────────────────────────────────────────────────────
@@ -126,7 +138,15 @@ export async function createInvoice(data: CreateInvoiceInput, taxRate = 0): Prom
       : 0
     const totals = calculateInvoiceTotals(data.lineItems, appliedTaxRate, applySalesTax)
     const invoiceNumber = `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`
-    const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined))
+    const issuedAt = Timestamp.fromDate(data.issuedAt ?? new Date())
+    const clean = Object.fromEntries(
+      Object.entries({
+        ...data,
+        issuedAt,
+        dueAt: Timestamp.fromDate(data.dueAt),
+        serviceDate: data.serviceDate ? Timestamp.fromDate(data.serviceDate) : undefined,
+      }).filter(([, v]) => v !== undefined),
+    )
     const ref = await addDoc(invoicesCol, {
       invoiceNumber,
       ...clean,
@@ -136,7 +156,6 @@ export async function createInvoice(data: CreateInvoiceInput, taxRate = 0): Prom
       salesTaxAmount: totals.tax,
       taxRate: appliedTaxRate,
       status: 'draft' as InvoiceStatus,
-      issuedAt: serverTimestamp(),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     } as unknown as Omit<Invoice, 'id'>)
@@ -176,7 +195,11 @@ export async function saveDraftInvoiceEdits(
       Object.entries({
         customerId: data.customerId,
         lineItems: data.lineItems,
+        issuedAt: data.issuedAt
+          ? Timestamp.fromDate(data.issuedAt)
+          : (current.issuedAt ?? Timestamp.fromDate(new Date())),
         dueAt: Timestamp.fromDate(data.dueAt),
+        serviceDate: data.serviceDate ? Timestamp.fromDate(data.serviceDate) : null,
         notes: data.notes,
         terms: data.terms,
         paymentTermsDays: data.paymentTermsDays,
@@ -186,6 +209,10 @@ export async function saveDraftInvoiceEdits(
         taxRate: appliedTaxRate,
         customerContactName: data.customerContactName,
         customerContactEmail: data.customerContactEmail,
+        salesRepId: data.salesRepId,
+        salesRepName: data.salesRepName,
+        salesRepEmail: data.salesRepEmail,
+        salesRepPhone: data.salesRepPhone,
       }).filter(([, v]) => v !== undefined),
     )
 

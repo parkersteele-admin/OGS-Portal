@@ -33,6 +33,7 @@ import {
 import { subscribeToCustomers, searchCustomers, getCustomer } from '../../../services/customerService'
 import { getLeads, getLead } from '../../../services/leadService'
 import { getCompanySettings } from '../../../services/companySettingsService'
+import { getActiveUsers } from '../../../services/userService'
 import { useAuth } from '../../../hooks/useAuth'
 import { formatCurrency, formatDate, formatRelative } from '../../../utils/format'
 import { Badge } from '../../../components/ui/Badge'
@@ -44,6 +45,7 @@ import type { ProductDropdownItem } from '../../../services/productService'
 import type { Quote, QuoteItem, QuoteStatus } from '../../../types/crm'
 import type { Customer } from '../../../types/customer'
 import type { Lead } from '../../../types/crm'
+import type { AppUser } from '../../../types/user'
 import './QuoteBuilder.css'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -340,6 +342,15 @@ export const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
 
   const [recipient,      setRecipient]      = useState<RecipientOption | null>(null)
   const [name,           setName]           = useState('')
+  const [salesRepId,     setSalesRepId]     = useState('')
+  const [salesRepSnapshot, setSalesRepSnapshot] = useState<{
+    id?: string
+    name?: string
+    email?: string
+    phone?: string
+  } | null>(null)
+  const [salesRepOptions, setSalesRepOptions] = useState<AppUser[]>([])
+  const [fallbackRep, setFallbackRep] = useState({ name: '', email: '', phone: '' })
   const [validUntil,     setValidUntil]     = useState(() => {
     const d = new Date(); d.setDate(d.getDate() + 30)
     return d.toISOString().slice(0, 10)
@@ -362,10 +373,33 @@ export const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
 
   useEffect(() => {
     let mounted = true
+    getActiveUsers()
+      .then((users) => {
+        if (!mounted) return
+        const internal = users.filter((u) => ['admin', 'dispatch', 'sales', 'driver'].includes(u.role))
+        const preferred = internal.filter((u) => u.role === 'sales' || u.role === 'admin')
+        const options = preferred.length > 0 ? preferred : internal
+        setSalesRepOptions(options)
+        if (!salesRepId && !editQuote) {
+          const defaultRep = options.find((u) => u.id === user?.id)
+          if (defaultRep) setSalesRepId(defaultRep.id)
+          else if (user?.id) setSalesRepId(user.id)
+        }
+      })
+      .catch(() => {
+        if (!mounted) return
+        setSalesRepOptions([])
+      })
+
     if (editQuote) return () => { mounted = false }
     getCompanySettings()
       .then((settings) => {
         if (!mounted) return
+        setFallbackRep({
+          name: settings.name ?? '',
+          email: settings.email ?? '',
+          phone: settings.phone ?? '',
+        })
         const configuredRate = Number(settings.defaultSalesTaxRate ?? 0)
         if (!Number.isFinite(configuredRate) || configuredRate <= 0) {
           setApplySalesTax(false)
@@ -381,7 +415,7 @@ export const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
         setSalesTaxRatePercent('0.00')
       })
     return () => { mounted = false }
-  }, [editQuote])
+  }, [editQuote, salesRepId, user?.id])
 
   // Pre-fill from edit quote
   useEffect(() => {
@@ -404,6 +438,13 @@ export const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
       }))
     )
     setNotes(editQuote.notes ?? '')
+    setSalesRepSnapshot({
+      id: editQuote.salesRepId,
+      name: editQuote.salesRepName,
+      email: editQuote.salesRepEmail,
+      phone: editQuote.salesRepPhone,
+    })
+    setSalesRepId(editQuote.salesRepId ?? editQuote.createdBy ?? user?.id ?? '')
     const initialTaxAmount = editQuote.salesTaxAmount ?? editQuote.tax ?? 0
     const initialTaxRate = editQuote.salesTaxRate ?? editQuote.taxRate ?? 0
     const inferredApplySalesTax = editQuote.applySalesTax ?? (initialTaxRate > 0 || initialTaxAmount > 0)
@@ -413,7 +454,12 @@ export const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
     if (editQuote.validUntil) {
       setValidUntil((editQuote.validUntil as { toDate(): Date }).toDate().toISOString().slice(0, 10))
     }
-  }, [editQuote?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [editQuote?.id, user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (editQuote || salesRepId || !user?.id) return
+    setSalesRepId(user.id)
+  }, [editQuote, salesRepId, user?.id])
 
   // Pre-fill leadId from query param
   useEffect(() => {
@@ -441,6 +487,64 @@ export const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
   const salesTaxRate = applySalesTax ? (safeSalesTaxRatePercent / 100) : 0
   const salesTaxAmount = parseFloat((preTaxTotal * salesTaxRate).toFixed(2))
   const total = parseFloat((preTaxTotal + salesTaxAmount).toFixed(2))
+
+  const selectedSalesRep = useMemo(
+    () => salesRepOptions.find((rep) => rep.id === salesRepId) ?? null,
+    [salesRepOptions, salesRepId],
+  )
+
+  const resolvedSalesRep = useMemo(() => {
+    if (selectedSalesRep) {
+      return {
+        salesRepId: selectedSalesRep.id,
+        salesRepName: selectedSalesRep.name,
+        salesRepEmail: selectedSalesRep.email,
+        salesRepPhone: selectedSalesRep.phone,
+      }
+    }
+    if (salesRepSnapshot && salesRepSnapshot.id && salesRepSnapshot.id === salesRepId) {
+      return {
+        salesRepId: salesRepSnapshot.id,
+        salesRepName: salesRepSnapshot.name,
+        salesRepEmail: salesRepSnapshot.email,
+        salesRepPhone: salesRepSnapshot.phone,
+      }
+    }
+    if (user?.id) {
+      return {
+        salesRepId: user.id,
+        salesRepName: user.name,
+        salesRepEmail: user.email,
+        salesRepPhone: user.phone,
+      }
+    }
+    return {
+      salesRepId: undefined,
+      salesRepName: fallbackRep.name || undefined,
+      salesRepEmail: fallbackRep.email || undefined,
+      salesRepPhone: fallbackRep.phone || undefined,
+    }
+  }, [selectedSalesRep, salesRepSnapshot, salesRepId, user, fallbackRep])
+
+  const salesRepSelectOptions = useMemo(() => {
+    const options = salesRepOptions.map((rep) => ({
+      id: rep.id,
+      name: rep.name,
+      email: rep.email,
+    }))
+    if (
+      salesRepSnapshot?.id
+      && !options.some((rep) => rep.id === salesRepSnapshot.id)
+      && (salesRepSnapshot.name || salesRepSnapshot.email)
+    ) {
+      options.push({
+        id: salesRepSnapshot.id,
+        name: salesRepSnapshot.name || salesRepSnapshot.email || 'Saved rep',
+        email: salesRepSnapshot.email || '',
+      })
+    }
+    return options
+  }, [salesRepOptions, salesRepSnapshot])
 
   // ── Row helpers ───────────────────────────────────────────────────────────
 
@@ -537,6 +641,7 @@ export const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
         createdBy:  user!.id,
         customerId: recipient!.type === 'customer' ? recipient!.id : undefined,
         leadId:     recipient!.type === 'lead'     ? recipient!.id : undefined,
+        ...resolvedSalesRep,
       }
 
       if (savedId) {
@@ -679,6 +784,22 @@ export const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
                 placeholder="e.g. Propane supply 2026"
                 disabled={isReadOnly}
               />
+            </div>
+            <div className="ui-field">
+              <label className="ui-field__label">Sales rep</label>
+              <select
+                className="ui-input"
+                value={salesRepId}
+                onChange={(e) => setSalesRepId(e.target.value)}
+                disabled={isReadOnly}
+              >
+                <option value="">Current user</option>
+                {salesRepSelectOptions.map((rep) => (
+                  <option key={rep.id} value={rep.id}>
+                    {rep.name || rep.email}
+                  </option>
+                ))}
+              </select>
             </div>
             <Input
               label="Valid until"

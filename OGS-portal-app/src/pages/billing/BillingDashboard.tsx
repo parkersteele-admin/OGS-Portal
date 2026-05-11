@@ -204,6 +204,12 @@ const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
             <span className="bd-inv-detail__meta-label">Due</span>
             <span className="bd-inv-detail__meta-value">{formatDate(invoice.dueAt)}</span>
           </div>
+          {invoice.serviceDate && (
+            <div className="bd-inv-detail__meta-item">
+              <span className="bd-inv-detail__meta-label">Service</span>
+              <span className="bd-inv-detail__meta-value">{formatDate(invoice.serviceDate)}</span>
+            </div>
+          )}
           <div className="bd-inv-detail__meta-item">
             <span className="bd-inv-detail__meta-label">Status</span>
             <span className="bd-inv-detail__meta-value">
@@ -260,6 +266,13 @@ const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
             </tr>
           </tfoot>
         </table>
+
+        {invoice.notes && (
+          <div className="bd-inv-detail__meta-item" style={{ marginTop: 12 }}>
+            <span className="bd-inv-detail__meta-label">Notes</span>
+            <span className="bd-inv-detail__meta-value">{invoice.notes}</span>
+          </div>
+        )}
 
         {invoice.status === 'draft' && (
           <div className="bd__void-actions" style={{ marginTop: 12 }}>

@@ -37,6 +37,12 @@ export interface Invoice {
   issuedAt: Timestamp
   /** Payment due date. */
   dueAt: Timestamp
+  /** Optional service completion date shown on invoice PDFs when provided. */
+  serviceDate?: Timestamp
+  salesRepId?: string
+  salesRepName?: string
+  salesRepEmail?: string
+  salesRepPhone?: string
   paidAt?: Timestamp
   stripeInvoiceId?: string
   /** Active Stripe PaymentIntent ID for the current payment attempt. */
