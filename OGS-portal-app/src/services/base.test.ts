@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { sanitizeForFirestore } from './base'
 
 class Marker {
-  constructor(public value: string) {}
+  value: string
+
+  constructor(value: string) {
+    this.value = value
+  }
 }
 
 describe('sanitizeForFirestore', () => {
