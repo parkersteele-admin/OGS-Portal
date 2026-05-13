@@ -484,6 +484,12 @@
   margin: 0;
 }
 
+.um-form__success {
+  font-size: var(--font-size-13);
+  color: var(--color-success);
+  margin: 0;
+}
+
 .um-form__actions {
   display: flex;
   justify-content: flex-end;
@@ -694,6 +700,17 @@
   margin: 0;
 }
 
+.um-edit__profile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.um-edit__profile-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .um-edit__customer-id {
   font-size: var(--font-size-13);
   font-family: monospace;
@@ -714,6 +731,12 @@
   font-size: var(--font-size-12);
   color: var(--color-danger);
   margin: 0;
+}
+
+@media (max-width: 767px) {
+  .um-edit__profile-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 1023px) {

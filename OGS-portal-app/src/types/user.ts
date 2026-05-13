@@ -18,6 +18,7 @@ export interface AppUser {
   id: string
   email: string
   name: string
+  position?: string
   role: UserRole
   active: boolean
   createdAt: Timestamp

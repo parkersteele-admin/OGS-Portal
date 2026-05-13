@@ -915,7 +915,7 @@ const QuoteEditorPage: React.FC = () => {
       if (selectedRecipient?.type !== 'customer') throw new Error('Convert requires a customer (not a lead).')
       const firstRow = rows.find(r => r.unitPrice > 0)
       if (!firstRow) throw new Error('No line item with a unit price.')
-      return convertQuoteToOrder(savedId, selectedRecipient.id, firstRow.unitPrice)
+      return convertQuoteToOrder(savedId, selectedRecipient.id, firstRow.unitPrice, user?.id)
     },
     onSuccess: () => {
       setStatus('accepted')

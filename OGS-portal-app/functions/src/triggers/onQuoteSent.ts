@@ -96,6 +96,14 @@ export const onQuoteSent = onDocumentWritten(
     const deliveryFee = 35
     const total = subtotal + deliveryFee
     const addOnAddedAt = new Date().toISOString()
+    const repFields = Object.fromEntries(
+      Object.entries({
+        salesRepId: (after.salesRepId as string | undefined) ?? undefined,
+        salesRepName: (after.salesRepName as string | undefined) ?? undefined,
+        salesRepEmail: (after.salesRepEmail as string | undefined) ?? undefined,
+        salesRepPhone: (after.salesRepPhone as string | undefined) ?? undefined,
+      }).filter(([, value]) => value !== undefined),
+    )
 
     const orderRef = db.collection('orders').doc()
     await orderRef.set({
@@ -113,10 +121,7 @@ export const onQuoteSent = onDocumentWritten(
       orderType: 'offRoute',
       quoteId,
       quoteNumber: (after.quoteNumber as string | undefined) ?? null,
-      salesRepId: (after.salesRepId as string | undefined) ?? null,
-      salesRepName: (after.salesRepName as string | undefined) ?? null,
-      salesRepEmail: (after.salesRepEmail as string | undefined) ?? null,
-      salesRepPhone: (after.salesRepPhone as string | undefined) ?? null,
+      ...repFields,
       approvedByName: (after.approval as Record<string, unknown> | undefined)?.approvedByName ?? null,
       approvedByEmail: (after.approval as Record<string, unknown> | undefined)?.approvedByEmail ?? null,
       primaryCommunicationMethod: (after.approval as Record<string, unknown> | undefined)?.primaryCommunicationMethod ?? 'email',

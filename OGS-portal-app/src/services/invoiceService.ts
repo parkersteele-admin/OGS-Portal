@@ -16,7 +16,7 @@ import {
 import { db } from '../lib/firebase'
 import { invoicesCol } from '../lib/firestore'
 import type { Invoice, InvoiceStatus, InvoiceLineItem } from '../types/billing'
-import { serviceCall, fromSnap, paginate, type Page, type PageOptions } from './base'
+import { serviceCall, fromSnap, paginate, type Page, type PageOptions, sanitizeForFirestore } from './base'
 
 export interface InvoiceFilters {
   customerId?: string
@@ -147,7 +147,7 @@ export async function createInvoice(data: CreateInvoiceInput, taxRate = 0): Prom
         serviceDate: data.serviceDate ? Timestamp.fromDate(data.serviceDate) : undefined,
       }).filter(([, v]) => v !== undefined),
     )
-    const ref = await addDoc(invoicesCol, {
+    const ref = await addDoc(invoicesCol, sanitizeForFirestore({
       invoiceNumber,
       ...clean,
       ...totals,
@@ -158,7 +158,7 @@ export async function createInvoice(data: CreateInvoiceInput, taxRate = 0): Prom
       status: 'draft' as InvoiceStatus,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    } as unknown as Omit<Invoice, 'id'>)
+    } as unknown as Omit<Invoice, 'id'>))
     return ref.id
   })
 }
@@ -168,7 +168,7 @@ export async function updateInvoice(
   data: Partial<Omit<Invoice, 'id' | 'createdAt'>>,
 ): Promise<void> {
   return serviceCall(() =>
-    updateDoc(doc(db, 'invoices', id), { ...data, updatedAt: serverTimestamp() }),
+    updateDoc(doc(db, 'invoices', id), sanitizeForFirestore({ ...data, updatedAt: serverTimestamp() })),
   )
 }
 
@@ -216,11 +216,11 @@ export async function saveDraftInvoiceEdits(
       }).filter(([, v]) => v !== undefined),
     )
 
-    await updateDoc(doc(db, 'invoices', id), {
+    await updateDoc(doc(db, 'invoices', id), sanitizeForFirestore({
       ...clean,
       ...totals,
       updatedAt: serverTimestamp(),
-    })
+    }))
   })
 }
 

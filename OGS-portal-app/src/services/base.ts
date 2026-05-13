@@ -112,6 +112,46 @@ export async function serviceCall<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
+// ── Firestore payload sanitization ───────────────────────────────────────────
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== 'object') return false
+  const proto = Object.getPrototypeOf(value)
+  return proto === Object.prototype || proto === null
+}
+
+function sanitizeValue(value: unknown): unknown {
+  if (value === undefined) return undefined
+
+  if (Array.isArray(value)) {
+    const cleanArray = value
+      .map((entry) => sanitizeValue(entry))
+      .filter((entry) => entry !== undefined)
+    return cleanArray
+  }
+
+  if (isPlainObject(value)) {
+    const cleanObject: Record<string, unknown> = {}
+    for (const [key, entry] of Object.entries(value)) {
+      const cleanEntry = sanitizeValue(entry)
+      if (cleanEntry !== undefined) {
+        cleanObject[key] = cleanEntry
+      }
+    }
+    return cleanObject
+  }
+
+  return value
+}
+
+/**
+ * Recursively removes undefined values from objects and arrays.
+ * Firestore rejects undefined payload values in addDoc/setDoc/updateDoc writes.
+ */
+export function sanitizeForFirestore<T>(value: T): T {
+  return sanitizeValue(value) as T
+}
+
 // ── Pagination ────────────────────────────────────────────────────────────────
 
 export interface Page<T> {

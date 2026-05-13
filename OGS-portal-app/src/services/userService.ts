@@ -86,11 +86,15 @@ export function subscribeToUser(id: string, callback: (user: AppUser | null) => 
 
 // ── Write ─────────────────────────────────────────────────────────────────────
 
-export type ProfileUpdateInput = Partial<Pick<AppUser, 'name' | 'phone' | 'avatarUrl'>>
+export type ProfileUpdateInput = Partial<Pick<AppUser, 'name' | 'phone' | 'position' | 'avatarUrl'>>
 
 export async function updateUserProfile(id: string, data: ProfileUpdateInput): Promise<void> {
+  const cleanData = Object.fromEntries(
+    Object.entries(data).filter(([, value]) => value !== undefined),
+  ) as ProfileUpdateInput
+
   return serviceCall(() =>
-    updateDoc(doc(db, 'users', id), { ...data, updatedAt: serverTimestamp() }),
+    updateDoc(doc(db, 'users', id), { ...cleanData, updatedAt: serverTimestamp() }),
   )
 }
 

@@ -17,7 +17,7 @@ import { db } from '../lib/firebase'
 import { customersCol } from '../lib/firestore'
 import type { Customer, CustomerStatus } from '../types/customer'
 import { formatAddress } from '../utils/addressUtils'
-import { serviceCall, fromSnap, paginate, type Page, type PageOptions } from './base'
+import { serviceCall, fromSnap, paginate, type Page, type PageOptions, sanitizeForFirestore } from './base'
 
 export interface CustomerFilters {
   status?: CustomerStatus
@@ -87,7 +87,7 @@ export async function createCustomer(data: CreateCustomerInput): Promise<string>
     const coords = await geocodeAddress(data).catch(() => null)
 
     const cleanData = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined))
-    const ref = await addDoc(customersCol, {
+    const ref = await addDoc(customersCol, sanitizeForFirestore({
       ...cleanData,
       status: 'active' as CustomerStatus,
       creditLimit: data.creditLimit ?? 5000,
@@ -97,7 +97,7 @@ export async function createCustomer(data: CreateCustomerInput): Promise<string>
       ...(coords ?? {}),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    } as Omit<Customer, 'id'>)
+    } as Omit<Customer, 'id'>))
     return ref.id
   })
 }
@@ -115,22 +115,22 @@ export async function updateCustomer(
       const existing = await getCustomer(id)
       coords = await geocodeAddress({ ...existing, ...data }).catch(() => null)
     }
-    await updateDoc(doc(db, 'customers', id), {
+    await updateDoc(doc(db, 'customers', id), sanitizeForFirestore({
       ...data,
       ...(coords ?? {}),
       updatedAt: serverTimestamp(),
-    })
+    }))
   })
 }
 
 /** Soft-archive a customer. The record is retained but hidden from normal lists. */
 export async function archiveCustomer(id: string): Promise<void> {
   return serviceCall(() =>
-    updateDoc(doc(db, 'customers', id), {
+    updateDoc(doc(db, 'customers', id), sanitizeForFirestore({
       status: 'archived' as CustomerStatus,
       archivedAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    }),
+    })),
   )
 }
 
@@ -141,23 +141,23 @@ export async function archiveCustomer(id: string): Promise<void> {
  */
 export async function deleteCustomer(id: string): Promise<void> {
   return serviceCall(() =>
-    updateDoc(doc(db, 'customers', id), {
+    updateDoc(doc(db, 'customers', id), sanitizeForFirestore({
       status: 'deleted' as CustomerStatus,
       deletedAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    }),
+    })),
   )
 }
 
 /** Restore an archived or soft-deleted customer back to active. */
 export async function restoreCustomer(id: string): Promise<void> {
   return serviceCall(() =>
-    updateDoc(doc(db, 'customers', id), {
+    updateDoc(doc(db, 'customers', id), sanitizeForFirestore({
       status: 'active' as CustomerStatus,
       archivedAt: deleteField(),
       deletedAt: deleteField(),
       updatedAt: serverTimestamp(),
-    }),
+    })),
   )
 }
 

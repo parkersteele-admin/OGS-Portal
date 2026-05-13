@@ -709,7 +709,7 @@ export const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
       }
       const firstRow = rows.find(r => r.unitPrice > 0)
       if (!firstRow) throw new Error('No line item with a unit price.')
-      return convertQuoteToOrder(savedId, recipient.id, firstRow.unitPrice)
+      return convertQuoteToOrder(savedId, recipient.id, firstRow.unitPrice, user?.id)
     },
     onSuccess: () => {
       setStatus('accepted')

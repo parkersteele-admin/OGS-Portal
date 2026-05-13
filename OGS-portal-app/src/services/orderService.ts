@@ -17,7 +17,7 @@ import { db } from '../lib/firebase'
 import { ordersCol, deliverySettingsRef, routeScheduleRef, routeScheduleHistoryCol } from '../lib/firestore'
 import type { Order, OrderStatus, DeliveryTier, DeliveryTierConfig, DeliverySettings, RouteSchedule, AddOnItem } from '../types/order'
 import { DEFAULT_DELIVERY_SETTINGS } from '../types/order'
-import { serviceCall, fromSnap, paginate, type Page, type PageOptions, OgsValidationError } from './base'
+import { serviceCall, fromSnap, paginate, type Page, type PageOptions, OgsValidationError, sanitizeForFirestore } from './base'
 
 export type { DeliveryTierConfig, DeliverySettings, RouteSchedule, AddOnItem }
 
@@ -68,7 +68,7 @@ export async function getDeliverySettings(): Promise<DeliverySettings> {
 /** Persist delivery settings. Admin only. */
 export async function updateDeliverySettings(settings: DeliverySettings): Promise<void> {
   return serviceCall(() =>
-    setDoc(deliverySettingsRef, settings, { merge: true }),
+    setDoc(deliverySettingsRef, sanitizeForFirestore(settings), { merge: true }),
   )
 }
 
@@ -91,13 +91,17 @@ export async function updateRouteSchedule(
 ): Promise<void> {
   return serviceCall(async () => {
     const now = serverTimestamp()
-    await setDoc(routeScheduleRef(customerId), { ...schedule, updatedBy, updatedAt: now }, { merge: true })
+    await setDoc(
+      routeScheduleRef(customerId),
+      sanitizeForFirestore({ ...schedule, updatedBy, updatedAt: now }),
+      { merge: true },
+    )
     // Audit trail
-    await addDoc(routeScheduleHistoryCol(customerId), {
+    await addDoc(routeScheduleHistoryCol(customerId), sanitizeForFirestore({
       ...(schedule as RouteSchedule),
       updatedBy,
       updatedAt: now,
-    })
+    }))
   })
 }
 
@@ -113,10 +117,10 @@ export async function addOnToNextDelivery(
   return serviceCall(async () => {
     const now = serverTimestamp()
     const addOns: Omit<AddOnItem, 'addedAt'>[] = items.map((item) => ({ ...item, addedBy }))
-    await updateDoc(doc(db, 'orders', orderId), {
+    await updateDoc(doc(db, 'orders', orderId), sanitizeForFirestore({
       addOns: addOns.map((a) => ({ ...a, addedAt: now })),
       updatedAt: now,
-    })
+    }))
   })
 }
 
@@ -225,14 +229,14 @@ export async function createOrder(
     const payload = Object.fromEntries(
       Object.entries(data).filter(([, v]) => v !== undefined),
     )
-    const ref = await addDoc(ordersCol, {
+    const ref = await addDoc(ordersCol, sanitizeForFirestore({
       ...payload,
       ...pricing,
       status: 'pending' as OrderStatus,
       requestedAt: serverTimestamp(),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    } as unknown as Omit<Order, 'id'>)
+    } as unknown as Omit<Order, 'id'>))
     return ref.id
   })
 }
@@ -255,7 +259,7 @@ export async function createBatchOrders(
         const payload = Object.fromEntries(
           Object.entries(item).filter(([, value]) => value !== undefined),
         )
-        const ref = await addDoc(ordersCol, {
+        const ref = await addDoc(ordersCol, sanitizeForFirestore({
           ...payload,
           ...pricing,
           ...(groupId ? { groupId } : {}),
@@ -264,7 +268,7 @@ export async function createBatchOrders(
           requestedAt: serverTimestamp(),
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
-        } as unknown as Omit<Order, 'id'>)
+        } as unknown as Omit<Order, 'id'>))
         return ref.id
       }),
     )
@@ -278,7 +282,7 @@ export async function updateOrder(
   data: Partial<Omit<Order, 'id' | 'createdAt' | 'requestedAt'>>,
 ): Promise<void> {
   return serviceCall(() =>
-    updateDoc(doc(db, 'orders', id), { ...data, updatedAt: serverTimestamp() }),
+    updateDoc(doc(db, 'orders', id), sanitizeForFirestore({ ...data, updatedAt: serverTimestamp() })),
   )
 }
 
@@ -293,20 +297,20 @@ export async function transitionOrderStatus(
         `Cannot transition order from '${order.status}' to '${nextStatus}'`,
       )
     }
-    await updateDoc(doc(db, 'orders', id), {
+    await updateDoc(doc(db, 'orders', id), sanitizeForFirestore({
       status: nextStatus,
       updatedAt: serverTimestamp(),
-    })
+    }))
   })
 }
 
 export async function archiveOrder(id: string): Promise<void> {
   return serviceCall(() =>
-    updateDoc(doc(db, 'orders', id), {
+    updateDoc(doc(db, 'orders', id), sanitizeForFirestore({
       status: 'archived' as OrderStatus,
       archivedAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-    }),
+    })),
   )
 }
 

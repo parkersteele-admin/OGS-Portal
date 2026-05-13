@@ -17,7 +17,7 @@ import { db } from '../lib/firebase'
 import { quotesCol, ordersCol } from '../lib/firestore'
 import type { Quote, QuoteStatus, QuoteItem } from '../types/crm'
 import { getInternalProductPricingGuards } from './productService'
-import { serviceCall, fromSnap, paginate, type Page, type PageOptions, OgsValidationError } from './base'
+import { serviceCall, fromSnap, paginate, type Page, type PageOptions, OgsValidationError, sanitizeForFirestore } from './base'
 
 export interface QuoteFilters {
   customerId?: string
@@ -152,7 +152,7 @@ export async function createQuote(data: CreateQuoteInput, taxRate = 0): Promise<
     const quoteNumber = `QT-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`
     // Strip undefined fields — Firestore rejects them
     const cleanData = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined))
-    const ref = await addDoc(quotesCol, {
+    const quotePayload = sanitizeForFirestore({
       quoteNumber,
       ...cleanData,
       applySalesTax,
@@ -165,6 +165,7 @@ export async function createQuote(data: CreateQuoteInput, taxRate = 0): Promise<
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     } as unknown as Omit<Quote, 'id'>)
+    const ref = await addDoc(quotesCol, quotePayload)
     return ref.id
   })
 }
@@ -239,9 +240,11 @@ export async function updateQuote(
   }
 
   // Strip undefined fields — Firestore rejects them
-  const clean = Object.fromEntries(Object.entries(nextData).filter(([, v]) => v !== undefined))
+  const clean = sanitizeForFirestore(
+    Object.fromEntries(Object.entries(nextData).filter(([, v]) => v !== undefined)),
+  )
   return serviceCall(() =>
-    updateDoc(doc(db, 'quotes', id), { ...clean, updatedAt: serverTimestamp() }),
+    updateDoc(doc(db, 'quotes', id), sanitizeForFirestore({ ...clean, updatedAt: serverTimestamp() })),
   )
 }
 
@@ -259,14 +262,14 @@ async function applyQuotePricingToCustomer(
   const batch = writeBatch(db)
   for (const item of eligible) {
     const ref = doc(db, 'customers', customerId, 'productPricing', item.productId)
-    batch.set(ref, {
+    batch.set(ref, sanitizeForFirestore({
       productId: item.productId,
       price:     item.unitPrice,
       source:    'quote',
       quoteId,
       setBy,
       setAt:     serverTimestamp(),
-    })
+    }))
   }
   await batch.commit()
 }
@@ -285,11 +288,11 @@ export async function sendQuote(id: string): Promise<void> {
 export async function acceptQuote(id: string, acceptedBy?: string): Promise<void> {
   return serviceCall(async () => {
     const quote = await getQuote(id)
-    await updateDoc(doc(db, 'quotes', id), {
+    await updateDoc(doc(db, 'quotes', id), sanitizeForFirestore({
       status:     'accepted' as QuoteStatus,
       acceptedAt: serverTimestamp(),
       updatedAt:  serverTimestamp(),
-    })
+    }))
     if (quote.customerId && quote.lineItems.length > 0) {
       await applyQuotePricingToCustomer(quote.customerId, id, quote.lineItems, acceptedBy ?? 'system')
     }
@@ -369,58 +372,93 @@ export async function convertQuoteToOrder(
       ? quote.total
       : parseFloat((quotedSubtotal + (applySalesTax ? quotedTaxAmount : 0)).toFixed(2))
     const addOnAddedAt = new Date().toISOString()
+    const salesRepId = quote.salesRepId ?? convertedBy
+    let salesRepName = quote.salesRepName
+    let salesRepEmail = quote.salesRepEmail
+    let salesRepPhone = quote.salesRepPhone
 
-    const orderRef = await addDoc(ordersCol, {
-      customerId,
-      productId: primaryItem.productId,
-      quantity: primaryItem.quantity,
-      deliveryTier: 'standard',
-      unitPrice: primaryItem.unitPrice || unitPrice,
-      upchargePercent: 0,
-      subtotal: quotedSubtotal,
-      deliveryFee: quotedDeliveryFee,
-      total: quotedTotal,
-      quoteSubtotal: quotedSubtotal,
-      quoteTax: applySalesTax ? quotedTaxAmount : 0,
-      quoteTotal: quotedTotal,
-      applySalesTax,
-      salesTaxRate: applySalesTax ? quotedTaxRate : 0,
-      salesTaxAmount: applySalesTax ? quotedTaxAmount : 0,
-      taxRate: applySalesTax ? quotedTaxRate : 0,
-      status: 'pending',
-      orderType: 'offRoute',
-      quoteId,
-      quoteNumber: quote.quoteNumber,
-      salesRepId: quote.salesRepId,
-      salesRepName: quote.salesRepName,
-      salesRepEmail: quote.salesRepEmail,
-      salesRepPhone: quote.salesRepPhone,
-      quotedLineItems: quote.lineItems,
-      addOns: restItems.map((item) => ({
-        productId: item.productId,
-        productName: item.description,
-        qty: item.quantity,
-        unitPrice: item.unitPrice,
-        addedBy: convertedBy ?? 'system',
-        // Firestore sentinels are not valid inside array elements.
-        addedAt: addOnAddedAt,
-      })),
-      notes: quote.notes,
-      requestedAt: serverTimestamp(),
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    } as unknown as Omit<import('../types/order').Order, 'id'>)
+    if (salesRepId && (!salesRepName || !salesRepEmail || !salesRepPhone)) {
+      const salesRepSnap = await getDoc(doc(db, 'users', salesRepId))
+      if (salesRepSnap.exists()) {
+        const repData = salesRepSnap.data() as Record<string, unknown>
+        const fullName = [
+          `${repData['firstName'] ?? ''}`,
+          `${repData['lastName'] ?? ''}`,
+        ].join(' ').trim()
+
+        salesRepName = salesRepName
+          || (repData['name'] as string | undefined)
+          || fullName
+          || undefined
+        salesRepEmail = salesRepEmail || (repData['email'] as string | undefined)
+        salesRepPhone = salesRepPhone || (repData['phone'] as string | undefined)
+      }
+    }
+
+    const repFields = Object.fromEntries(
+      Object.entries({
+        salesRepId,
+        salesRepName,
+        salesRepEmail,
+        salesRepPhone,
+      }).filter(([, value]) => value !== undefined),
+    )
+
+    const orderPayload = Object.fromEntries(
+      Object.entries({
+        customerId,
+        productId: primaryItem.productId,
+        quantity: primaryItem.quantity,
+        deliveryTier: 'standard',
+        unitPrice: primaryItem.unitPrice || unitPrice,
+        upchargePercent: 0,
+        subtotal: quotedSubtotal,
+        deliveryFee: quotedDeliveryFee,
+        total: quotedTotal,
+        quoteSubtotal: quotedSubtotal,
+        quoteTax: applySalesTax ? quotedTaxAmount : 0,
+        quoteTotal: quotedTotal,
+        applySalesTax,
+        salesTaxRate: applySalesTax ? quotedTaxRate : 0,
+        salesTaxAmount: applySalesTax ? quotedTaxAmount : 0,
+        taxRate: applySalesTax ? quotedTaxRate : 0,
+        status: 'pending',
+        orderType: 'offRoute',
+        quoteId,
+        quoteNumber: quote.quoteNumber,
+        ...repFields,
+        quotedLineItems: quote.lineItems,
+        addOns: restItems.map((item) => ({
+          productId: item.productId,
+          productName: item.description,
+          qty: item.quantity,
+          unitPrice: item.unitPrice,
+          addedBy: convertedBy ?? 'system',
+          // Firestore sentinels are not valid inside array elements.
+          addedAt: addOnAddedAt,
+        })),
+        notes: quote.notes,
+        requestedAt: serverTimestamp(),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }).filter(([, value]) => value !== undefined),
+    )
+
+    const orderRef = await addDoc(
+      ordersCol,
+      sanitizeForFirestore(orderPayload as unknown as Omit<import('../types/order').Order, 'id'>),
+    )
     const orderId = orderRef.id
 
     // Mark quote accepted and record the order ID
-    await updateDoc(doc(db, 'quotes', quoteId), {
+    await updateDoc(doc(db, 'quotes', quoteId), sanitizeForFirestore({
       status:           'accepted' as QuoteStatus,
       acceptedAt:       serverTimestamp(),
       convertedOrderId: orderId,
       convertedOrderIds: [orderId],
       needsOrderSetup: false,
       updatedAt:        serverTimestamp(),
-    })
+    }))
 
     // Apply all line-item prices to the customer's product pricing subcollection
     await applyQuotePricingToCustomer(customerId, quoteId, quote.lineItems, convertedBy ?? 'system')

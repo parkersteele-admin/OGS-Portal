@@ -27,6 +27,7 @@ import {
   createAppUser,
   hardDeleteUser,
   sendPasswordReset,
+  updateUserProfile,
 } from '../../../services/userService'
 import { useViewAsStore } from '../../../store/viewAsStore'
 import { ROLE_HOME } from '../../../types/auth'
@@ -216,30 +217,61 @@ interface EditUserModalProps {
   user:      AppUser
   onClose:   () => void
   onUpdated: () => void
+  onRefresh: () => void
 }
 
-const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onUpdated }) => {
+const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onUpdated, onRefresh }) => {
+  const [name,      setName]      = useState(user.name ?? '')
+  const [phone,     setPhone]     = useState(user.phone ?? '')
+  const [position,  setPosition]  = useState(user.position ?? '')
   const [role,      setRole]      = useState<UserRole>(user.role)
-  const [error,     setError]     = useState('')
+  const [statusMsg, setStatusMsg] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
 
+  const normalizedName = name.trim()
+  const normalizedPhone = phone.trim()
+  const normalizedPosition = position.trim()
+  const profileChanged =
+    normalizedName !== (user.name ?? '').trim()
+    || normalizedPhone !== (user.phone ?? '').trim()
+    || normalizedPosition !== (user.position ?? '').trim()
   const roleChanged    = role !== user.role
 
   const roleMutation = useMutation({
     mutationFn: () => assignUserRole(user.id, role),
     onSuccess:  () => { onUpdated() },
-    onError:    (err: Error) => setError(err.message || 'Failed to update role.'),
+    onError:    (err: Error) => setStatusMsg({ tone: 'error', text: err.message || 'Failed to update role.' }),
   })
 
   const toggleMutation = useMutation({
     mutationFn: () => (user.active ? deactivateUser(user.id) : reactivateUser(user.id)),
     onSuccess:  () => { onUpdated() },
-    onError:    (err: Error) => setError(err.message || 'Failed to update status.'),
+    onError:    (err: Error) => setStatusMsg({ tone: 'error', text: err.message || 'Failed to update status.' }),
   })
 
   const resetMutation = useMutation({
     mutationFn: () => sendPasswordReset(user.email),
-    onSuccess:  () => setError('Password reset email sent.'),
-    onError:    (err: Error) => setError(err.message || 'Failed to send reset email.'),
+    onSuccess:  () => setStatusMsg({ tone: 'success', text: 'Password reset email sent.' }),
+    onError:    (err: Error) => setStatusMsg({ tone: 'error', text: err.message || 'Failed to send reset email.' }),
+  })
+
+  const profileMutation = useMutation({
+    mutationFn: async () => {
+      if (!normalizedName) {
+        throw new Error('Full name is required.')
+      }
+      await updateUserProfile(user.id, {
+        name: normalizedName,
+        phone: normalizedPhone,
+        position: normalizedPosition,
+      })
+    },
+    onSuccess: () => {
+      setStatusMsg({ tone: 'success', text: 'Profile saved.' })
+      onRefresh()
+    },
+    onError: (err: Error) => {
+      setStatusMsg({ tone: 'error', text: err.message || 'Failed to save profile.' })
+    },
   })
 
   return (
@@ -286,6 +318,67 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onUpdated 
           </p>
         </section>
 
+        {/* Profile fields */}
+        <section className="um-edit__section">
+          <p className="um-edit__section-label">Profile</p>
+          <div className="um-edit__profile-grid">
+            <label className="ui-field">
+              <span className="ui-field__label">Full name</span>
+              <input
+                className="ui-input"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Enter full name"
+                autoComplete="name"
+              />
+            </label>
+            <label className="ui-field">
+              <span className="ui-field__label">Email</span>
+              <input
+                className="ui-input"
+                value={user.email}
+                readOnly
+                disabled
+                aria-readonly="true"
+              />
+            </label>
+            <label className="ui-field">
+              <span className="ui-field__label">Phone number</span>
+              <input
+                className="ui-input"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="(555) 555-5555"
+                autoComplete="tel"
+              />
+            </label>
+            <label className="ui-field">
+              <span className="ui-field__label">Title / position <span className="um-optional">optional</span></span>
+              <input
+                className="ui-input"
+                value={position}
+                onChange={(e) => setPosition(e.target.value)}
+                placeholder="Sales Representative"
+                autoComplete="organization-title"
+              />
+            </label>
+          </div>
+          <div className="um-edit__profile-actions">
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => profileMutation.mutate()}
+              disabled={!profileChanged}
+              loading={profileMutation.isPending}
+            >
+              Save Profile
+            </Button>
+          </div>
+          <p className="um-edit__hint">
+            Email is managed through Firebase Auth and is read-only here.
+          </p>
+        </section>
+
         {/* Password reset */}
         <section className="um-edit__section">
           <p className="um-edit__section-label">Password Reset</p>
@@ -325,7 +418,14 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ user, onClose, onUpdated 
           )}
         </section>
 
-        {error && <p className="um-form__error" role="alert">{error}</p>}
+        {statusMsg && (
+          <p
+            className={statusMsg.tone === 'error' ? 'um-form__error' : 'um-form__success'}
+            role={statusMsg.tone === 'error' ? 'alert' : 'status'}
+          >
+            {statusMsg.text}
+          </p>
+        )}
 
         <div className="um-form__actions">
           <Button type="button" variant="ghost" onClick={onClose}>
@@ -437,6 +537,10 @@ export const UserManagement: React.FC = () => {
 
   const handleUpdated = useCallback(() => {
     setEditUser(null)
+    queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
+  }, [queryClient])
+
+  const handleRefresh = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
   }, [queryClient])
 
@@ -613,6 +717,7 @@ export const UserManagement: React.FC = () => {
           user={editUser}
           onClose={() => setEditUser(null)}
           onUpdated={handleUpdated}
+          onRefresh={handleRefresh}
         />
       )}
 

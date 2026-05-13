@@ -186,6 +186,14 @@ async function createOperationalOrder(args: {
   const total = subtotal + deliveryFee
   const orderRef = db.collection('orders').doc()
   const addOnAddedAt = new Date().toISOString()
+  const repFields = Object.fromEntries(
+    Object.entries({
+      salesRepId: (args.quote.salesRepId as string | undefined) ?? undefined,
+      salesRepName: (args.quote.salesRepName as string | undefined) ?? undefined,
+      salesRepEmail: (args.quote.salesRepEmail as string | undefined) ?? undefined,
+      salesRepPhone: (args.quote.salesRepPhone as string | undefined) ?? undefined,
+    }).filter(([, value]) => value !== undefined),
+  )
 
   await orderRef.set({
     customerId: args.customerId,
@@ -202,10 +210,7 @@ async function createOperationalOrder(args: {
     orderType: 'offRoute',
     quoteId: args.quoteId,
     quoteNumber: (args.quote.quoteNumber as string | undefined) ?? null,
-    salesRepId: (args.quote.salesRepId as string | undefined) ?? null,
-    salesRepName: (args.quote.salesRepName as string | undefined) ?? null,
-    salesRepEmail: (args.quote.salesRepEmail as string | undefined) ?? null,
-    salesRepPhone: (args.quote.salesRepPhone as string | undefined) ?? null,
+    ...repFields,
     approvedByName: args.approval.approvedByName,
     approvedByEmail: args.approval.approvedByEmail ?? null,
     primaryCommunicationMethod: args.approval.primaryCommunicationMethod,
