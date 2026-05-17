@@ -115,7 +115,7 @@
 
 .et-field__textarea:focus {
   outline: none;
-  border-color: #E87722;
+  border-color: var(--color-brand);
   box-shadow: 0 0 0 3px rgba(232, 119, 34, 0.12);
 }
 

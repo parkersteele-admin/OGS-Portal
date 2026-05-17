@@ -100,7 +100,7 @@
 }
 
 .qep-error--warn {
-  background: #fff7ed;
+  background: var(--color-brand-light);
   border-color: #fdba74;
   color: #9a3412;
 }
@@ -264,7 +264,7 @@
   font-weight: 600;
   padding: 6px 14px;
   border-radius: 6px;
-  border: 1px solid #E87722;
+  border: 1px solid var(--color-brand);
   background: #fff8f3;
   color: #c05e12;
   cursor: pointer;
@@ -340,7 +340,7 @@
 }
 
 .qep-recipient-add {
-  border: 1px solid #e87722;
+  border: 1px solid var(--color-brand);
   background: #fff8f2;
   color: #a04d08;
   border-radius: 8px;
@@ -368,7 +368,7 @@
 
 .qep-select:focus {
   outline: none;
-  border-color: #e87722;
+  border-color: var(--color-brand);
   box-shadow: 0 0 0 3px rgba(232, 119, 34, 0.14);
 }
 
@@ -519,7 +519,7 @@
   margin-top: 0.55rem;
   border: none;
   background: none;
-  color: #e87722;
+  color: var(--color-brand);
   font-size: 0.82rem;
   font-weight: 600;
   padding: 0;
@@ -559,7 +559,7 @@
   border: 1px dashed #cfcfcf;
   border-radius: 10px;
   background: #fff;
-  color: #e87722;
+  color: var(--color-brand);
   padding: 0.6rem 0.75rem;
   font-size: 0.9rem;
   font-weight: 600;
@@ -568,7 +568,7 @@
 }
 
 .qep-add-row:hover {
-  border-color: #e87722;
+  border-color: var(--color-brand);
   background: #fff8f2;
 }
 
@@ -591,7 +591,7 @@
 }
 
 .qep-addon__check input[type="checkbox"] {
-  accent-color: #e87722;
+  accent-color: var(--color-brand);
 }
 
 .qep-addon__fields {
@@ -687,7 +687,7 @@
   margin-top: 0.15rem;
   padding-top: 0.55rem;
   font-weight: 700;
-  color: #e87722;
+  color: var(--color-brand);
 }
 
 .qep-summary__bill-to,
@@ -759,7 +759,7 @@
   }
 
   .qep-summary {
-    border-left: 4px solid #e87722;
+    border-left: 4px solid var(--color-brand);
   }
 
   .qep-item__controls {
@@ -863,7 +863,7 @@
   }
 
   .qep-mobile-summarybar__btn {
-    border: 1px solid #e87722;
+    border: 1px solid var(--color-brand);
     background: #fff8f2;
     color: #a04d08;
     border-radius: 8px;

@@ -20,7 +20,7 @@
   width: 28px;
   height: 28px;
   border: 3px solid var(--color-border, #e5e7eb);
-  border-top-color: var(--color-brand, #E87722);
+  border-top-color: var(--color-brand);
   border-radius: 50%;
   animation: cp-spin 0.7s linear infinite;
 }
@@ -223,7 +223,7 @@
 
 .cp-field__input:focus {
   outline: none;
-  border-color: var(--color-brand, #E87722);
+  border-color: var(--color-brand);
   box-shadow: 0 0 0 3px rgba(232, 119, 34, 0.12);
 }
 
@@ -266,7 +266,7 @@
 }
 
 .cp-btn--primary {
-  background: var(--color-brand, #E87722);
+  background: var(--color-brand);
   color: #fff;
 }
 
@@ -275,9 +275,9 @@
 }
 
 .cp-btn--secondary {
-  background: var(--color-brand-light, #fff3e8);
-  color: var(--color-brand, #E87722);
-  border: 1px solid var(--color-brand, #E87722);
+  background: var(--color-brand-light);
+  color: var(--color-brand);
+  border: 1px solid var(--color-brand);
 }
 
 .cp-btn--secondary:not(:disabled):hover {
@@ -399,8 +399,8 @@
 }
 
 .cp-day-toggle--on {
-  background: var(--color-brand, #E87722);
-  border-color: var(--color-brand, #E87722);
+  background: var(--color-brand);
+  border-color: var(--color-brand);
   color: #fff;
 }
 

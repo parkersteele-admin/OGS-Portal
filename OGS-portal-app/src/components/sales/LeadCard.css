@@ -86,7 +86,7 @@
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: #e87722;
+  background: var(--color-brand);
   color: #fff;
   font-size: 0.65rem;
   font-weight: 700;
@@ -97,7 +97,7 @@
 }
 .lc-avatar--unassigned {
   background: #e2e8f0;
-  color: #e87722;
+  color: var(--color-brand);
 }
 
 /* Follow-up */
@@ -118,6 +118,6 @@
   border-radius: 50%;
   flex-shrink: 0;
 }
-.lc-priority--high   { background: #e87722; }
+.lc-priority--high   { background: var(--color-brand); }
 .lc-priority--normal { border: 2px solid #cbd5e0; background: transparent; }
 .lc-priority--low    { background: #cbd5e0; }

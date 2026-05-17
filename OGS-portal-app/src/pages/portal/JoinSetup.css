@@ -58,7 +58,7 @@
 }
 
 .join-steps__dot--active {
-  background: #E87722;
+  background: var(--color-brand);
   color: #fff;
 }
 
@@ -99,18 +99,18 @@
 }
 
 .join-role:hover {
-  border-color: #E87722;
+  border-color: var(--color-brand);
   background: #fffbf7;
 }
 
 .join-role--selected {
-  border-color: #E87722;
+  border-color: var(--color-brand);
   background: #fff8f3;
 }
 
 .join-role__radio {
   margin-top: 3px;
-  accent-color: #E87722;
+  accent-color: var(--color-brand);
   flex-shrink: 0;
   width: 16px;
   height: 16px;
@@ -154,7 +154,7 @@
 }
 
 .join-back-btn:hover {
-  color: #E87722;
+  color: var(--color-brand);
 }
 
 /* ── Done state ───────────────────────────────────────────────────────────── */

@@ -196,8 +196,8 @@
 }
 
 .ob-step__day-chip--on {
-  background: #E87722;
-  border-color: #E87722;
+  background: var(--color-brand);
+  border-color: var(--color-brand);
   color: #ffffff;
 }
 
@@ -275,7 +275,7 @@
 }
 
 .ob-step__pm-card--on {
-  border-color: #E87722;
+  border-color: var(--color-brand);
   background: #fff8f3;
 }
 
@@ -318,7 +318,7 @@
 }
 
 .ob-step__cat-card--on {
-  border-color: #E87722;
+  border-color: var(--color-brand);
 }
 
 .ob-step__cat-card__btn {
@@ -425,7 +425,7 @@
 .ob-review__edit-link {
   background: none;
   border: none;
-  color: #E87722;
+  color: var(--color-brand);
   font-size: 0.875rem;
   cursor: pointer;
   font-weight: 500;
@@ -728,7 +728,7 @@
   width: 1rem;
   height: 1rem;
   border: 2px solid #d1d5db;
-  border-top-color: #E87722;
+  border-top-color: var(--color-brand);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
@@ -813,7 +813,7 @@
 }
 
 .signup-terms__link {
-  color: #E87722;
+  color: var(--color-brand);
   text-decoration: underline;
 }
 
@@ -830,7 +830,7 @@
 }
 
 .signup-card__login-link {
-  color: #E87722;
+  color: var(--color-brand);
   text-decoration: underline;
 }
 
@@ -862,6 +862,6 @@
 
 .signup-hold__back {
   font-size: 0.875rem;
-  color: #E87722;
+  color: var(--color-brand);
   text-decoration: underline;
 }

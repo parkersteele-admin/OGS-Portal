@@ -44,7 +44,7 @@
 }
 
 .pc-search:focus-within {
-  border-color: #E87722;
+  border-color: var(--color-brand);
   box-shadow: 0 0 0 3px rgba(232, 119, 34, 0.10);
 }
 
@@ -219,7 +219,7 @@
 
 .pc-row__popular {
   display: inline-block;
-  background: #E87722;
+  background: var(--color-brand);
   color: #fff;
   font-size: 10px;
   font-weight: 700;
@@ -263,8 +263,8 @@
 .pc-row__btn {
   justify-self: end;
   background: transparent;
-  color: #E87722;
-  border: 1.5px solid #E87722;
+  color: var(--color-brand);
+  border: 1.5px solid var(--color-brand);
   border-radius: var(--radius-md);
   padding: var(--space-2) var(--space-3);
   font-size: var(--font-size-12);
@@ -276,7 +276,7 @@
 }
 
 .pc-row__btn:hover {
-  background: #E87722;
+  background: var(--color-brand);
   color: #fff;
 }
 

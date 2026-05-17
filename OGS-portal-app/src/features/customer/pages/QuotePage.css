@@ -114,7 +114,7 @@
   text-align: right;
   font-weight: 700;
   font-size: 1.05rem;
-  color: var(--color-brand, #E87722);
+  color: var(--color-brand);
 }
 
 /* ── Notes ───────────────────────────────────────────────────────────────────── */
@@ -129,7 +129,7 @@
 /* ── Action area ─────────────────────────────────────────────────────────────── */
 
 .qp__card--actions {
-  border-color: var(--color-brand, #E87722);
+  border-color: var(--color-brand);
 }
 
 .qp__action-desc {

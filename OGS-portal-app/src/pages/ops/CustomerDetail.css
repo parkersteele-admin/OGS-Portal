@@ -18,7 +18,7 @@
   margin-bottom: 20px;
   transition: color 0.15s;
 }
-.ops-cust-detail__back:hover { color: #E87722; }
+.ops-cust-detail__back:hover { color: var(--color-brand); }
 
 /* ── Header ──────────────────────────────────────────────────────────────── */
 
@@ -83,8 +83,8 @@
 .ops-cust-detail__tab:hover { color: #111; }
 
 .ops-cust-detail__tab--active {
-  color: #E87722;
-  border-bottom-color: #E87722;
+  color: var(--color-brand);
+  border-bottom-color: var(--color-brand);
   font-weight: 600;
 }
 
@@ -263,7 +263,7 @@
 }
 
 .ops-cust-detail__doc-link {
-  color: #E87722;
+  color: var(--color-brand);
   font-size: 0.875rem;
   text-decoration: none;
   font-weight: 500;

@@ -866,8 +866,8 @@
   white-space: nowrap;
 }
 .cr-inv-addon-chip:hover:not(:disabled) {
-  border-color: var(--color-brand, #E87722);
-  background: var(--color-brand-50, #fff7ed);
+  border-color: var(--color-brand);
+  background: var(--color-brand-50, var(--color-brand-light));
 }
 .cr-inv-addon-chip--added {
   background: var(--color-success-bg, #f0fdf4);
@@ -1256,7 +1256,7 @@
 .cr-so-toggle-check {
   width: 16px;
   height: 16px;
-  accent-color: var(--color-brand, #E87722);
+  accent-color: var(--color-brand);
   cursor: pointer;
 }
 
@@ -1286,14 +1286,14 @@
 
 .cr-so-cadence-btn:hover,
 .cr-so-day-btn:hover {
-  border-color: var(--color-brand, #E87722);
-  color: var(--color-brand, #E87722);
+  border-color: var(--color-brand);
+  color: var(--color-brand);
 }
 
 .cr-so-cadence-btn--active,
 .cr-so-day-btn--active {
-  background: var(--color-brand, #E87722);
-  border-color: var(--color-brand, #E87722);
+  background: var(--color-brand);
+  border-color: var(--color-brand);
   color: #fff;
   font-weight: 600;
 }

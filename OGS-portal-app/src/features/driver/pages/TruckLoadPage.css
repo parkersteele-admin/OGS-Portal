@@ -95,7 +95,7 @@
 .tl-progress-counter {
   font-size: var(--font-size-28);
   font-weight: 900;
-  color: #E87722;
+  color: var(--color-brand);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.5px;
 }

@@ -23,7 +23,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, Error
     if (this.state.hasError) {
       return (
         <div style={{ padding: 40, fontFamily: 'system-ui, sans-serif', maxWidth: 600, margin: '60px auto' }}>
-          <h2 style={{ color: '#E87722', marginBottom: 12 }}>Something went wrong</h2>
+          <h2 style={{ color: 'var(--color-brand)', marginBottom: 12 }}>Something went wrong</h2>
           <p style={{ color: '#374151', marginBottom: 16, lineHeight: 1.6 }}>
             The page ran into an unexpected error. Try refreshing. If the problem persists, contact support.
           </p>
@@ -32,7 +32,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, Error
           </pre>
           <button
             onClick={() => window.location.reload()}
-            style={{ marginTop: 20, padding: '10px 24px', background: '#E87722', color: '#fff', border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}
+            style={{ marginTop: 20, padding: '10px 24px', background: 'var(--color-brand)', color: '#fff', border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}
           >
             Reload page
           </button>

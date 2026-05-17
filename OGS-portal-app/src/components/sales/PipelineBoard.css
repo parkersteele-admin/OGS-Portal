@@ -39,11 +39,11 @@
   transition: all 0.15s;
 }
 .pb-filters__chip--on {
-  border-color: #e87722;
-  background: #fff3e8;
-  color: #e87722;
+  border-color: var(--color-brand);
+  background: var(--color-brand-light);
+  color: var(--color-brand);
 }
-.pb-filters__chip--high.pb-filters__chip--on { background: #fff3e8; border-color: #e87722; color: #e87722; }
+.pb-filters__chip--high.pb-filters__chip--on { background: var(--color-brand-light); border-color: var(--color-brand); color: var(--color-brand); }
 .pb-filters__clear {
   margin-left: auto;
   font-size: 0.78rem;
@@ -78,8 +78,8 @@
 }
 
 .pb-col--over {
-  border-color: #e87722;
-  background: #fff3e8;
+  border-color: var(--color-brand);
+  background: var(--color-brand-light);
 }
 
 .pb-col__header {

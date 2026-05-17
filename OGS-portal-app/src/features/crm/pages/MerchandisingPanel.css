@@ -79,7 +79,7 @@
 .mp-legend__dot--hidden  { background: var(--color-border); }
 
 .mp-legend__badge {
-  background: #E87722;
+  background: var(--color-brand);
   color: #fff;
   font-size: 10px;
   font-weight: 700;
@@ -88,7 +88,7 @@
 }
 
 .mp-legend__dirty {
-  color: #E87722;
+  color: var(--color-brand);
   font-weight: 600;
 }
 
@@ -135,11 +135,11 @@
 
 .mp-row--over {
   background: var(--color-brand-light);
-  border-top: 2px solid #E87722;
+  border-top: 2px solid var(--color-brand);
 }
 
 .mp-row--dirty {
-  border-left: 3px solid #E87722;
+  border-left: 3px solid var(--color-brand);
 }
 
 /* Drag handle */
@@ -203,7 +203,7 @@
 }
 
 .mp-row__featured-badge {
-  background: #E87722;
+  background: var(--color-brand);
   color: #fff;
   font-size: 10px;
   font-weight: 700;
@@ -213,7 +213,7 @@
 }
 
 .mp-row__unsaved {
-  color: #E87722;
+  color: var(--color-brand);
   font-size: 10px;
 }
 
@@ -272,7 +272,7 @@
   flex-shrink: 0;
 }
 
-.mp-toggle--on { background: #E87722; }
+.mp-toggle--on { background: var(--color-brand); }
 .mp-toggle--disabled { opacity: 0.35; cursor: not-allowed; }
 
 .mp-toggle__thumb {
@@ -380,7 +380,7 @@
   position: absolute;
   top: 10px;
   right: 10px;
-  background: #E87722;
+  background: var(--color-brand);
   color: #fff;
   font-size: 10px;
   font-weight: 700;

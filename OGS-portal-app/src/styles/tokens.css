@@ -1,27 +1,32 @@
 :root {
-  /* Brand Colors – orange accent only */
-  --color-brand: #E87722;
-  --color-brand-light: #FFF3E8;
-  --color-brand-dark: #B85A16;
-  --color-brand-border: rgba(232, 119, 34, 0.34);
+  /* OGS brand palette */
+  --color-brand: #0066FF;
+  --color-brand-light: #E6F0FF;
+  --color-brand-dark: #0A1B33;
+  --color-brand-border: rgba(0, 102, 255, 0.22);
+  --color-brand-secondary: #00B7FF;
+  --color-brand-secondary-light: #E6FAFF;
+  --color-accent: #FF6A00;
+  --color-accent-light: #FFF0E5;
+  --color-accent-border: rgba(255, 106, 0, 0.26);
 
   /* Semantic Colors */
-  --color-success: #1D9E75;
-  --color-warning: #BA7517;
-  --color-danger: #E24B4A;
-  --color-info: #378ADD;
+  --color-success: #13815D;
+  --color-warning: #FF6A00;
+  --color-danger: #D64545;
+  --color-info: #00B7FF;
 
-  /* Neutrals – monochrome foundation */
+  /* Neutrals */
   --color-bg: #FFFFFF;
-  --color-bg-2: #F4F4F5;
-  --color-bg-3: #E9E9EB;
-  --color-bg-shell: #E6E6E8;
-  --color-text: #111111;
-  --color-text-2: #2E2E31;
-  --color-text-3: #66666B;
-  --color-border: #CFCFD3;
-  --color-border-2: #A9A9AE;
-  --color-divider: #DDDDDF;
+  --color-bg-2: #F4F8FC;
+  --color-bg-3: #E7EEF7;
+  --color-bg-shell: #EDF3FA;
+  --color-text: #0A1B33;
+  --color-text-2: #1E3554;
+  --color-text-3: #5D708A;
+  --color-border: #D5E0EC;
+  --color-border-2: #A9B9CC;
+  --color-divider: #E3EBF4;
 
   /* Typography */
   --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
@@ -62,11 +67,11 @@
   --radius: 6px;  /* Reduced from 8px for more refined feel */
   --radius-lg: 8px;  /* Reduced from 12px, less "pill" style */
 
-  /* Shadows – subtle industrial depth */
-  --shadow-xs: 0 1px 2px rgba(17, 17, 17, 0.06);
-  --shadow-sm: 0 2px 8px rgba(17, 17, 17, 0.08);
-  --shadow: 0 10px 24px rgba(17, 17, 17, 0.12);
-  --shadow-lg: 0 20px 46px rgba(17, 17, 17, 0.16);
+  /* Shadows */
+  --shadow-xs: 0 1px 2px rgba(10, 27, 51, 0.06);
+  --shadow-sm: 0 6px 18px rgba(10, 27, 51, 0.08);
+  --shadow: 0 14px 32px rgba(10, 27, 51, 0.14);
+  --shadow-lg: 0 24px 56px rgba(10, 27, 51, 0.18);
 
   /* Transitions */
   --transition-fast: 100ms ease;

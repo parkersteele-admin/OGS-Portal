@@ -62,7 +62,7 @@
 
 .team-settings__invite-form input:focus,
 .team-settings__invite-form select:focus {
-  outline: 2px solid #E87722;
+  outline: 2px solid var(--color-brand);
   outline-offset: 1px;
   border-color: transparent;
 }

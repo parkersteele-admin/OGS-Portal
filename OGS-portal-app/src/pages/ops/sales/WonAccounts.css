@@ -31,5 +31,5 @@
 .wa-badge { font-size: 0.72rem; font-weight: 600; padding: 2px 9px; border-radius: 999px; }
 .wa-badge--won { background: #f0fff4; color: #276749; }
 .wa-unassigned { color: #a0aec0; font-style: italic; }
-.wa-link { font-size: 0.82rem; color: #e87722; text-decoration: none; font-weight: 500; }
+.wa-link { font-size: 0.82rem; color: var(--color-brand); text-decoration: none; font-weight: 500; }
 .wa-link:hover { text-decoration: underline; }

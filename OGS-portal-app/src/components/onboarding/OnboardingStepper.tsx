@@ -2,7 +2,7 @@
  * src/components/onboarding/OnboardingStepper.tsx
  *
  * 5-step horizontal (desktop) / vertical (mobile) progress indicator.
- * - Current step: #E87722 accent
+ * - Current step: brand blue accent
  * - Completed steps: checkmark, clickable to navigate back
  * - Future steps: gray
  */

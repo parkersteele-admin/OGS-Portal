@@ -40,7 +40,7 @@
 }
 
 .tf-section-count {
-  background: #e87722;
+  background: var(--color-brand);
   color: #fff;
   font-size: 0.7rem;
   font-weight: 700;
@@ -120,7 +120,7 @@
   color: #4a5568;
   font-weight: 500;
 }
-.tf-rep--unassigned { color: #e87722; }
+.tf-rep--unassigned { color: var(--color-brand); }
 
 .tf-loading {
   display: flex;

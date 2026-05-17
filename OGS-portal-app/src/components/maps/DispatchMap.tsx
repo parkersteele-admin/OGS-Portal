@@ -9,10 +9,10 @@
  *   driverName — Display name for the truck pin tooltip
  *
  * Marker types:
- *   🟠 Truck       — animated orange pin; shows driver name; positioned at
+ *   🔵 Truck       — animated brand-blue pin; shows driver name; positioned at
  *                    the driver's current location via useDriverLocation
  *   🟢 Completed   — green checkmark pin
- *   🟠 Current     — pulsing orange pin (first 'arrived' or first 'pending' stop)
+ *   🔵 Current     — pulsing brand-blue pin (first 'arrived' or first 'pending' stop)
  *   ⚪ Pending     — gray numbered circle pin
  *   Click any stop pin → StopDetailPopover
  *
@@ -52,7 +52,7 @@ const CENTRAL_OHIO: LatLngLiteral = { lat: 40.0, lng: -82.9 }
 const DEFAULT_ZOOM = 10
 
 // Brand + status colours
-const COLOR_BRAND     = '#E87722'
+const COLOR_BRAND     = '#0066FF'
 const COLOR_COMPLETED = '#22c55e'
 const COLOR_PENDING   = '#6b7280'
 const COLOR_WHITE     = '#ffffff'

@@ -24,9 +24,9 @@ interface StripeProviderProps {
 const appearance: import('@stripe/stripe-js').Appearance = {
   theme: 'stripe',
   variables: {
-    colorPrimary: '#E87722',
+    colorPrimary: '#0066FF',
     colorBackground: '#ffffff',
-    colorText: '#222222',
+    colorText: '#0A1B33',
     colorDanger: '#E24B4A',
     fontFamily: '"IBM Plex Sans", system-ui, sans-serif',
     fontSizeBase: '14px',
@@ -39,8 +39,8 @@ const appearance: import('@stripe/stripe-js').Appearance = {
       boxShadow: 'none',
     },
     '.Input:focus': {
-      border: '1px solid #E87722',
-      boxShadow: '0 0 0 3px rgba(232,119,34,0.15)',
+      border: '1px solid #0066FF',
+      boxShadow: '0 0 0 3px rgba(0,102,255,0.15)',
       outline: 'none',
     },
     '.Label': {

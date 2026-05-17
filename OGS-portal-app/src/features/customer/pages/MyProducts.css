@@ -44,7 +44,7 @@
 }
 
 .mp-search:focus-within {
-  border-color: #E87722;
+  border-color: var(--color-brand);
   box-shadow: 0 0 0 3px rgba(232, 119, 34, 0.10);
 }
 
@@ -223,7 +223,7 @@
 
 .mp-row__popular {
   display: inline-block;
-  background: #E87722;
+  background: var(--color-brand);
   color: #fff;
   font-size: 10px;
   font-weight: 700;
@@ -285,11 +285,11 @@
 
 .mp-row__btn--order {
   background: transparent;
-  color: #E87722;
-  border: 1.5px solid #E87722;
+  color: var(--color-brand);
+  border: 1.5px solid var(--color-brand);
 }
 .mp-row__btn--order:hover {
-  background: #E87722;
+  background: var(--color-brand);
   color: #fff;
 }
 
@@ -299,14 +299,14 @@
   border: 1.5px solid var(--color-border);
 }
 .mp-row__btn--request:hover {
-  border-color: #E87722;
-  color: #E87722;
+  border-color: var(--color-brand);
+  color: var(--color-brand);
 }
 
 .mp-row__btn--in-cart {
-  background: #E87722;
+  background: var(--color-brand);
   color: #fff;
-  border: 1.5px solid #E87722;
+  border: 1.5px solid var(--color-brand);
 }
 .mp-row__btn--in-cart:hover {
   background: #c95e10;
@@ -380,7 +380,7 @@
 }
 
 .mp-cart-bar__submit {
-  background: #E87722;
+  background: var(--color-brand);
   color: #fff;
   border: none;
   border-radius: var(--radius-md);

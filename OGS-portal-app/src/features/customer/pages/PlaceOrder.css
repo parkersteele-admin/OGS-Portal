@@ -168,7 +168,7 @@
   padding: 2px 8px;
   border-radius: 999px;
   background: #fff4ec;
-  color: #E87722;
+  color: var(--color-brand);
   border: 1px solid rgba(232, 119, 34, 0.25);
 }
 
@@ -245,7 +245,7 @@
   flex-shrink: 0;
 }
 .po-list-row__badge--popular {
-  background: #E87722;
+  background: var(--color-brand);
   color: #fff;
 }
 .po-list-row__badge--recent {
@@ -299,8 +299,8 @@
 
 .po-list-row__btn {
   background: transparent;
-  color: #E87722;
-  border: 1.5px solid #E87722;
+  color: var(--color-brand);
+  border: 1.5px solid var(--color-brand);
   border-radius: var(--radius-md, 8px);
   padding: var(--space-2) var(--space-3);
   font-size: 12px;
@@ -311,13 +311,13 @@
   transition: background var(--transition-fast), color var(--transition-fast);
 }
 .po-list-row__btn:hover {
-  background: #E87722;
+  background: var(--color-brand);
   color: #fff;
 }
 .po-list-row__btn--added {
-  background: #E87722;
+  background: var(--color-brand);
   color: #fff;
-  border-color: #E87722;
+  border-color: var(--color-brand);
 }
 .po-list-row__btn--added:hover {
   background: #c96315;
@@ -1255,8 +1255,8 @@
 /* ── Review card warning variant ────────────────────────────────────────── */
 
 .po-review-card--warning {
-  border-color: #fed7aa;
-  background: #fff7ed;
+  border-color: var(--color-brand-border);
+  background: var(--color-brand-light);
 }
 
 .po-review-warning {

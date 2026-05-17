@@ -23,7 +23,7 @@ import {
 } from '../../utils/navigation'
 import { formatAddress } from '../../utils/addressUtils'
 
-const COLOR_BRAND   = '#E87722'
+const COLOR_BRAND   = '#0066FF'
 const COLOR_WHITE   = '#ffffff'
 const COLOR_BORDER  = '#e5e7eb'
 const COLOR_TEXT_2  = '#6b7280'

@@ -93,7 +93,7 @@ const ORDER_TYPE_LABEL: Record<OrderType, string> = {
 const ORDER_TYPE_STYLE: Record<OrderType, React.CSSProperties> = {
   route:    { background: '#f3f4f6', color: '#374151', border: '1px solid #e5e7eb' },
   offRoute: { background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' },
-  addOn:    { background: '#fff7ed', color: '#E87722', border: '1px solid #fed7aa' },
+  addOn:    { background: 'var(--color-brand-light)', color: 'var(--color-brand)', border: '1px solid var(--color-brand-border)' },
 }
 
 const TIMELINE_STEPS: OrderStatus[] = [

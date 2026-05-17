@@ -43,7 +43,7 @@
 
 .cust-db__setup-banner {
   background: linear-gradient(135deg, #fff8f3, #fff);
-  border: 1.5px solid #fed7aa;
+  border: 1.5px solid var(--color-brand-border);
   border-radius: 12px;
   padding: 20px 24px;
   margin-bottom: 24px;
@@ -66,7 +66,7 @@
 
 .cust-db__setup-banner__cta {
   display: inline-block;
-  background: #E87722;
+  background: var(--color-brand);
   color: #fff;
   padding: 8px 18px;
   border-radius: 6px;
@@ -128,14 +128,14 @@
 }
 
 .cust-db__setup-step--next {
-  color: #E87722;
-  border-color: #fed7aa;
+  color: var(--color-brand);
+  border-color: var(--color-brand-border);
   background: #fff8f3;
   font-weight: 600;
 }
 
 .cust-db__setup-step--next .cust-db__setup-step__num {
-  background: #E87722;
+  background: var(--color-brand);
   color: #fff;
 }
 

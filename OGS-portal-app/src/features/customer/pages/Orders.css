@@ -571,8 +571,8 @@
   justify-content: center;
   padding: 10px 14px;
   border-radius: 999px;
-  border: 1px solid #fed7aa;
-  background: #fff7ed;
+  border: 1px solid var(--color-brand-border);
+  background: var(--color-brand-light);
   color: #c05621;
   font-size: var(--font-size-13);
   font-weight: 600;
@@ -699,7 +699,7 @@
 
 .oh-detail__section--addons {
   background: #fffbf0;
-  border-color: #fed7aa;
+  border-color: var(--color-brand-border);
 }
 
 /* ── Add to next delivery drawer ─────────────────────────────────────────── */

@@ -22,7 +22,7 @@
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s;
-  background: #e87722;
+  background: var(--color-brand);
   color: #fff;
   border: none;
 }
@@ -35,7 +35,7 @@
   font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
-  background: #e87722;
+  background: var(--color-brand);
   color: #fff;
   border: none;
 }
@@ -46,7 +46,7 @@
   align-items: center;
   gap: 10px;
   padding: 10px 16px;
-  background: #fff3e8;
+  background: var(--color-brand-light);
   border-radius: 8px;
   margin-bottom: 16px;
   flex-wrap: wrap;
@@ -93,7 +93,7 @@
 
 .pl-table tr:last-child td { border-bottom: none; }
 .pl-table tr:hover td { background: #fafafa; }
-.pl-row--selected td { background: #fff3e8 !important; }
+.pl-row--selected td { background: var(--color-brand-light) !important; }
 
 .pl-td--name { font-weight: 600; color: #1a202c; }
 
@@ -107,18 +107,18 @@
 }
 .pl-stage-badge--new_signup      { background: #ebf8ff; color: #2b6cb0; }
 .pl-stage-badge--pending_setup   { background: #faf5ff; color: #6b46c1; }
-.pl-stage-badge--quote_requested { background: #fff3e8; color: #c05621; }
+.pl-stage-badge--quote_requested { background: var(--color-brand-light); color: #c05621; }
 .pl-stage-badge--quote_sent      { background: #fffbeb; color: #b7791f; }
 .pl-stage-badge--negotiating     { background: #f0fff4; color: #276749; }
 .pl-stage-badge--stalled         { background: #fff5f5; color: #c53030; }
 
-.pl-unassigned { color: #e87722; font-style: italic; font-size: 0.82rem; }
+.pl-unassigned { color: var(--color-brand); font-style: italic; font-size: 0.82rem; }
 .pl-overdue    { color: #c53030; font-weight: 600; }
 .pl-days--warn     { color: #b7791f; font-weight: 600; }
 .pl-days--critical { color: #c53030; font-weight: 600; }
 
 .pl-priority { font-size: 0.72rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
-.pl-priority--high   { background: #fff3e8; color: #e87722; }
+.pl-priority--high   { background: var(--color-brand-light); color: var(--color-brand); }
 .pl-priority--normal { background: #f7fafc; color: #718096; }
 .pl-priority--low    { background: #f7fafc; color: #a0aec0; }
 

@@ -45,7 +45,7 @@
 }
 
 .ops-cust-list__filter-input:focus {
-  outline: 2px solid #E87722;
+  outline: 2px solid var(--color-brand);
   outline-offset: 1px;
   border-color: transparent;
 }
@@ -90,7 +90,7 @@
 }
 
 .ops-cust-list__link {
-  color: #E87722;
+  color: var(--color-brand);
   text-decoration: none;
   font-weight: 500;
 }
@@ -119,7 +119,7 @@
 
 .ops-cust-list__setup-badge__bar-fill {
   height: 100%;
-  background: #E87722;
+  background: var(--color-brand);
   border-radius: 3px;
   transition: width 0.3s ease;
 }

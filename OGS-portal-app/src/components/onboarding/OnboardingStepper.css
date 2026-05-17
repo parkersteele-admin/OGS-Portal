@@ -82,14 +82,14 @@
 }
 
 .ob-stepper__item--current .ob-stepper__circle {
-  background: #E87722;
-  border-color: #E87722;
+  background: var(--color-brand);
+  border-color: var(--color-brand);
   color: #ffffff;
 }
 
 .ob-stepper__item--completed .ob-stepper__circle {
-  background: #E87722;
-  border-color: #E87722;
+  background: var(--color-brand);
+  border-color: var(--color-brand);
   color: #ffffff;
 }
 
@@ -108,7 +108,7 @@
 }
 
 .ob-stepper__item--current .ob-stepper__label {
-  color: #E87722;
+  color: var(--color-brand);
   font-weight: 600;
 }
 
@@ -125,7 +125,7 @@
 }
 
 .ob-stepper__connector--done {
-  background: #E87722;
+  background: var(--color-brand);
 }
 
 /* On mobile the connector is vertical */

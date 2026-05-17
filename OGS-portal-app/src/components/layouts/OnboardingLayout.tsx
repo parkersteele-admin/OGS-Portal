@@ -7,12 +7,13 @@
 
 import React from 'react'
 import { Outlet } from 'react-router-dom'
+import { BrandLogo } from '../branding/BrandLogo'
 import './OnboardingLayout.css'
 
 export const OnboardingLayout: React.FC = () => (
   <div className="ob-layout">
     <header className="ob-layout__header">
-      <span className="ob-layout__logo" aria-label="Ohio Gas Supply Co." />
+      <BrandLogo className="ob-layout__logo" />
     </header>
     <main className="ob-layout__main">
       <Outlet />

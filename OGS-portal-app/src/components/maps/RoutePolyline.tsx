@@ -5,7 +5,7 @@
  * it on the DispatchMap.
  *
  * - Completed legs: solid green (#22c55e)
- * - Remaining legs: solid brand orange (#E87722)
+ * - Remaining legs: solid brand blue (#0066FF)
  *
  * Uses suppressPolylines + per-leg Polylines so each leg can be coloured
  * independently.  Coordinates come from Customer.lat / Customer.lng.
@@ -23,7 +23,7 @@ interface RoutePolylineProps {
   onPositionsResolved?: (positions: Record<string, { lat: number; lng: number }>) => void
 }
 
-const COLOR_BRAND     = '#E87722'
+const COLOR_BRAND     = '#0066FF'
 const COLOR_COMPLETED = '#22c55e'
 
 type WaypointEntry = {

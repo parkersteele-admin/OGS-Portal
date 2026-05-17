@@ -14,6 +14,7 @@
 import React, { useState, useId } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { signIn } from '../../../lib/auth'
+import { BrandLogo } from '../../../components/branding/BrandLogo'
 import { useAuth } from '../../../hooks/useAuth'
 import { ROLE_HOME } from '../../../types/auth'
 import { Button } from '../../../components/ui/Button'
@@ -158,9 +159,8 @@ export default function Login() {
 
         {/* ── Brand lockup ── */}
         <div className="auth-brand">
-          <div className="auth-brand__accent" aria-hidden="true" />
           <div className="auth-brand__lockup">
-            <h1 className="auth-brand__name">Ohio Gas Supply</h1>
+            <BrandLogo className="auth-brand__logo" />
             <p className="auth-brand__tagline">
               Reliable Gas. Local Service. Built for Ohio.
             </p>

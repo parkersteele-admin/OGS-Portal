@@ -171,8 +171,8 @@
 /* ── Low level alert section ───────────────────────────────────────────────── */
 
 .ti-alert-section {
-  background: #fff7ed;
-  border: 1px solid #fed7aa;
+  background: var(--color-brand-light);
+  border: 1px solid var(--color-brand-border);
   border-radius: var(--radius);
   overflow: hidden;
 }

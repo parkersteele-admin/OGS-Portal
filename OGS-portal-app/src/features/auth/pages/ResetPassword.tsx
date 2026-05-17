@@ -13,6 +13,7 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { sendPasswordReset } from '../../../lib/auth'
+import { BrandLogo } from '../../../components/branding/BrandLogo'
 import { useAuth } from '../../../hooks/useAuth'
 import { ROLE_HOME } from '../../../types/auth'
 import { Button } from '../../../components/ui/Button'
@@ -76,9 +77,8 @@ export default function ResetPassword() {
 
         {/* ── Brand lockup ── */}
         <div className="auth-brand">
-          <div className="auth-brand__bar" aria-hidden="true" />
           <div className="auth-brand__lockup">
-            <span className="auth-brand__name">Ohio Gas Supply</span>
+            <BrandLogo className="auth-brand__logo" />
             <span className="auth-brand__tagline">
               Reliable Gas. Local Service. Built for Ohio.
             </span>

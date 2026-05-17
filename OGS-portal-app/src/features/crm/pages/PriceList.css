@@ -95,8 +95,8 @@
 }
 
 .pl-cat-pill--active {
-  background: #E87722;
-  border-color: #E87722;
+  background: var(--color-brand);
+  border-color: var(--color-brand);
   color: #fff;
 }
 
@@ -191,7 +191,7 @@
 }
 
 .pl-cell--warn {
-  background: #fff7ed;
+  background: var(--color-brand-light);
 }
 
 .pl-margin-stack {
@@ -292,7 +292,7 @@
 }
 
 .pl-toggle--on {
-  background: #E87722;
+  background: var(--color-brand);
 }
 
 .pl-toggle--disabled {

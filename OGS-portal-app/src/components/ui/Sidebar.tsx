@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
+import { BrandLogo } from '../branding/BrandLogo'
 import './Sidebar.css'
 
 export interface SidebarItem {
@@ -64,9 +65,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       />
       <nav className={`sidebar${mobileOpen ? ' sidebar--mobile-open' : ''}`} aria-label="Main navigation">
         <div className="sidebar__logo-bar">
-          <span className="sidebar__logo-mark" aria-hidden="true">OGS</span>
-          <span className="sidebar__logo-sep" aria-hidden="true">·</span>
-          <span className="sidebar__logo-text">Portal</span>
+          <BrandLogo className="sidebar__logo-image" />
         </div>
 
         <p className="sidebar__portal-label">{title}</p>
