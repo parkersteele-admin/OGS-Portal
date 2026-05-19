@@ -388,10 +388,9 @@ function buildInvoicePdf(
       .font('Helvetica')
       .fillColor('#333333')
       .text(`Due Date:     ${fmtDate(invoice.dueAt)}`,                              C_DESC + 12, BOX_Y + 24)
-      .text(`Pay online at:  ${company.website ? company.website + '/portal/invoices' : 'your customer portal'}`, C_DESC + 12, BOX_Y + 38)
-      .text(`Questions?    ${[company.phone, company.email].filter(Boolean).join('  ·  ') || ''}`, C_DESC + 12, BOX_Y + 52)
+      .text(`Questions?    ${[company.phone, company.email].filter(Boolean).join('  ·  ') || ''}`, C_DESC + 12, BOX_Y + 38)
 
-    // ── Portal links below payment box ─────────────────────────────────────
+    // ── Notes below payment box ─────────────────────────────────────────────
     rowY = BOX_Y + BOX_H + 12
 
     const invoiceNotes = (invoice.notes as string | undefined)?.trim()
@@ -407,19 +406,6 @@ function buildInvoicePdf(
       doc.fontSize(8).font('Helvetica').fillColor('#444444')
         .text(invoiceNotes, C_DESC, rowY, { width: CONTENT_W })
       rowY += notesHeight + 8
-    }
-
-    if (company.portalLoginUrl || company.portalSignupUrl) {
-      if (company.portalLoginUrl) {
-        doc.fontSize(8).font('Helvetica').fillColor('#555555')
-          .text(`Log in to your account:  ${company.portalLoginUrl}`, C_DESC, rowY)
-        rowY += 13
-      }
-      if (company.portalSignupUrl) {
-        doc.fontSize(8).font('Helvetica').fillColor('#555555')
-          .text(`Create an account:  ${company.portalSignupUrl}`, C_DESC, rowY)
-        rowY += 13
-      }
     }
 
     // ── Terms & Conditions ─────────────────────────────────────────────────

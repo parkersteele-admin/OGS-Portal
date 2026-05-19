@@ -21,6 +21,10 @@ export const FOOTER_Y = 748
 
 type PdfDoc = InstanceType<typeof PDFDocument>
 
+function displayUrl(url: string): string {
+  return url.replace(/^https?:\/\//i, '').replace(/\/$/, '')
+}
+
 export function drawBrandedHeader(
   doc: PdfDoc,
   company: CompanySettings,
@@ -66,7 +70,7 @@ export function drawBrandedHeader(
   }
 
   if (company.website) {
-    doc.fontSize(8.5).font('Helvetica').fillColor('#666666').text(company.website, MARGIN_L, headerY)
+    doc.fontSize(8.5).font('Helvetica').fillColor('#666666').text(displayUrl(company.website), MARGIN_L, headerY)
     headerY += 11
   }
 
@@ -117,7 +121,7 @@ export function drawBrandedFooter(
 
   const footerLine =
     secondaryText ??
-    [company.name, company.website, company.phone].filter(Boolean).join('  ·  ')
+    [company.name, company.website ? displayUrl(company.website) : '', company.phone].filter(Boolean).join('  ·  ')
 
   doc
     .fontSize(7.5)

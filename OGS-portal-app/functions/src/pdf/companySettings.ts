@@ -57,8 +57,21 @@ export async function fetchOfficialDocumentLogoSvg(): Promise<string | null> {
   if (cachedOfficialDocumentLogoSvg !== undefined) return cachedOfficialDocumentLogoSvg
 
   try {
-    const logoPath = path.resolve(__dirname, '../../../public/logo.svg')
-    cachedOfficialDocumentLogoSvg = await fs.readFile(logoPath, 'utf8')
+    const logoCandidates = [
+      path.resolve(__dirname, '../../assets/logo-dark.svg'),
+      path.resolve(__dirname, '../../../public/logo.svg'),
+    ]
+
+    for (const logoPath of logoCandidates) {
+      try {
+        cachedOfficialDocumentLogoSvg = await fs.readFile(logoPath, 'utf8')
+        return cachedOfficialDocumentLogoSvg
+      } catch {
+        // Try next candidate path.
+      }
+    }
+
+    cachedOfficialDocumentLogoSvg = null
   } catch {
     cachedOfficialDocumentLogoSvg = null
   }
