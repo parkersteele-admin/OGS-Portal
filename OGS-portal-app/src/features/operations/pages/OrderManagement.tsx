@@ -542,6 +542,16 @@ function OrderDetailPanel({
                 >
                   More Details
                 </Button>
+                {isAdminView && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={handleGenerateInvoice}
+                    disabled={generatingInvoice}
+                  >
+                    {generatingInvoice ? 'Regenerating...' : 'Regenerate Invoice'}
+                  </Button>
+                )}
               </div>
             </section>
           )}
@@ -736,16 +746,6 @@ function CreateOrderModal({ onClose, onCreated }: CreateOrderModalProps) {
 
           {/* Customer typeahead */}
           <div className="om-field">
-                {isAdminView && (
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={handleGenerateInvoice}
-                    disabled={generatingInvoice}
-                  >
-                    {generatingInvoice ? 'Regenerating...' : 'Regenerate Invoice'}
-                  </Button>
-                )}
             <label className="om-field__label">Customer *</label>
             <div className="om-typeahead">
               <input
