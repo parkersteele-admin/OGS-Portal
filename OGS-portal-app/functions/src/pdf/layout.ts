@@ -34,30 +34,37 @@ export function drawBrandedHeader(
 ): number {
   doc.rect(0, 0, 8, PAGE_H).fill(OGS_BRAND_BLUE)
 
+  const hasLogo = Boolean(logoAsset)
+
   if (logoAsset) {
     try {
       if (typeof logoAsset === 'string') {
-        SVGtoPDF(doc, logoAsset, MARGIN_L, 34, {
-          width: 120,
-          height: 50,
+        SVGtoPDF(doc, logoAsset, MARGIN_L, 30, {
+          width: 176,
+          height: 68,
           preserveAspectRatio: 'xMinYMin meet',
         })
       } else {
-        doc.image(logoAsset, MARGIN_L, 34, { fit: [120, 50] })
+        doc.image(logoAsset, MARGIN_L, 30, { fit: [176, 68] })
       }
     } catch {
       // Ignore malformed assets and continue with the text header.
     }
   }
 
-  const nameY = logoAsset ? 92 : 40
-  doc
-    .fontSize(logoAsset ? 13 : 17)
-    .font('Helvetica-Bold')
-    .fillColor(OGS_BRAND_DARK)
-    .text(company.name || 'Ohio Gas Supply', MARGIN_L, nameY)
-
-  let headerY = nameY + (logoAsset ? 16 : 23)
+  let headerY = 40
+  if (!hasLogo) {
+    const nameY = 40
+    doc
+      .fontSize(17)
+      .font('Helvetica-Bold')
+      .fillColor(OGS_BRAND_DARK)
+      .text(company.name || 'Ohio Gas Supply', MARGIN_L, nameY)
+    headerY = nameY + 23
+  } else {
+    // Start company detail lines below the full logo mark.
+    headerY = 104
+  }
   if (company.tagline) {
     doc.fontSize(8.5).font('Helvetica').fillColor('#666666').text(company.tagline, MARGIN_L, headerY)
     headerY += 11
