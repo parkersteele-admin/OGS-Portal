@@ -408,6 +408,12 @@ export const generateInvoiceForOrder = onCall(
     normalizedPrimaryItems.forEach((item) => productIds.add(item.productId))
     normalizedAddOns.forEach((item) => productIds.add(item.productId))
     const productMap = await loadProductSnapshots(productIds)
+    const expectedLineItems = buildInvoiceLineItemsForOrder({
+      primaryItems: normalizedPrimaryItems,
+      addOnItems: normalizedAddOns,
+      order,
+      productMap,
+    })
 
     let invoice = await findInvoiceForOrder(data.orderId)
     const created = !invoice
@@ -425,7 +431,7 @@ export const generateInvoiceForOrder = onCall(
       })
     }
 
-    const repaired = await maybeRepairInvoiceTotals(invoice.id, order)
+    const repaired = await maybeRepairInvoiceTotals(invoice.id, order, expectedLineItems)
 
     const invoicePdfUrl = (invoice.pdfUrl && !repaired)
       ? invoice.pdfUrl
@@ -521,33 +527,14 @@ async function createInvoiceForDelivery(args: {
   order: Record<string, unknown>
   productMap: Map<string, ProductSnapshot>
 }): Promise<InvoiceRecord> {
-  const quotedAddOnPrices = new Map<string, number>()
-  const orderAddOns = Array.isArray(args.order.addOns)
-    ? (args.order.addOns as Array<Record<string, unknown>>)
-    : []
-  for (const addOn of orderAddOns) {
-    const productId = addOn.productId as string | undefined
-    const unitPrice = addOn.unitPrice as number | undefined
-    if (productId && typeof unitPrice === 'number') {
-      quotedAddOnPrices.set(productId, unitPrice)
-    }
-  }
+  const lineItems = buildInvoiceLineItemsForOrder({
+    primaryItems: args.primaryItems,
+    addOnItems: args.addOnItems,
+    order: args.order,
+    productMap: args.productMap,
+  })
 
-  const lineItems = [
-    ...args.primaryItems.map((item) => buildInvoiceLine(item, args.productMap.get(item.productId), args.order.unitPrice as number | undefined)),
-    ...args.addOnItems.map((item) => buildInvoiceLine(item, args.productMap.get(item.productId), quotedAddOnPrices.get(item.productId))),
-  ]
-
-  const deliveryFee = typeof args.order.deliveryFee === 'number' ? args.order.deliveryFee : 0
-  if (deliveryFee > 0) {
-    lineItems.push({
-      description: 'Delivery fee',
-      quantity: 1,
-      unitPrice: deliveryFee,
-      amount: deliveryFee,
-      total: deliveryFee,
-    })
-  }
+  const deliveryFee = toNumber(args.order.deliveryFee, 0)
 
   const subtotal = lineItems.reduce((sum, item) => sum + item.total, 0)
   const orderTaxRate = toNumber(args.order.salesTaxRate, args.order.taxRate, DEFAULT_SALES_TAX_RATE)
@@ -606,7 +593,11 @@ async function createInvoiceForDelivery(args: {
   return { id: invoiceRef.id, invoiceNumber }
 }
 
-async function maybeRepairInvoiceTotals(invoiceId: string, order: Record<string, unknown>): Promise<boolean> {
+async function maybeRepairInvoiceTotals(
+  invoiceId: string,
+  order: Record<string, unknown>,
+  expectedLineItems?: Array<Record<string, unknown>>,
+): Promise<boolean> {
   const invoiceRef = db.collection('invoices').doc(invoiceId)
   const invoiceSnap = await invoiceRef.get()
   if (!invoiceSnap.exists) return false
@@ -615,8 +606,9 @@ async function maybeRepairInvoiceTotals(invoiceId: string, order: Record<string,
   const lineItems = Array.isArray(invoice.lineItems)
     ? (invoice.lineItems as Array<Record<string, unknown>>)
     : []
+  const normalizedLineItems = expectedLineItems ?? lineItems
 
-  const lineItemSubtotal = lineItems.reduce((sum, item) => {
+  const lineItemSubtotal = normalizedLineItems.reduce((sum, item) => {
     const itemTotal = toNumber(
       item.total,
       item.amount,
@@ -647,11 +639,13 @@ async function maybeRepairInvoiceTotals(invoiceId: string, order: Record<string,
   const currentTotal = toNumber(invoice.total, invoice.totalAmount, subtotal + currentTax)
   const currentApplySalesTax = typeof invoice.applySalesTax === 'boolean' ? invoice.applySalesTax : undefined
   const currentSalesTaxRate = typeof invoice.salesTaxRate === 'number' ? invoice.salesTaxRate : undefined
+  const lineItemsNeedRepair = expectedLineItems ? lineItemsDiffer(lineItems, expectedLineItems) : false
   const needsRepair =
     Math.abs(currentTax - taxAmount) > 0.009
     || Math.abs(currentTotal - total) > 0.009
     || currentApplySalesTax === undefined
     || currentSalesTaxRate === undefined
+    || lineItemsNeedRepair
 
   const currentStatus = invoice.status as string | undefined
   const resetVoidStatus = currentStatus === 'void'
@@ -659,6 +653,7 @@ async function maybeRepairInvoiceTotals(invoiceId: string, order: Record<string,
   if (!needsRepair && !resetVoidStatus) return false
 
   await invoiceRef.update({
+    ...(lineItemsNeedRepair && { lineItems: expectedLineItems }),
     applySalesTax,
     salesTaxRate: taxRate,
     salesTaxAmount: taxAmount,
@@ -673,6 +668,90 @@ async function maybeRepairInvoiceTotals(invoiceId: string, order: Record<string,
   })
 
   return true
+}
+
+function buildInvoiceLineItemsForOrder(args: {
+  primaryItems: Array<{ productId: string; qty: number }>
+  addOnItems: Array<{ productId: string; qty: number }>
+  order: Record<string, unknown>
+  productMap: Map<string, ProductSnapshot>
+}) {
+  const quotedUnitPrices = getQuotedUnitPrices(args.order)
+  const primaryFallbackPrice = toNumber(args.order.unitPrice, 0)
+
+  const lineItems = [
+    ...args.primaryItems.map((item) => {
+      const quotedPrice = quotedUnitPrices.get(item.productId)
+      return buildInvoiceLine(item, args.productMap.get(item.productId), quotedPrice ?? primaryFallbackPrice)
+    }),
+    ...args.addOnItems.map((item) => {
+      const quotedPrice = quotedUnitPrices.get(item.productId)
+      return buildInvoiceLine(item, args.productMap.get(item.productId), quotedPrice)
+    }),
+  ]
+
+  const deliveryFee = toNumber(args.order.deliveryFee, 0)
+  if (deliveryFee > 0) {
+    lineItems.push({
+      description: 'Delivery fee',
+      quantity: 1,
+      unitPrice: deliveryFee,
+      amount: deliveryFee,
+      total: deliveryFee,
+    })
+  }
+
+  return lineItems
+}
+
+function getQuotedUnitPrices(order: Record<string, unknown>): Map<string, number> {
+  const prices = new Map<string, number>()
+
+  const quotedLineItems = Array.isArray(order.quotedLineItems)
+    ? (order.quotedLineItems as Array<Record<string, unknown>>)
+    : []
+  for (const item of quotedLineItems) {
+    const productId = item.productId as string | undefined
+    const unitPrice = toNumber(item.unitPrice, 0)
+    if (productId && unitPrice > 0) {
+      prices.set(productId, unitPrice)
+    }
+  }
+
+  const addOns = Array.isArray(order.addOns)
+    ? (order.addOns as Array<Record<string, unknown>>)
+    : []
+  for (const item of addOns) {
+    const productId = item.productId as string | undefined
+    const unitPrice = toNumber(item.unitPrice, 0)
+    if (productId && unitPrice > 0) {
+      prices.set(productId, unitPrice)
+    }
+  }
+
+  return prices
+}
+
+function lineItemsDiffer(
+  current: Array<Record<string, unknown>>,
+  expected: Array<Record<string, unknown>>,
+): boolean {
+  if (current.length !== expected.length) return true
+
+  for (let index = 0; index < expected.length; index += 1) {
+    const a = current[index] ?? {}
+    const b = expected[index] ?? {}
+    const sameDescription = String(a.description ?? '') === String(b.description ?? '')
+    const sameQuantity = Math.abs(toNumber(a.quantity, 0) - toNumber(b.quantity, 0)) <= 0.009
+    const sameUnitPrice = Math.abs(toNumber(a.unitPrice, 0) - toNumber(b.unitPrice, 0)) <= 0.009
+    const sameTotal = Math.abs(toNumber(a.total, a.amount, 0) - toNumber(b.total, b.amount, 0)) <= 0.009
+
+    if (!sameDescription || !sameQuantity || !sameUnitPrice || !sameTotal) {
+      return true
+    }
+  }
+
+  return false
 }
 
 function toNumber(...values: unknown[]): number {
