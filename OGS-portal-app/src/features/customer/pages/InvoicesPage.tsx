@@ -24,7 +24,7 @@ import './Invoices.css'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const OUTSTANDING_STATUSES: InvoiceStatus[] = ['draft', 'sent', 'overdue']
+const OUTSTANDING_STATUSES: InvoiceStatus[] = ['draft', 'sent', 'delivered', 'overdue']
 
 type FilterTab = 'all' | 'outstanding' | 'paid'
 
@@ -55,6 +55,7 @@ function StatusBadge({ inv }: { inv: Invoice }): React.ReactElement {
 
   const map: Record<InvoiceStatus, { variant: BadgeVariant; label: string }> = {
     sent:    { variant: 'warning', label: due ? `Due ${formatDate(due)}` : 'Due' },
+    delivered: { variant: 'info', label: 'Delivered' },
     overdue: { variant: 'danger',  label: 'Overdue' },
     paid:    { variant: 'success', label: 'Paid' },
     draft:   { variant: 'neutral', label: 'Draft' },

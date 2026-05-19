@@ -59,6 +59,7 @@ function invoiceBadgeVariant(status: InvoiceStatus): BadgeVariant {
   const map: Record<InvoiceStatus, BadgeVariant> = {
     draft:   'neutral',
     sent:    'info',
+    delivered: 'info',
     paid:    'success',
     overdue: 'danger',
     void:    'neutral',

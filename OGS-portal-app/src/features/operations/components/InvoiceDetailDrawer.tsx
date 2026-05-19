@@ -6,7 +6,7 @@
  */
 
 import { useState } from 'react'
-import type { Invoice } from '../../../types/billing'
+import type { Invoice, InvoiceStatus } from '../../../types/billing'
 import { updateInvoice } from '../../../services/invoiceService'
 import { Button } from '../../../components/ui/Button'
 import './InvoiceDetailDrawer.css'
@@ -52,10 +52,10 @@ export function InvoiceDetailDrawer({
     })
   }
 
-  async function handleStatusChange(newStatus: string) {
+  async function handleStatusChange(newStatus: InvoiceStatus) {
     setIsUpdatingStatus(true)
     try {
-      const updateData: Record<string, unknown> = { status: newStatus }
+      const updateData: { status: InvoiceStatus } = { status: newStatus }
 
       if (newStatus === 'paid') {
         setShowStatusMenu(false)
@@ -68,7 +68,7 @@ export function InvoiceDetailDrawer({
 
       // Reload updated invoice
       if (onInvoiceUpdated) {
-        const updatedInvoice = { ...invoice, ...updateData } as Invoice
+        const updatedInvoice: Invoice = { ...invoice, ...updateData }
         onInvoiceUpdated(updatedInvoice)
       }
 
@@ -91,7 +91,7 @@ export function InvoiceDetailDrawer({
       })
 
       if (onInvoiceUpdated) {
-        const updatedInvoice = {
+        const updatedInvoice: Invoice = {
           ...invoice,
           status: 'paid',
           paidAt: dateObj as never,
@@ -114,7 +114,7 @@ export function InvoiceDetailDrawer({
     }
   }
 
-  const statusOptions: Array<{ value: string; label: string }> = [
+  const statusOptions: Array<{ value: InvoiceStatus; label: string }> = [
     { value: 'sent', label: '✉️ Sent' },
     { value: 'delivered', label: '✓ Delivered' },
     { value: 'paid', label: '💰 Paid' },

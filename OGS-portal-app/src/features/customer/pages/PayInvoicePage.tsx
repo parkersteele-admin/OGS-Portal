@@ -39,6 +39,7 @@ function statusBadge(status: Invoice['status']) {
   const map = {
     draft:   { variant: 'neutral',  label: 'Draft' },
     sent:    { variant: 'info',     label: 'Due' },
+    delivered: { variant: 'info',   label: 'Delivered' },
     overdue: { variant: 'danger',   label: 'Overdue' },
     paid:    { variant: 'success',  label: 'Paid' },
     void:    { variant: 'neutral',  label: 'Void' },
