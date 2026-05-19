@@ -88,6 +88,8 @@ const EMPTY_ROW = (): DraftLineItem => ({
   amount:      0,
 })
 
+const DELIVERY_PRODUCT_ID = 'delivery'
+
 function rowAmount(row: DraftLineItem): number {
   return parseFloat((row.quantity * row.unitPrice).toFixed(2))
 }
@@ -470,9 +472,34 @@ export const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
 
   // ── Computed totals ───────────────────────────────────────────────────────
 
-  const subtotal = useMemo(
-    () => parseFloat(rows.reduce((s, r) => s + r.amount, 0).toFixed(2)),
+  const deliveryRows = useMemo(
+    () => rows.filter((r) => r.productId === DELIVERY_PRODUCT_ID),
     [rows],
+  )
+  const productRows = useMemo(
+    () => rows.filter((r) => r.productId !== DELIVERY_PRODUCT_ID),
+    [rows],
+  )
+
+  useEffect(() => {
+    if (deliveryRows.length === 0) return
+
+    const latestDeliveryRow = deliveryRows[deliveryRows.length - 1]
+    const inferredDeliveryFee = latestDeliveryRow.amount > 0
+      ? latestDeliveryRow.amount
+      : latestDeliveryRow.unitPrice
+    const nextDeliveryFee = Number.isFinite(inferredDeliveryFee)
+      ? Math.max(inferredDeliveryFee, 0)
+      : 0
+
+    setIncludeDelivery(true)
+    setDeliveryFee((prev) => (Math.abs(prev - nextDeliveryFee) < 0.005 ? prev : nextDeliveryFee))
+    setRows((prev) => prev.filter((r) => r.productId !== DELIVERY_PRODUCT_ID))
+  }, [deliveryRows])
+
+  const subtotal = useMemo(
+    () => parseFloat(productRows.reduce((s, r) => s + r.amount, 0).toFixed(2)),
+    [productRows],
   )
   const rentalTotal = useMemo(
     () => includeRental ? parseFloat((rentalRate * rentalMonths).toFixed(2)) : 0,
@@ -566,6 +593,19 @@ export const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
       setRows(prev => prev.map(r => {
         if (r._id !== id) return r
         if (!product) return { ...r, productId: '', skuLabel: '' }
+        if (product.id === DELIVERY_PRODUCT_ID) {
+          setIncludeDelivery(true)
+          setDeliveryFee(product.basePrice)
+          return {
+            ...r,
+            productId: '',
+            skuLabel: '',
+            description: '',
+            quantity: 1,
+            unitPrice: 0,
+            amount: 0,
+          }
+        }
         const updated: DraftLineItem = {
           ...r,
           productId:   product.id,
@@ -587,13 +627,13 @@ export const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
   // ── Build payload ─────────────────────────────────────────────────────────
 
   const buildLineItems = (): QuoteItem[] => {
-    const items: QuoteItem[] = rows
+    const items: QuoteItem[] = productRows
       .filter(r => r.description.trim() || r.amount > 0)
       .map(toQuoteItem)
 
     if (includeDelivery && deliveryFee > 0) {
       items.push({
-        productId:   'delivery',
+        productId:   DELIVERY_PRODUCT_ID,
         description: 'Delivery fee',
         quantity:    1,
         unitPrice:   deliveryFee,
@@ -614,7 +654,7 @@ export const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
 
   const validate = (): string | null => {
     if (!recipient) return 'Please select a customer or lead.'
-    if (rows.every(r => !r.description.trim() && r.amount === 0)) return 'Add at least one line item.'
+    if (productRows.every(r => !r.description.trim() && r.amount === 0)) return 'Add at least one line item.'
     if (!validUntil) return 'Please set a valid-until date.'
     return null
   }
@@ -825,7 +865,7 @@ export const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
           </div>
 
           <div className="qb-rows">
-            {rows.map((row, i) => (
+            {productRows.map((row, i) => (
               <LineItemRow
                 key={row._id}
                 row={row}

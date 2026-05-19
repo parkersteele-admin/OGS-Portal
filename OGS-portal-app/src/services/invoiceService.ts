@@ -255,3 +255,17 @@ export async function generateInvoicePdf(invoiceId: string): Promise<string> {
     return result.data.url
   })
 }
+
+/** Admin-only manual invoice generation for an order. */
+export async function generateInvoiceForOrder(orderId: string): Promise<{ invoiceId: string; invoiceNumber: string | null; invoicePdfUrl: string; created: boolean }> {
+  return serviceCall(async () => {
+    const { httpsCallable } = await import('firebase/functions')
+    const { functions } = await import('../lib/firebase')
+    const fn = httpsCallable<
+      { orderId: string },
+      { invoiceId: string; invoiceNumber: string | null; invoicePdfUrl: string; created: boolean }
+    >(functions, 'generateInvoiceForOrder')
+    const result = await fn({ orderId })
+    return result.data
+  })
+}

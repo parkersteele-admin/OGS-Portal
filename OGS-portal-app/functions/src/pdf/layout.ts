@@ -1,7 +1,17 @@
 import PDFDocument from 'pdfkit'
 import type { CompanySettings } from './companySettings'
 
-export const OGS_ORANGE = '#E87722'
+const SVGtoPDF = require('svg-to-pdfkit') as (
+  doc: PdfDoc,
+  svg: string,
+  x: number,
+  y: number,
+  options?: { width?: number; height?: number; preserveAspectRatio?: string },
+) => void
+
+export const OGS_BRAND_BLUE = '#0066FF'
+export const OGS_BRAND_BLUE_LIGHT = '#E6F0FF'
+export const OGS_BRAND_DARK = '#0A1B33'
 export const PAGE_W = 612
 export const PAGE_H = 792
 export const MARGIN_L = 58
@@ -14,28 +24,36 @@ type PdfDoc = InstanceType<typeof PDFDocument>
 export function drawBrandedHeader(
   doc: PdfDoc,
   company: CompanySettings,
-  logoBuf: Buffer | null,
+  logoAsset: Buffer | string | null,
   title: string,
   referenceText: string,
 ): number {
-  doc.rect(0, 0, 8, PAGE_H).fill(OGS_ORANGE)
+  doc.rect(0, 0, 8, PAGE_H).fill(OGS_BRAND_BLUE)
 
-  if (logoBuf) {
+  if (logoAsset) {
     try {
-      doc.image(logoBuf, MARGIN_L, 34, { fit: [120, 50] })
+      if (typeof logoAsset === 'string') {
+        SVGtoPDF(doc, logoAsset, MARGIN_L, 34, {
+          width: 120,
+          height: 50,
+          preserveAspectRatio: 'xMinYMin meet',
+        })
+      } else {
+        doc.image(logoAsset, MARGIN_L, 34, { fit: [120, 50] })
+      }
     } catch {
       // Ignore malformed assets and continue with the text header.
     }
   }
 
-  const nameY = logoBuf ? 92 : 40
+  const nameY = logoAsset ? 92 : 40
   doc
-    .fontSize(logoBuf ? 13 : 17)
+    .fontSize(logoAsset ? 13 : 17)
     .font('Helvetica-Bold')
-    .fillColor('#111111')
-    .text(company.name || 'OGS Gas Services', MARGIN_L, nameY)
+    .fillColor(OGS_BRAND_DARK)
+    .text(company.name || 'Ohio Gas Supply', MARGIN_L, nameY)
 
-  let headerY = nameY + (logoBuf ? 16 : 23)
+  let headerY = nameY + (logoAsset ? 16 : 23)
   if (company.tagline) {
     doc.fontSize(8.5).font('Helvetica').fillColor('#666666').text(company.tagline, MARGIN_L, headerY)
     headerY += 11
@@ -55,7 +73,7 @@ export function drawBrandedHeader(
   doc
     .fontSize(30)
     .font('Helvetica-Bold')
-    .fillColor(OGS_ORANGE)
+    .fillColor(OGS_BRAND_BLUE)
     .text(title, 0, 40, { align: 'right', width: RIGHT_EDGE })
 
   doc
@@ -68,7 +86,7 @@ export function drawBrandedHeader(
   doc
     .moveTo(MARGIN_L, dividerY)
     .lineTo(RIGHT_EDGE, dividerY)
-    .strokeColor(OGS_ORANGE)
+    .strokeColor(OGS_BRAND_BLUE)
     .lineWidth(1.5)
     .stroke()
 
@@ -114,10 +132,10 @@ export function drawBrandedFooter(
 export function newBrandedPage(
   doc: PdfDoc,
   company: CompanySettings,
-  logoBuf: Buffer | null,
+  logoAsset: Buffer | string | null,
   title: string,
   referenceText: string,
 ): number {
   doc.addPage({ margin: 0, size: 'LETTER' })
-  return drawBrandedHeader(doc, company, logoBuf, title, referenceText)
+  return drawBrandedHeader(doc, company, logoAsset, title, referenceText)
 }

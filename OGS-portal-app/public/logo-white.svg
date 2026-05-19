@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 300" role="img" aria-labelledby="logo-title logo-desc">
-  <title id="logo-title">Ohio Gas Supply logo</title>
-  <desc id="logo-desc">OGS dark wordmark with Ohio Gas Supply stacked text and blue to orange speed lines.</desc>
+  <title id="logo-title">Ohio Gas Supply logo white</title>
+  <desc id="logo-desc">OGS white wordmark with Ohio Gas Supply stacked text and blue to orange speed lines.</desc>
   <defs>
     <linearGradient id="logo-stripe" x1="0%" y1="0%" x2="100%" y2="0%">
       <stop offset="0%" stop-color="#0066FF" />
@@ -10,7 +10,7 @@
     </linearGradient>
   </defs>
 
-  <g fill="#0A1B33" font-family="Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif" font-style="italic" font-weight="700">
+  <g fill="#FFFFFF" font-family="Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif" font-style="italic" font-weight="700">
     <text x="28" y="176" font-size="180" letter-spacing="2">OGS</text>
     <text x="680" y="92" font-size="70">OHIO</text>
     <text x="660" y="168" font-size="70">GAS</text>

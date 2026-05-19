@@ -12,14 +12,15 @@ import PDFDocument from 'pdfkit'
 import * as https from 'https'
 import * as http from 'http'
 import { db, storage, FieldValue } from '../admin'
-import { getCompanySettings, fetchLogoBuffer } from './companySettings'
+import { getCompanySettings, fetchLogoBuffer, fetchOfficialDocumentLogoSvg } from './companySettings'
 import type { CompanySettings } from './companySettings'
 import { registerGeneratedFile } from '../files/registerGeneratedFile'
 import {
   CONTENT_W,
   FOOTER_Y,
   MARGIN_L,
-  OGS_ORANGE,
+  OGS_BRAND_BLUE,
+  OGS_BRAND_BLUE_LIGHT,
   RIGHT_EDGE,
   drawBrandedFooter,
   drawBrandedHeader,
@@ -52,7 +53,7 @@ export async function generateQuotePdf(quoteId: string): Promise<string> {
   }
 
   const company   = await getCompanySettings()
-  const logoBuf   = await fetchLogoBuffer(company.logoUrl)
+  const logoAsset = await fetchOfficialDocumentLogoSvg() ?? await fetchLogoBuffer(company.logoUrl)
 
   // Build QR code image for the "accept / setup" link in the PDF.
   // Use the setupToken URL if present (quote accepted), otherwise the public quote link.
@@ -92,7 +93,7 @@ export async function generateQuotePdf(quoteId: string): Promise<string> {
     }
   }
 
-  const pdfBuffer = await buildQuotePdf(quoteId, quote, recipient, company, logoBuf, salesRep, qrBuf, qrUrl)
+  const pdfBuffer = await buildQuotePdf(quoteId, quote, recipient, company, logoAsset, salesRep, qrBuf, qrUrl)
 
   const storagePath = `ogs-portal/quotes/${quoteId}.pdf`
   const fileRef     = storage.bucket().file(storagePath)
@@ -158,7 +159,7 @@ function buildQuotePdf(
   quote:     Record<string, unknown>,
   recipient: Record<string, unknown>,
   company:   CompanySettings,
-  logoBuf:   Buffer | null,
+  logoAsset: Buffer | string | null,
   salesRep:  { name: string; email: string; phone: string } | null,
   qrBuf:     Buffer | null = null,
   qrUrl:     string | null = null,
@@ -195,7 +196,7 @@ function buildQuotePdf(
 
     const quoteNum = (quote.quoteNumber as string) || quoteId.slice(-8).toUpperCase()
     const referenceText = `#${quoteNum}`
-    const DIVIDER_Y = drawBrandedHeader(doc, company, logoBuf, 'QUOTE', referenceText)
+    const DIVIDER_Y = drawBrandedHeader(doc, company, logoAsset, 'QUOTE', referenceText)
 
     // ── Section labels ─────────────────────────────────────────────────────
     const META_X = 380
@@ -317,7 +318,7 @@ function buildQuotePdf(
       const rowHeight = Math.max(18, descriptionHeight + 4)
 
       if (rowY + rowHeight > FOOTER_Y - 170) {
-        const nextDividerY = newBrandedPage(doc, company, logoBuf, 'QUOTE', referenceText)
+        const nextDividerY = newBrandedPage(doc, company, logoAsset, 'QUOTE', referenceText)
         doc
           .fontSize(7)
           .font('Helvetica-Bold')
@@ -411,7 +412,7 @@ function buildQuotePdf(
     if (notesText) {
       const notesHeight = doc.heightOfString(notesText, { width: CONTENT_W })
       if (rowY + 30 + notesHeight > FOOTER_Y - 140) {
-        const nextDividerY = newBrandedPage(doc, company, logoBuf, 'QUOTE', referenceText)
+        const nextDividerY = newBrandedPage(doc, company, logoAsset, 'QUOTE', referenceText)
         rowY = nextDividerY + 18
       }
       doc
@@ -443,13 +444,13 @@ function buildQuotePdf(
     const BOX_H = hasRep ? 148 : 66
 
     if (rowY + BOX_H + 24 > FOOTER_Y - 10) {
-      const nextDividerY = newBrandedPage(doc, company, logoBuf, 'QUOTE', referenceText)
+      const nextDividerY = newBrandedPage(doc, company, logoAsset, 'QUOTE', referenceText)
       rowY = nextDividerY + 18
     }
 
     doc
       .rect(C_DESC, rowY, CONTENT_W, BOX_H)
-      .fillAndStroke('#FFF8F3', OGS_ORANGE)
+      .fillAndStroke(OGS_BRAND_BLUE_LIGHT, OGS_BRAND_BLUE)
       .lineWidth(0.75)
 
     // ── QR code block on the right of the info box ─────────────────────────
@@ -473,7 +474,7 @@ function buildQuotePdf(
     doc
       .fontSize(8.5)
       .font('Helvetica-Bold')
-      .fillColor(OGS_ORANGE)
+      .fillColor(OGS_BRAND_BLUE)
       .text('TO ACCEPT THIS QUOTE', C_DESC + 12, rowY + 10)
 
     // Row 2–3: acceptance instructions
@@ -498,7 +499,7 @@ function buildQuotePdf(
       doc
         .moveTo(C_DESC + 12, rowY + 58)
         .lineTo(dividerEndX, rowY + 58)
-        .strokeColor(OGS_ORANGE)
+        .strokeColor(OGS_BRAND_BLUE)
         .lineWidth(0.4)
         .stroke()
 
@@ -529,7 +530,7 @@ function buildQuotePdf(
       doc
         .fontSize(9)
         .font('Helvetica-Oblique')
-        .fillColor(OGS_ORANGE)
+        .fillColor(OGS_BRAND_BLUE)
         .text(
           'We look forward to doing business with you!',
           C_DESC + 12, rowY + 112,
@@ -542,7 +543,7 @@ function buildQuotePdf(
 
     // ── Page 2: Terms & Conditions ──────────────────────────────────────────
     if (company.termsAndConditions) {
-      const pageTwoDividerY = newBrandedPage(doc, company, logoBuf, 'TERMS & CONDITIONS', referenceText)
+      const pageTwoDividerY = newBrandedPage(doc, company, logoAsset, 'TERMS & CONDITIONS', referenceText)
 
       // T&C body text
       doc

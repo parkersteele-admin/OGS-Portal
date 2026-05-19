@@ -7,6 +7,7 @@ import { ViewAsBanner } from '../ui/ViewAsBanner'
 import { useAuth } from '../../hooks/useAuth'
 import type { SidebarItem } from '../ui/Sidebar'
 import type { MobileNavItem } from '../ui/MobileNav'
+import { ADMIN_SIDEBAR_GROUPS, ADMIN_SIDEBAR_OVERVIEW_ITEMS } from './adminSidebarConfig'
 import './Layout.css'
 
 const BASE_NAV_ITEMS: SidebarItem[] = [
@@ -37,8 +38,9 @@ export const OpsLayout: React.FC = () => {
   return (
     <div className="layout">
       <Sidebar
-        title="Operations"
-        items={navItems}
+        title={isAdmin ? 'Admin' : 'Operations'}
+        items={isAdmin ? ADMIN_SIDEBAR_OVERVIEW_ITEMS : navItems}
+        groups={isAdmin ? ADMIN_SIDEBAR_GROUPS : undefined}
         mobileOpen={mobileNavOpen}
         onMobileClose={() => setMobileNavOpen(false)}
       />

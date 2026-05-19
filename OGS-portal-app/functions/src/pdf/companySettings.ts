@@ -7,6 +7,8 @@
 
 import * as https from 'https'
 import * as http from 'http'
+import { promises as fs } from 'fs'
+import * as path from 'path'
 import { db } from '../admin'
 
 export interface CompanySettings {
@@ -27,7 +29,7 @@ export interface CompanySettings {
 }
 
 const DEFAULTS: CompanySettings = {
-  name:               'OGS Gas Services',
+  name:               'Ohio Gas Supply',
   tagline:            '',
   email:              '',
   phone:              '',
@@ -43,10 +45,25 @@ const DEFAULTS: CompanySettings = {
   termsAndConditions: '',
 }
 
+let cachedOfficialDocumentLogoSvg: string | null | undefined
+
 export async function getCompanySettings(): Promise<CompanySettings> {
   const snap = await db.collection('settings').doc('company').get()
   if (!snap.exists) return { ...DEFAULTS }
   return { ...DEFAULTS, ...snap.data() } as CompanySettings
+}
+
+export async function fetchOfficialDocumentLogoSvg(): Promise<string | null> {
+  if (cachedOfficialDocumentLogoSvg !== undefined) return cachedOfficialDocumentLogoSvg
+
+  try {
+    const logoPath = path.resolve(__dirname, '../../../public/logo.svg')
+    cachedOfficialDocumentLogoSvg = await fs.readFile(logoPath, 'utf8')
+  } catch {
+    cachedOfficialDocumentLogoSvg = null
+  }
+
+  return cachedOfficialDocumentLogoSvg
 }
 
 /** Fetches the company logo as a Buffer for embedding in PDFs. Returns null if no logoUrl is set or the fetch fails. */

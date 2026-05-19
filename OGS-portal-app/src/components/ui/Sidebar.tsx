@@ -24,8 +24,13 @@ export interface SidebarGroup {
   items: SidebarItem[]
 }
 
+function getRouteVariants(to: string): string[] {
+  if (!to.startsWith('/admin/')) return [to]
+  return [to, to.replace('/admin', '')]
+}
+
 function isRouteMatch(pathname: string, to: string): boolean {
-  return pathname === to || pathname.startsWith(`${to}/`)
+  return getRouteVariants(to).some((variant) => pathname === variant || pathname.startsWith(`${variant}/`))
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -65,7 +70,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       />
       <nav className={`sidebar${mobileOpen ? ' sidebar--mobile-open' : ''}`} aria-label="Main navigation">
         <div className="sidebar__logo-bar">
-          <BrandLogo className="sidebar__logo-image" />
+          <BrandLogo className="sidebar__logo-image" variant="white" />
         </div>
 
         <p className="sidebar__portal-label">{title}</p>
@@ -81,8 +86,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <li key={to}>
               <NavLink
                 to={to}
-                className={({ isActive }) =>
-                  `sidebar__link${isActive ? ' sidebar__link--active' : ''}`
+                className={() =>
+                  `sidebar__link${isRouteMatch(location.pathname, to) ? ' sidebar__link--active' : ''}`
                 }
               >
                 <span className="sidebar__icon" aria-hidden="true">{icon}</span>
@@ -119,8 +124,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <li key={to}>
                         <NavLink
                           to={to}
-                          className={({ isActive }) =>
-                            `sidebar__link${isActive ? ' sidebar__link--active' : ''}`
+                          className={() =>
+                            `sidebar__link${isRouteMatch(location.pathname, to) ? ' sidebar__link--active' : ''}`
                           }
                         >
                           <span className="sidebar__icon" aria-hidden="true">{icon}</span>

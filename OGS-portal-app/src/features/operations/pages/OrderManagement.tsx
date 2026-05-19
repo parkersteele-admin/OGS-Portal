@@ -34,6 +34,7 @@ import {
   archiveOrder,
   deleteOrder,
 } from '../../../services/orderService'
+import { generateInvoiceForOrder } from '../../../services/invoiceService'
 import { subscribeToCustomers } from '../../../services/customerService'
 import { Button } from '../../../components/ui/Button'
 import { Input } from '../../../components/ui/Input'
@@ -230,7 +231,9 @@ function OrderDetailPanel({
   const navigate = useNavigate()
   const location = useLocation()
   const opsBase  = location.pathname.startsWith('/admin') ? '/admin/ops' : '/ops'
+  const isAdminView = location.pathname.startsWith('/admin')
   const [invoice, setInvoice] = useState<Invoice | null>(null)
+  const [generatingInvoice, setGeneratingInvoice] = useState(false)
   const [runStopInfo, setRunStopInfo] = useState<{
     runNumber: string
     stopOrder: number
@@ -292,6 +295,22 @@ function OrderDetailPanel({
   const canCancel = canTransition(order.status, 'cancelled')
   const canEdit =
     order.status === 'pending' || order.status === 'scheduled'
+
+  async function handleGenerateInvoice() {
+    setGeneratingInvoice(true)
+    try {
+      const result = await generateInvoiceForOrder(order.id)
+      const invoiceSnap = await getDoc(doc(db, 'invoices', result.invoiceId))
+      if (invoiceSnap.exists()) {
+        setInvoice({ ...invoiceSnap.data(), id: invoiceSnap.id } as Invoice)
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to generate invoice.'
+      alert(message)
+    } finally {
+      setGeneratingInvoice(false)
+    }
+  }
 
   return (
     <div className="om-panel-overlay" onClick={onClose}>
@@ -526,6 +545,16 @@ function OrderDetailPanel({
 
         {/* Actions */}
         <div className="om-panel__footer">
+          {isAdminView && !invoice && (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleGenerateInvoice}
+              disabled={generatingInvoice}
+            >
+              {generatingInvoice ? 'Generating...' : 'Generate Invoice'}
+            </Button>
+          )}
           {canEdit && (
             <Button
               variant="secondary"

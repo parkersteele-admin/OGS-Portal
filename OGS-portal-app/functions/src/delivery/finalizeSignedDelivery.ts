@@ -32,6 +32,10 @@ interface InvoiceRecord {
   invoiceNumber?: string
 }
 
+interface GenerateInvoiceForOrderInput {
+  orderId: string
+}
+
 export const finalizeSignedDelivery = onCall(
   async (request) => {
     if (!request.auth) {
@@ -345,6 +349,96 @@ export const finalizeSignedDelivery = onCall(
   },
 )
 
+export const generateInvoiceForOrder = onCall(
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'You must be signed in.')
+    }
+
+    const role = request.auth.token.role as string | undefined
+    if (role !== 'admin') {
+      throw new HttpsError('permission-denied', 'Only admins can generate invoices manually.')
+    }
+
+    const data = request.data as Partial<GenerateInvoiceForOrderInput>
+    if (!data.orderId || typeof data.orderId !== 'string') {
+      throw new HttpsError('invalid-argument', 'orderId is required.')
+    }
+
+    const orderSnap = await db.collection('orders').doc(data.orderId).get()
+    if (!orderSnap.exists) {
+      throw new HttpsError('not-found', 'Order not found.')
+    }
+
+    const order = orderSnap.data() as Record<string, unknown>
+    const customerId = order.customerId as string | undefined
+    if (!customerId) {
+      throw new HttpsError('failed-precondition', 'Order is missing customer information.')
+    }
+
+    const primaryItems = Array.isArray(order.deliveredLineItems)
+      ? (order.deliveredLineItems as Array<{ productId: string; qty: number }>).filter((item) => item.productId && item.qty > 0)
+      : []
+    const fallbackPrimaryItems = order.productId
+      ? [{ productId: order.productId as string, qty: Number(order.quantity ?? 0) }]
+      : []
+    const normalizedPrimaryItems = (primaryItems.length > 0 ? primaryItems : fallbackPrimaryItems)
+      .filter((item) => item.productId && item.qty > 0)
+
+    if (normalizedPrimaryItems.length === 0) {
+      throw new HttpsError('failed-precondition', 'Order has no delivered/ordered line items to invoice.')
+    }
+
+    const deliveredAddOns = Array.isArray(order.deliveredAddOns)
+      ? (order.deliveredAddOns as Array<{ productId: string; qty: number }>).filter((item) => item.productId && item.qty > 0)
+      : []
+    const fallbackAddOns = Array.isArray(order.addOns)
+      ? (order.addOns as Array<Record<string, unknown>>)
+          .map((item) => ({
+            productId: item.productId as string,
+            qty: Number(item.qty ?? 0),
+          }))
+          .filter((item) => item.productId && item.qty > 0)
+      : []
+    const normalizedAddOns = deliveredAddOns.length > 0 ? deliveredAddOns : fallbackAddOns
+
+    const productIds = new Set<string>()
+    normalizedPrimaryItems.forEach((item) => productIds.add(item.productId))
+    normalizedAddOns.forEach((item) => productIds.add(item.productId))
+    const productMap = await loadProductSnapshots(productIds)
+
+    let invoice = await findInvoiceForOrder(data.orderId)
+    const created = !invoice
+    if (!invoice) {
+      const deliveredAt = (order.deliveredAt as { toDate?: () => Date } | undefined)?.toDate?.()
+      const deliveryDate = deliveredAt ?? new Date()
+      invoice = await createInvoiceForDelivery({
+        orderId: data.orderId,
+        customerId,
+        deliveryDate,
+        primaryItems: normalizedPrimaryItems,
+        addOnItems: normalizedAddOns,
+        order,
+        productMap,
+      })
+    }
+
+    const invoicePdfUrl = invoice.pdfUrl || await generateInvoicePdf(invoice.id)
+
+    await orderSnap.ref.update({
+      invoicePdfUrl,
+      updatedAt: FieldValue.serverTimestamp(),
+    })
+
+    return {
+      invoiceId: invoice.id,
+      invoiceNumber: invoice.invoiceNumber ?? null,
+      invoicePdfUrl,
+      created,
+    }
+  },
+)
+
 function parseDataUrl(dataUrl: string): { buffer: Buffer; contentType: string } | null {
   const match = dataUrl.match(/^data:(.+);base64,(.+)$/)
   if (!match) return null
@@ -380,6 +474,24 @@ async function uploadOrderAsset(args: {
   const encodedPath = encodeURIComponent(storagePath)
   const url = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodedPath}?alt=media&token=${downloadToken}`
   return { url, storagePath }
+}
+
+async function loadProductSnapshots(productIds: Set<string>): Promise<Map<string, ProductSnapshot>> {
+  const productDocs = await Promise.all([...productIds].map(async (productId) => {
+    const snap = await db.collection('products').doc(productId).get()
+    const docData = snap.data() as Record<string, unknown> | undefined
+    return [
+      productId,
+      {
+        id: productId,
+        name: (docData?.name as string | undefined) || productId,
+        unit: (docData?.unit as string | undefined) || 'unit',
+        basePrice: docData?.basePrice as number | undefined,
+        pricePerUnit: docData?.pricePerUnit as number | undefined,
+      } satisfies ProductSnapshot,
+    ] as const
+  }))
+  return new Map(productDocs)
 }
 
 async function findInvoiceForOrder(orderId: string): Promise<InvoiceRecord | null> {

@@ -2,7 +2,7 @@
  * functions/src/triggers/onDeliveryComplete.ts
  *
  * Trigger: Firestore onDocumentUpdated — runs/{runId}/stops/{stopId}
- * Condition: stop.status transitions to 'delivered'
+ * Condition: stop.status transitions to 'delivered' or 'completed'
  *
  * Execution sequence (each step wrapped in try/catch — see below):
  *
@@ -55,14 +55,25 @@ export const onDeliveryComplete = onDocumentUpdated(
     const before = event.data?.before.data()
     const after  = event.data?.after.data()
 
-    // Only react to the specific transition to 'delivered'
-    if (!after || before?.status === 'delivered' || after.status !== 'delivered') {
+    // React only when a stop first enters a delivery-complete state.
+    const beforeStatus = before?.status as string | undefined
+    const afterStatus = after?.status as string | undefined
+    const wasDeliveryComplete = beforeStatus === 'delivered' || beforeStatus === 'completed'
+    const isDeliveryComplete = afterStatus === 'delivered' || afterStatus === 'completed'
+
+    if (!after || wasDeliveryComplete || !isDeliveryComplete) {
+      return
+    }
+
+    // Signed-delivery flow is handled end-to-end by finalizeSignedDelivery callable.
+    // Skip here to avoid duplicate invoice emails/notifications.
+    if (afterStatus === 'completed' && (after.signedAt || after.signatureUrl)) {
       return
     }
 
     const { runId, stopId } = event.params
     const orderId           = after.orderId          as string | undefined
-    const quantityDelivered = (after.quantityDelivered ?? after.gallons ?? 0) as number
+    const quantityDelivered = (after.quantityDelivered ?? after.gallonsDelivered ?? after.gallons ?? 0) as number
 
     if (!orderId) {
       console.error(`onDeliveryComplete [stop=${stopId}]: missing orderId — skipping`)

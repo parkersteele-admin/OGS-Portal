@@ -14,14 +14,15 @@
 
 import PDFDocument from 'pdfkit'
 import { db, storage, FieldValue } from '../admin'
-import { getCompanySettings, fetchLogoBuffer } from './companySettings'
+import { getCompanySettings, fetchLogoBuffer, fetchOfficialDocumentLogoSvg } from './companySettings'
 import type { CompanySettings } from './companySettings'
 import { registerGeneratedFile } from '../files/registerGeneratedFile'
 import {
   CONTENT_W,
   FOOTER_Y,
   MARGIN_L,
-  OGS_ORANGE,
+  OGS_BRAND_BLUE,
+  OGS_BRAND_BLUE_LIGHT,
   RIGHT_EDGE,
   drawBrandedFooter,
   drawBrandedHeader,
@@ -56,8 +57,8 @@ export async function generateInvoicePdf(invoiceId: string): Promise<string> {
 
   // ── Build PDF bytes ────────────────────────────────────────────────────────
   const company   = await getCompanySettings()
-  const logoBuf   = await fetchLogoBuffer(company.logoUrl)
-  const pdfBuffer = await buildInvoicePdf(invoiceId, invoice, customer, company, logoBuf)
+  const logoAsset = await fetchOfficialDocumentLogoSvg() ?? await fetchLogoBuffer(company.logoUrl)
+  const pdfBuffer = await buildInvoicePdf(invoiceId, invoice, customer, company, logoAsset)
 
   // ── Upload to Firebase Storage ─────────────────────────────────────────────
   const storagePath = `ogs-portal/invoices/${customerId ?? '_unknown'}/${invoiceId}.pdf`
@@ -113,7 +114,7 @@ function buildInvoicePdf(
   invoice:   Record<string, unknown>,
   customer:  Record<string, unknown>,
   company:   CompanySettings,
-  logoBuf:   Buffer | null,
+  logoAsset: Buffer | string | null,
 ): Promise<Buffer> {
   return new Promise<Buffer>((resolve, reject) => {
     const doc    = new PDFDocument({ margin: 0, size: 'LETTER' })
@@ -153,7 +154,7 @@ function buildInvoicePdf(
 
     const invoiceNum = (invoice.invoiceNumber as string) || invoiceId.slice(-8).toUpperCase()
     const referenceText = `#${invoiceNum}`
-    const DIVIDER_Y = drawBrandedHeader(doc, company, logoBuf, 'INVOICE', referenceText)
+    const DIVIDER_Y = drawBrandedHeader(doc, company, logoAsset, 'INVOICE', referenceText)
 
     // ── Section labels ─────────────────────────────────────────────────────
     const META_X = 380    // right column x-start for invoice meta
@@ -281,7 +282,7 @@ function buildInvoicePdf(
       const rowHeight = Math.max(18, descriptionHeight + 4)
 
       if (rowY + rowHeight > FOOTER_Y - 90) {
-        const nextDividerY = newBrandedPage(doc, company, logoBuf, 'INVOICE', referenceText)
+        const nextDividerY = newBrandedPage(doc, company, logoAsset, 'INVOICE', referenceText)
         doc
           .fontSize(7)
           .font('Helvetica-Bold')
@@ -373,13 +374,13 @@ function buildInvoicePdf(
     // Light orange fill + orange border
     doc
       .rect(C_DESC, BOX_Y, CONTENT_W, BOX_H)
-      .fillAndStroke('#FFF8F3', OGS_ORANGE)
+      .fillAndStroke(OGS_BRAND_BLUE_LIGHT, OGS_BRAND_BLUE)
       .lineWidth(0.75)
 
     doc
       .fontSize(8.5)
       .font('Helvetica-Bold')
-      .fillColor(OGS_ORANGE)
+      .fillColor(OGS_BRAND_BLUE)
       .text('PAYMENT INFORMATION', C_DESC + 12, BOX_Y + 10)
 
     doc
@@ -397,7 +398,7 @@ function buildInvoicePdf(
     if (invoiceNotes) {
       const notesHeight = doc.heightOfString(invoiceNotes, { width: CONTENT_W })
       if (rowY + 24 + notesHeight > FOOTER_Y - 8) {
-        const nextDividerY = newBrandedPage(doc, company, logoBuf, 'INVOICE', referenceText)
+        const nextDividerY = newBrandedPage(doc, company, logoAsset, 'INVOICE', referenceText)
         rowY = nextDividerY + 18
       }
       doc.fontSize(7).font('Helvetica-Bold').fillColor('#999999')
@@ -425,7 +426,7 @@ function buildInvoicePdf(
     if (company.termsAndConditions) {
       const termsHeight = doc.heightOfString(company.termsAndConditions, { width: CONTENT_W })
       if (rowY + 24 + termsHeight > FOOTER_Y - 8) {
-        const nextDividerY = newBrandedPage(doc, company, logoBuf, 'INVOICE', referenceText)
+        const nextDividerY = newBrandedPage(doc, company, logoAsset, 'INVOICE', referenceText)
         rowY = nextDividerY + 18
       }
       rowY += 8

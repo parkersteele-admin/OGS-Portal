@@ -170,6 +170,8 @@ const EMPTY_ROW = (): DraftLineItem => ({
   amount:      0,
 })
 
+const DELIVERY_PRODUCT_ID = 'delivery'
+
 function normalizeMarginInput(value: number): number {
   if (!Number.isFinite(value)) return 0
   const normalized = value > 1 ? value / 100 : value
@@ -696,17 +698,42 @@ const QuoteEditorPage: React.FC = () => {
 
   // ── Computed totals ───────────────────────────────────────────────────────
 
-  const subtotal = useMemo(
-    () => parseFloat(rows.reduce((s, r) => s + r.amount, 0).toFixed(2)),
+  const deliveryRows = useMemo(
+    () => rows.filter((r) => r.productId === DELIVERY_PRODUCT_ID),
     [rows],
+  )
+  const productRows = useMemo(
+    () => rows.filter((r) => r.productId !== DELIVERY_PRODUCT_ID),
+    [rows],
+  )
+
+  useEffect(() => {
+    if (deliveryRows.length === 0) return
+
+    const latestDeliveryRow = deliveryRows[deliveryRows.length - 1]
+    const inferredDeliveryFee = latestDeliveryRow.amount > 0
+      ? latestDeliveryRow.amount
+      : latestDeliveryRow.unitPrice
+    const nextDeliveryFee = Number.isFinite(inferredDeliveryFee)
+      ? Math.max(inferredDeliveryFee, 0)
+      : 0
+
+    setIncludeDelivery(true)
+    setDeliveryFee((prev) => (Math.abs(prev - nextDeliveryFee) < 0.005 ? prev : nextDeliveryFee))
+    setRows((prev) => prev.filter((r) => r.productId !== DELIVERY_PRODUCT_ID))
+  }, [deliveryRows])
+
+  const subtotal = useMemo(
+    () => parseFloat(productRows.reduce((s, r) => s + r.amount, 0).toFixed(2)),
+    [productRows],
   )
   const totalCost = useMemo(
-    () => parseFloat(rows.reduce((s, r) => s + (r.cost * r.quantity), 0).toFixed(2)),
-    [rows],
+    () => parseFloat(productRows.reduce((s, r) => s + (r.cost * r.quantity), 0).toFixed(2)),
+    [productRows],
   )
   const totalLineProfit = useMemo(
-    () => parseFloat(rows.reduce((s, r) => s + r.profit, 0).toFixed(2)),
-    [rows],
+    () => parseFloat(productRows.reduce((s, r) => s + r.profit, 0).toFixed(2)),
+    [productRows],
   )
   const rentalTotal = useMemo(
     () => includeRental ? parseFloat((rentalRate * rentalMonths).toFixed(2)) : 0,
@@ -724,8 +751,8 @@ const QuoteEditorPage: React.FC = () => {
   const totalProfit = parseFloat((totalLineProfit + effectiveDelivery + rentalTotal).toFixed(2))
   const overallMarginPercent = preTaxTotal > 0 ? totalProfit / preTaxTotal : 0
   const marginViolations = useMemo(
-    () => rows.filter((r) => r.productId && r.marginPercent + 0.0001 < r.minMarginPercent),
-    [rows],
+    () => productRows.filter((r) => r.productId && r.marginPercent + 0.0001 < r.minMarginPercent),
+    [productRows],
   )
 
   // ── Row helpers ───────────────────────────────────────────────────────────
@@ -754,6 +781,23 @@ const QuoteEditorPage: React.FC = () => {
           productId: '',
           productName: '',
           skuLabel: '',
+          cost: 0,
+          basePrice: 0,
+          minMarginPercent: 0.2,
+          minPrice: 0,
+          marginPercent: 0,
+          unitPrice: 0,
+        })
+      }
+      if (product.id === DELIVERY_PRODUCT_ID) {
+        setIncludeDelivery(true)
+        setDeliveryFee(product.basePrice)
+        return recalcRow({
+          ...r,
+          productId: '',
+          productName: '',
+          skuLabel: '',
+          description: '',
           cost: 0,
           basePrice: 0,
           minMarginPercent: 0.2,
@@ -806,7 +850,7 @@ const QuoteEditorPage: React.FC = () => {
 
   // Compute filtered products based on selected category
   const filteredProducts = useMemo(() => {
-    const products = Object.values(productMap)
+    const products = Object.values(productMap).filter((p) => p.id !== DELIVERY_PRODUCT_ID)
     if (selectedCategory === 'All') return products
     return products.filter((p) => p.category === selectedCategory)
   }, [productMap, selectedCategory])
@@ -814,12 +858,12 @@ const QuoteEditorPage: React.FC = () => {
   // ── Build payload ─────────────────────────────────────────────────────────
 
   const buildLineItems = (): QuoteItem[] => {
-    const items: QuoteItem[] = rows
+    const items: QuoteItem[] = productRows
       .filter(r => r.description.trim() || r.amount > 0)
       .map(toQuoteItem)
 
     if (includeDelivery && deliveryFee > 0)
-      items.push({ productId: 'delivery', description: 'Delivery fee', quantity: 1, unitPrice: deliveryFee, amount: deliveryFee })
+      items.push({ productId: DELIVERY_PRODUCT_ID, description: 'Delivery fee', quantity: 1, unitPrice: deliveryFee, amount: deliveryFee })
     if (includeRental && rentalRate > 0 && rentalMonths > 0)
       items.push({ productId: 'rental', description: `Tank rental (${rentalMonths} mo.)`, quantity: rentalMonths, unitPrice: rentalRate, amount: rentalTotal })
     return items
@@ -827,7 +871,7 @@ const QuoteEditorPage: React.FC = () => {
 
   const validate = (): string | null => {
     if (!recipientId) return 'Please select a customer or lead.'
-    if (rows.every(r => !r.description.trim() && r.amount === 0)) return 'Add at least one line item.'
+    if (productRows.every(r => !r.description.trim() && r.amount === 0)) return 'Add at least one line item.'
     if (marginViolations.length > 0) {
       return `Margin is below minimum on ${marginViolations.length} line item${marginViolations.length === 1 ? '' : 's'}.`
     }
@@ -1251,7 +1295,7 @@ const QuoteEditorPage: React.FC = () => {
                 </div>
               )}
               <div className="qep-items" role="list" aria-label="Quote line items">
-                {rows.map((row, i) => (
+                {productRows.map((row, i) => (
                   <LineItemRow key={row._id} row={row} index={i}
                     onChange={handleRowChange} onProductSelect={handleProductSelect}
                     onRemove={removeRow}
