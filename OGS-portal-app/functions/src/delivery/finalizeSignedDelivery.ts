@@ -36,6 +36,8 @@ interface GenerateInvoiceForOrderInput {
   orderId: string
 }
 
+const DEFAULT_SALES_TAX_RATE = 0.08
+
 export const finalizeSignedDelivery = onCall(
   async (request) => {
     if (!request.auth) {
@@ -423,7 +425,11 @@ export const generateInvoiceForOrder = onCall(
       })
     }
 
-    const invoicePdfUrl = invoice.pdfUrl || await generateInvoicePdf(invoice.id)
+    const repaired = await maybeRepairInvoiceTotals(invoice.id, order)
+
+    const invoicePdfUrl = (invoice.pdfUrl && !repaired)
+      ? invoice.pdfUrl
+      : await generateInvoicePdf(invoice.id)
 
     await orderSnap.ref.update({
       invoicePdfUrl,
@@ -544,9 +550,13 @@ async function createInvoiceForDelivery(args: {
   }
 
   const subtotal = lineItems.reduce((sum, item) => sum + item.total, 0)
-  const taxRate = 0
-  const taxAmount = 0
-  const totalAmount = subtotal + taxAmount
+  const orderTaxRate = toNumber(args.order.salesTaxRate, args.order.taxRate, DEFAULT_SALES_TAX_RATE)
+  const applySalesTax = typeof args.order.applySalesTax === 'boolean'
+    ? args.order.applySalesTax
+    : orderTaxRate > 0
+  const taxRate = applySalesTax ? orderTaxRate : 0
+  const taxAmount = Number((subtotal * taxRate).toFixed(2))
+  const totalAmount = Number((subtotal + taxAmount).toFixed(2))
 
   // ── GUARD: Verify delivery fee is included in total if order has one ──
   if (deliveryFee > 0) {
@@ -578,6 +588,9 @@ async function createInvoiceForDelivery(args: {
     salesRepPhone: args.order.salesRepPhone ?? null,
     status: 'sent',
     lineItems,
+    applySalesTax,
+    salesTaxRate: taxRate,
+    salesTaxAmount: taxAmount,
     subtotal,
     tax: taxAmount,
     total: totalAmount,
@@ -591,6 +604,82 @@ async function createInvoiceForDelivery(args: {
   })
 
   return { id: invoiceRef.id, invoiceNumber }
+}
+
+async function maybeRepairInvoiceTotals(invoiceId: string, order: Record<string, unknown>): Promise<boolean> {
+  const invoiceRef = db.collection('invoices').doc(invoiceId)
+  const invoiceSnap = await invoiceRef.get()
+  if (!invoiceSnap.exists) return false
+
+  const invoice = invoiceSnap.data() as Record<string, unknown>
+  const lineItems = Array.isArray(invoice.lineItems)
+    ? (invoice.lineItems as Array<Record<string, unknown>>)
+    : []
+
+  const lineItemSubtotal = lineItems.reduce((sum, item) => {
+    const itemTotal = toNumber(
+      item.total,
+      item.amount,
+      Number(item.quantity ?? 0) * Number(item.unitPrice ?? 0),
+      0,
+    )
+    return sum + itemTotal
+  }, 0)
+
+  const subtotal = Number(toNumber(invoice.subtotal, lineItemSubtotal, 0).toFixed(2))
+  const configuredTaxRate = toNumber(
+    invoice.salesTaxRate,
+    invoice.taxRate,
+    order.salesTaxRate,
+    order.taxRate,
+    DEFAULT_SALES_TAX_RATE,
+  )
+  const applySalesTax = typeof invoice.applySalesTax === 'boolean'
+    ? invoice.applySalesTax
+    : typeof order.applySalesTax === 'boolean'
+      ? order.applySalesTax
+      : configuredTaxRate > 0
+  const taxRate = applySalesTax ? configuredTaxRate : 0
+  const taxAmount = Number((subtotal * taxRate).toFixed(2))
+  const total = Number((subtotal + taxAmount).toFixed(2))
+
+  const currentTax = toNumber(invoice.salesTaxAmount, invoice.tax, invoice.taxAmount, 0)
+  const currentTotal = toNumber(invoice.total, invoice.totalAmount, subtotal + currentTax)
+  const currentApplySalesTax = typeof invoice.applySalesTax === 'boolean' ? invoice.applySalesTax : undefined
+  const currentSalesTaxRate = typeof invoice.salesTaxRate === 'number' ? invoice.salesTaxRate : undefined
+  const needsRepair =
+    Math.abs(currentTax - taxAmount) > 0.009
+    || Math.abs(currentTotal - total) > 0.009
+    || currentApplySalesTax === undefined
+    || currentSalesTaxRate === undefined
+
+  if (!needsRepair) return false
+
+  await invoiceRef.update({
+    applySalesTax,
+    salesTaxRate: taxRate,
+    salesTaxAmount: taxAmount,
+    subtotal,
+    tax: taxAmount,
+    taxRate,
+    taxAmount,
+    total,
+    totalAmount: total,
+    updatedAt: FieldValue.serverTimestamp(),
+  })
+
+  return true
+}
+
+function toNumber(...values: unknown[]): number {
+  for (const value of values) {
+    if (typeof value === 'number' && Number.isFinite(value)) return value
+    if (typeof value === 'string' && value.trim() !== '') {
+      const parsed = Number(value)
+      if (Number.isFinite(parsed)) return parsed
+    }
+  }
+  return 0
 }
 
 function buildInvoiceLine(
