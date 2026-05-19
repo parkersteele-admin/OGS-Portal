@@ -653,7 +653,10 @@ async function maybeRepairInvoiceTotals(invoiceId: string, order: Record<string,
     || currentApplySalesTax === undefined
     || currentSalesTaxRate === undefined
 
-  if (!needsRepair) return false
+  const currentStatus = invoice.status as string | undefined
+  const resetVoidStatus = currentStatus === 'void'
+
+  if (!needsRepair && !resetVoidStatus) return false
 
   await invoiceRef.update({
     applySalesTax,
@@ -665,6 +668,7 @@ async function maybeRepairInvoiceTotals(invoiceId: string, order: Record<string,
     taxAmount,
     total,
     totalAmount: total,
+    ...(resetVoidStatus && { status: 'sent' }),
     updatedAt: FieldValue.serverTimestamp(),
   })
 
