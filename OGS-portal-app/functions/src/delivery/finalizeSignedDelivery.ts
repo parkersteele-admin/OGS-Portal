@@ -431,11 +431,11 @@ export const generateInvoiceForOrder = onCall(
       })
     }
 
-    const repaired = await maybeRepairInvoiceTotals(invoice.id, order, expectedLineItems)
+    await maybeRepairInvoiceTotals(invoice.id, order, expectedLineItems)
 
-    const invoicePdfUrl = (invoice.pdfUrl && !repaired)
-      ? invoice.pdfUrl
-      : await generateInvoicePdf(invoice.id)
+    // Manual regenerate should always render a fresh PDF so branding/template
+    // updates are reflected immediately even when totals are unchanged.
+    const invoicePdfUrl = await generateInvoicePdf(invoice.id)
 
     await orderSnap.ref.update({
       invoicePdfUrl,
