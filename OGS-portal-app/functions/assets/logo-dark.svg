@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 300" role="img" aria-labelledby="logo-title logo-desc">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 400" role="img" aria-labelledby="logo-title logo-desc">
   <title id="logo-title">Ohio Gas Supply logo</title>
-  <desc id="logo-desc">OGS dark wordmark with Ohio Gas Supply stacked text and blue to orange speed lines.</desc>
+  <desc id="logo-desc">OGS dark wordmark with Ohio Gas Supply text and blue to orange gradient stripes.</desc>
   <defs>
     <linearGradient id="logo-stripe" x1="0%" y1="0%" x2="100%" y2="0%">
       <stop offset="0%" stop-color="#0066FF" />
@@ -10,14 +10,20 @@
     </linearGradient>
   </defs>
 
-  <g fill="#0A1B33" font-family="Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif" font-style="italic" font-weight="700">
-    <text x="28" y="176" font-size="180" letter-spacing="2">OGS</text>
-    <text x="680" y="92" font-size="70">OHIO</text>
-    <text x="660" y="168" font-size="70">GAS</text>
-    <text x="598" y="252" font-size="96">SUPPLY</text>
+  <!-- Main OGS text (large, left side) -->
+  <g fill="#0A1B33" font-family="Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif" font-style="italic" font-weight="900">
+    <text x="40" y="240" font-size="320" letter-spacing="8">OGS</text>
   </g>
 
-  <path d="M24 206 L676 206 L660 224 L98 224 Z" fill="url(#logo-stripe)" />
-  <path d="M26 237 L916 237 L904 255 L165 255 Z" fill="url(#logo-stripe)" />
-  <path d="M0 268 L906 268 L894 286 L46 286 Z" fill="url(#logo-stripe)" />
+  <!-- Right side: OHIO, GAS, SUPPLY stacked -->
+  <g fill="#0A1B33" font-family="Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif" font-style="italic" font-weight="700">
+    <text x="920" y="120" font-size="80" letter-spacing="2">OHIO</text>
+    <text x="900" y="210" font-size="80" letter-spacing="2">GAS</text>
+    <text x="800" y="310" font-size="110" letter-spacing="2">SUPPLY</text>
+  </g>
+
+  <!-- Gradient stripes (full width, below text) -->
+  <path d="M 30 340 L 1370 340 L 1350 370 L 10 370 Z" fill="url(#logo-stripe)" />
+  <path d="M 40 295 L 1380 295 L 1360 325 L 20 325 Z" fill="url(#logo-stripe)" />
+  <path d="M 50 250 L 1390 250 L 1370 280 L 30 280 Z" fill="url(#logo-stripe)" />
 </svg>
