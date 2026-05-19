@@ -228,6 +228,10 @@ export async function markInvoiceSent(id: string): Promise<void> {
   return updateInvoice(id, { status: 'sent' })
 }
 
+export async function markInvoiceDelivered(id: string): Promise<void> {
+  return updateInvoice(id, { status: 'delivered' })
+}
+
 export async function markInvoicePaid(id: string): Promise<void> {
   return updateInvoice(id, { status: 'paid', paidAt: serverTimestamp() as never })
 }

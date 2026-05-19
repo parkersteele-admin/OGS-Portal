@@ -980,3 +980,35 @@
     text-align: center;
   }
 }
+
+/* ── Invoice Section ───────────────────────────────────────────────────────── */
+
+.om-invoice-link {
+  background: none;
+  border: none;
+  color: var(--color-brand);
+  text-decoration: none;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: inherit;
+  padding: 0;
+  transition: color 0.2s;
+}
+
+.om-invoice-link:hover {
+  color: var(--color-brand-hover);
+  text-decoration: underline;
+}
+
+.om-invoice-link:focus {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.om-invoice-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}

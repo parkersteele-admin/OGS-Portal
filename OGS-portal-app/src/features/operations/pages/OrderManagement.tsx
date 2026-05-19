@@ -39,6 +39,7 @@ import { subscribeToCustomers } from '../../../services/customerService'
 import { Button } from '../../../components/ui/Button'
 import { Input } from '../../../components/ui/Input'
 import { Modal } from '../../../components/ui/Modal'
+import { InvoiceDetailDrawer } from '../components/InvoiceDetailDrawer'
 import type { Order, OrderStatus, DeliveryTier } from '../../../types/order'
 import type { Customer } from '../../../types/customer'
 import type { Product } from '../../../types/product'
@@ -234,6 +235,7 @@ function OrderDetailPanel({
   const isAdminView = location.pathname.startsWith('/admin')
   const [invoice, setInvoice] = useState<Invoice | null>(null)
   const [generatingInvoice, setGeneratingInvoice] = useState(false)
+  const [showInvoiceDetail, setShowInvoiceDetail] = useState(false)
   const [runStopInfo, setRunStopInfo] = useState<{
     runNumber: string
     stopOrder: number
@@ -507,7 +509,13 @@ function OrderDetailPanel({
               <div className="om-panel__section-title">Invoice</div>
               <div className="om-panel__row">
                 <span className="om-panel__label">Invoice #</span>
-                <span className="om-panel__val">{invoice.invoiceNumber}</span>
+                <button
+                  className="om-invoice-link"
+                  onClick={() => setShowInvoiceDetail(true)}
+                  title="Click to view full invoice details"
+                >
+                  {invoice.invoiceNumber}
+                </button>
               </div>
               <div className="om-panel__row">
                 <span className="om-panel__label">Status</span>
@@ -516,6 +524,24 @@ function OrderDetailPanel({
               <div className="om-panel__row">
                 <span className="om-panel__label">Total</span>
                 <span className="om-panel__val">{fmtCurrency(invoice.total)}</span>
+              </div>
+              <div className="om-invoice-actions">
+                {invoice.pdfUrl && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => window.open(invoice.pdfUrl, '_blank')}
+                  >
+                    📄 View PDF
+                  </Button>
+                )}
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setShowInvoiceDetail(true)}
+                >
+                  More Details
+                </Button>
               </div>
             </section>
           )}
@@ -575,6 +601,16 @@ function OrderDetailPanel({
           )}
         </div>
       </div>
+
+      {/* Invoice Detail Drawer */}
+      {invoice && (
+        <InvoiceDetailDrawer
+          invoice={invoice}
+          isOpen={showInvoiceDetail}
+          onClose={() => setShowInvoiceDetail(false)}
+          onInvoiceUpdated={setInvoice}
+        />
+      )}
     </div>
   )
 }

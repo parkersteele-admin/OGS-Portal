@@ -1,6 +1,6 @@
 import type { Timestamp } from 'firebase/firestore'
 
-export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'void'
+export type InvoiceStatus = 'draft' | 'sent' | 'delivered' | 'paid' | 'overdue' | 'void'
 
 export type PaymentStatus = 'pending' | 'succeeded' | 'failed' | 'refunded'
 
