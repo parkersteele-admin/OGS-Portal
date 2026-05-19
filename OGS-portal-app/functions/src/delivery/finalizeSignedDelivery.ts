@@ -547,6 +547,21 @@ async function createInvoiceForDelivery(args: {
   const taxRate = 0
   const taxAmount = 0
   const totalAmount = subtotal + taxAmount
+
+  // ── GUARD: Verify delivery fee is included in total if order has one ──
+  if (deliveryFee > 0) {
+    const hasDeliveryFeeLine = lineItems.some((item) => /delivery\s*fee/i.test(item.description))
+    if (!hasDeliveryFeeLine) {
+      console.error(`[INVOICE ERROR] Order ${args.orderId} has deliveryFee $${deliveryFee.toFixed(2)} but no delivery fee line item in invoice!`)
+      throw new Error(`Order ${args.orderId} has delivery fee but invoice does not include it. This is a critical bug.`)
+    }
+    const deliveryFeeLineTotal = lineItems.find((item) => /delivery\s*fee/i.test(item.description))?.total ?? 0
+    if (deliveryFeeLineTotal !== deliveryFee) {
+      console.error(`[INVOICE ERROR] Order ${args.orderId} delivery fee mismatch: order has $${deliveryFee.toFixed(2)}, invoice line has $${deliveryFeeLineTotal.toFixed(2)}`)
+      throw new Error(`Delivery fee mismatch in invoice for order ${args.orderId}`)
+    }
+  }
+
   const invoiceRef = db.collection('invoices').doc()
   const invoiceNumber = `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`
   const dueAt = Timestamp.fromDate(new Date(args.deliveryDate.getTime() + 30 * 24 * 60 * 60 * 1000))
