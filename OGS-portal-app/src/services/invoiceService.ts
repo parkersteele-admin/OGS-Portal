@@ -273,3 +273,17 @@ export async function generateInvoiceForOrder(orderId: string): Promise<{ invoic
     return result.data
   })
 }
+
+/** Admin-only manual invoice email send for an order. */
+export async function sendInvoiceEmailForOrder(orderId: string): Promise<{ invoiceId: string; invoiceNumber: string; invoicePdfUrl: string; emailedTo: string }> {
+  return serviceCall(async () => {
+    const { httpsCallable } = await import('firebase/functions')
+    const { functions } = await import('../lib/firebase')
+    const fn = httpsCallable<
+      { orderId: string },
+      { invoiceId: string; invoiceNumber: string; invoicePdfUrl: string; emailedTo: string }
+    >(functions, 'sendInvoiceEmailForOrder')
+    const result = await fn({ orderId })
+    return result.data
+  })
+}

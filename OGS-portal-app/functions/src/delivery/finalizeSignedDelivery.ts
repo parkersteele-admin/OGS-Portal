@@ -36,6 +36,10 @@ interface GenerateInvoiceForOrderInput {
   orderId: string
 }
 
+interface SendInvoiceEmailInput {
+  orderId: string
+}
+
 const DEFAULT_SALES_TAX_RATE = 0.08
 
 export const finalizeSignedDelivery = onCall(
@@ -329,12 +333,22 @@ export const finalizeSignedDelivery = onCall(
       </div>
     `
 
+    let deliveredEmailCount = 0
     for (const email of recipients) {
       try {
         await sendEmail({ to: email, subject, html, attachments })
+        deliveredEmailCount += 1
       } catch (err) {
         console.error(`finalizeSignedDelivery: failed to send email to ${email} —`, err)
       }
+    }
+
+    if (deliveredEmailCount > 0) {
+      await db.collection('invoices').doc(invoice.id).update({
+        status: 'sent',
+        sentAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      })
     }
 
     await orderSnap.ref.update({
@@ -447,6 +461,151 @@ export const generateInvoiceForOrder = onCall(
       invoiceNumber: invoice.invoiceNumber ?? null,
       invoicePdfUrl,
       created,
+    }
+  },
+)
+
+export const sendInvoiceEmailForOrder = onCall(
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'You must be signed in.')
+    }
+
+    const role = request.auth.token.role as string | undefined
+    if (role !== 'admin') {
+      throw new HttpsError('permission-denied', 'Only admins can send invoices manually.')
+    }
+
+    const data = request.data as Partial<SendInvoiceEmailInput>
+    if (!data.orderId || typeof data.orderId !== 'string') {
+      throw new HttpsError('invalid-argument', 'orderId is required.')
+    }
+
+    const orderSnap = await db.collection('orders').doc(data.orderId).get()
+    if (!orderSnap.exists) {
+      throw new HttpsError('not-found', 'Order not found.')
+    }
+
+    const order = orderSnap.data() as Record<string, unknown>
+    const customerId = order.customerId as string | undefined
+    if (!customerId) {
+      throw new HttpsError('failed-precondition', 'Order is missing customer information.')
+    }
+
+    const customerSnap = await db.collection('customers').doc(customerId).get()
+    if (!customerSnap.exists) {
+      throw new HttpsError('not-found', 'Customer not found.')
+    }
+    const customer = customerSnap.data() as Record<string, unknown>
+    const customerEmail = (customer.email as string | undefined)?.trim()
+    if (!customerEmail) {
+      throw new HttpsError('failed-precondition', 'Customer does not have a billing email address.')
+    }
+
+    const primaryItems = Array.isArray(order.deliveredLineItems)
+      ? (order.deliveredLineItems as Array<{ productId: string; qty: number }>).filter((item) => item.productId && item.qty > 0)
+      : []
+    const fallbackPrimaryItems = order.productId
+      ? [{ productId: order.productId as string, qty: Number(order.quantity ?? 0) }]
+      : []
+    const normalizedPrimaryItems = (primaryItems.length > 0 ? primaryItems : fallbackPrimaryItems)
+      .filter((item) => item.productId && item.qty > 0)
+
+    if (normalizedPrimaryItems.length === 0) {
+      throw new HttpsError('failed-precondition', 'Order has no delivered/ordered line items to invoice.')
+    }
+
+    const deliveredAddOns = Array.isArray(order.deliveredAddOns)
+      ? (order.deliveredAddOns as Array<{ productId: string; qty: number }>).filter((item) => item.productId && item.qty > 0)
+      : []
+    const fallbackAddOns = Array.isArray(order.addOns)
+      ? (order.addOns as Array<Record<string, unknown>>)
+          .map((item) => ({
+            productId: item.productId as string,
+            qty: Number(item.qty ?? 0),
+          }))
+          .filter((item) => item.productId && item.qty > 0)
+      : []
+    const normalizedAddOns = deliveredAddOns.length > 0 ? deliveredAddOns : fallbackAddOns
+
+    const productIds = new Set<string>()
+    normalizedPrimaryItems.forEach((item) => productIds.add(item.productId))
+    normalizedAddOns.forEach((item) => productIds.add(item.productId))
+    const productMap = await loadProductSnapshots(productIds)
+    const expectedLineItems = buildInvoiceLineItemsForOrder({
+      primaryItems: normalizedPrimaryItems,
+      addOnItems: normalizedAddOns,
+      order,
+      productMap,
+    })
+
+    let invoice = await findInvoiceForOrder(data.orderId)
+    if (!invoice) {
+      const deliveredAt = (order.deliveredAt as { toDate?: () => Date } | undefined)?.toDate?.()
+      const deliveryDate = deliveredAt ?? new Date()
+      invoice = await createInvoiceForDelivery({
+        orderId: data.orderId,
+        customerId,
+        deliveryDate,
+        primaryItems: normalizedPrimaryItems,
+        addOnItems: normalizedAddOns,
+        order,
+        productMap,
+      })
+    }
+
+    await maybeRepairInvoiceTotals(invoice.id, order, expectedLineItems)
+    const invoicePdfUrl = await generateInvoicePdf(invoice.id)
+
+    const invoiceSnap = await db.collection('invoices').doc(invoice.id).get()
+    if (!invoiceSnap.exists) {
+      throw new HttpsError('not-found', 'Invoice not found after generation.')
+    }
+
+    const invoiceData = invoiceSnap.data() as Record<string, unknown>
+    const invoiceNumber = (invoiceData.invoiceNumber as string | undefined) || invoice.id
+    const totalAmount = toNumber(invoiceData.total, invoiceData.totalAmount, 0)
+    const dueDate = (invoiceData.dueAt as { toDate?: () => Date } | undefined)?.toDate?.()
+      ?? (invoiceData.issuedAt as { toDate?: () => Date } | undefined)?.toDate?.()
+      ?? new Date()
+
+    const html = `
+      <div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;color:#222;line-height:1.5">
+        <h2 style="margin:0 0 12px">Invoice Ready</h2>
+        <p style="margin:0 0 12px">Hi ${(customer.name as string | undefined) || 'Customer'},</p>
+        <p style="margin:0 0 12px">
+          Your invoice <strong>#${invoiceNumber}</strong> for <strong>$${totalAmount.toFixed(2)}</strong> is ready.
+        </p>
+        <p style="margin:0 0 12px"><strong>Due date:</strong> ${dueDate.toLocaleDateString('en-US')}</p>
+        <p style="margin:0 0 12px">
+          <a href="${invoicePdfUrl}" style="color:#005eb8;text-decoration:underline">View and download invoice PDF</a>
+        </p>
+        <p style="margin:20px 0 0;color:#666;font-size:12px">Ohio Gas Supply</p>
+      </div>
+    `
+
+    await sendEmail({
+      to: customerEmail,
+      subject: `Invoice #${invoiceNumber} — Ohio Gas Supply`,
+      html,
+    })
+
+    await db.collection('invoices').doc(invoice.id).update({
+      status: 'sent',
+      sentAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    })
+
+    await orderSnap.ref.update({
+      invoicePdfUrl,
+      updatedAt: FieldValue.serverTimestamp(),
+    })
+
+    return {
+      invoiceId: invoice.id,
+      invoiceNumber,
+      invoicePdfUrl,
+      emailedTo: customerEmail,
     }
   },
 )
@@ -573,7 +732,7 @@ async function createInvoiceForDelivery(args: {
     salesRepName: args.order.salesRepName ?? null,
     salesRepEmail: args.order.salesRepEmail ?? null,
     salesRepPhone: args.order.salesRepPhone ?? null,
-    status: 'sent',
+    status: 'pending',
     lineItems,
     applySalesTax,
     salesTaxRate: taxRate,
@@ -663,7 +822,7 @@ async function maybeRepairInvoiceTotals(
     taxAmount,
     total,
     totalAmount: total,
-    ...(resetVoidStatus && { status: 'sent' }),
+    ...(resetVoidStatus && { status: 'pending' }),
     updatedAt: FieldValue.serverTimestamp(),
   })
 

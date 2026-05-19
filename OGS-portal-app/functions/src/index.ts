@@ -46,7 +46,7 @@ export { createStripePaymentIntent }                              from './stripe
 export { createSetupIntent, savePaymentMethod, removePaymentMethod } from './stripe/index'
 export { onOrderComplete }                                        from './orders'
 export { onDeliveryComplete }                                     from './triggers/onDeliveryComplete'
-export { finalizeSignedDelivery, generateInvoiceForOrder }        from './delivery/finalizeSignedDelivery'
+export { finalizeSignedDelivery, generateInvoiceForOrder, sendInvoiceEmailForOrder }        from './delivery/finalizeSignedDelivery'
 export { onRunCreated }                                           from './triggers/onRunCreated'
 export { geocodeCustomerOnCreate, geocodeCustomerOnUpdate }       from './triggers/geocodeCustomer'
 export { processAutopay }         from './scheduled/processAutopay'

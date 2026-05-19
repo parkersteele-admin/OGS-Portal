@@ -34,7 +34,7 @@ import {
   archiveOrder,
   deleteOrder,
 } from '../../../services/orderService'
-import { generateInvoiceForOrder } from '../../../services/invoiceService'
+import { generateInvoiceForOrder, sendInvoiceEmailForOrder } from '../../../services/invoiceService'
 import { subscribeToCustomers } from '../../../services/customerService'
 import { Button } from '../../../components/ui/Button'
 import { Input } from '../../../components/ui/Input'
@@ -235,6 +235,7 @@ function OrderDetailPanel({
   const isAdminView = location.pathname.startsWith('/admin')
   const [invoice, setInvoice] = useState<Invoice | null>(null)
   const [generatingInvoice, setGeneratingInvoice] = useState(false)
+  const [sendingInvoiceEmail, setSendingInvoiceEmail] = useState(false)
   const [showInvoiceDetail, setShowInvoiceDetail] = useState(false)
   const [runStopInfo, setRunStopInfo] = useState<{
     runNumber: string
@@ -311,6 +312,23 @@ function OrderDetailPanel({
       alert(message)
     } finally {
       setGeneratingInvoice(false)
+    }
+  }
+
+  async function handleSendInvoiceEmail() {
+    setSendingInvoiceEmail(true)
+    try {
+      const result = await sendInvoiceEmailForOrder(order.id)
+      const invoiceSnap = await getDoc(doc(db, 'invoices', result.invoiceId))
+      if (invoiceSnap.exists()) {
+        setInvoice({ ...invoiceSnap.data(), id: invoiceSnap.id } as Invoice)
+      }
+      alert(`Invoice email sent to ${result.emailedTo}`)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to send invoice email.'
+      alert(message)
+    } finally {
+      setSendingInvoiceEmail(false)
     }
   }
 
@@ -546,8 +564,18 @@ function OrderDetailPanel({
                   <Button
                     variant="primary"
                     size="sm"
+                    onClick={handleSendInvoiceEmail}
+                    disabled={sendingInvoiceEmail}
+                  >
+                    {sendingInvoiceEmail ? 'Sending...' : 'Send Invoice Email'}
+                  </Button>
+                )}
+                {isAdminView && (
+                  <Button
+                    variant="primary"
+                    size="sm"
                     onClick={handleGenerateInvoice}
-                    disabled={generatingInvoice}
+                    disabled={generatingInvoice || sendingInvoiceEmail}
                   >
                     {generatingInvoice ? 'Regenerating...' : 'Regenerate Invoice'}
                   </Button>
