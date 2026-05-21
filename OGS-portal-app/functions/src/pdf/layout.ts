@@ -35,17 +35,21 @@ export function drawBrandedHeader(
   doc.rect(0, 0, 8, PAGE_H).fill(OGS_BRAND_BLUE)
 
   const hasLogo = Boolean(logoAsset)
+  const LOGO_X = MARGIN_L - 25
+  const LOGO_Y = 26
+  const LOGO_WIDTH = 400
+  const LOGO_HEIGHT = 96
 
   if (logoAsset) {
     try {
       if (typeof logoAsset === 'string') {
-        SVGtoPDF(doc, logoAsset, MARGIN_L - 25, 26, {
-          width: 520,
-          height: 125,
+        SVGtoPDF(doc, logoAsset, LOGO_X, LOGO_Y, {
+          width: LOGO_WIDTH,
+          height: LOGO_HEIGHT,
           preserveAspectRatio: 'xMinYMin meet',
         })
       } else {
-        doc.image(logoAsset, MARGIN_L - 25, 26, { fit: [520, 125] })
+        doc.image(logoAsset, LOGO_X, LOGO_Y, { fit: [LOGO_WIDTH, LOGO_HEIGHT] })
       }
     } catch {
       // Ignore malformed assets and continue with the text header.
@@ -62,8 +66,8 @@ export function drawBrandedHeader(
       .text(company.name || 'Ohio Gas Supply', MARGIN_L, nameY)
     headerY = nameY + 23
   } else {
-    // Start company detail lines below the prominent full logo.
-    headerY = 160
+    // Start company detail lines just below the resized logo.
+    headerY = LOGO_Y + LOGO_HEIGHT + 2
   }
   if (company.tagline) {
     doc.fontSize(8.5).font('Helvetica').fillColor('#666666').text(company.tagline, MARGIN_L, headerY)
