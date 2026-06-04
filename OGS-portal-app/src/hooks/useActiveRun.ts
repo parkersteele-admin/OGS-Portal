@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
-import { onSnapshot, query, orderBy } from 'firebase/firestore'
-import { runStopsCol } from '../lib/firestore'
+import { useState, useEffect, useMemo } from 'react'
+import { onSnapshot, query, orderBy, doc } from 'firebase/firestore'
 import { db } from '../lib/firebase'
-import { doc } from 'firebase/firestore'
+import { runStopsCol } from '../lib/firestore'
+import { useFirestoreSubscription } from './useFirestoreSubscription'
 import type { Run } from '../types/run'
 import type { RunStop } from '../types/run'
 
@@ -16,65 +16,52 @@ interface UseActiveRunResult {
 /**
  * Subscribes to a run document and its ordered stops in real time.
  * Used by the dispatch live map and the driver schedule view.
+ * 
+ * Note: Run document uses direct onSnapshot since it's a single doc.
+ * Stops use generic useFirestoreSubscription for consistency.
  */
 export function useActiveRun(runId: string | null | undefined): UseActiveRunResult {
   const [run, setRun] = useState<Run | null>(null)
-  const [stops, setStops] = useState<RunStop[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<Error | null>(null)
+  const [runLoading, setRunLoading] = useState(true)
+  const [runError, setRunError] = useState<Error | null>(null)
 
-  // Track whether both subscriptions have delivered their first snapshot
-  const runReady = useRef(false)
-  const stopsReady = useRef(false)
-
+  // Subscribe to run document (single doc, use direct onSnapshot)
   useEffect(() => {
     if (!runId) {
+      setRun(null)
+      setRunLoading(false)
       return
     }
 
-    runReady.current = false
-    stopsReady.current = false
-
-    const checkBothReady = () => {
-      if (runReady.current && stopsReady.current) setLoading(false)
-    }
-
-    const unsubRun = onSnapshot(
+    const unsubscribe = onSnapshot(
       doc(db, 'runs', runId),
       (snap) => {
-        setRun(snap.exists() ? ({ id: snap.id, ...snap.data() } as Run) : null)
-        runReady.current = true
-        checkBothReady()
+        if (snap.exists()) {
+          setRun({ id: snap.id, ...snap.data() } as Run)
+        } else {
+          setRun(null)
+        }
+        setRunLoading(false)
       },
       (err) => {
-        setError(err)
-        setLoading(false)
+        setRunError(err)
+        setRunLoading(false)
       },
     )
 
-    const unsubStops = onSnapshot(
-      query(runStopsCol(runId), orderBy('order')),
-      (snap) => {
-        setStops(snap.docs.map((d) => ({ ...d.data(), id: d.id }) as RunStop))
-        stopsReady.current = true
-        checkBothReady()
-      },
-      (err) => {
-        setError(err)
-        setLoading(false)
-      },
-    )
-
-    return () => {
-      unsubRun()
-      unsubStops()
-    }
+    return unsubscribe
   }, [runId])
+
+  // Subscribe to run stops (collection, use generic hook)
+  const { data: stops, loading: stopsLoading } = useFirestoreSubscription<RunStop>(
+    query(runStopsCol(runId!), orderBy('order')),
+    !!runId,
+  )
 
   return {
     run: runId ? run : null,
     stops: runId ? stops : [],
-    loading: runId ? loading : false,
-    error: runId ? error : null,
+    loading: runId ? runLoading || stopsLoading : false,
+    error: runId ? runError : null,
   }
 }

@@ -19,6 +19,7 @@ import {
   collection,
   type Unsubscribe,
 } from 'firebase/firestore'
+import { getLimitConstraint } from './queryOptimizer'
 import { db } from '../lib/firebase'
 import {
   companyLocationsCol,
@@ -83,7 +84,9 @@ export async function advanceSetupStep(
 
 export async function getLocations(companyId: string): Promise<DeliveryLocation[]> {
   return serviceCall(async () => {
-    const snap = await getDocs(companyLocationsCol(companyId))
+    const snap = await getDocs(
+      query(companyLocationsCol(companyId), getLimitConstraint('tanks')),
+    )
     return snap.docs.map(
       (d) => ({ id: d.id, ...(d.data() as Omit<DeliveryLocation, 'id'>) }),
     )

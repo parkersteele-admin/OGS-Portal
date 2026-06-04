@@ -11,6 +11,7 @@ import {
   serverTimestamp,
   type Unsubscribe,
 } from 'firebase/firestore'
+import { getLimitConstraint } from './queryOptimizer'
 import { db } from '../lib/firebase'
 import { usersCol } from '../lib/firestore'
 import type { AppUser } from '../types/user'
@@ -29,7 +30,7 @@ export async function getUser(id: string): Promise<AppUser> {
 export async function getUsersByRole(role: UserRole): Promise<AppUser[]> {
   return serviceCall(async () => {
     const snap = await getDocs(
-      query(usersCol, where('role', '==', role), orderBy('name')),
+      query(usersCol, where('role', '==', role), orderBy('name'), getLimitConstraint('users')),
     )
     return snap.docs.map((d) => ({ ...d.data(), id: d.id }) as AppUser)
   })
@@ -39,7 +40,7 @@ export async function getActiveUsers(): Promise<AppUser[]> {
   return serviceCall(async () => {
     // Fetch all users and filter client-side — avoids needing a composite index
     // on (active, name) and also handles users where the `active` field is absent.
-    const snap = await getDocs(query(usersCol, orderBy('name')))
+    const snap = await getDocs(query(usersCol, orderBy('name'), getLimitConstraint('users')))
     const users = snap.docs.map((d) => ({ ...d.data(), id: d.id }) as AppUser)
     // Exclude users where active is explicitly false (treat missing field as active)
     return users.filter((u) => u.active !== false)
@@ -54,8 +55,8 @@ export async function getActiveUsers(): Promise<AppUser[]> {
 export async function getUsersByCompany(companyId: string): Promise<AppUser[]> {
   return serviceCall(async () => {
     const [byCompanyId, byCustomerId] = await Promise.all([
-      getDocs(query(usersCol, where('companyId',  '==', companyId))),
-      getDocs(query(usersCol, where('customerId', '==', companyId))),
+      getDocs(query(usersCol, where('companyId',  '==', companyId), getLimitConstraint('users'))),
+      getDocs(query(usersCol, where('customerId', '==', companyId), getLimitConstraint('users'))),
     ])
     const seen = new Set<string>()
     const users: AppUser[] = []

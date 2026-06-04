@@ -13,6 +13,7 @@ import {
   type QueryConstraint,
   type Unsubscribe,
 } from 'firebase/firestore'
+import { getLimitConstraint } from './queryOptimizer'
 import { db } from '../lib/firebase'
 import { runsCol, runStopsCol } from '../lib/firestore'
 import type { Run, RunStop, RunStatus, RunStopStatus } from '../types/run'
@@ -65,7 +66,9 @@ export async function getRuns(
 
 export async function getRunStops(runId: string): Promise<RunStop[]> {
   return serviceCall(async () => {
-    const snap = await getDocs(query(runStopsCol(runId), orderBy('order')))
+    const snap = await getDocs(
+      query(runStopsCol(runId), orderBy('order'), getLimitConstraint('runs')),
+    )
     return snap.docs.map((d) => ({ ...d.data(), id: d.id }) as RunStop)
   })
 }

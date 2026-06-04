@@ -19,6 +19,7 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
+import { getLimitConstraint } from './queryOptimizer'
 import { db, functions } from '../lib/firebase'
 import { pipelineLeadsCol } from '../lib/firestore'
 import { serviceCall } from './base'
@@ -49,7 +50,12 @@ export async function getLead(companyId: string): Promise<PipelineLead | null> {
 export async function getLeadsByStage(stage: PipelineStage): Promise<PipelineLead[]> {
   return serviceCall(async () => {
     const snap = await getDocs(
-      query(pipelineLeadsCol, where('stage', '==', stage), orderBy('updatedAt', 'desc')),
+      query(
+        pipelineLeadsCol,
+        where('stage', '==', stage),
+        orderBy('updatedAt', 'desc'),
+        getLimitConstraint('leads'),
+      ),
     )
     return snap.docs.map(toId)
   })
@@ -63,6 +69,7 @@ export async function getAllActiveLeads(): Promise<PipelineLead[]> {
         where('stage', 'not-in', ['won', 'lost']),
         orderBy('stage'),
         orderBy('updatedAt', 'desc'),
+        getLimitConstraint('leads'),
       ),
     )
     return snap.docs.map(toId)
@@ -72,7 +79,12 @@ export async function getAllActiveLeads(): Promise<PipelineLead[]> {
 export async function getWonLeads(): Promise<PipelineLead[]> {
   return serviceCall(async () => {
     const snap = await getDocs(
-      query(pipelineLeadsCol, where('stage', '==', 'won'), orderBy('updatedAt', 'desc')),
+      query(
+        pipelineLeadsCol,
+        where('stage', '==', 'won'),
+        orderBy('updatedAt', 'desc'),
+        getLimitConstraint('leads'),
+      ),
     )
     return snap.docs.map(toId)
   })

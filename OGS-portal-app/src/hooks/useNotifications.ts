@@ -1,16 +1,16 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 import {
-  collection,
   query,
   where,
   orderBy,
   limit,
-  onSnapshot,
   doc,
   updateDoc,
   writeBatch,
 } from 'firebase/firestore'
 import { db } from '../lib/firebase'
+import { notificationsCol } from '../lib/firestore'
+import { useFirestoreSubscription } from './useFirestoreSubscription'
 import type { Notification } from '../types/index'
 
 interface UseUnreadNotificationsResult {
@@ -26,52 +26,31 @@ interface UseUnreadNotificationsResult {
 
 /**
  * Subscribes to unread notifications for the given user in real time.
- * Used by the TopBar notification bell.
+ * Used by the TopBar notification bell badge.
+ * Refactored to use generic useFirestoreSubscription hook.
  */
 export function useUnreadNotifications(
   userId: string | null | undefined,
 ): UseUnreadNotificationsResult {
-  const [notifications, setNotifications] = useState<Notification[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<Error | null>(null)
-
-  useEffect(() => {
-    if (!userId) {
-      return
-    }
-
-    const q = query(
-      collection(db, 'notifications'),
-      where('userId', '==', userId),
+  const { data: notifications, loading, error } = useFirestoreSubscription<Notification>(
+    query(
+      notificationsCol,
+      where('userId', '==', userId ?? ''),
       where('read', '==', false),
-    )
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snap) => {
-        setNotifications(
-          snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Notification),
-        )
-        setLoading(false)
-      },
-      (err) => {
-        setError(err)
-        setLoading(false)
-      },
-    )
-
-    return unsubscribe
-  }, [userId])
+    ),
+    !!userId,
+  )
 
   const markRead = useCallback(async (notifId: string) => {
     await updateDoc(doc(db, 'notifications', notifId), { read: true })
   }, [])
 
   const markAllRead = useCallback(async () => {
-    const unread = notifications.filter((n) => !n.read)
-    if (unread.length === 0) return
+    if (notifications.length === 0) return
     const batch = writeBatch(db)
-    unread.forEach((n) => batch.update(doc(db, 'notifications', n.id), { read: true }))
+    notifications.forEach((n) =>
+      batch.update(doc(db, 'notifications', n.id), { read: true }),
+    )
     await batch.commit()
   }, [notifications])
 
@@ -91,44 +70,33 @@ interface UseNotificationsResult {
   markRead: (notifId: string) => Promise<void>
   markAllRead: () => Promise<void>
   loading: boolean
+  error: Error | null
 }
 
 /**
  * Subscribes to the last 20 notifications for the given user (read + unread),
- * ordered newest-first.  Also derives unreadCount for the badge.
+ * ordered newest-first. Also derives unreadCount for the badge.
  *
  * Use this in the NotificationBell dropdown.
- * Use useUnreadNotifications when you only need the badge count.
+ * Refactored to use generic useFirestoreSubscription hook.
  */
 export function useNotifications(
   userId: string | null | undefined,
 ): UseNotificationsResult {
-  const [notifications, setNotifications] = useState<Notification[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    if (!userId) {
-      return
-    }
-
-    const q = query(
-      collection(db, 'notifications'),
-      where('userId', '==', userId),
+  const { data: notifications, loading, error } = useFirestoreSubscription<Notification>(
+    query(
+      notificationsCol,
+      where('userId', '==', userId ?? ''),
       orderBy('createdAt', 'desc'),
       limit(20),
-    )
+    ),
+    !!userId,
+  )
 
-    const unsubscribe = onSnapshot(
-      q,
-      (snap) => {
-        setNotifications(snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Notification))
-        setLoading(false)
-      },
-      () => setLoading(false),
-    )
-
-    return unsubscribe
-  }, [userId])
+  const unreadCount = useMemo(
+    () => notifications.filter((n) => !n.read).length,
+    [notifications],
+  )
 
   const markRead = useCallback(async (notifId: string) => {
     await updateDoc(doc(db, 'notifications', notifId), { read: true })
@@ -144,10 +112,11 @@ export function useNotifications(
 
   return {
     notifications: userId ? notifications : [],
-    unreadCount: userId ? notifications.filter((n) => !n.read).length : 0,
+    unreadCount,
     markRead,
     markAllRead,
     loading: userId ? loading : false,
+    error: userId ? error : null,
   }
 }
 

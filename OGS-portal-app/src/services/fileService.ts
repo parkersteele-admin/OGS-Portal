@@ -20,6 +20,7 @@ import {
   type UploadTask,
   type StorageReference,
 } from 'firebase/storage'
+import { getLimitConstraint } from './queryOptimizer'
 import { db, storage, auth } from '../lib/firebase'
 import type { AppFile, FileEntityType, FileType } from '../types/file'
 import { serviceCall, fromSnap, OgsValidationError } from './base'
@@ -135,6 +136,7 @@ export async function getFilesForEntity(
       where('entityType', '==', entityType),
       where('entityId',   '==', entityId),
       orderBy('createdAt', 'desc'),
+      getLimitConstraint('products'),
     ]
     if (fileType) constraints.push(where('fileType', '==', fileType))
     const snap = await getDocs(query(fileCol, ...constraints))

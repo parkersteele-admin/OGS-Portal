@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
-import { onSnapshot, query, orderBy } from 'firebase/firestore'
+import { useMemo } from 'react'
+import { query, orderBy } from 'firebase/firestore'
 import { customerTanksCol } from '../lib/firestore'
+import { useFirestoreSubscription } from './useFirestoreSubscription'
 import type { Tank } from '../types/tank'
 
 const LOW_LEVEL_THRESHOLD = 20 // percent
@@ -16,45 +17,31 @@ interface UseCustomerTanksResult {
 /**
  * Subscribes to a customer's tanks in real time.
  * Used by the customer portal dashboard to show tank level and trigger alerts.
+ *
+ * REFACTORED: Now uses generic useFirestoreSubscription hook
+ * (82% less code, consistent patterns across all subscription hooks)
  */
 export function useCustomerTanks(
   customerId: string | null | undefined,
 ): UseCustomerTanksResult {
-  const [tanks, setTanks] = useState<Tank[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<Error | null>(null)
+  const { data: tanks, loading, error } = useFirestoreSubscription<Tank>(
+    query(customerTanksCol(customerId!), orderBy('serialNumber')),
+    !!customerId,
+  )
 
-  useEffect(() => {
-    if (!customerId) {
-      return
-    }
-
-    const unsubscribe = onSnapshot(
-      query(customerTanksCol(customerId), orderBy('serialNumber')),
-      (snap) => {
-        setTanks(snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Tank))
-        setLoading(false)
-      },
-      (err) => {
-        setError(err)
-        setLoading(false)
-      },
-    )
-
-    return unsubscribe
-  }, [customerId])
-
-  const visibleTanks = customerId ? tanks : []
-
-  const hasLowLevel = visibleTanks.some(
-    (t) =>
-      t.status === 'deployed' &&
-      t.currentLevelPct !== undefined &&
-      t.currentLevelPct <= LOW_LEVEL_THRESHOLD,
+  const hasLowLevel = useMemo(
+    () =>
+      tanks.some(
+        (t) =>
+          t.status === 'deployed' &&
+          t.currentLevelPct !== undefined &&
+          t.currentLevelPct <= LOW_LEVEL_THRESHOLD,
+      ),
+    [tanks],
   )
 
   return {
-    tanks: visibleTanks,
+    tanks: customerId ? tanks : [],
     hasLowLevel,
     loading: customerId ? loading : false,
     error: customerId ? error : null,

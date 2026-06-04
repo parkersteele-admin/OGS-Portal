@@ -9,6 +9,7 @@ import {
   serverTimestamp,
   type Unsubscribe,
 } from 'firebase/firestore'
+import { getLimitConstraint } from './queryOptimizer'
 import { db } from '../lib/firebase'
 import { customerProductPricingCol } from '../lib/firestore'
 import type { CustomerProductPricing } from '../types/customerPricing'
@@ -20,7 +21,9 @@ export async function getCustomerProductPricing(
   customerId: string,
 ): Promise<CustomerProductPricing[]> {
   return serviceCall(async () => {
-    const snap = await getDocs(customerProductPricingCol(customerId))
+    const snap = await getDocs(
+      query(customerProductPricingCol(customerId), getLimitConstraint('products')),
+    )
     return snap.docs.map((d) => ({ ...d.data(), productId: d.id }) as CustomerProductPricing)
   })
 }

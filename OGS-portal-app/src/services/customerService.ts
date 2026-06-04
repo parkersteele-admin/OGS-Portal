@@ -13,6 +13,7 @@ import {
   type QueryConstraint,
   type Unsubscribe,
 } from 'firebase/firestore'
+import { getLimitConstraint } from './queryOptimizer'
 import { db } from '../lib/firebase'
 import { customersCol } from '../lib/firestore'
 import type { Customer, CustomerStatus } from '../types/customer'
@@ -203,7 +204,14 @@ async function geocodeAddress(addr: GeocodableAddress): Promise<{ lat: number; l
 /** Search customers by name prefix (client-side filter — replace with Algolia/Typesense for scale). */
 export async function searchCustomers(term: string): Promise<Customer[]> {
   return serviceCall(async () => {
-    const snap = await getDocs(query(customersCol, orderBy('name'), where('status', '==', 'active')))
+    const snap = await getDocs(
+      query(
+        customersCol,
+        orderBy('name'),
+        where('status', '==', 'active'),
+        getLimitConstraint('customers'),
+      ),
+    )
     const lower = term.toLowerCase()
     return snap.docs
       .map((d) => ({ ...d.data(), id: d.id }) as Customer)

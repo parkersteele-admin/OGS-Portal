@@ -15,6 +15,7 @@ import {
   type QueryConstraint,
   type Unsubscribe,
 } from 'firebase/firestore'
+import { getLimitConstraint } from './queryOptimizer'
 import { db } from '../lib/firebase'
 import { tanksCol, customerTanksCol, tankEventsCol } from '../lib/firestore'
 import type { Tank, TankStatus, TankOwnership, TankEvent, TankEventType } from '../types/tank'
@@ -85,7 +86,7 @@ export async function getTanks(
 export async function getCustomerTanks(customerId: string): Promise<Tank[]> {
   return serviceCall(async () => {
     const col = customerTanksCol(customerId)
-    const snap = await getDocs(query(col, orderBy('serialNumber')))
+    const snap = await getDocs(query(col, orderBy('serialNumber'), getLimitConstraint('tanks')))
     return snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Tank)
   })
 }
@@ -214,7 +215,7 @@ async function addTankEvent(
 export async function getTankEvents(tankId: string): Promise<TankEvent[]> {
   return serviceCall(async () => {
     const evCol = tankEventsCol(tankId)
-    const snap = await getDocs(query(evCol, orderBy('timestamp', 'desc')))
+    const snap = await getDocs(query(evCol, orderBy('timestamp', 'desc'), getLimitConstraint('orders')))
     return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<TankEvent, 'id'>) }))
   })
 }

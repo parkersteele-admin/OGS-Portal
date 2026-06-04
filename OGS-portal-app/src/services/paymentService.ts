@@ -14,6 +14,7 @@ import {
   orderBy,
   type Unsubscribe,
 } from 'firebase/firestore'
+import { getLimitConstraint } from './queryOptimizer'
 import { db } from '../lib/firebase'
 import { paymentsCol, paymentMethodsCol } from '../lib/firestore'
 import type { Payment, PaymentMethod } from '../types/billing'
@@ -31,7 +32,12 @@ export async function getPayment(id: string): Promise<Payment> {
 export async function getPaymentsForInvoice(invoiceId: string): Promise<Payment[]> {
   return serviceCall(async () => {
     const snap = await getDocs(
-      query(paymentsCol, where('invoiceId', '==', invoiceId), orderBy('processedAt', 'desc')),
+      query(
+        paymentsCol,
+        where('invoiceId', '==', invoiceId),
+        orderBy('processedAt', 'desc'),
+        getLimitConstraint('invoices'),
+      ),
     )
     return snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Payment)
   })
@@ -40,7 +46,12 @@ export async function getPaymentsForInvoice(invoiceId: string): Promise<Payment[
 export async function getPaymentsForCustomer(customerId: string): Promise<Payment[]> {
   return serviceCall(async () => {
     const snap = await getDocs(
-      query(paymentsCol, where('customerId', '==', customerId), orderBy('processedAt', 'desc')),
+      query(
+        paymentsCol,
+        where('customerId', '==', customerId),
+        orderBy('processedAt', 'desc'),
+        getLimitConstraint('orders'),
+      ),
     )
     return snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Payment)
   })
@@ -62,7 +73,9 @@ export function subscribeToCustomerPayments(
 
 export async function getPaymentMethods(customerId: string): Promise<PaymentMethod[]> {
   return serviceCall(async () => {
-    const snap = await getDocs(paymentMethodsCol(customerId))
+    const snap = await getDocs(
+      query(paymentMethodsCol(customerId), getLimitConstraint('products')),
+    )
     return snap.docs.map((d) => ({ ...d.data(), id: d.id }) as PaymentMethod)
   })
 }

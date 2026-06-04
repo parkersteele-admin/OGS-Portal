@@ -20,6 +20,7 @@ import {
 import { db } from '../../../lib/firebase'
 import { runStopsCol, customersCol, productsCol } from '../../../lib/firestore'
 import { usePendingOrders } from '../../../hooks/usePendingOrders'
+import { useRunBuilderData } from '../../../hooks/useRunBuilderData'
 import { createRun } from '../../../services/runService'
 import { updateOrder } from '../../../services/orderService'
 import { getActiveUsers } from '../../../services/userService'
@@ -788,11 +789,10 @@ export default function RunBuilder() {
   })
 
   // Remote data
-  const [drivers,        setDrivers]        = useState<AppUser[]>([])
-  const [driversLoading, setDriversLoading] = useState(true)
-  const [customerMap,    setCustomerMap]    = useState<Record<string, Customer>>({})
-  const [productMap,     setProductMap]     = useState<Record<string, Product>>({})
+  const { customerMap, productMap, loading: dataLoading } = useRunBuilderData()
   const { orders: pendingOrders, loading: ordersLoading } = usePendingOrders()
+  const [drivers, setDrivers] = useState<AppUser[]>([])
+  const [driversLoading, setDriversLoading] = useState(true)
 
   // Step 2: Selection
   const [selected, setSelected] = useState<Set<string>>(new Set(preselectedIds))
@@ -816,18 +816,6 @@ export default function RunBuilder() {
         console.error('[RunBuilder] Failed to load users:', err);
         setDriversLoading(false);
       })
-
-    getDocs(customersCol).then(snap => {
-      const m: Record<string, Customer> = {}
-      snap.docs.forEach(d => { m[d.id] = { ...d.data(), id: d.id } as Customer })
-      setCustomerMap(m)
-    })
-
-    getDocs(productsCol).then(snap => {
-      const m: Record<string, Product> = {}
-      snap.docs.forEach(d => { m[d.id] = { ...d.data(), id: d.id } as Product })
-      setProductMap(m)
-    })
   }, [])
 
   // ── Selection helpers ───────────────────────────────────────────────────────

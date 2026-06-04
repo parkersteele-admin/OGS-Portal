@@ -1,4 +1,5 @@
-import { getDocs } from 'firebase/firestore'
+import { getDocs, query } from 'firebase/firestore'
+import { getLimitConstraint } from './queryOptimizer'
 import { customersCol, leadsCol, quotesCol, usersCol } from '../lib/firestore'
 import type { Customer } from '../types/customer'
 import type { Lead, LeadStatus, Quote } from '../types/crm'
@@ -144,10 +145,10 @@ export function getSalesDashboardPresetRange(
 
 export async function fetchSalesDashboardSnapshot(): Promise<SalesDashboardSnapshot> {
   const [quotesSnap, leadsSnap, customersSnap, usersSnap] = await Promise.all([
-    getDocs(quotesCol),
-    getDocs(leadsCol),
-    getDocs(customersCol),
-    getDocs(usersCol),
+    getDocs(query(quotesCol, getLimitConstraint('quotes'))),
+    getDocs(query(leadsCol, getLimitConstraint('leads'))),
+    getDocs(query(customersCol, getLimitConstraint('customers'))),
+    getDocs(query(usersCol, getLimitConstraint('users'))),
   ])
 
   return {
