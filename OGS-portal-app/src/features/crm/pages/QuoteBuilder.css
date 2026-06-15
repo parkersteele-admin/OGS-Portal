@@ -151,6 +151,16 @@
   color: #d1d5db;
 }
 
+.qb-mobile-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.qb-mobile-card__actions .ui-btn {
+  flex: 1 1 calc(50% - 8px);
+}
+
 .qb-mobile-card__status {
   border-radius: 999px;
   padding: 4px 8px;

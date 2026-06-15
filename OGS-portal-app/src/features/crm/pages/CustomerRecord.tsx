@@ -47,7 +47,7 @@ import { getProductDropdown, getVisibleProducts, type ProductDropdownItem } from
 import { setCustomerProductPrice, removeCustomerProductPrice } from '../../../services/customerPricingService'
 import { useCustomerProductPricing } from '../../../hooks/useCustomerProductPricing'
 import { getOrders, getRouteSchedule, updateRouteSchedule } from '../../../services/orderService'
-import { getQuotes, duplicateQuote, convertQuoteToOrder } from '../../../services/quoteService'
+import { getQuotes, duplicateQuote, convertQuoteToOrder, updateQuote, deleteQuote } from '../../../services/quoteService'
 import type { Order, RouteSchedule, RouteCadence } from '../../../types/order'
 import { getFilesForEntity, uploadFile, deleteFile, getFileUrl } from '../../../services/fileService'
 import { formatCurrency, formatDate, formatRelative } from '../../../utils/format'
@@ -1272,6 +1272,7 @@ const CustomerRecord: React.FC = () => {
   })
   const orderHistoryOrders = orderHistoryPage?.data ?? []
   const orderHistoryQuotes = quotesPage?.data ?? []
+  const canManageQuotes = user?.role === 'admin' || user?.role === 'sales'
 
   const { data: invoiceHistoryPage } = useQuery({
     queryKey: ['invoices', 'history', customerId],
@@ -1638,6 +1639,32 @@ const CustomerRecord: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['orders', 'history', customerId] })
       setInvoiceError(null)
       setInvoiceSuccess('Quote converted to order.')
+    },
+    onError: (e: Error) => {
+      setInvoiceSuccess(null)
+      setInvoiceError(e.message)
+    },
+  })
+
+  const archiveQuoteMutation = useMutation({
+    mutationFn: async (quoteId: string) => updateQuote(quoteId, { status: 'expired' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['quotes', 'customer', customerId] })
+      setInvoiceError(null)
+      setInvoiceSuccess('Quote archived.')
+    },
+    onError: (e: Error) => {
+      setInvoiceSuccess(null)
+      setInvoiceError(e.message)
+    },
+  })
+
+  const deleteQuoteMutation = useMutation({
+    mutationFn: async (quoteId: string) => deleteQuote(quoteId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['quotes', 'customer', customerId] })
+      setInvoiceError(null)
+      setInvoiceSuccess('Quote deleted.')
     },
     onError: (e: Error) => {
       setInvoiceSuccess(null)
@@ -2050,7 +2077,7 @@ const CustomerRecord: React.FC = () => {
               {recentOrders.length === 0 ? (
                 <p className="cr-empty">No orders yet.</p>
               ) : (
-                <table className="cr-table">
+                <table className="cr-table cr-table--quotes">
                   <thead>
                     <tr>
                       <th>Date</th>
@@ -2121,9 +2148,9 @@ const CustomerRecord: React.FC = () => {
                   <tbody>
                     {recentQuotes.map((quote) => (
                       <tr key={quote.id}>
-                        <td className="cr-table__mono">{quote.quoteNumber}</td>
-                        <td>{quote.salesRepName ?? '—'}</td>
-                        <td>
+                        <td className="cr-table__mono" data-label="Quote #">{quote.quoteNumber}</td>
+                        <td data-label="Rep">{quote.salesRepName ?? '—'}</td>
+                        <td data-label="Status">
                           <Badge variant={
                             quote.status === 'accepted' ? 'success' :
                             quote.status === 'sent' ? 'info' :
@@ -2132,8 +2159,8 @@ const CustomerRecord: React.FC = () => {
                             {quote.status}
                           </Badge>
                         </td>
-                        <td>{formatCurrency(quote.total)}</td>
-                        <td>
+                        <td data-label="Total">{formatCurrency(quote.total)}</td>
+                        <td data-label="Actions">
                           <div className="cr-table__actions">
                             <Button variant="ghost" size="sm" onClick={() => navigate(`${crmBase}/quotes/${quote.id}`)}>
                               Open
@@ -2146,6 +2173,32 @@ const CustomerRecord: React.FC = () => {
                             >
                               Duplicate
                             </Button>
+                            {canManageQuotes && quote.status !== 'expired' && (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                loading={archiveQuoteMutation.isPending && archiveQuoteMutation.variables === quote.id}
+                                onClick={() => {
+                                  if (!window.confirm('Archive this quote? It will be marked as expired.')) return
+                                  archiveQuoteMutation.mutate(quote.id)
+                                }}
+                              >
+                                Archive
+                              </Button>
+                            )}
+                            {canManageQuotes && (quote.status === 'draft' || quote.status === 'declined' || quote.status === 'expired') && (
+                              <Button
+                                variant="danger"
+                                size="sm"
+                                loading={deleteQuoteMutation.isPending && deleteQuoteMutation.variables === quote.id}
+                                onClick={() => {
+                                  if (!window.confirm(`Delete quote ${quote.quoteNumber ?? quote.id}? This cannot be undone.`)) return
+                                  deleteQuoteMutation.mutate(quote.id)
+                                }}
+                              >
+                                Delete
+                              </Button>
+                            )}
                             {quote.status === 'accepted' && (
                               <Button
                                 variant="primary"
@@ -2182,7 +2235,7 @@ const CustomerRecord: React.FC = () => {
               {recentInvoices.length === 0 ? (
                 <p className="cr-empty">No invoices yet.</p>
               ) : (
-                <table className="cr-table">
+                <table className="cr-table cr-table--quotes">
                   <thead>
                     <tr>
                       <th>Invoice #</th>
@@ -2273,9 +2326,9 @@ const CustomerRecord: React.FC = () => {
                   <tbody>
                     {orderHistoryQuotes.map((quote) => (
                       <tr key={quote.id}>
-                        <td className="cr-table__mono">{quote.quoteNumber || quote.id}</td>
-                        <td>{quote.salesRepName ?? '—'}</td>
-                        <td>
+                        <td className="cr-table__mono" data-label="Quote #">{quote.quoteNumber || quote.id}</td>
+                        <td data-label="Rep">{quote.salesRepName ?? '—'}</td>
+                        <td data-label="Status">
                           <Badge variant={
                             quote.status === 'accepted' ? 'success' :
                             quote.status === 'sent' ? 'info' :
@@ -2284,8 +2337,8 @@ const CustomerRecord: React.FC = () => {
                             {quote.status}
                           </Badge>
                         </td>
-                        <td>{formatCurrency(quote.total)}</td>
-                        <td>
+                        <td data-label="Total">{formatCurrency(quote.total)}</td>
+                        <td data-label="Actions">
                           <div className="cr-table__actions">
                             <Button variant="ghost" size="sm" onClick={() => navigate(`${crmBase}/quotes/${quote.id}`)}>
                               Open
@@ -2298,6 +2351,32 @@ const CustomerRecord: React.FC = () => {
                             >
                               Duplicate
                             </Button>
+                            {canManageQuotes && quote.status !== 'expired' && (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                loading={archiveQuoteMutation.isPending && archiveQuoteMutation.variables === quote.id}
+                                onClick={() => {
+                                  if (!window.confirm('Archive this quote? It will be marked as expired.')) return
+                                  archiveQuoteMutation.mutate(quote.id)
+                                }}
+                              >
+                                Archive
+                              </Button>
+                            )}
+                            {canManageQuotes && (quote.status === 'draft' || quote.status === 'declined' || quote.status === 'expired') && (
+                              <Button
+                                variant="danger"
+                                size="sm"
+                                loading={deleteQuoteMutation.isPending && deleteQuoteMutation.variables === quote.id}
+                                onClick={() => {
+                                  if (!window.confirm(`Delete quote ${quote.quoteNumber ?? quote.id}? This cannot be undone.`)) return
+                                  deleteQuoteMutation.mutate(quote.id)
+                                }}
+                              >
+                                Delete
+                              </Button>
+                            )}
                             {quote.status === 'accepted' && (
                               <Button
                                 variant="primary"
@@ -3119,7 +3198,7 @@ const CustomerRecord: React.FC = () => {
             serviceDate,
             notes,
             terms,
-            applySalesTax,
+            applySalesTax, 
             salesTaxRatePercent,
             paymentTermsDays,
             customerContactName,

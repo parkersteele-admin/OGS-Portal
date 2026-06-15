@@ -1107,15 +1107,17 @@ interface QuoteTableProps {
   onEdit:      (quote: Quote) => void
   onDuplicate: (quote: Quote) => void
   onResend:    (quote: Quote) => void
+  onArchive:   (quote: Quote) => void
   onDelete:    (quote: Quote) => void
+  archivingId: string | null
   deletingId:  string | null
   duplicatingId: string | null
   resendingId: string | null
-  canDelete:   boolean
+  canManage:   boolean
 }
 
 const QuoteTable: React.FC<QuoteTableProps> = ({
-  quotes, loading, nameMap, onEdit, onDuplicate, onResend, onDelete, deletingId, duplicatingId, resendingId, canDelete,
+  quotes, loading, nameMap, onEdit, onDuplicate, onResend, onArchive, onDelete, archivingId, deletingId, duplicatingId, resendingId, canManage,
   currentUserId,
 }) => {
   if (loading) {
@@ -1191,7 +1193,17 @@ const QuoteTable: React.FC<QuoteTableProps> = ({
                       Re-send
                     </Button>
                   )}
-                  {canDelete && q.status === 'draft' && (
+                  {canManage && q.status !== 'expired' && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      loading={archivingId === q.id}
+                      onClick={() => onArchive(q)}
+                    >
+                      Archive
+                    </Button>
+                  )}
+                  {canManage && (q.status === 'draft' || q.status === 'declined' || q.status === 'expired') && (
                     <Button
                       variant="danger"
                       size="sm"
@@ -1243,6 +1255,47 @@ const QuoteTable: React.FC<QuoteTableProps> = ({
               <span className={`qb-mobile-card__status ${statusClass}`}>{statusLabel}</span>
               <span>{q.validUntil ? `Valid ${formatDate(q.validUntil)}` : 'No expiry'} {mineLabel && `· ${mineLabel}`}</span>
             </div>
+            <div className="qb-mobile-card__actions" onClick={(e) => e.stopPropagation()}>
+              <Button variant="ghost" size="sm" onClick={() => onEdit(q)}>Open</Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                loading={duplicatingId === q.id}
+                onClick={() => onDuplicate(q)}
+              >
+                Duplicate
+              </Button>
+              {q.status !== 'draft' && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  loading={resendingId === q.id}
+                  onClick={() => onResend(q)}
+                >
+                  Re-send
+                </Button>
+              )}
+              {canManage && q.status !== 'expired' && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  loading={archivingId === q.id}
+                  onClick={() => onArchive(q)}
+                >
+                  Archive
+                </Button>
+              )}
+              {canManage && (q.status === 'draft' || q.status === 'declined' || q.status === 'expired') && (
+                <Button
+                  variant="danger"
+                  size="sm"
+                  loading={deletingId === q.id}
+                  onClick={() => onDelete(q)}
+                >
+                  Delete
+                </Button>
+              )}
+            </div>
           </article>
         )
       })}
@@ -1261,6 +1314,7 @@ const QuoteBuilder: React.FC = () => {
   const { user }          = useAuth()
 
   const [listFilter, setListFilter] = useState<'all' | 'mine' | 'pending' | 'expired'>('all')
+  const [archivingId, setArchivingId] = useState<string | null>(null)
   const [deletingId,  setDeletingId]  = useState<string | null>(null)
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
   const [resendingId, setResendingId] = useState<string | null>(null)
@@ -1344,7 +1398,7 @@ const QuoteBuilder: React.FC = () => {
     return () => { cancelled = true }
   }, [quotes, nameMap])
 
-  const canDeleteQuotes = user?.role === 'admin' || user?.role === 'sales'
+  const canManageQuotes = user?.role === 'admin' || user?.role === 'sales'
 
   const visibleQuotes = useMemo(() => {
     return quotes.filter((quote) => {
@@ -1363,6 +1417,8 @@ const QuoteBuilder: React.FC = () => {
     onSuccess: (_result, vars) => {
       setDeletingId(null)
       setQuoteToDelete(null)
+      setListToast('Quote deleted.')
+      setTimeout(() => setListToast(null), 5000)
       queryClient.setQueriesData({ queryKey: ['quotes'] }, (old: unknown) => {
         if (!old || typeof old !== 'object') return old
         const maybePage = old as { data?: unknown }
@@ -1374,6 +1430,25 @@ const QuoteBuilder: React.FC = () => {
       })
     },
     onError: () => setDeletingId(null),
+  })
+
+  const archiveMutation = useMutation({
+    mutationFn: async (quote: Quote) => {
+      setArchivingId(quote.id)
+      setListError(null)
+      await updateQuote(quote.id, { status: 'expired' })
+      return quote
+    },
+    onSuccess: (quote) => {
+      setArchivingId(null)
+      setListToast(`Quote ${quote.quoteNumber} archived.`)
+      setTimeout(() => setListToast(null), 5000)
+      queryClient.invalidateQueries({ queryKey: ['quotes'] })
+    },
+    onError: (err: Error) => {
+      setArchivingId(null)
+      setListError(err.message || 'Failed to archive quote.')
+    },
   })
 
   const resendMutation = useMutation({
@@ -1464,11 +1539,16 @@ const QuoteBuilder: React.FC = () => {
           onEdit={handleEdit}
           onDuplicate={setQuoteToDuplicate}
           onResend={(quote) => resendMutation.mutate(quote)}
+          onArchive={(quote) => {
+            if (!window.confirm(`Archive quote ${quote.quoteNumber}? It will be marked as expired.`)) return
+            archiveMutation.mutate(quote)
+          }}
           onDelete={setQuoteToDelete}
+          archivingId={archivingId}
           deletingId={deletingId}
           duplicatingId={duplicatingId}
           resendingId={resendingId}
-          canDelete={canDeleteQuotes}
+          canManage={canManageQuotes}
         />
       </div>
 
