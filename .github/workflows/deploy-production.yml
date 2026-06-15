@@ -180,6 +180,29 @@ jobs:
             firebase deploy --only hosting --project "$FIREBASE_PROJECT_ID" --non-interactive
           fi
 
+      - name: Delete removed legacy functions (non-interactive)
+        working-directory: OGS-portal-app
+        run: |
+          LEGACY_FUNCTIONS=(
+            createSetupIntent
+            createStripePaymentIntent
+            generateInvoiceForOrder
+            processAutopay
+            removePaymentMethod
+            savePaymentMethod
+            sendInvoiceEmailForOrder
+            stripeWebhook
+          )
+
+          for fn in "${LEGACY_FUNCTIONS[@]}"; do
+            echo "Ensuring legacy function is removed: $fn"
+            if [ -n "$FIREBASE_CLI_TOKEN" ]; then
+              firebase functions:delete "$fn" --region us-central1 --project "$FIREBASE_PROJECT_ID" --token "$FIREBASE_CLI_TOKEN" --force --non-interactive || true
+            else
+              firebase functions:delete "$fn" --region us-central1 --project "$FIREBASE_PROJECT_ID" --force --non-interactive || true
+            fi
+          done
+
       - name: Deploy Firebase Functions
         working-directory: OGS-portal-app
         run: |
