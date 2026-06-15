@@ -15,7 +15,7 @@
  */
 
 import { useState, useEffect } from 'react'
-import type { Query, DocumentData, QueryConstraint } from 'firebase/firestore'
+import type { Query, DocumentData } from 'firebase/firestore'
 import { onSnapshot } from 'firebase/firestore'
 
 interface UseFirestoreSubscriptionResult<T> {

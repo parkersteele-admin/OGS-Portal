@@ -25,7 +25,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import { getCustomers } from '../services/customerService'
-import { getProducts } from '../services/productService'
+import { getAllProducts } from '../services/productService'
 import type { Customer, Product } from '../types'
 
 const QUERY_STALE_TIMES = {
@@ -81,7 +81,7 @@ export function useRunBuilderData(): UseRunBuilderDataResult {
     queryFn: () =>
       getCustomers(
         {}, // no filters
-        { limit: QUERY_PAGE_SIZES.customers }, // explicit limit
+        { pageSize: QUERY_PAGE_SIZES.customers }, // explicit limit
       ),
     staleTime: QUERY_STALE_TIMES.customers,
     gcTime: 30 * 60 * 1000, // Keep in cache for 30 min
@@ -91,11 +91,7 @@ export function useRunBuilderData(): UseRunBuilderDataResult {
   // Fetch products with caching
   const productsQuery = useQuery({
     queryKey: ['run-builder', 'products'],
-    queryFn: () =>
-      getProducts(
-        { active: true, visible: true },
-        { limit: QUERY_PAGE_SIZES.products },
-      ),
+    queryFn: () => getAllProducts(),
     staleTime: QUERY_STALE_TIMES.products,
     gcTime: 30 * 60 * 1000,
     retry: 2,
@@ -103,15 +99,16 @@ export function useRunBuilderData(): UseRunBuilderDataResult {
 
   // Memoize map creation to prevent unnecessary re-renders
   const customerMap = useMemo(() => {
-    if (!customersQuery.data?.items) return {}
+    if (!customersQuery.data?.data) return {}
     return Object.fromEntries(
-      customersQuery.data.items.map((c) => [c.id, c]),
+      customersQuery.data.data.map((c: any) => [c.id, c]),
     )
   }, [customersQuery.data])
 
   const productMap = useMemo(() => {
-    if (!productsQuery.data?.items) return {}
-    return Object.fromEntries(productsQuery.data.items.map((p) => [p.id, p]))
+    if (!productsQuery.data) return {}
+    const items = Array.isArray(productsQuery.data) ? productsQuery.data : (productsQuery.data as any)?.items || []
+    return Object.fromEntries(items.map((p: any) => [p.id, p]))
   }, [productsQuery.data])
 
   const loading = customersQuery.isLoading || productsQuery.isLoading

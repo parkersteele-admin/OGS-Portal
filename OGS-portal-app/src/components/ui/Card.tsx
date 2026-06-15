@@ -1,14 +1,13 @@
 import React from 'react';
 import './Card.css';
 
-interface CardProps {
+interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
-  className?: string;
   padding?: boolean;
 }
 
-export const Card: React.FC<CardProps> = ({ children, className = '', padding = true }) => (
-  <div className={`ui-card${padding ? ' ui-card--padded' : ''} ${className}`.trim()}>
+export const Card: React.FC<CardProps> = ({ children, className = '', padding = true, ...divProps }) => (
+  <div {...divProps} className={`ui-card${padding ? ' ui-card--padded' : ''} ${className}`.trim()}>
     {children}
   </div>
 );

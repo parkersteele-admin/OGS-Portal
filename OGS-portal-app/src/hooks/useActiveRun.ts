@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { onSnapshot, query, orderBy, doc } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import { runStopsCol } from '../lib/firestore'

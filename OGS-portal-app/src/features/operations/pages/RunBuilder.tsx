@@ -15,10 +15,9 @@ import {
   writeBatch,
   doc,
   serverTimestamp,
-  getDocs,
 } from 'firebase/firestore'
 import { db } from '../../../lib/firebase'
-import { runStopsCol, customersCol, productsCol } from '../../../lib/firestore'
+import { runStopsCol } from '../../../lib/firestore'
 import { usePendingOrders } from '../../../hooks/usePendingOrders'
 import { useRunBuilderData } from '../../../hooks/useRunBuilderData'
 import { createRun } from '../../../services/runService'
@@ -789,7 +788,7 @@ export default function RunBuilder() {
   })
 
   // Remote data
-  const { customerMap, productMap, loading: dataLoading } = useRunBuilderData()
+  const { customerMap, productMap } = useRunBuilderData()
   const { orders: pendingOrders, loading: ordersLoading } = usePendingOrders()
   const [drivers, setDrivers] = useState<AppUser[]>([])
   const [driversLoading, setDriversLoading] = useState(true)

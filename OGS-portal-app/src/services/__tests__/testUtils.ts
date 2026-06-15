@@ -5,7 +5,7 @@
  * Provides factories for creating test data and mocking Firebase/Firestore.
  */
 
-import { vi } from 'vitest'
+import { vi, expect } from 'vitest'
 import type { DocumentSnapshot, QuerySnapshot } from 'firebase/firestore'
 
 /**
@@ -30,7 +30,8 @@ export function createMockDocSnapshot<T extends Record<string, any>>(
     get: (field: string) => (exists ? (data as any)[field] : undefined),
     metadata: {} as any,
     isEqual: () => false,
-  } as DocumentSnapshot<T>
+    toJSON: () => data,
+  } as any as DocumentSnapshot<T>
 }
 
 /**
@@ -50,7 +51,7 @@ export function createMockQuerySnapshot<T extends Record<string, any>>(
 ): QuerySnapshot<T> {
   const docSnapshots = docs.map((doc) => {
     const { id, ...data } = doc
-    return createMockDocSnapshot(id, data as T)
+    return createMockDocSnapshot(id, data as T, true)
   })
 
   return {
@@ -61,7 +62,9 @@ export function createMockQuerySnapshot<T extends Record<string, any>>(
     forEach: (callback: any) => docSnapshots.forEach((d) => callback(d)),
     metadata: {} as any,
     isEqual: () => false,
-  } as QuerySnapshot<T>
+    docChanges: () => [],
+    toJSON: () => ({ docs }),
+  } as any as QuerySnapshot<T>
 }
 
 /**

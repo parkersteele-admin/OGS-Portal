@@ -61,7 +61,6 @@ const STATUS_LABELS: Record<OrderStatus, string> = {
   delivered:  'Delivered',
   ready_to_invoice: 'Ready to Invoice',
   invoice_sent: 'Invoice Sent',
-  invoiced:   'Invoiced',
   paid:       'Paid',
   cancelled:  'Cancelled',
   archived:   'Archived',
@@ -75,7 +74,6 @@ const STATUS_ICONS: Record<OrderStatus, LucideIcon> = {
   delivered: CheckCircle,
   ready_to_invoice: FileText,
   invoice_sent: Send,
-  invoiced: CheckCircle,
   paid: CheckCircle,
   cancelled: CheckCircle,
   archived: CheckCircle,
@@ -89,7 +87,6 @@ const STATUS_ICON_COLORS: Record<OrderStatus, string> = {
   delivered: '#065f46',
   ready_to_invoice: '#FF6A00',
   invoice_sent: '#0066FF',
-  invoiced: '#00B7FF',
   paid: '#065f46',
   cancelled: '#6b7280',
   archived: '#6b7280',
@@ -2099,7 +2096,7 @@ export default function OrderManagement() {
                 const prod = productMap[order.productId]
                 const isActiveDelivery = order.status === 'scheduled' || order.status === 'assigned' || order.status === 'in-transit'
                 const isBillingStage = order.status === 'ready_to_invoice' || order.status === 'invoice_sent'
-                const isClosed = order.status === 'paid' || order.status === 'invoiced' || order.status === 'archived'
+                const isClosed = order.status === 'paid' || order.status === 'archived'
                 const canEditOrder = order.status === 'pending' || order.status === 'scheduled'
                 const canCancelOrder = canTransition(order.status, 'cancelled')
                 const canComplete = canCompleteDelivery(order)

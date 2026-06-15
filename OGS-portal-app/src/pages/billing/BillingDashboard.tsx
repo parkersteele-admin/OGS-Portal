@@ -19,7 +19,7 @@ import type { Order, OrderStatus } from '../../types/order'
 import './BillingDashboard.css'
 
 type RevenueStatusFilter = 'all' | 'ready_to_invoice' | 'invoice_sent' | 'paid'
-type SortKey = 'date' | 'invoiced' | 'received'
+type SortKey = 'date' | 'amount' | 'received'
 type SortDirection = 'asc' | 'desc'
 type BadgeVariant = 'brand' | 'success' | 'warning' | 'danger' | 'info' | 'neutral'
 
@@ -182,7 +182,7 @@ const BillingDashboard: React.FC = () => {
         bValue = getOrderDate(b)?.getTime() ?? 0
       }
 
-      if (sortKey === 'invoiced') {
+      if (sortKey === 'amount') {
         aValue = a.invoiceAmount ?? Number.NEGATIVE_INFINITY
         bValue = b.invoiceAmount ?? Number.NEGATIVE_INFINITY
       }
@@ -312,7 +312,7 @@ const BillingDashboard: React.FC = () => {
                   <th>Customer</th>
                   <th>QB Invoice #</th>
                   <th className="bd__col-r">
-                    <button type="button" className="bd__sort-btn bd__sort-btn--right" onClick={() => toggleSort('invoiced')}>
+                    <button type="button" className="bd__sort-btn bd__sort-btn--right" onClick={() => toggleSort('amount')}>
                       Invoiced
                     </button>
                   </th>

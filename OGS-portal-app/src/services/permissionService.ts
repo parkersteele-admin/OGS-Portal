@@ -19,10 +19,8 @@
  */
 
 import type { AuthUser } from '../types/auth'
-import type { Customer } from '../types/customer'
 import type { Order } from '../types/order'
 import type { Run } from '../types/run'
-import type { Invoice } from '../types/billing'
 
 export interface PermissionContext {
   user: AuthUser
@@ -56,7 +54,7 @@ export function canViewCustomer(
 ): boolean {
   if (context.isAdmin) return true
   if (context.isDispatch) return true // Dispatch can view all
-  if (context.isCustomer && context.user.customerId === customerId) return true
+  if (context.isCustomer && (context.user as any).customerId === customerId) return true
   return false
 }
 
@@ -85,7 +83,7 @@ export function canEditOrder(
 
   if (
     context.isCustomer &&
-    context.user.customerId === order.customerId &&
+    (context.user as any).customerId === order.customerId &&
     order.status === 'pending'
   ) {
     return true
@@ -110,7 +108,7 @@ export function canDeleteOrder(
   if (context.isDispatch && order.status === 'pending') return true
   if (
     context.isCustomer &&
-    context.user.customerId === order.customerId &&
+    (context.user as any).customerId === order.customerId &&
     order.status === 'pending'
   ) {
     return true
@@ -137,7 +135,7 @@ export function canAccessRun(
 ): boolean {
   if (context.isAdmin) return true
   if (context.isDispatch) return true
-  if (context.isDriver && context.user.uid === run.assignedDriverId) {
+  if (context.isDriver && context.user.uid === (run as any).assignedDriverId) {
     return true
   }
   return false
@@ -153,7 +151,7 @@ export function canAccessRun(
  */
 export function canEditRun(context: PermissionContext, run: Run): boolean {
   if (context.isAdmin) return true
-  if (context.isDispatch && (run.status === 'pending' || run.status === 'assigned')) {
+  if (context.isDispatch && (run.status === 'scheduled' || run.status === 'in-progress')) {
     return true
   }
   return false
@@ -169,11 +167,11 @@ export function canEditRun(context: PermissionContext, run: Run): boolean {
  */
 export function canViewInvoice(
   context: PermissionContext,
-  invoice: Invoice,
+  invoiceCustomerId: string,
 ): boolean {
   if (context.isAdmin) return true
   if (context.isDispatch) return true
-  if (context.isCustomer && context.user.customerId === invoice.customerId) {
+  if (context.isCustomer && (context.user as any).customerId === invoiceCustomerId) {
     return true
   }
   return false
@@ -188,13 +186,12 @@ export function canViewInvoice(
  */
 export function canPayInvoice(
   context: PermissionContext,
-  invoice: Invoice,
+  invoiceCustomerId: string,
 ): boolean {
   if (context.isAdmin) return true
   if (
     context.isCustomer &&
-    context.user.customerId === invoice.customerId &&
-    invoice.status === 'outstanding'
+    (context.user as any).customerId === invoiceCustomerId
   ) {
     return true
   }

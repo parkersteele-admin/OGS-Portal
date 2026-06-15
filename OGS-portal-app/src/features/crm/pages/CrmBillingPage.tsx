@@ -1,1 +1,3 @@
-export { BillingDashboard as default } from '../../../pages/billing/BillingDashboard'
+import BillingDashboard from '../../../pages/billing/BillingDashboard'
+
+export { BillingDashboard as default }

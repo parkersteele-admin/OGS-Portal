@@ -57,7 +57,6 @@ const STATUS_VARIANT: Record<OrderStatus, BadgeVariant> = {
   delivered: 'success',
   ready_to_invoice: 'warning',
   invoice_sent: 'info',
-  invoiced: 'info',
   paid: 'success',
   cancelled: 'danger',
   archived: 'neutral',
@@ -71,7 +70,6 @@ const STATUS_LABEL: Record<OrderStatus, string> = {
   delivered: 'Delivered',
   ready_to_invoice: 'Ready to Invoice',
   invoice_sent: 'Invoice Sent',
-  invoiced: 'Invoiced',
   paid: 'Paid',
   cancelled: 'Cancelled',
   archived: 'Archived',
@@ -85,7 +83,6 @@ const STATUS_ICON: Record<OrderStatus, LucideIcon> = {
   delivered: CheckCircle,
   ready_to_invoice: FileText,
   invoice_sent: Send,
-  invoiced: CheckCircle,
   paid: CheckCircle,
   cancelled: CheckCircle,
   archived: CheckCircle,
@@ -99,7 +96,6 @@ const STATUS_ICON_COLOR: Record<OrderStatus, string> = {
   delivered: '#065f46',
   ready_to_invoice: '#FF6A00',
   invoice_sent: '#0066FF',
-  invoiced: '#00B7FF',
   paid: '#065f46',
   cancelled: '#6b7280',
   archived: '#6b7280',
@@ -140,7 +136,7 @@ const ORDER_TYPE_STYLE: Record<OrderType, React.CSSProperties> = {
 }
 
 const TIMELINE_STEPS: OrderStatus[] = [
-  'pending', 'scheduled', 'in-transit', 'delivered', 'ready_to_invoice', 'invoice_sent', 'invoiced', 'paid',
+  'pending', 'scheduled', 'in-transit', 'delivered', 'ready_to_invoice', 'invoice_sent', 'paid',
 ]
 
 function timelineState(current: OrderStatus, step: OrderStatus): 'done' | 'active' | 'upcoming' {
@@ -152,7 +148,7 @@ function timelineState(current: OrderStatus, step: OrderStatus): 'done' | 'activ
   return 'upcoming'
 }
 
-type StatusFilter = 'all' | 'pending' | 'scheduled' | 'delivered' | 'invoiced' | 'standing'
+type StatusFilter = 'all' | 'pending' | 'scheduled' | 'delivered' | 'paid' | 'standing'
 
 const FILTER_PILLS: { value: StatusFilter; label: string }[] = [
   { value: 'all',       label: 'All' },
@@ -160,7 +156,7 @@ const FILTER_PILLS: { value: StatusFilter; label: string }[] = [
   { value: 'pending',   label: 'Pending' },
   { value: 'scheduled', label: 'Scheduled' },
   { value: 'delivered', label: 'Delivered' },
-  { value: 'invoiced',  label: 'Invoiced' },
+  { value: 'paid',  label: 'Paid' },
 ]
 
 const PAGE_SIZE = 20
@@ -186,7 +182,7 @@ const LinkedInvoiceRow: React.FC<{ order: Order }> = ({ order }) => {
       return snap.docs.map((d) => ({ ...d.data(), id: d.id } as Invoice))
     },
     staleTime: 2 * 60 * 1000,
-    enabled: ['invoiced', 'paid'].includes(order.status),
+    enabled: ['paid'].includes(order.status),
   })
 
   if (invoices.length === 0) return null

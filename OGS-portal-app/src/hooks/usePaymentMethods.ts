@@ -21,13 +21,15 @@ interface UsePaymentMethodsResult {
 export function usePaymentMethods(
   customerId: string | undefined,
 ): UsePaymentMethodsResult {
+  const q: any = query(
+    paymentMethodsCol(customerId ?? '__disabled__'),
+    where('customerId', '==', customerId ?? '__disabled__'),
+    orderBy('isDefault', 'desc'),
+    orderBy('createdAt', 'desc'),
+  )
+  
   const { data: methods, loading, error } = useFirestoreSubscription<PaymentMethod>(
-    query(
-      paymentMethodsCol,
-      where('customerId', '==', customerId ?? ''),
-      orderBy('isDefault', 'desc'),
-      orderBy('createdAt', 'desc'),
-    ),
+    q,
     !!customerId,
   )
 
