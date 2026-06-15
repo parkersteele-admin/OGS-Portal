@@ -45,7 +45,7 @@ export { onOrderComplete }                                        from './orders
 export { onDeliveryComplete }                                     from './triggers/onDeliveryComplete'
 export { onOrderReadyToInvoice }                                  from './triggers/onOrderReadyToInvoice'
 export { onReadyToInvoice }                                       from './triggers/onReadyToInvoice'
-export { finalizeSignedDelivery, generateInvoiceForOrder, sendInvoiceEmailForOrder }        from './delivery/finalizeSignedDelivery'
+export { finalizeSignedDelivery }        from './delivery/finalizeSignedDelivery'
 export { adminFinalizeDelivery }                                  from './delivery/adminFinalizeDelivery'
 export { updateOrderBillingStatus }                               from './orders/updateOrderBillingStatus'
 export { onRunCreated }                                           from './triggers/onRunCreated'

@@ -137,8 +137,6 @@ export const finalizeSignedDelivery = onCall(
       },
     })
 
-    let invoicePdfUrl: string | undefined
-
     const bolItems = [
       ...data.deliveredLineItems.map((item) => {
         const product = productMap.get(item.productId)

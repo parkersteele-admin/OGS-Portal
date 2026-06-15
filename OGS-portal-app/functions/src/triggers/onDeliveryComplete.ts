@@ -24,6 +24,8 @@ import { sendEmail } from '../mail'
 import { createNotification } from '../notifications/createNotification'
 import { appendStatusHistory } from '../lib/orderStatus'
 
+const LOW_LEVEL_THRESHOLD_PCT = 25
+
 // ── Trigger ───────────────────────────────────────────────────────────────────
 
 export const onDeliveryComplete = onDocumentUpdated(
