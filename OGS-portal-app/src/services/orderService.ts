@@ -164,7 +164,9 @@ const VALID_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   scheduled:    ['assigned',  'pending', 'cancelled', 'archived'],
   assigned:     ['in-transit','scheduled', 'archived'],
   'in-transit': ['delivered', 'archived'],
-  delivered:    ['invoiced', 'archived'],
+  delivered:    ['ready_to_invoice', 'invoiced', 'archived'],
+  ready_to_invoice: ['invoice_sent', 'invoiced', 'archived'],
+  invoice_sent: ['invoiced', 'paid', 'archived'],
   invoiced:     ['paid', 'archived'],
   paid:         ['archived'],
   cancelled:    ['archived'],
@@ -301,6 +303,22 @@ export async function transitionOrderStatus(
       status: nextStatus,
       updatedAt: serverTimestamp(),
     }))
+  })
+}
+
+export async function updateOrderBillingStatus(
+  orderId: string,
+  newStatus: 'invoice_sent' | 'paid',
+): Promise<{ success: true; newStatus: 'invoice_sent' | 'paid' }> {
+  return serviceCall(async () => {
+    const { httpsCallable } = await import('firebase/functions')
+    const { functions } = await import('../lib/firebase')
+    const fn = httpsCallable<
+      { orderId: string; newStatus: 'invoice_sent' | 'paid' },
+      { success: true; newStatus: 'invoice_sent' | 'paid' }
+    >(functions, 'updateOrderBillingStatus')
+    const result = await fn({ orderId, newStatus })
+    return result.data
   })
 }
 

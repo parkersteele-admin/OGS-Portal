@@ -13,6 +13,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { CheckCircle, DollarSign, Eye, FileText, Pencil, Send, Truck, XCircle, type LucideIcon } from 'lucide-react'
 import {
   onSnapshot,
   query,
@@ -33,13 +34,17 @@ import {
   canTransition,
   archiveOrder,
   deleteOrder,
+  updateOrderBillingStatus,
 } from '../../../services/orderService'
 import { generateInvoiceForOrder, sendInvoiceEmailForOrder } from '../../../services/invoiceService'
 import { subscribeToCustomers } from '../../../services/customerService'
+import { useAuth } from '../../../hooks/useAuth'
 import { Button } from '../../../components/ui/Button'
 import { Input } from '../../../components/ui/Input'
 import { Modal } from '../../../components/ui/Modal'
 import { InvoiceDetailDrawer } from '../components/InvoiceDetailDrawer'
+import { DeliveryCompleteModal } from '../../../components/delivery/DeliveryCompleteModal'
+import MobileOrderCard from '../../../components/orders/MobileOrderCard'
 import type { Order, OrderStatus, DeliveryTier } from '../../../types/order'
 import type { Customer } from '../../../types/customer'
 import type { Product } from '../../../types/product'
@@ -54,10 +59,40 @@ const STATUS_LABELS: Record<OrderStatus, string> = {
   assigned:   'Assigned',
   'in-transit': 'In Transit',
   delivered:  'Delivered',
+  ready_to_invoice: 'Ready to Invoice',
+  invoice_sent: 'Invoice Sent',
   invoiced:   'Invoiced',
   paid:       'Paid',
   cancelled:  'Cancelled',
   archived:   'Archived',
+}
+
+const STATUS_ICONS: Record<OrderStatus, LucideIcon> = {
+  pending: FileText,
+  scheduled: FileText,
+  assigned: FileText,
+  'in-transit': Send,
+  delivered: CheckCircle,
+  ready_to_invoice: FileText,
+  invoice_sent: Send,
+  invoiced: CheckCircle,
+  paid: CheckCircle,
+  cancelled: CheckCircle,
+  archived: CheckCircle,
+}
+
+const STATUS_ICON_COLORS: Record<OrderStatus, string> = {
+  pending: '#92400e',
+  scheduled: '#1e40af',
+  assigned: '#3730a3',
+  'in-transit': '#9d174d',
+  delivered: '#065f46',
+  ready_to_invoice: '#FF6A00',
+  invoice_sent: '#0066FF',
+  invoiced: '#00B7FF',
+  paid: '#065f46',
+  cancelled: '#6b7280',
+  archived: '#6b7280',
 }
 
 const TIER_LABELS: Record<DeliveryTier, string> = {
@@ -116,9 +151,11 @@ function getOrderStatusLabel(order: Order): string {
 // ── Status badge ───────────────────────────────────────────────────────────────
 
 function StatusBadge({ order }: { order: Order }) {
+  const StatusIcon = STATUS_ICONS[order.status]
   return (
     <span className={`om-badge om-badge--${order.status}`}>
-      {getOrderStatusLabel(order)}
+      <StatusIcon size={12} aria-hidden="true" style={{ color: STATUS_ICON_COLORS[order.status] }} />
+      <span>{getOrderStatusLabel(order)}</span>
     </span>
   )
 }
@@ -142,6 +179,9 @@ interface OrderDetailPanelProps {
   onClose: () => void
   onCancelOrder: (id: string) => void
   onReschedule: (order: Order) => void
+  canCompleteDelivery: boolean
+  onCompleteDelivery: (order: Order) => void
+  onBillingStatusUpdated: (orderId: string) => Promise<void>
 }
 
 interface OrderDetailSheetProps {
@@ -151,6 +191,9 @@ interface OrderDetailSheetProps {
   onClose: () => void
   onCancelOrder: (id: string) => void
   onReschedule: (order: Order) => void
+  canCompleteDelivery: boolean
+  onCompleteDelivery: (order: Order) => void
+  onBillingStatusUpdated: (orderId: string) => Promise<void>
 }
 
 function OrderDetailSheet({
@@ -160,9 +203,47 @@ function OrderDetailSheet({
   onClose,
   onCancelOrder,
   onReschedule,
+  canCompleteDelivery,
+  onCompleteDelivery,
+  onBillingStatusUpdated,
 }: OrderDetailSheetProps) {
+  const { isAdmin } = useAuth()
   const canCancel = canTransition(order.status, 'cancelled')
   const canEdit = order.status === 'pending' || order.status === 'scheduled'
+  const [billingBusy, setBillingBusy] = useState(false)
+  const [billingToast, setBillingToast] = useState<string | null>(null)
+
+  const showBillingPanel = isAdmin && (order.status === 'ready_to_invoice' || order.status === 'invoice_sent')
+
+  async function handleMarkInvoiceSent() {
+    if (!confirm('Mark this order as Invoice Sent?')) return
+    setBillingBusy(true)
+    try {
+      await updateOrderBillingStatus(order.id, 'invoice_sent')
+      await onBillingStatusUpdated(order.id)
+      setBillingToast('Invoice marked as sent.')
+      setTimeout(() => setBillingToast(null), 2500)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to update billing status.')
+    } finally {
+      setBillingBusy(false)
+    }
+  }
+
+  async function handleMarkPaid() {
+    if (!confirm('Mark this order as Paid?')) return
+    setBillingBusy(true)
+    try {
+      await updateOrderBillingStatus(order.id, 'paid')
+      await onBillingStatusUpdated(order.id)
+      setBillingToast('Order marked as paid.')
+      setTimeout(() => setBillingToast(null), 2500)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to update billing status.')
+    } finally {
+      setBillingBusy(false)
+    }
+  }
 
   return (
     <Modal open onClose={onClose} title={`Order ${order.id.slice(0, 8).toUpperCase()}`} size="lg">
@@ -198,7 +279,50 @@ function OrderDetailSheet({
 
         {order.notes && <p className="om-sheet__notes">{order.notes}</p>}
 
+        {showBillingPanel && (
+          <section className="om-billing-panel">
+            <div className="om-billing-panel__header">
+              <span className="om-billing-panel__title"><DollarSign size={14} /> QuickBooks Billing</span>
+            </div>
+            <div className="om-billing-panel__body">
+              <span className={`om-billing-badge om-billing-badge--${order.status}`}>
+                {order.status === 'ready_to_invoice' ? 'Ready to Invoice' : 'Invoice Sent'}
+              </span>
+              <p className="om-billing-copy">
+                {order.status === 'ready_to_invoice'
+                  ? 'Create the invoice in QuickBooks, then mark it sent below.'
+                  : 'Once payment is received, mark this order as paid.'}
+              </p>
+              {order.status === 'ready_to_invoice' ? (
+                <Button className="om-billing-btn" onClick={handleMarkInvoiceSent} disabled={billingBusy}>
+                  {billingBusy ? 'Saving…' : 'Mark Invoice Sent'}
+                </Button>
+              ) : (
+                <div className="om-billing-actions">
+                  <Button
+                    className="om-billing-btn om-billing-btn--paid"
+                    onClick={handleMarkPaid}
+                    disabled={billingBusy}
+                  >
+                    {billingBusy ? 'Saving…' : 'Mark as Paid'}
+                  </Button>
+                  {/* TODO: partial payment status is not part of OrderStatus yet. */}
+                  <Button className="om-billing-btn" variant="secondary" disabled>
+                    Mark as Partial
+                  </Button>
+                </div>
+              )}
+              {billingToast && <p className="om-billing-toast">{billingToast}</p>}
+            </div>
+          </section>
+        )}
+
         <div className="om-sheet__actions">
+          {canCompleteDelivery && (
+            <Button variant="primary" onClick={() => onCompleteDelivery(order)}>
+              <Truck size={14} /> Complete Delivery
+            </Button>
+          )}
           {canEdit && (
             <Button
               variant="secondary"
@@ -228,15 +352,21 @@ function OrderDetailPanel({
   onClose,
   onCancelOrder,
   onReschedule,
+  canCompleteDelivery,
+  onCompleteDelivery,
+  onBillingStatusUpdated,
 }: OrderDetailPanelProps) {
   const navigate = useNavigate()
   const location = useLocation()
+  const { isAdmin } = useAuth()
   const opsBase  = location.pathname.startsWith('/admin') ? '/admin/ops' : '/ops'
   const isAdminView = location.pathname.startsWith('/admin')
   const [invoice, setInvoice] = useState<Invoice | null>(null)
   const [generatingInvoice, setGeneratingInvoice] = useState(false)
   const [sendingInvoiceEmail, setSendingInvoiceEmail] = useState(false)
   const [showInvoiceDetail, setShowInvoiceDetail] = useState(false)
+  const [billingBusy, setBillingBusy] = useState(false)
+  const [billingToast, setBillingToast] = useState<string | null>(null)
   const [runStopInfo, setRunStopInfo] = useState<{
     runNumber: string
     stopOrder: number
@@ -298,6 +428,7 @@ function OrderDetailPanel({
   const canCancel = canTransition(order.status, 'cancelled')
   const canEdit =
     order.status === 'pending' || order.status === 'scheduled'
+  const showBillingPanel = isAdmin && (order.status === 'ready_to_invoice' || order.status === 'invoice_sent')
 
   async function handleGenerateInvoice() {
     setGeneratingInvoice(true)
@@ -329,6 +460,36 @@ function OrderDetailPanel({
       alert(message)
     } finally {
       setSendingInvoiceEmail(false)
+    }
+  }
+
+  async function handleMarkInvoiceSent() {
+    if (!confirm('Mark this order as Invoice Sent?')) return
+    setBillingBusy(true)
+    try {
+      await updateOrderBillingStatus(order.id, 'invoice_sent')
+      await onBillingStatusUpdated(order.id)
+      setBillingToast('Invoice marked as sent.')
+      setTimeout(() => setBillingToast(null), 2500)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to update billing status.')
+    } finally {
+      setBillingBusy(false)
+    }
+  }
+
+  async function handleMarkPaid() {
+    if (!confirm('Mark this order as Paid?')) return
+    setBillingBusy(true)
+    try {
+      await updateOrderBillingStatus(order.id, 'paid')
+      await onBillingStatusUpdated(order.id)
+      setBillingToast('Order marked as paid.')
+      setTimeout(() => setBillingToast(null), 2500)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to update billing status.')
+    } finally {
+      setBillingBusy(false)
     }
   }
 
@@ -584,6 +745,44 @@ function OrderDetailPanel({
             </section>
           )}
 
+          {showBillingPanel && (
+            <section className="om-panel__section om-billing-panel">
+              <div className="om-billing-panel__header">
+                <span className="om-billing-panel__title"><DollarSign size={14} /> QuickBooks Billing</span>
+              </div>
+              <div className="om-billing-panel__body">
+                <span className={`om-billing-badge om-billing-badge--${order.status}`}>
+                  {order.status === 'ready_to_invoice' ? 'Ready to Invoice' : 'Invoice Sent'}
+                </span>
+                <p className="om-billing-copy">
+                  {order.status === 'ready_to_invoice'
+                    ? 'Create the invoice in QuickBooks, then mark it sent below.'
+                    : 'Once payment is received, mark this order as paid.'}
+                </p>
+                {order.status === 'ready_to_invoice' ? (
+                  <Button className="om-billing-btn" onClick={handleMarkInvoiceSent} disabled={billingBusy}>
+                    {billingBusy ? 'Saving…' : 'Mark Invoice Sent'}
+                  </Button>
+                ) : (
+                  <div className="om-billing-actions">
+                    <Button
+                      className="om-billing-btn om-billing-btn--paid"
+                      onClick={handleMarkPaid}
+                      disabled={billingBusy}
+                    >
+                      {billingBusy ? 'Saving…' : 'Mark as Paid'}
+                    </Button>
+                    {/* TODO: partial payment status is not part of OrderStatus yet. */}
+                    <Button className="om-billing-btn" variant="secondary" disabled>
+                      Mark as Partial
+                    </Button>
+                  </div>
+                )}
+                {billingToast && <p className="om-billing-toast">{billingToast}</p>}
+              </div>
+            </section>
+          )}
+
           {/* Timeline */}
           <section className="om-panel__section">
             <div className="om-panel__section-title">Timeline</div>
@@ -609,6 +808,15 @@ function OrderDetailPanel({
 
         {/* Actions */}
         <div className="om-panel__footer">
+          {canCompleteDelivery && (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => onCompleteDelivery(order)}
+            >
+              <Truck size={14} /> Complete Delivery
+            </Button>
+          )}
           {isAdminView && !invoice && (
             <Button
               variant="primary"
@@ -1062,6 +1270,7 @@ export default function OrderManagement() {
   const navigate = useNavigate()
   const location = useLocation()
   const opsBase  = location.pathname.startsWith('/admin') ? '/admin/ops' : '/ops'
+  const { isAdmin, isDispatch } = useAuth()
 
   // ── Data ──────────────────────────────────────────────────────────────────────
   const [allOrders, setAllOrders] = useState<Order[]>([])
@@ -1084,6 +1293,7 @@ export default function OrderManagement() {
   const [detailOrder, setDetailOrder] = useState<Order | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [rescheduleOrder, setRescheduleOrder] = useState<Order | null>(null)
+  const [deliveryModalOrder, setDeliveryModalOrder] = useState<Order | null>(null)
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia('(max-width: 767px)').matches : false,
   )
@@ -1215,6 +1425,24 @@ export default function OrderManagement() {
     return result
   }, [allOrders, search, statusFilter, tierFilter, dateFrom, dateTo, rushOnly, customerMap])
 
+  const canManageDelivery = isAdmin || isDispatch
+
+  function canCompleteDelivery(order: Order): boolean {
+    return (
+      canManageDelivery
+      && (order.status === 'in-transit' || order.status === 'assigned')
+      && !!order.runId
+      && !!order.runStopId
+    )
+  }
+
+  async function refreshOrderDetail(orderId: string) {
+    const snap = await getDoc(doc(db, 'orders', orderId))
+    if (!snap.exists()) return
+    const fresh = { id: snap.id, ...snap.data() } as Order
+    setDetailOrder(fresh)
+  }
+
   // ── Bulk select ───────────────────────────────────────────────────────────────
   const selectableFiltered = filtered.filter((o) => o.status !== 'archived')
   const allSelectableSelected =
@@ -1250,6 +1478,16 @@ export default function OrderManagement() {
       if (detailOrder?.id === id) setDetailOrder(null)
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to cancel order.')
+    }
+  }
+
+  async function handleMobileBillingStatus(orderId: string, status: 'invoice_sent' | 'paid') {
+    const prompt = status === 'invoice_sent' ? 'Mark this order as Invoice Sent?' : 'Mark this order as Paid?'
+    if (!confirm(prompt)) return
+    try {
+      await updateOrderBillingStatus(orderId, status)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to update billing status.')
     }
   }
 
@@ -1290,140 +1528,168 @@ export default function OrderManagement() {
 
   return (
     <div className="om-page">
-      {/* ── Page header ── */}
-      <div className="om-page-header">
-        <div className="om-page-header__left">
-          <h1 className="om-page-header__title">Orders</h1>
-          {!ordersLoading && (
-            <span className="om-page-header__count">
-              {filtered.length} of {allOrders.length}
-            </span>
-          )}
-        </div>
-        <div className="om-page-header__actions">
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={selectedCount === 0}
-            onClick={handleBulkArchive}
-          >
-            Archive{selectedCount > 0 ? ` (${selectedCount})` : ''}
-          </Button>
-          <Button
-            variant="danger"
-            size="sm"
-            disabled={selectedCount === 0}
-            onClick={handleBulkDelete}
-          >
-            Delete{selectedCount > 0 ? ` (${selectedCount})` : ''}
-          </Button>
-          {selectedCount > 0 && (
-            <Button variant="secondary" size="sm" onClick={handleBuildRun}>
-              Add {selectedCount} to Run →
-            </Button>
-          )}
-          <Button size="sm" onClick={() => setShowCreate(true)}>
-            + Create Order
-          </Button>
-        </div>
-      </div>
-
-      {/* ── Filter bar ── */}
-      <div className="om-filters">
-        {/* Search */}
-        <div className="om-filters__search">
-          <svg
-            className="om-filters__search-icon"
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-          >
-            <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2" />
-            <path
-              d="M21 21l-4.35-4.35"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-          </svg>
-          <input
-            className="om-filters__search-input"
-            placeholder="Search customer or order #…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          {search && (
-            <button
-              className="om-filters__search-clear"
-              onClick={() => setSearch('')}
-              aria-label="Clear search"
+      <div className="om-mobile-sticky-shell">
+        {/* ── Page header ── */}
+        <div className="om-page-header">
+          <div className="om-page-header__left">
+            <h1 className="om-page-header__title">Orders</h1>
+            {!ordersLoading && (
+              <span className="om-page-header__count">
+                {filtered.length} of {allOrders.length}
+              </span>
+            )}
+          </div>
+          <div className="om-page-header__actions">
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={selectedCount === 0}
+              onClick={handleBulkArchive}
             >
-              ✕
-            </button>
+              Archive{selectedCount > 0 ? ` (${selectedCount})` : ''}
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              disabled={selectedCount === 0}
+              onClick={handleBulkDelete}
+            >
+              Delete{selectedCount > 0 ? ` (${selectedCount})` : ''}
+            </Button>
+            {selectedCount > 0 && (
+              <Button variant="secondary" size="sm" onClick={handleBuildRun}>
+                Add {selectedCount} to Run →
+              </Button>
+            )}
+            <Button size="sm" onClick={() => setShowCreate(true)}>
+              + Create Order
+            </Button>
+          </div>
+        </div>
+
+        {/* ── Filter bar ── */}
+        <div className="om-filters">
+          {/* Search */}
+          <div className="om-filters__search">
+            <svg
+              className="om-filters__search-icon"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+            >
+              <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2" />
+              <path
+                d="M21 21l-4.35-4.35"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
+            <input
+              className="om-filters__search-input"
+              placeholder="Search customer or order #…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            {search && (
+              <button
+                className="om-filters__search-clear"
+                onClick={() => setSearch('')}
+                aria-label="Clear search"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {/* Status */}
+          {isMobile ? (
+            <div className="om-filters__chips" aria-label="Filter by status">
+              <button
+                type="button"
+                className={`om-filters__chip${statusFilter === 'all' ? ' om-filters__chip--active' : ''}`}
+                onClick={() => setStatusFilter('all')}
+              >
+                All
+              </button>
+              {(Object.keys(STATUS_LABELS) as OrderStatus[]).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  className={`om-filters__chip${statusFilter === s ? ' om-filters__chip--active' : ''}`}
+                  onClick={() => setStatusFilter(s)}
+                >
+                  {STATUS_LABELS[s]}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <select
+              className="om-filters__select"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as OrderStatus | 'all')}
+              aria-label="Filter by status"
+            >
+              <option value="all">All Statuses</option>
+              {(Object.keys(STATUS_LABELS) as OrderStatus[]).map((s) => (
+                <option key={s} value={s}>
+                  {STATUS_LABELS[s]}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {!isMobile && (
+            <>
+              {/* Tier */}
+              <select
+                className="om-filters__select"
+                value={tierFilter}
+                onChange={(e) => setTierFilter(e.target.value as DeliveryTier | 'all')}
+                aria-label="Filter by delivery tier"
+              >
+                <option value="all">All Tiers</option>
+                {(Object.keys(TIER_LABELS) as DeliveryTier[]).map((t) => (
+                  <option key={t} value={t}>
+                    {TIER_LABELS[t]}
+                  </option>
+                ))}
+              </select>
+
+              {/* Date range */}
+              <div className="om-filters__dates">
+                <input
+                  type="date"
+                  className="om-filters__date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  aria-label="From date"
+                />
+                <span className="om-filters__date-sep">–</span>
+                <input
+                  type="date"
+                  className="om-filters__date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  aria-label="To date"
+                />
+              </div>
+
+              {/* Rush toggle */}
+              <label className="om-filters__toggle">
+                <input
+                  type="checkbox"
+                  className="om-filters__toggle-input"
+                  checked={rushOnly}
+                  onChange={(e) => setRushOnly(e.target.checked)}
+                />
+                <span className="om-filters__toggle-track" />
+                <span className="om-filters__toggle-label">Rush only</span>
+              </label>
+            </>
           )}
         </div>
-
-        {/* Status */}
-        <select
-          className="om-filters__select"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as OrderStatus | 'all')}
-          aria-label="Filter by status"
-        >
-          <option value="all">All Statuses</option>
-          {(Object.keys(STATUS_LABELS) as OrderStatus[]).map((s) => (
-            <option key={s} value={s}>
-              {STATUS_LABELS[s]}
-            </option>
-          ))}
-        </select>
-
-        {/* Tier */}
-        <select
-          className="om-filters__select"
-          value={tierFilter}
-          onChange={(e) => setTierFilter(e.target.value as DeliveryTier | 'all')}
-          aria-label="Filter by delivery tier"
-        >
-          <option value="all">All Tiers</option>
-          {(Object.keys(TIER_LABELS) as DeliveryTier[]).map((t) => (
-            <option key={t} value={t}>
-              {TIER_LABELS[t]}
-            </option>
-          ))}
-        </select>
-
-        {/* Date range */}
-        <div className="om-filters__dates">
-          <input
-            type="date"
-            className="om-filters__date"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-            aria-label="From date"
-          />
-          <span className="om-filters__date-sep">–</span>
-          <input
-            type="date"
-            className="om-filters__date"
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-            aria-label="To date"
-          />
-        </div>
-
-        {/* Rush toggle */}
-        <label className="om-filters__toggle">
-          <input
-            type="checkbox"
-            className="om-filters__toggle-input"
-            checked={rushOnly}
-            onChange={(e) => setRushOnly(e.target.checked)}
-          />
-          <span className="om-filters__toggle-track" />
-          <span className="om-filters__toggle-label">Rush only</span>
-        </label>
       </div>
 
       {/* ── Table ── */}
@@ -1638,27 +1904,85 @@ export default function OrderManagement() {
               {filtered.map((order) => {
                 const cust = customerMap[order.customerId]
                 const prod = productMap[order.productId]
+                const isActiveDelivery = order.status === 'scheduled' || order.status === 'assigned' || order.status === 'in-transit'
+                const isBillingStage = order.status === 'ready_to_invoice' || order.status === 'invoice_sent'
+                const isClosed = order.status === 'paid' || order.status === 'invoiced' || order.status === 'archived'
+                const canEditOrder = order.status === 'pending' || order.status === 'scheduled'
+                const canCancelOrder = canTransition(order.status, 'cancelled')
+                const canComplete = canCompleteDelivery(order)
+
+                const primaryAction = isActiveDelivery
+                  ? canComplete
+                    ? {
+                        label: 'Complete Delivery',
+                        icon: Truck,
+                        onClick: () => setDeliveryModalOrder(order),
+                      }
+                    : {
+                        label: 'View Details',
+                        icon: Eye,
+                        onClick: () => setDetailOrder(order),
+                      }
+                  : isBillingStage
+                    ? order.status === 'ready_to_invoice'
+                      ? {
+                          label: 'Mark Invoice Sent',
+                          icon: Send,
+                          onClick: () => { void handleMobileBillingStatus(order.id, 'invoice_sent') },
+                        }
+                      : {
+                          label: 'Mark as Paid',
+                          icon: CheckCircle,
+                          onClick: () => { void handleMobileBillingStatus(order.id, 'paid') },
+                        }
+                    : {
+                        label: 'View Details',
+                        icon: Eye,
+                        onClick: () => setDetailOrder(order),
+                      }
+
+                const secondaryActions = isClosed
+                  ? []
+                  : [
+                      ...(canEditOrder
+                        ? [{
+                            label: 'Edit',
+                            icon: Pencil,
+                            onClick: () => setRescheduleOrder(order),
+                          }]
+                        : []),
+                      {
+                        label: 'View Details',
+                        icon: Eye,
+                        onClick: () => setDetailOrder(order),
+                      },
+                      ...(canCancelOrder
+                        ? [{
+                            label: 'Cancel',
+                            icon: XCircle,
+                            onClick: () => { void handleCancel(order.id) },
+                            destructive: true,
+                          }]
+                        : []),
+                    ]
+
                 return (
-                  <article
+                  <div
                     key={`mobile-${order.id}`}
-                    className="om-mobile-card"
-                    onClick={() => setDetailOrder(order)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(event) => event.key === 'Enter' && setDetailOrder(order)}
+                    className="om-mobile-card-wrap"
                   >
-                    <div className="om-mobile-card__title-row">
-                      <h3>{order.id.slice(0, 8).toUpperCase()} · {cust?.name ?? 'Customer'}</h3>
-                      <button type="button" className="om-mobile-card__view">View →</button>
-                    </div>
-                    <div className="om-mobile-card__meta-row">
-                      <span>{prod?.name ?? '—'} · {order.quantity} {prod?.unit ?? 'gal'}</span>
-                    </div>
-                    <div className="om-mobile-card__meta-row">
-                      <StatusBadge order={order} />
-                      <span>{fmtDate(order.scheduledAt)}</span>
-                    </div>
-                  </article>
+                    <MobileOrderCard
+                      order={{
+                        ...order,
+                        customerName: cust?.name ?? 'Customer',
+                        productName: prod?.name ?? 'Product',
+                        productUnit: prod?.unit ?? 'gal',
+                      } as Order}
+                      primaryAction={primaryAction}
+                      secondaryActions={secondaryActions}
+                      expanded={!['delivered', 'ready_to_invoice', 'invoice_sent', 'paid'].includes(order.status)}
+                    />
+                  </div>
                 )
               })}
             </div>
@@ -1681,6 +2005,9 @@ export default function OrderManagement() {
             setDetailOrder(null)
             setRescheduleOrder(order)
           }}
+          canCompleteDelivery={canCompleteDelivery(detailOrder)}
+          onCompleteDelivery={(order) => setDeliveryModalOrder(order)}
+          onBillingStatusUpdated={refreshOrderDetail}
         />
       )}
 
@@ -1697,6 +2024,22 @@ export default function OrderManagement() {
           onReschedule={(order) => {
             setDetailOrder(null)
             setRescheduleOrder(order)
+          }}
+          canCompleteDelivery={canCompleteDelivery(detailOrder)}
+          onCompleteDelivery={(order) => setDeliveryModalOrder(order)}
+          onBillingStatusUpdated={refreshOrderDetail}
+        />
+      )}
+
+      {deliveryModalOrder && deliveryModalOrder.runId && deliveryModalOrder.runStopId && (
+        <DeliveryCompleteModal
+          order={deliveryModalOrder}
+          runId={deliveryModalOrder.runId}
+          stopId={deliveryModalOrder.runStopId}
+          onClose={() => setDeliveryModalOrder(null)}
+          onSuccess={() => {
+            void refreshOrderDetail(deliveryModalOrder.id)
+            setDeliveryModalOrder(null)
           }}
         />
       )}

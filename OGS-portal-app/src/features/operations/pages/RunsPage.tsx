@@ -6,7 +6,7 @@
  * RunSummary, and Dispatch Map.
  */
 
-import React, { useState, useMemo } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getDocs, query, orderBy, where } from 'firebase/firestore'
@@ -62,6 +62,17 @@ export default function RunsPage() {
   const [statusFilter, setStatusFilter] = useState<RunStatus | 'all'>('all')
   const [search,       setSearch]       = useState('')
   const [selected,     setSelected]     = useState<Set<string>>(new Set())
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(max-width: 767px)').matches : false,
+  )
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 767px)')
+    const onChange = (event: MediaQueryListEvent) => setIsMobile(event.matches)
+    setIsMobile(media.matches)
+    media.addEventListener('change', onChange)
+    return () => media.removeEventListener('change', onChange)
+  }, [])
 
   const queryClient = useQueryClient()
 
@@ -146,75 +157,104 @@ export default function RunsPage() {
   return (
     <div className="rp-page">
 
-      {/* ── Header ────────────────────────────────────────────── */}
-      <div className="rp-header">
-        <div>
-          <h1 className="rp-title">Runs</h1>
-          <p className="rp-subtitle">{runs.length} total run{runs.length !== 1 ? 's' : ''}</p>
+      <div className="rp-mobile-sticky-shell">
+
+        {/* ── Header ────────────────────────────────────────────── */}
+        <div className="rp-header">
+          <div>
+            <h1 className="rp-title">Runs</h1>
+            <p className="rp-subtitle">{runs.length} total run{runs.length !== 1 ? 's' : ''}</p>
+          </div>
+          <div className="rp-header__actions">
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={selectedCount === 0}
+              onClick={handleBulkArchive}
+            >
+              Archive{selectedCount > 0 ? ` (${selectedCount})` : ''}
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              disabled={selectedCount === 0}
+              onClick={handleBulkDelete}
+            >
+              Delete{selectedCount > 0 ? ` (${selectedCount})` : ''}
+            </Button>
+            <Button variant="primary" onClick={() => navigate(`${opsBase}/runs/new`)}>
+              + New Run
+            </Button>
+          </div>
         </div>
-        <div className="rp-header__actions">
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={selectedCount === 0}
-            onClick={handleBulkArchive}
-          >
-            Archive{selectedCount > 0 ? ` (${selectedCount})` : ''}
-          </Button>
-          <Button
-            variant="danger"
-            size="sm"
-            disabled={selectedCount === 0}
-            onClick={handleBulkDelete}
-          >
-            Delete{selectedCount > 0 ? ` (${selectedCount})` : ''}
-          </Button>
-          <Button variant="primary" onClick={() => navigate(`${opsBase}/runs/new`)}>
-            + New Run
-          </Button>
+
+        {/* ── Filters ──────────────────────────────────────────── */}
+        <div className="rp-filters">
+          <input
+            type="search"
+            className="rp-search"
+            placeholder="Search run # or driver…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+
+          {isMobile ? (
+            <div className="rp-status-chips" aria-label="Filter by status">
+              <button
+                type="button"
+                className={`rp-status-chip${statusFilter === 'all' ? ' rp-status-chip--active' : ''}`}
+                onClick={() => setStatusFilter('all')}
+              >
+                All
+              </button>
+              {(['scheduled', 'in-progress', 'completed', 'cancelled'] as RunStatus[]).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  className={`rp-status-chip${statusFilter === s ? ' rp-status-chip--active' : ''}`}
+                  onClick={() => setStatusFilter(s)}
+                >
+                  {STATUS_LABELS[s]}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <select
+              className="rp-select"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as RunStatus | 'all')}
+            >
+              <option value="all">All statuses</option>
+              {(['scheduled', 'in-progress', 'completed', 'cancelled'] as RunStatus[]).map((s) => (
+                <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+              ))}
+            </select>
+          )}
+
+          {(search || statusFilter !== 'all') && (
+            <button className="rp-clear" onClick={() => { setSearch(''); setStatusFilter('all') }}>
+              Clear
+            </button>
+          )}
+          <span className="rp-count">{filtered.length} run{filtered.length !== 1 ? 's' : ''}</span>
         </div>
       </div>
 
       {/* ── Stat pills ───────────────────────────────────────── */}
-      <div className="rp-stats">
-        {(['scheduled', 'in-progress', 'completed', 'cancelled'] as RunStatus[]).map((s) => (
-          <button
-            key={s}
-            className={`rp-stat rp-stat--${s}${statusFilter === s ? ' rp-stat--active' : ''}`}
-            onClick={() => setStatusFilter(statusFilter === s ? 'all' : s)}
-          >
-            <span className="rp-stat__count">{stats[s]}</span>
-            <span className="rp-stat__label">{STATUS_LABELS[s]}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* ── Filters ──────────────────────────────────────────── */}
-      <div className="rp-filters">
-        <input
-          type="search"
-          className="rp-search"
-          placeholder="Search run # or driver…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <select
-          className="rp-select"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as RunStatus | 'all')}
-        >
-          <option value="all">All statuses</option>
+      {!isMobile && (
+        <div className="rp-stats">
           {(['scheduled', 'in-progress', 'completed', 'cancelled'] as RunStatus[]).map((s) => (
-            <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+            <button
+              key={s}
+              className={`rp-stat rp-stat--${s}${statusFilter === s ? ' rp-stat--active' : ''}`}
+              onClick={() => setStatusFilter(statusFilter === s ? 'all' : s)}
+            >
+              <span className="rp-stat__count">{stats[s]}</span>
+              <span className="rp-stat__label">{STATUS_LABELS[s]}</span>
+            </button>
           ))}
-        </select>
-        {(search || statusFilter !== 'all') && (
-          <button className="rp-clear" onClick={() => { setSearch(''); setStatusFilter('all') }}>
-            Clear
-          </button>
-        )}
-        <span className="rp-count">{filtered.length} run{filtered.length !== 1 ? 's' : ''}</span>
-      </div>
+        </div>
+      )}
 
       {/* ── Table ────────────────────────────────────────────── */}
       <div className="rp-card">

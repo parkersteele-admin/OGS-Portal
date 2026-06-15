@@ -50,10 +50,20 @@ export type OrderStatus =
   | 'assigned'
   | 'in-transit'
   | 'delivered'
+  | 'ready_to_invoice'
+  | 'invoice_sent'
   | 'invoiced'
   | 'paid'
   | 'cancelled'
   | 'archived'
+
+export type OrderStatusEvent = {
+  status: OrderStatus
+  changedAt: Timestamp
+  changedBy: string
+  changedByName: string
+  note?: string
+}
 
 /** Per-tier pricing configuration (admin-configurable). */
 export interface DeliveryTierConfig {
@@ -91,6 +101,7 @@ export interface Order {
   quoteTax?: number
   quoteTotal?: number
   status: OrderStatus
+  statusHistory?: OrderStatusEvent[]
   notes?: string
   /** Links all items from a single customer checkout into one order reference. */
   groupId?: string

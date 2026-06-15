@@ -13,6 +13,7 @@
 
 import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { CheckCircle, FileText, Send, type LucideIcon } from 'lucide-react'
 import {
   useQuery,
   useMutation,
@@ -48,7 +49,7 @@ import { setCustomerProductPrice, removeCustomerProductPrice } from '../../../se
 import { useCustomerProductPricing } from '../../../hooks/useCustomerProductPricing'
 import { getOrders, getRouteSchedule, updateRouteSchedule } from '../../../services/orderService'
 import { getQuotes, duplicateQuote, convertQuoteToOrder, updateQuote, deleteQuote } from '../../../services/quoteService'
-import type { Order, RouteSchedule, RouteCadence } from '../../../types/order'
+import type { Order, OrderStatus, RouteSchedule, RouteCadence } from '../../../types/order'
 import { getFilesForEntity, uploadFile, deleteFile, getFileUrl } from '../../../services/fileService'
 import { formatCurrency, formatDate, formatRelative } from '../../../utils/format'
 import { formatAddress, getGoogleMapsUrl } from '../../../utils/addressUtils'
@@ -133,22 +134,77 @@ const INVOICE_BADGE: Record<string, 'success' | 'warning' | 'danger' | 'info' | 
   void:    'neutral',
 }
 
-const ORDER_BADGE: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'brand'> = {
+const ORDER_BADGE: Record<OrderStatus, 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'brand'> = {
   pending:    'warning',
   scheduled:  'info',
   assigned:   'info',
   'in-transit':'brand',
   delivered:  'success',
+  ready_to_invoice: 'warning',
+  invoice_sent: 'info',
   invoiced:   'neutral',
   paid:       'success',
   cancelled:  'danger',
+  archived:   'neutral',
+}
+
+const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
+  pending: 'Pending',
+  scheduled: 'Scheduled',
+  assigned: 'Assigned',
+  'in-transit': 'In Transit',
+  delivered: 'Delivered',
+  ready_to_invoice: 'Ready to Invoice',
+  invoice_sent: 'Invoice Sent',
+  invoiced: 'Invoiced',
+  paid: 'Paid',
+  cancelled: 'Cancelled',
+  archived: 'Archived',
+}
+
+const ORDER_STATUS_ICON: Record<OrderStatus, LucideIcon> = {
+  pending: FileText,
+  scheduled: FileText,
+  assigned: FileText,
+  'in-transit': Send,
+  delivered: CheckCircle,
+  ready_to_invoice: FileText,
+  invoice_sent: Send,
+  invoiced: CheckCircle,
+  paid: CheckCircle,
+  cancelled: CheckCircle,
+  archived: CheckCircle,
+}
+
+const ORDER_STATUS_ICON_COLOR: Record<OrderStatus, string> = {
+  pending: '#92400e',
+  scheduled: '#1e40af',
+  assigned: '#3730a3',
+  'in-transit': '#9d174d',
+  delivered: '#065f46',
+  ready_to_invoice: '#FF6A00',
+  invoice_sent: '#0066FF',
+  invoiced: '#00B7FF',
+  paid: '#065f46',
+  cancelled: '#6b7280',
+  archived: '#6b7280',
 }
 
 function getOrderStatusLabel(order: Order): string {
   if (order.status === 'delivered' && order.deliveryStatus === 'signed') {
     return 'Delivered / Signed'
   }
-  return order.status
+  return ORDER_STATUS_LABEL[order.status]
+}
+
+function renderOrderStatus(order: Order) {
+  const Icon = ORDER_STATUS_ICON[order.status]
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+      <Icon size={12} aria-hidden="true" style={{ color: ORDER_STATUS_ICON_COLOR[order.status] }} />
+      <span>{getOrderStatusLabel(order)}</span>
+    </span>
+  )
 }
 
 function getFileDisplayName(file: AppFile): string {
@@ -2096,8 +2152,8 @@ const CustomerRecord: React.FC = () => {
                         <td>{order.quantity}</td>
                         <td>{formatCurrency(order.total)}</td>
                         <td>
-                          <Badge variant={ORDER_BADGE[order.status] ?? 'neutral'}>
-                            {getOrderStatusLabel(order)}
+                          <Badge variant={ORDER_BADGE[order.status]}>
+                            {renderOrderStatus(order)}
                           </Badge>
                         </td>
                         <td>
@@ -2423,8 +2479,8 @@ const CustomerRecord: React.FC = () => {
                         <td>{order.requestedAt ? formatDate(order.requestedAt) : '—'}</td>
                         <td className="cr-table__mono">{order.quoteNumber || order.quoteId || '—'}</td>
                         <td>
-                          <Badge variant={ORDER_BADGE[order.status] ?? 'neutral'}>
-                            {getOrderStatusLabel(order)}
+                          <Badge variant={ORDER_BADGE[order.status]}>
+                            {renderOrderStatus(order)}
                           </Badge>
                         </td>
                         <td>{order.quantity}</td>

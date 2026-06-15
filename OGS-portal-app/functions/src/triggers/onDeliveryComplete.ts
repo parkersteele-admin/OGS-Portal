@@ -27,6 +27,7 @@ import { STRIPE_SECRET_KEY, requireSecret } from '../config'
 import { sendEmail } from '../mail'
 import { createNotification } from '../notifications/createNotification'
 import { generateInvoicePdf } from '../pdf/generateInvoicePdf'
+import { appendStatusHistory } from '../lib/orderStatus'
 
 // ── Business-rule constants ───────────────────────────────────────────────────
 // Adjust these without touching logic.
@@ -103,8 +104,11 @@ export const onDeliveryComplete = onDocumentUpdated(
         customerId = orderData.customerId as string | undefined
 
         // ── Step 1: Update order ──────────────────────────────────────────────
+        const shouldMarkReadyToInvoice =
+          afterStatus === 'completed' && (orderData.deliveryStatus as string | undefined) !== 'signed'
+        const nextOrderStatus = shouldMarkReadyToInvoice ? 'ready_to_invoice' : 'delivered'
         tx.update(orderRef, {
-          status:             'delivered',
+          status:             nextOrderStatus,
           deliveredAt:        FieldValue.serverTimestamp(),
           quantityDelivered,
           updatedAt:          FieldValue.serverTimestamp(),
@@ -134,6 +138,17 @@ export const onDeliveryComplete = onDocumentUpdated(
     } catch (err) {
       console.error(`onDeliveryComplete [${orderId}]: transaction failed —`, err)
       throw err // re-throw: Functions will retry
+    }
+
+    if (afterStatus === 'completed' && (orderData?.deliveryStatus as string | undefined) !== 'signed') {
+      await appendStatusHistory(
+        db,
+        orderId,
+        'ready_to_invoice',
+        'system:onDeliveryComplete',
+        'Delivery Completion Trigger',
+        'Stop marked completed and moved to ready_to_invoice.',
+      )
     }
 
     // ── Step 2b: Clear pending low-level alerts ───────────────────────────────

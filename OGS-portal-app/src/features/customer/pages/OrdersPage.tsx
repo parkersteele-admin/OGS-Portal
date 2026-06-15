@@ -14,6 +14,7 @@ import React, {
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getDocs, query, where } from 'firebase/firestore'
+import { CheckCircle, FileText, Send, type LucideIcon } from 'lucide-react'
 import { productsCol, invoicesCol } from '../../../lib/firestore'
 import { useAuth } from '../../../hooks/useAuth'
 import { useCustomer } from '../../../hooks/queries'
@@ -54,6 +55,8 @@ const STATUS_VARIANT: Record<OrderStatus, BadgeVariant> = {
   assigned: 'info',
   'in-transit': 'brand',
   delivered: 'success',
+  ready_to_invoice: 'warning',
+  invoice_sent: 'info',
   invoiced: 'info',
   paid: 'success',
   cancelled: 'danger',
@@ -66,10 +69,50 @@ const STATUS_LABEL: Record<OrderStatus, string> = {
   assigned: 'Assigned',
   'in-transit': 'In Transit',
   delivered: 'Delivered',
+  ready_to_invoice: 'Ready to Invoice',
+  invoice_sent: 'Invoice Sent',
   invoiced: 'Invoiced',
   paid: 'Paid',
   cancelled: 'Cancelled',
   archived: 'Archived',
+}
+
+const STATUS_ICON: Record<OrderStatus, LucideIcon> = {
+  pending: FileText,
+  scheduled: FileText,
+  assigned: FileText,
+  'in-transit': Send,
+  delivered: CheckCircle,
+  ready_to_invoice: FileText,
+  invoice_sent: Send,
+  invoiced: CheckCircle,
+  paid: CheckCircle,
+  cancelled: CheckCircle,
+  archived: CheckCircle,
+}
+
+const STATUS_ICON_COLOR: Record<OrderStatus, string> = {
+  pending: '#92400e',
+  scheduled: '#1e40af',
+  assigned: '#3730a3',
+  'in-transit': '#9d174d',
+  delivered: '#065f46',
+  ready_to_invoice: '#FF6A00',
+  invoice_sent: '#0066FF',
+  invoiced: '#00B7FF',
+  paid: '#065f46',
+  cancelled: '#6b7280',
+  archived: '#6b7280',
+}
+
+function renderOrderStatus(order: Order) {
+  const Icon = STATUS_ICON[order.status]
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+      <Icon size={12} aria-hidden="true" style={{ color: STATUS_ICON_COLOR[order.status] }} />
+      <span>{getOrderStatusLabel(order)}</span>
+    </span>
+  )
 }
 
 const TIER_LABEL: Record<DeliveryTier, string> = {
@@ -97,7 +140,7 @@ const ORDER_TYPE_STYLE: Record<OrderType, React.CSSProperties> = {
 }
 
 const TIMELINE_STEPS: OrderStatus[] = [
-  'pending', 'scheduled', 'in-transit', 'delivered', 'invoiced', 'paid',
+  'pending', 'scheduled', 'in-transit', 'delivered', 'ready_to_invoice', 'invoice_sent', 'invoiced', 'paid',
 ]
 
 function timelineState(current: OrderStatus, step: OrderStatus): 'done' | 'active' | 'upcoming' {
@@ -251,7 +294,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
         <div className="oh-detail__header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <span className="oh-detail__id">#{order.id.slice(0, 8).toUpperCase()}</span>
-            <Badge variant={STATUS_VARIANT[order.status]}>{getOrderStatusLabel(order)}</Badge>
+            <Badge variant={STATUS_VARIANT[order.status]}>{renderOrderStatus(order)}</Badge>
             {order.orderType && (
               <span className="oh-order-type-pill" style={ORDER_TYPE_STYLE[order.orderType]}>
                 {ORDER_TYPE_LABEL[order.orderType]}
@@ -539,7 +582,7 @@ const OrderRow: React.FC<OrderRowProps> = ({
       <td className="oh-td oh-td--mono">#{order.id.slice(0, 8).toUpperCase()}</td>
       <td className="oh-td">
         <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <Badge variant={STATUS_VARIANT[order.status]}>{getOrderStatusLabel(order)}</Badge>
+          <Badge variant={STATUS_VARIANT[order.status]}>{renderOrderStatus(order)}</Badge>
           {order.orderType && (
             <span className="oh-order-type-pill" style={ORDER_TYPE_STYLE[order.orderType]}>
               {ORDER_TYPE_LABEL[order.orderType]}

@@ -16,6 +16,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { Eye, Info, Truck } from 'lucide-react'
 import {
   getDoc,
   getDocs,
@@ -38,6 +39,9 @@ import type { Invoice } from '../../../types/billing'
 import type { Customer } from '../../../types/customer'
 import type { Product } from '../../../types/product'
 import { Button } from '../../../components/ui/Button'
+import { Modal } from '../../../components/ui/Modal'
+import { DeliveryCompleteModal } from '../../../components/delivery/DeliveryCompleteModal'
+import MobileOrderCard from '../../../components/orders/MobileOrderCard'
 import './RunSummary.css'
 
 // ── Formatting helpers ─────────────────────────────────────────────────────────
@@ -144,7 +148,7 @@ export default function RunSummary() {
   const navigate   = useNavigate()
   const location   = useLocation()
   const opsBase    = location.pathname.startsWith('/admin') ? '/admin/ops' : '/ops'
-  const { isDispatch } = useAuth()
+  const { isAdmin, isDispatch } = useAuth()
 
   const [run,        setRun]        = useState<Run | null>(null)
   const [stops,      setStops]      = useState<RunStop[]>([])
@@ -162,6 +166,20 @@ export default function RunSummary() {
   const [reassignDriverId, setReassignDriverId] = useState<string>('')
   const [reassigning,      setReassigning]      = useState(false)
   const [reassignError,    setReassignError]    = useState<string | null>(null)
+  const [refreshNonce,     setRefreshNonce]     = useState(0)
+  const [deliveryTarget,   setDeliveryTarget]   = useState<{ stop: RunStop; order: Order } | null>(null)
+  const [stopDetailTarget, setStopDetailTarget] = useState<RunStop | null>(null)
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(max-width: 767px)').matches : false,
+  )
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 767px)')
+    const onChange = (event: MediaQueryListEvent) => setIsMobile(event.matches)
+    setIsMobile(media.matches)
+    media.addEventListener('change', onChange)
+    return () => media.removeEventListener('change', onChange)
+  }, [])
 
   // ── Load drivers for reassignment ──────────────────────────────────────────
 
@@ -245,7 +263,7 @@ export default function RunSummary() {
       setError(err.message ?? 'Failed to load run summary.')
       setLoading(false)
     })
-  }, [runId])
+  }, [runId, refreshNonce])
 
   // ── KPIs ─────────────────────────────────────────────────────────────────────
 
@@ -448,88 +466,157 @@ export default function RunSummary() {
           <h2 className="rs-card__title">Stop Summary</h2>
           <span className="rs-card__badge">{stops.length} stop{stops.length !== 1 ? 's' : ''}</span>
         </div>
-        <div className="rs-table-wrap">
-          <table className="rs-table">
-            <thead>
-              <tr>
-                <th className="rs-th rs-th--num">#</th>
-                <th className="rs-th">Customer</th>
-                <th className="rs-th">Product</th>
-                <th className="rs-th rs-th--num">Qty Delivered</th>
-                <th className="rs-th">Status</th>
-                <th className="rs-th rs-th--time">Arrived</th>
-                <th className="rs-th rs-th--time">Completed</th>
-                <th className="rs-th rs-th--notes">Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {stops.map((stop) => {
-                const order    = orders.get(stop.orderId)
-                const customer = customers.get(stop.customerId)
-                const product  = order ? products.get(order.productId) : undefined
-                const isSkipped = stop.status === 'skipped'
+        {isMobile ? (
+          <div className="rs-mobile-cards">
+            {stops.map((stop) => {
+              const order = orders.get(stop.orderId)
+              if (!order) return null
 
-                return (
-                  <tr
-                    key={stop.id}
-                    className={`rs-tr rs-tr--${stop.status}`}
-                  >
-                    <td className="rs-td rs-td--num">{stop.order}</td>
+              const customer = customers.get(stop.customerId)
+              const product = products.get(order.productId)
+              const canCompleteDelivery =
+                (isAdmin || isDispatch)
+                && (order.status === 'in-transit' || order.status === 'assigned')
 
-                    <td className="rs-td">
-                      <div className="rs-customer">
-                        {customer?.name ?? stop.customerId}
-                      </div>
-                      {customer && (
-                        <div className="rs-customer__sub">
-                          {customer.city}, {customer.state}
+              return (
+                <MobileOrderCard
+                  key={stop.id}
+                  order={{
+                    ...order,
+                    quantity: stop.gallonsDelivered ?? order.quantity,
+                    customerName: customer?.name ?? stop.customerId,
+                    productName: product?.name ?? order.productId,
+                    productUnit: product?.unit ?? 'gal',
+                  } as Order}
+                  primaryAction={canCompleteDelivery ? {
+                    label: 'Complete Delivery',
+                    icon: Truck,
+                    onClick: () => setDeliveryTarget({ stop, order }),
+                  } : {
+                    label: 'View Details',
+                    icon: Eye,
+                    onClick: () => setStopDetailTarget(stop),
+                  }}
+                  secondaryActions={[
+                    {
+                      label: 'View Order',
+                      icon: Eye,
+                      onClick: () => navigate(`${opsBase}/orders?orderId=${order.id}`),
+                    },
+                    {
+                      label: 'View Stop Details',
+                      icon: Info,
+                      onClick: () => setStopDetailTarget(stop),
+                    },
+                  ]}
+                  expanded={!['delivered', 'ready_to_invoice', 'invoice_sent', 'paid'].includes(order.status)}
+                />
+              )
+            })}
+          </div>
+        ) : (
+          <div className="rs-table-wrap">
+            <table className="rs-table">
+              <thead>
+                <tr>
+                  <th className="rs-th rs-th--num">#</th>
+                  <th className="rs-th">Customer</th>
+                  <th className="rs-th">Product</th>
+                  <th className="rs-th rs-th--num">Qty Delivered</th>
+                  <th className="rs-th">Status</th>
+                  <th className="rs-th rs-th--time">Arrived</th>
+                  <th className="rs-th rs-th--time">Completed</th>
+                  <th className="rs-th rs-th--notes">Notes</th>
+                  <th className="rs-th">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stops.map((stop) => {
+                  const order    = orders.get(stop.orderId)
+                  const customer = customers.get(stop.customerId)
+                  const product  = order ? products.get(order.productId) : undefined
+                  const isSkipped = stop.status === 'skipped'
+                  const canCompleteDelivery =
+                    !!order
+                    && (isAdmin || isDispatch)
+                    && (order.status === 'in-transit' || order.status === 'assigned')
+
+                  return (
+                    <tr
+                      key={stop.id}
+                      className={`rs-tr rs-tr--${stop.status}`}
+                    >
+                      <td className="rs-td rs-td--num">{stop.order}</td>
+
+                      <td className="rs-td">
+                        <div className="rs-customer">
+                          {customer?.name ?? stop.customerId}
                         </div>
-                      )}
-                    </td>
+                        {customer && (
+                          <div className="rs-customer__sub">
+                            {customer.city}, {customer.state}
+                          </div>
+                        )}
+                      </td>
 
-                    <td className="rs-td">
-                      <span>{product?.name ?? order?.productId ?? '—'}</span>
-                      {product && (
-                        <span className="rs-unit"> /{product.unit}</span>
-                      )}
-                    </td>
+                      <td className="rs-td">
+                        <span>{product?.name ?? order?.productId ?? '—'}</span>
+                        {product && (
+                          <span className="rs-unit"> /{product.unit}</span>
+                        )}
+                      </td>
 
-                    <td className="rs-td rs-td--num">
-                      {stop.gallonsDelivered != null ? (
-                        <>
-                          {stop.gallonsDelivered}
-                          <span className="rs-unit"> {product?.unit ?? 'gal'}</span>
-                        </>
-                      ) : (
-                        <span className={isSkipped ? 'rs-skip-dash' : ''}>—</span>
-                      )}
-                    </td>
+                      <td className="rs-td rs-td--num">
+                        {stop.gallonsDelivered != null ? (
+                          <>
+                            {stop.gallonsDelivered}
+                            <span className="rs-unit"> {product?.unit ?? 'gal'}</span>
+                          </>
+                        ) : (
+                          <span className={isSkipped ? 'rs-skip-dash' : ''}>—</span>
+                        )}
+                      </td>
 
-                    <td className="rs-td">
-                      <span className={`rs-stop-badge rs-stop-badge--${stop.status}`}>
-                        {stop.status === 'completed' && '✓ '}
-                        {stop.status === 'skipped'   && '✕ '}
-                        {stop.status.charAt(0).toUpperCase() + stop.status.slice(1)}
-                      </span>
-                    </td>
+                      <td className="rs-td">
+                        <span className={`rs-stop-badge rs-stop-badge--${stop.status}`}>
+                          {stop.status === 'completed' && '✓ '}
+                          {stop.status === 'skipped'   && '✕ '}
+                          {stop.status.charAt(0).toUpperCase() + stop.status.slice(1)}
+                        </span>
+                      </td>
 
-                    <td className="rs-td rs-td--time">
-                      {fmtTimestamp(stop.arrivedAt as unknown as Timestamp)}
-                    </td>
+                      <td className="rs-td rs-td--time">
+                        {fmtTimestamp(stop.arrivedAt as unknown as Timestamp)}
+                      </td>
 
-                    <td className="rs-td rs-td--time">
-                      {fmtTimestamp(stop.completedAt as unknown as Timestamp)}
-                    </td>
+                      <td className="rs-td rs-td--time">
+                        {fmtTimestamp(stop.completedAt as unknown as Timestamp)}
+                      </td>
 
-                    <td className="rs-td rs-td--notes">
-                      {stop.notes ?? '—'}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+                      <td className="rs-td rs-td--notes">
+                        {stop.notes ?? '—'}
+                      </td>
+
+                      <td className="rs-td">
+                        {canCompleteDelivery ? (
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              if (!order) return
+                              setDeliveryTarget({ stop, order })
+                            }}
+                          >
+                            <Truck size={14} /> Complete Delivery
+                          </Button>
+                        ) : '—'}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* ── 4. Skipped stop actions ── */}
@@ -700,6 +787,51 @@ export default function RunSummary() {
           )}
         </div>
       </div>
+
+      {deliveryTarget && (
+        <DeliveryCompleteModal
+          order={deliveryTarget.order}
+          runId={run.id}
+          stopId={deliveryTarget.stop.id}
+          onClose={() => setDeliveryTarget(null)}
+          onSuccess={() => {
+            setDeliveryTarget(null)
+            setRefreshNonce((value) => value + 1)
+          }}
+        />
+      )}
+
+      {stopDetailTarget && (
+        <Modal
+          open
+          onClose={() => setStopDetailTarget(null)}
+          title={`Stop #${stopDetailTarget.order} Details`}
+          size="md"
+        >
+          <div className="rs-stop-detail">
+            <div className="rs-stop-detail__row">
+              <span>Status</span>
+              <strong>{stopDetailTarget.status}</strong>
+            </div>
+            <div className="rs-stop-detail__row">
+              <span>Arrived</span>
+              <strong>{fmtTimestamp(stopDetailTarget.arrivedAt as unknown as Timestamp)}</strong>
+            </div>
+            <div className="rs-stop-detail__row">
+              <span>Completed</span>
+              <strong>{fmtTimestamp(stopDetailTarget.completedAt as unknown as Timestamp)}</strong>
+            </div>
+            <div className="rs-stop-detail__row">
+              <span>Delivered</span>
+              <strong>{stopDetailTarget.gallonsDelivered ?? '—'}</strong>
+            </div>
+            <div className="rs-stop-detail__row rs-stop-detail__row--notes">
+              <span>Notes</span>
+              <strong>{stopDetailTarget.notes ?? '—'}</strong>
+            </div>
+          </div>
+        </Modal>
+      )}
 
     </div>
   )

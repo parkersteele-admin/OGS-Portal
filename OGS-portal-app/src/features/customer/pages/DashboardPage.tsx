@@ -16,6 +16,7 @@ import React, { useMemo } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { collection, getDocs } from 'firebase/firestore'
+import { CheckCircle, FileText, Send, type LucideIcon } from 'lucide-react'
 import { db } from '../../../lib/firebase'
 import { useAuth } from '../../../hooks/useAuth'
 import { useOnboarding } from '../../../hooks/useOnboarding'
@@ -74,6 +75,8 @@ function orderStatusVariant(status: OrderStatus): BadgeVariant {
     assigned:     'info',
     'in-transit': 'brand',
     delivered:    'success',
+    ready_to_invoice: 'warning',
+    invoice_sent: 'info',
     invoiced:     'info',
     paid:         'success',
     cancelled:    'danger',
@@ -82,11 +85,63 @@ function orderStatusVariant(status: OrderStatus): BadgeVariant {
   return map[status] ?? 'neutral'
 }
 
+const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
+  pending: 'Pending',
+  scheduled: 'Scheduled',
+  assigned: 'Assigned',
+  'in-transit': 'In Transit',
+  delivered: 'Delivered',
+  ready_to_invoice: 'Ready to Invoice',
+  invoice_sent: 'Invoice Sent',
+  invoiced: 'Invoiced',
+  paid: 'Paid',
+  cancelled: 'Cancelled',
+  archived: 'Archived',
+}
+
+const ORDER_STATUS_ICON: Record<OrderStatus, LucideIcon> = {
+  pending: FileText,
+  scheduled: FileText,
+  assigned: FileText,
+  'in-transit': Send,
+  delivered: CheckCircle,
+  ready_to_invoice: FileText,
+  invoice_sent: Send,
+  invoiced: CheckCircle,
+  paid: CheckCircle,
+  cancelled: CheckCircle,
+  archived: CheckCircle,
+}
+
+const ORDER_STATUS_ICON_COLOR: Record<OrderStatus, string> = {
+  pending: '#92400e',
+  scheduled: '#1e40af',
+  assigned: '#3730a3',
+  'in-transit': '#9d174d',
+  delivered: '#065f46',
+  ready_to_invoice: '#FF6A00',
+  invoice_sent: '#0066FF',
+  invoiced: '#00B7FF',
+  paid: '#065f46',
+  cancelled: '#6b7280',
+  archived: '#6b7280',
+}
+
 function getOrderStatusLabel(order: Order): string {
   if (order.status === 'delivered' && order.deliveryStatus === 'signed') {
     return 'Delivered / Signed'
   }
-  return order.status
+  return ORDER_STATUS_LABEL[order.status]
+}
+
+function renderOrderStatus(order: Order) {
+  const Icon = ORDER_STATUS_ICON[order.status]
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+      <Icon size={12} aria-hidden="true" style={{ color: ORDER_STATUS_ICON_COLOR[order.status] }} />
+      <span>{getOrderStatusLabel(order)}</span>
+    </span>
+  )
 }
 
 function tierLabel(tier: DeliveryTier, upchargePercent: number): string | null {
@@ -147,7 +202,7 @@ const OrderRow: React.FC<OrderRowProps> = ({ order, productName }) => {
             {label}
           </Badge>
         )}
-        <Badge variant={orderStatusVariant(order.status)}>{getOrderStatusLabel(order)}</Badge>
+        <Badge variant={orderStatusVariant(order.status)}>{renderOrderStatus(order)}</Badge>
       </div>
       <span className="cust-db__ord-amount">{fmtCurrency(order.total)}</span>
     </div>

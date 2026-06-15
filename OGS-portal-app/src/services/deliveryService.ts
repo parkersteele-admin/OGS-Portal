@@ -21,6 +21,17 @@ export interface FinalizeSignedDeliveryResult {
   invoiceId: string
 }
 
+export interface AdminFinalizeDeliveryInput {
+  runId: string
+  stopId: string
+  qtyDelivered: number
+  receivedByName: string
+  signatureDataUrl: string
+  deliveryNotes?: string
+  deliveredLineItems: { productId: string; qty: number }[]
+  deliveredAddOns?: { productId: string; qty: number }[]
+}
+
 export async function finalizeSignedDelivery(
   input: FinalizeSignedDeliveryInput,
 ): Promise<FinalizeSignedDeliveryResult> {
@@ -29,6 +40,19 @@ export async function finalizeSignedDelivery(
       FinalizeSignedDeliveryInput,
       FinalizeSignedDeliveryResult
     >(functions, 'finalizeSignedDelivery')
+    const result = await fn(input)
+    return result.data
+  })
+}
+
+export async function adminFinalizeDelivery(
+  input: AdminFinalizeDeliveryInput,
+): Promise<FinalizeSignedDeliveryResult> {
+  return serviceCall(async () => {
+    const fn = httpsCallable<
+      AdminFinalizeDeliveryInput,
+      FinalizeSignedDeliveryResult
+    >(functions, 'adminFinalizeDelivery')
     const result = await fn(input)
     return result.data
   })
