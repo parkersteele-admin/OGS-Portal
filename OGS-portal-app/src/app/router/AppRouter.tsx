@@ -33,11 +33,9 @@ import {
   CustomerLayout,
   DashboardPage,
   InvoicesPage,
-  ManageAutopay,
   MyProducts,
   OrderPage,
   OrdersPage,
-  PayInvoicePage,
   ProfilePage,
   QuotePage,
   TankLevelsPage,
@@ -136,8 +134,6 @@ export const AppRouter: React.FC = () => (
         <Route path="order" element={<OrderPage />} />
         <Route path="orders" element={<OrdersPage />} />
         <Route path="invoices" element={<InvoicesPage />} />
-        <Route path="invoices/:invoiceId/pay" element={<PayInvoicePage />} />
-        <Route path="autopay" element={<ManageAutopay />} />
         <Route path="tanks" element={<TankLevelsPage />} />
         <Route path="catalog" element={<MyProducts />} />
         <Route path="quotes/:quoteId" element={<QuotePage />} />

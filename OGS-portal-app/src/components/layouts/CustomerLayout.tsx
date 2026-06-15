@@ -34,13 +34,6 @@ const IC_INVOICES = (
     <path d="M6.5 7.5h3M6.5 10h2" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round"/>
   </svg>
 )
-const IC_AUTOPAY = (
-  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-    <rect x="1" y="3.5" width="14" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.5"/>
-    <path d="M1 7h14" stroke="currentColor" strokeWidth="1.5"/>
-    <rect x="3" y="9.5" width="3.5" height="1.5" rx="0.5" fill="currentColor"/>
-  </svg>
-)
 const IC_TANKS = (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
     <ellipse cx="8" cy="5" rx="4" ry="1.75" stroke="currentColor" strokeWidth="1.5"/>
@@ -73,7 +66,6 @@ const NAV_ITEMS: SidebarItem[] = [
   { to: '/portal/order',     label: 'New Order',       icon: IC_ORDER },
   { to: '/portal/orders',    label: 'My Orders',       icon: IC_ORDERS },
   { to: '/portal/invoices',  label: 'Invoices',        icon: IC_INVOICES },
-  { to: '/portal/autopay',   label: 'Autopay',         icon: IC_AUTOPAY },
   { to: '/portal/tanks',     label: 'My Tanks',        icon: IC_TANKS },
   { to: '/portal/catalog',   label: 'My Products',     icon: IC_PRODUCTS },
   { to: '/portal/profile',   label: 'My Profile',      icon: IC_PROFILE },

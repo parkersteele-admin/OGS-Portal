@@ -9,46 +9,26 @@
  *  1. [Transaction] Update order:     status='delivered', deliveredAt, quantityDelivered
  *  2. [Transaction] Update tank level: recalculate currentLevelPct, lastFilledAt
  *  2b.              Clear any pending low-level alerts if new level > 25%
- *  3.               Generate invoice:  line items, tier upcharge, rental, delivery fee
- *  4.               Handle autopay:    Stripe PaymentIntent (off-session) OR invoice email
- *  5.               Delivery confirmation email to customer
- *  6.               In-app notification for dispatch
+ *  3.               Delivery confirmation email to customer
+ *  4.               In-app notification for dispatch
  *  [bonus]          Run completion check: mark run 'completed' if all stops delivered
  *
  * Error strategy:
  *  - Steps 1+2 (transaction): re-throw on failure — function retries are desirable
- *  - Steps 3-6 + run check:   catch + log, continue — delivery is complete regardless
+ *  - Steps 3-4 + run check:   catch + log, continue — delivery is complete regardless
  */
 
 import { onDocumentUpdated } from 'firebase-functions/v2/firestore'
-import Stripe from 'stripe'
 import { db, FieldValue } from '../admin'
-import { STRIPE_SECRET_KEY, requireSecret } from '../config'
 import { sendEmail } from '../mail'
 import { createNotification } from '../notifications/createNotification'
-import { generateInvoicePdf } from '../pdf/generateInvoicePdf'
 import { appendStatusHistory } from '../lib/orderStatus'
-
-// ── Business-rule constants ───────────────────────────────────────────────────
-// Adjust these without touching logic.
-
-const DELIVERY_TIER_UPCHARGE: Record<string, number> = {
-  standard:  0,
-  express:   0.15,
-  emergency: 0.30,
-}
-
-const TANK_RENTAL_MONTHLY_FEE = 15.00  // USD per month
-const FLAT_DELIVERY_FEE       = 12.50  // USD per delivery
-const TAX_RATE                = 0.08   // 8 %
-const LOW_LEVEL_THRESHOLD_PCT = 25     // clear alerts above this
 
 // ── Trigger ───────────────────────────────────────────────────────────────────
 
 export const onDeliveryComplete = onDocumentUpdated(
   {
     document:      'runs/{runId}/stops/{stopId}',
-    secrets:       [STRIPE_SECRET_KEY],
     memory:        '512MiB',
     timeoutSeconds: 300,
   },
@@ -172,7 +152,7 @@ export const onDeliveryComplete = onDocumentUpdated(
       }
     }
 
-    // ── Fetch customer record (needed for steps 3-5) ──────────────────────────
+    // ── Fetch customer record (needed for step 3) ────────────────────────────
     if (customerId) {
       try {
         const snap = await db.collection('customers').doc(customerId).get()
@@ -182,200 +162,7 @@ export const onDeliveryComplete = onDocumentUpdated(
       }
     }
 
-    // ── Step 3: Generate invoice ──────────────────────────────────────────────
-    let invoiceId:     string | undefined
-    let invoiceNumber: string | undefined
-    let totalAmount:   number | undefined
-
-    try {
-      // Idempotency guard: don't create duplicate invoices
-      const existingSnap = await db
-        .collection('invoices')
-        .where('orderId', '==', orderId)
-        .limit(1)
-        .get()
-
-      if (!existingSnap.empty) {
-        invoiceId     = existingSnap.docs[0].id
-        invoiceNumber = existingSnap.docs[0].data().invoiceNumber as string
-        totalAmount   = existingSnap.docs[0].data().totalAmount   as number
-        console.log(`onDeliveryComplete [${orderId}]: invoice already exists (${invoiceId})`)
-      } else {
-        // Determine if this is the first delivery for the tank (for rental note)
-        let isFirstDelivery = false
-        if (tankId) {
-          const prevSnap = await db
-            .collection('orders')
-            .where('tankId', '==', tankId)
-            .where('status', '==', 'delivered')
-            .get()
-          // size includes the current order (already marked delivered in transaction)
-          isFirstDelivery = prevSnap.size <= 1
-        }
-
-        const unitPrice    = (orderData!.unitPrice    as number) ?? 0
-        const deliveryTier = (orderData!.deliveryTier as string) ?? 'standard'
-        const upchargeRate = DELIVERY_TIER_UPCHARGE[deliveryTier] ?? 0
-
-        const productSubtotal = unitPrice * quantityDelivered
-        const upchargeAmount  = productSubtotal * upchargeRate
-        const subtotal        = productSubtotal + upchargeAmount + TANK_RENTAL_MONTHLY_FEE + FLAT_DELIVERY_FEE
-        const taxAmount       = subtotal * TAX_RATE
-        totalAmount           = subtotal + taxAmount
-        invoiceNumber         = `INV-${Date.now().toString().slice(-8)}`
-
-        const dueAt = new Date()
-        dueAt.setDate(dueAt.getDate() + 30)
-
-        const lineItems = [
-          {
-            description: `Gas delivery — ${quantityDelivered.toFixed(1)} gal @ $${unitPrice.toFixed(2)}/gal`,
-            quantity:    quantityDelivered,
-            unitPrice,
-            total:       productSubtotal,
-          },
-          ...(upchargeAmount > 0
-            ? [{
-                description: `${deliveryTier.charAt(0).toUpperCase()}${deliveryTier.slice(1)} delivery upcharge (${(upchargeRate * 100).toFixed(0)}%)`,
-                quantity:    1,
-                unitPrice:   upchargeAmount,
-                total:       upchargeAmount,
-              }]
-            : []),
-          {
-            description: `Tank rental${isFirstDelivery ? ' (first month)' : ''}`,
-            quantity:    1,
-            unitPrice:   TANK_RENTAL_MONTHLY_FEE,
-            total:       TANK_RENTAL_MONTHLY_FEE,
-          },
-          {
-            description: 'Flat delivery fee',
-            quantity:    1,
-            unitPrice:   FLAT_DELIVERY_FEE,
-            total:       FLAT_DELIVERY_FEE,
-          },
-        ]
-
-        const invoiceRef = db.collection('invoices').doc()
-        await invoiceRef.set({
-          orderId,
-          customerId:   customerId ?? null,
-          tankId:       tankId     ?? null,
-          invoiceNumber,
-          status:       'pending',
-          lineItems,
-          subtotal,
-          taxRate:      TAX_RATE,
-          taxAmount,
-          totalAmount,
-          deliveryTier,
-          issuedAt:     FieldValue.serverTimestamp(),
-          dueAt,
-          createdAt:    FieldValue.serverTimestamp(),
-          updatedAt:    FieldValue.serverTimestamp(),
-        })
-
-        invoiceId = invoiceRef.id
-        console.log(`onDeliveryComplete [${orderId}]: invoice ${invoiceId} (${invoiceNumber}) created — $${totalAmount.toFixed(2)}`)
-      }
-    } catch (err) {
-      console.error(`onDeliveryComplete [${orderId}]: invoice generation failed —`, err)
-    }
-
-    // ── Step 3b: Generate PDF ───────────────────────────────────────────────────
-    if (invoiceId) {
-      try {
-        await generateInvoicePdf(invoiceId)
-        console.log(`onDeliveryComplete [${orderId}]: PDF generated for invoice ${invoiceId}`)
-      } catch (err) {
-        console.error(`onDeliveryComplete [${orderId}]: PDF generation failed —`, err)
-      }
-    }
-
-    // ── Step 4: Autopay or invoice email ──────────────────────────────────────
-    if (invoiceId && invoiceNumber && totalAmount !== undefined && customerData) {
-      try {
-        const hasAutopay =
-          customerData.autopayEnabled === true &&
-          typeof customerData.stripeCustomerId === 'string' &&
-          customerData.stripeCustomerId !== ''
-
-        if (hasAutopay) {
-          // ── Autopay: confirm PaymentIntent off-session ──────────────────────
-          const stripeKey   = requireSecret(STRIPE_SECRET_KEY.value(), 'STRIPE_SECRET_KEY')
-          const stripe      = new Stripe(stripeKey)
-          const amountCents = Math.round(totalAmount * 100)
-
-          const pi = await stripe.paymentIntents.create({
-            amount:         amountCents,
-            currency:       'usd',
-            customer:       customerData.stripeCustomerId as string,
-            payment_method: customerData.stripeDefaultPaymentMethodId as string | undefined,
-            confirm:        true,
-            off_session:    true,
-            description:    `Autopay — Invoice ${invoiceNumber}`,
-            metadata: {
-              invoiceId,
-              customerId:    customerId  ?? '',
-              invoiceNumber,
-              orderId,
-            },
-          })
-
-          if (pi.status === 'succeeded') {
-            const batch = db.batch()
-            batch.update(db.collection('invoices').doc(invoiceId), {
-              status:    'paid',
-              paidAt:    FieldValue.serverTimestamp(),
-              updatedAt: FieldValue.serverTimestamp(),
-            })
-            batch.set(db.collection('payments').doc(), {
-              invoiceId,
-              customerId: customerId ?? null,
-              orderId,
-              amount:                totalAmount,
-              currency:              'USD',
-              stripePaymentIntentId: pi.id,
-              method:                'autopay',
-              status:                'succeeded',
-              createdAt:             FieldValue.serverTimestamp(),
-            })
-            await batch.commit()
-            console.log(`onDeliveryComplete [${orderId}]: autopay succeeded (${pi.id})`)
-          } else {
-            console.warn(`onDeliveryComplete [${orderId}]: autopay PI ${pi.id} status=${pi.status}`)
-          }
-
-        } else if (customerData.email) {
-          // ── No autopay: send invoice email with pay link ──────────────────
-          const dueDateStr = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString()
-          await sendEmail({
-            to:      customerData.email as string,
-            subject: `Invoice #${invoiceNumber} — OGS Portal`,
-            html: `
-              <h2>Invoice Ready — OGS Portal</h2>
-              <p>Hi ${customerData.name as string},</p>
-              <p>Your delivery has been completed. Invoice
-              <strong>#${invoiceNumber}</strong> for
-              <strong>$${totalAmount.toFixed(2)}</strong> is now ready.</p>
-              <p><strong>Due:</strong> ${dueDateStr}</p>
-              <p style="margin-top:24px">
-                <a href="https://app.ohiogassupply.com/portal/invoices"
-                   style="background:#2563eb;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none">
-                  Pay Now →
-                </a>
-              </p>
-              <p style="margin-top:24px;color:#666;font-size:12px">— The OGS Portal Team</p>
-            `,
-          })
-          console.log(`onDeliveryComplete [${orderId}]: invoice email sent to ${customerData.email as string}`)
-        }
-      } catch (err) {
-        console.error(`onDeliveryComplete [${orderId}]: autopay/invoice email failed —`, err)
-      }
-    }
-
-    // ── Step 5: Delivery confirmation email ───────────────────────────────────
+    // ── Step 3: Delivery confirmation email ───────────────────────────────────
     if (customerData?.email) {
       try {
         const tankLine = tankId && newLevelPct > 0
@@ -401,7 +188,7 @@ export const onDeliveryComplete = onDocumentUpdated(
       }
     }
 
-    // ── Step 6: In-app notification for dispatch ──────────────────────────────
+    // ── Step 4: In-app notification for dispatch ──────────────────────────────
     const orderNum = (orderData!.orderNumber as string | undefined) ?? orderId
     await createNotification({
       userId:   null,

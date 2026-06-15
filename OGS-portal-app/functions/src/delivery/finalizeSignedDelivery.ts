@@ -1,7 +1,6 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https'
 import { db, FieldValue, storage, Timestamp } from '../admin'
 import { sendEmail, type MailAttachment } from '../email/sendEmail'
-import { generateInvoicePdf } from '../pdf/generateInvoicePdf'
 import { generateBillOfLadingPdf } from '../pdf/generateBillOfLadingPdf'
 import { getCompanySettings } from '../pdf/companySettings'
 import { registerGeneratedFile } from '../files/registerGeneratedFile'
@@ -26,22 +25,6 @@ interface ProductSnapshot {
   basePrice?: number
   pricePerUnit?: number
 }
-
-interface InvoiceRecord {
-  id: string
-  pdfUrl?: string
-  invoiceNumber?: string
-}
-
-interface GenerateInvoiceForOrderInput {
-  orderId: string
-}
-
-interface SendInvoiceEmailInput {
-  orderId: string
-}
-
-const DEFAULT_SALES_TAX_RATE = 0.08
 
 export const finalizeSignedDelivery = onCall(
   async (request) => {
@@ -154,20 +137,7 @@ export const finalizeSignedDelivery = onCall(
       },
     })
 
-    let invoice = await findInvoiceForOrder(orderId)
-    if (!invoice) {
-      invoice = await createInvoiceForDelivery({
-        orderId,
-        customerId,
-        deliveryDate,
-        primaryItems: data.deliveredLineItems,
-        addOnItems: data.deliveredAddOns ?? [],
-        order,
-        productMap,
-      })
-    }
-
-    const invoicePdfUrl = invoice.pdfUrl || await generateInvoicePdf(invoice.id)
+    let invoicePdfUrl: string | undefined
 
     const bolItems = [
       ...data.deliveredLineItems.map((item) => {
@@ -223,7 +193,6 @@ export const finalizeSignedDelivery = onCall(
         metadata: {
           linkedEntityType: 'order',
           linkedEntityId: orderId,
-          invoiceId: invoice.id,
           documentKind: 'delivery-receipt',
         },
       })
@@ -245,8 +214,6 @@ export const finalizeSignedDelivery = onCall(
       deliveryDate: Timestamp.fromDate(deliveryDate),
       receivedByName,
       signatureUrl: signatureUpload.url,
-      invoiceId: invoice.id,
-      invoicePdfUrl,
       billOfLadingUrl: billOfLading.url,
       deliveryNotes: deliveryNotes || null,
       createdByUid: request.auth.uid,
@@ -263,7 +230,6 @@ export const finalizeSignedDelivery = onCall(
         signedByName: receivedByName,
         signatureUrl: signatureUpload.url,
         billOfLadingUrl: billOfLading.url,
-        invoicePdfUrl,
         ...(deliveryNotes ? { notes: deliveryNotes } : {}),
         ...(photoUrls?.length ? { photoUrls } : {}),
       }),
@@ -277,7 +243,6 @@ export const finalizeSignedDelivery = onCall(
         receivedByName,
         signatureUrl: signatureUpload.url,
         billOfLadingUrl: billOfLading.url,
-        invoicePdfUrl,
         deliveredLineItems: data.deliveredLineItems,
         deliveredAddOns: data.deliveredAddOns ?? [],
         ...(deliveryNotes ? { deliveryNotes } : {}),
@@ -328,13 +293,6 @@ export const finalizeSignedDelivery = onCall(
       })
     }
 
-    const invoiceBuffer = await downloadBuffer(invoicePdfUrl)
-    attachments.push({
-      content: invoiceBuffer.toString('base64'),
-      filename: `Invoice-${invoice.invoiceNumber || invoice.id}.pdf`,
-      type: 'application/pdf',
-    })
-
     const company = await getCompanySettings()
     const html = `
       <div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;color:#222">
@@ -348,7 +306,7 @@ export const finalizeSignedDelivery = onCall(
           <p style="margin:0 0 14px">A signed delivery has been completed by ${driverName}.</p>
           ${orderSummaryHtml}
           <p style="margin:18px 0 0">
-            The Bill of Lading and Invoice PDFs are attached for your records.
+            The Bill of Lading PDF is attached for your records.
           </p>
           <p style="margin:18px 0 0;color:#666;font-size:12px">
             ${company.name || 'OGS Gas Services'}
@@ -368,11 +326,7 @@ export const finalizeSignedDelivery = onCall(
     }
 
     if (deliveredEmailCount > 0) {
-      await db.collection('invoices').doc(invoice.id).update({
-        status: 'sent',
-        sentAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
-      })
+      // Invoice updates removed - auto-invoice generation no longer needed
     }
 
     await orderSnap.ref.update({
@@ -383,253 +337,6 @@ export const finalizeSignedDelivery = onCall(
     return {
       signatureUrl: signatureUpload.url,
       billOfLadingUrl: billOfLading.url,
-      invoicePdfUrl,
-      invoiceId: invoice.id,
-    }
-  },
-)
-
-export const generateInvoiceForOrder = onCall(
-  async (request) => {
-    if (!request.auth) {
-      throw new HttpsError('unauthenticated', 'You must be signed in.')
-    }
-
-    const role = request.auth.token.role as string | undefined
-    if (role !== 'admin') {
-      throw new HttpsError('permission-denied', 'Only admins can generate invoices manually.')
-    }
-
-    const data = request.data as Partial<GenerateInvoiceForOrderInput>
-    if (!data.orderId || typeof data.orderId !== 'string') {
-      throw new HttpsError('invalid-argument', 'orderId is required.')
-    }
-
-    const orderSnap = await db.collection('orders').doc(data.orderId).get()
-    if (!orderSnap.exists) {
-      throw new HttpsError('not-found', 'Order not found.')
-    }
-
-    const order = orderSnap.data() as Record<string, unknown>
-    const customerId = order.customerId as string | undefined
-    if (!customerId) {
-      throw new HttpsError('failed-precondition', 'Order is missing customer information.')
-    }
-
-    const primaryItems = Array.isArray(order.deliveredLineItems)
-      ? (order.deliveredLineItems as Array<{ productId: string; qty: number }>).filter((item) => item.productId && item.qty > 0)
-      : []
-    const fallbackPrimaryItems = order.productId
-      ? [{ productId: order.productId as string, qty: Number(order.quantity ?? 0) }]
-      : []
-    const normalizedPrimaryItems = (primaryItems.length > 0 ? primaryItems : fallbackPrimaryItems)
-      .filter((item) => item.productId && item.qty > 0)
-
-    if (normalizedPrimaryItems.length === 0) {
-      throw new HttpsError('failed-precondition', 'Order has no delivered/ordered line items to invoice.')
-    }
-
-    const deliveredAddOns = Array.isArray(order.deliveredAddOns)
-      ? (order.deliveredAddOns as Array<{ productId: string; qty: number }>).filter((item) => item.productId && item.qty > 0)
-      : []
-    const fallbackAddOns = Array.isArray(order.addOns)
-      ? (order.addOns as Array<Record<string, unknown>>)
-          .map((item) => ({
-            productId: item.productId as string,
-            qty: Number(item.qty ?? 0),
-          }))
-          .filter((item) => item.productId && item.qty > 0)
-      : []
-    const normalizedAddOns = deliveredAddOns.length > 0 ? deliveredAddOns : fallbackAddOns
-
-    const productIds = new Set<string>()
-    normalizedPrimaryItems.forEach((item) => productIds.add(item.productId))
-    normalizedAddOns.forEach((item) => productIds.add(item.productId))
-    const productMap = await loadProductSnapshots(productIds)
-    const expectedLineItems = buildInvoiceLineItemsForOrder({
-      primaryItems: normalizedPrimaryItems,
-      addOnItems: normalizedAddOns,
-      order,
-      productMap,
-    })
-
-    let invoice = await findInvoiceForOrder(data.orderId)
-    const created = !invoice
-    if (!invoice) {
-      const deliveredAt = (order.deliveredAt as { toDate?: () => Date } | undefined)?.toDate?.()
-      const deliveryDate = deliveredAt ?? new Date()
-      invoice = await createInvoiceForDelivery({
-        orderId: data.orderId,
-        customerId,
-        deliveryDate,
-        primaryItems: normalizedPrimaryItems,
-        addOnItems: normalizedAddOns,
-        order,
-        productMap,
-      })
-    }
-
-    await maybeRepairInvoiceTotals(invoice.id, order, expectedLineItems)
-
-    // Manual regenerate should always render a fresh PDF so branding/template
-    // updates are reflected immediately even when totals are unchanged.
-    const invoicePdfUrl = await generateInvoicePdf(invoice.id)
-
-    await orderSnap.ref.update({
-      invoicePdfUrl,
-      updatedAt: FieldValue.serverTimestamp(),
-    })
-
-    return {
-      invoiceId: invoice.id,
-      invoiceNumber: invoice.invoiceNumber ?? null,
-      invoicePdfUrl,
-      created,
-    }
-  },
-)
-
-export const sendInvoiceEmailForOrder = onCall(
-  async (request) => {
-    if (!request.auth) {
-      throw new HttpsError('unauthenticated', 'You must be signed in.')
-    }
-
-    const role = request.auth.token.role as string | undefined
-    if (role !== 'admin') {
-      throw new HttpsError('permission-denied', 'Only admins can send invoices manually.')
-    }
-
-    const data = request.data as Partial<SendInvoiceEmailInput>
-    if (!data.orderId || typeof data.orderId !== 'string') {
-      throw new HttpsError('invalid-argument', 'orderId is required.')
-    }
-
-    const orderSnap = await db.collection('orders').doc(data.orderId).get()
-    if (!orderSnap.exists) {
-      throw new HttpsError('not-found', 'Order not found.')
-    }
-
-    const order = orderSnap.data() as Record<string, unknown>
-    const customerId = order.customerId as string | undefined
-    if (!customerId) {
-      throw new HttpsError('failed-precondition', 'Order is missing customer information.')
-    }
-
-    const customerSnap = await db.collection('customers').doc(customerId).get()
-    if (!customerSnap.exists) {
-      throw new HttpsError('not-found', 'Customer not found.')
-    }
-    const customer = customerSnap.data() as Record<string, unknown>
-    const customerEmail = (customer.email as string | undefined)?.trim()
-    if (!customerEmail) {
-      throw new HttpsError('failed-precondition', 'Customer does not have a billing email address.')
-    }
-
-    const primaryItems = Array.isArray(order.deliveredLineItems)
-      ? (order.deliveredLineItems as Array<{ productId: string; qty: number }>).filter((item) => item.productId && item.qty > 0)
-      : []
-    const fallbackPrimaryItems = order.productId
-      ? [{ productId: order.productId as string, qty: Number(order.quantity ?? 0) }]
-      : []
-    const normalizedPrimaryItems = (primaryItems.length > 0 ? primaryItems : fallbackPrimaryItems)
-      .filter((item) => item.productId && item.qty > 0)
-
-    if (normalizedPrimaryItems.length === 0) {
-      throw new HttpsError('failed-precondition', 'Order has no delivered/ordered line items to invoice.')
-    }
-
-    const deliveredAddOns = Array.isArray(order.deliveredAddOns)
-      ? (order.deliveredAddOns as Array<{ productId: string; qty: number }>).filter((item) => item.productId && item.qty > 0)
-      : []
-    const fallbackAddOns = Array.isArray(order.addOns)
-      ? (order.addOns as Array<Record<string, unknown>>)
-          .map((item) => ({
-            productId: item.productId as string,
-            qty: Number(item.qty ?? 0),
-          }))
-          .filter((item) => item.productId && item.qty > 0)
-      : []
-    const normalizedAddOns = deliveredAddOns.length > 0 ? deliveredAddOns : fallbackAddOns
-
-    const productIds = new Set<string>()
-    normalizedPrimaryItems.forEach((item) => productIds.add(item.productId))
-    normalizedAddOns.forEach((item) => productIds.add(item.productId))
-    const productMap = await loadProductSnapshots(productIds)
-    const expectedLineItems = buildInvoiceLineItemsForOrder({
-      primaryItems: normalizedPrimaryItems,
-      addOnItems: normalizedAddOns,
-      order,
-      productMap,
-    })
-
-    let invoice = await findInvoiceForOrder(data.orderId)
-    if (!invoice) {
-      const deliveredAt = (order.deliveredAt as { toDate?: () => Date } | undefined)?.toDate?.()
-      const deliveryDate = deliveredAt ?? new Date()
-      invoice = await createInvoiceForDelivery({
-        orderId: data.orderId,
-        customerId,
-        deliveryDate,
-        primaryItems: normalizedPrimaryItems,
-        addOnItems: normalizedAddOns,
-        order,
-        productMap,
-      })
-    }
-
-    await maybeRepairInvoiceTotals(invoice.id, order, expectedLineItems)
-    const invoicePdfUrl = await generateInvoicePdf(invoice.id)
-
-    const invoiceSnap = await db.collection('invoices').doc(invoice.id).get()
-    if (!invoiceSnap.exists) {
-      throw new HttpsError('not-found', 'Invoice not found after generation.')
-    }
-
-    const invoiceData = invoiceSnap.data() as Record<string, unknown>
-    const invoiceNumber = (invoiceData.invoiceNumber as string | undefined) || invoice.id
-    const totalAmount = toNumber(invoiceData.total, invoiceData.totalAmount, 0)
-    const dueDate = (invoiceData.dueAt as { toDate?: () => Date } | undefined)?.toDate?.()
-      ?? (invoiceData.issuedAt as { toDate?: () => Date } | undefined)?.toDate?.()
-      ?? new Date()
-
-    const html = `
-      <div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;color:#222;line-height:1.5">
-        <h2 style="margin:0 0 12px">Invoice Ready</h2>
-        <p style="margin:0 0 12px">Hi ${(customer.name as string | undefined) || 'Customer'},</p>
-        <p style="margin:0 0 12px">
-          Your invoice <strong>#${invoiceNumber}</strong> for <strong>$${totalAmount.toFixed(2)}</strong> is ready.
-        </p>
-        <p style="margin:0 0 12px"><strong>Due date:</strong> ${dueDate.toLocaleDateString('en-US')}</p>
-        <p style="margin:0 0 12px">
-          <a href="${invoicePdfUrl}" style="color:#005eb8;text-decoration:underline">View and download invoice PDF</a>
-        </p>
-        <p style="margin:20px 0 0;color:#666;font-size:12px">Ohio Gas Supply</p>
-      </div>
-    `
-
-    await sendEmail({
-      to: customerEmail,
-      subject: `Invoice #${invoiceNumber} — Ohio Gas Supply`,
-      html,
-    })
-
-    await db.collection('invoices').doc(invoice.id).update({
-      status: 'sent',
-      sentAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
-    })
-
-    await orderSnap.ref.update({
-      invoicePdfUrl,
-      updatedAt: FieldValue.serverTimestamp(),
-    })
-
-    return {
-      invoiceId: invoice.id,
-      invoiceNumber,
-      invoicePdfUrl,
-      emailedTo: customerEmail,
     }
   },
 )
@@ -669,303 +376,6 @@ async function uploadOrderAsset(args: {
   const encodedPath = encodeURIComponent(storagePath)
   const url = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodedPath}?alt=media&token=${downloadToken}`
   return { url, storagePath }
-}
-
-async function loadProductSnapshots(productIds: Set<string>): Promise<Map<string, ProductSnapshot>> {
-  const productDocs = await Promise.all([...productIds].map(async (productId) => {
-    const snap = await db.collection('products').doc(productId).get()
-    const docData = snap.data() as Record<string, unknown> | undefined
-    return [
-      productId,
-      {
-        id: productId,
-        name: (docData?.name as string | undefined) || productId,
-        unit: (docData?.unit as string | undefined) || 'unit',
-        basePrice: docData?.basePrice as number | undefined,
-        pricePerUnit: docData?.pricePerUnit as number | undefined,
-      } satisfies ProductSnapshot,
-    ] as const
-  }))
-  return new Map(productDocs)
-}
-
-async function findInvoiceForOrder(orderId: string): Promise<InvoiceRecord | null> {
-  const snap = await db.collection('invoices').where('orderId', '==', orderId).limit(1).get()
-  if (snap.empty) return null
-  const doc = snap.docs[0]
-  const data = doc.data() as Record<string, unknown>
-  return {
-    id: doc.id,
-    pdfUrl: data.pdfUrl as string | undefined,
-    invoiceNumber: data.invoiceNumber as string | undefined,
-  }
-}
-
-async function createInvoiceForDelivery(args: {
-  orderId: string
-  customerId: string
-  deliveryDate: Date
-  primaryItems: Array<{ productId: string; qty: number }>
-  addOnItems: Array<{ productId: string; qty: number }>
-  order: Record<string, unknown>
-  productMap: Map<string, ProductSnapshot>
-}): Promise<InvoiceRecord> {
-  const lineItems = buildInvoiceLineItemsForOrder({
-    primaryItems: args.primaryItems,
-    addOnItems: args.addOnItems,
-    order: args.order,
-    productMap: args.productMap,
-  })
-
-  const deliveryFee = toNumber(args.order.deliveryFee, 0)
-
-  const subtotal = lineItems.reduce((sum, item) => sum + item.total, 0)
-  const orderTaxRate = toNumber(args.order.salesTaxRate, args.order.taxRate, DEFAULT_SALES_TAX_RATE)
-  const applySalesTax = typeof args.order.applySalesTax === 'boolean'
-    ? args.order.applySalesTax
-    : orderTaxRate > 0
-  const taxRate = applySalesTax ? orderTaxRate : 0
-  const taxAmount = Number((subtotal * taxRate).toFixed(2))
-  const totalAmount = Number((subtotal + taxAmount).toFixed(2))
-
-  // ── GUARD: Verify delivery fee is included in total if order has one ──
-  if (deliveryFee > 0) {
-    const hasDeliveryFeeLine = lineItems.some((item) => /delivery\s*fee/i.test(item.description))
-    if (!hasDeliveryFeeLine) {
-      console.error(`[INVOICE ERROR] Order ${args.orderId} has deliveryFee $${deliveryFee.toFixed(2)} but no delivery fee line item in invoice!`)
-      throw new Error(`Order ${args.orderId} has delivery fee but invoice does not include it. This is a critical bug.`)
-    }
-    const deliveryFeeLineTotal = lineItems.find((item) => /delivery\s*fee/i.test(item.description))?.total ?? 0
-    if (deliveryFeeLineTotal !== deliveryFee) {
-      console.error(`[INVOICE ERROR] Order ${args.orderId} delivery fee mismatch: order has $${deliveryFee.toFixed(2)}, invoice line has $${deliveryFeeLineTotal.toFixed(2)}`)
-      throw new Error(`Delivery fee mismatch in invoice for order ${args.orderId}`)
-    }
-  }
-
-  const invoiceRef = db.collection('invoices').doc()
-  const invoiceNumber = `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`
-  const dueAt = Timestamp.fromDate(new Date(args.deliveryDate.getTime() + 30 * 24 * 60 * 60 * 1000))
-
-  await invoiceRef.set({
-    invoiceNumber,
-    customerId: args.customerId,
-    orderId: args.orderId,
-    quoteId: args.order.quoteId ?? null,
-    quoteNumber: args.order.quoteNumber ?? null,
-    salesRepId: args.order.salesRepId ?? null,
-    salesRepName: args.order.salesRepName ?? null,
-    salesRepEmail: args.order.salesRepEmail ?? null,
-    salesRepPhone: args.order.salesRepPhone ?? null,
-    status: 'pending',
-    lineItems,
-    applySalesTax,
-    salesTaxRate: taxRate,
-    salesTaxAmount: taxAmount,
-    subtotal,
-    tax: taxAmount,
-    total: totalAmount,
-    taxRate,
-    taxAmount,
-    totalAmount,
-    issuedAt: FieldValue.serverTimestamp(),
-    dueAt,
-    createdAt: FieldValue.serverTimestamp(),
-    updatedAt: FieldValue.serverTimestamp(),
-  })
-
-  return { id: invoiceRef.id, invoiceNumber }
-}
-
-async function maybeRepairInvoiceTotals(
-  invoiceId: string,
-  order: Record<string, unknown>,
-  expectedLineItems?: Array<Record<string, unknown>>,
-): Promise<boolean> {
-  const invoiceRef = db.collection('invoices').doc(invoiceId)
-  const invoiceSnap = await invoiceRef.get()
-  if (!invoiceSnap.exists) return false
-
-  const invoice = invoiceSnap.data() as Record<string, unknown>
-  const lineItems = Array.isArray(invoice.lineItems)
-    ? (invoice.lineItems as Array<Record<string, unknown>>)
-    : []
-  const normalizedLineItems = expectedLineItems ?? lineItems
-
-  const lineItemSubtotal = normalizedLineItems.reduce((sum, item) => {
-    const itemTotal = toNumber(
-      item.total,
-      item.amount,
-      Number(item.quantity ?? 0) * Number(item.unitPrice ?? 0),
-      0,
-    )
-    return sum + itemTotal
-  }, 0)
-
-  const subtotal = Number(toNumber(invoice.subtotal, lineItemSubtotal, 0).toFixed(2))
-  const configuredTaxRate = toNumber(
-    invoice.salesTaxRate,
-    invoice.taxRate,
-    order.salesTaxRate,
-    order.taxRate,
-    DEFAULT_SALES_TAX_RATE,
-  )
-  const applySalesTax = typeof invoice.applySalesTax === 'boolean'
-    ? invoice.applySalesTax
-    : typeof order.applySalesTax === 'boolean'
-      ? order.applySalesTax
-      : configuredTaxRate > 0
-  const taxRate = applySalesTax ? configuredTaxRate : 0
-  const taxAmount = Number((subtotal * taxRate).toFixed(2))
-  const total = Number((subtotal + taxAmount).toFixed(2))
-
-  const currentTax = toNumber(invoice.salesTaxAmount, invoice.tax, invoice.taxAmount, 0)
-  const currentTotal = toNumber(invoice.total, invoice.totalAmount, subtotal + currentTax)
-  const currentApplySalesTax = typeof invoice.applySalesTax === 'boolean' ? invoice.applySalesTax : undefined
-  const currentSalesTaxRate = typeof invoice.salesTaxRate === 'number' ? invoice.salesTaxRate : undefined
-  const lineItemsNeedRepair = expectedLineItems ? lineItemsDiffer(lineItems, expectedLineItems) : false
-  const needsRepair =
-    Math.abs(currentTax - taxAmount) > 0.009
-    || Math.abs(currentTotal - total) > 0.009
-    || currentApplySalesTax === undefined
-    || currentSalesTaxRate === undefined
-    || lineItemsNeedRepair
-
-  const currentStatus = invoice.status as string | undefined
-  const resetVoidStatus = currentStatus === 'void'
-
-  if (!needsRepair && !resetVoidStatus) return false
-
-  await invoiceRef.update({
-    ...(lineItemsNeedRepair && { lineItems: expectedLineItems }),
-    applySalesTax,
-    salesTaxRate: taxRate,
-    salesTaxAmount: taxAmount,
-    subtotal,
-    tax: taxAmount,
-    taxRate,
-    taxAmount,
-    total,
-    totalAmount: total,
-    ...(resetVoidStatus && { status: 'pending' }),
-    updatedAt: FieldValue.serverTimestamp(),
-  })
-
-  return true
-}
-
-function buildInvoiceLineItemsForOrder(args: {
-  primaryItems: Array<{ productId: string; qty: number }>
-  addOnItems: Array<{ productId: string; qty: number }>
-  order: Record<string, unknown>
-  productMap: Map<string, ProductSnapshot>
-}) {
-  const quotedUnitPrices = getQuotedUnitPrices(args.order)
-  const primaryFallbackPrice = toNumber(args.order.unitPrice, 0)
-
-  const lineItems = [
-    ...args.primaryItems.map((item) => {
-      const quotedPrice = quotedUnitPrices.get(item.productId)
-      return buildInvoiceLine(item, args.productMap.get(item.productId), quotedPrice ?? primaryFallbackPrice)
-    }),
-    ...args.addOnItems.map((item) => {
-      const quotedPrice = quotedUnitPrices.get(item.productId)
-      return buildInvoiceLine(item, args.productMap.get(item.productId), quotedPrice)
-    }),
-  ]
-
-  const deliveryFee = toNumber(args.order.deliveryFee, 0)
-  if (deliveryFee > 0) {
-    lineItems.push({
-      description: 'Delivery fee',
-      quantity: 1,
-      unitPrice: deliveryFee,
-      amount: deliveryFee,
-      total: deliveryFee,
-    })
-  }
-
-  return lineItems
-}
-
-function getQuotedUnitPrices(order: Record<string, unknown>): Map<string, number> {
-  const prices = new Map<string, number>()
-
-  const quotedLineItems = Array.isArray(order.quotedLineItems)
-    ? (order.quotedLineItems as Array<Record<string, unknown>>)
-    : []
-  for (const item of quotedLineItems) {
-    const productId = item.productId as string | undefined
-    const unitPrice = toNumber(item.unitPrice, 0)
-    if (productId && unitPrice > 0) {
-      prices.set(productId, unitPrice)
-    }
-  }
-
-  const addOns = Array.isArray(order.addOns)
-    ? (order.addOns as Array<Record<string, unknown>>)
-    : []
-  for (const item of addOns) {
-    const productId = item.productId as string | undefined
-    const unitPrice = toNumber(item.unitPrice, 0)
-    if (productId && unitPrice > 0) {
-      prices.set(productId, unitPrice)
-    }
-  }
-
-  return prices
-}
-
-function lineItemsDiffer(
-  current: Array<Record<string, unknown>>,
-  expected: Array<Record<string, unknown>>,
-): boolean {
-  if (current.length !== expected.length) return true
-
-  for (let index = 0; index < expected.length; index += 1) {
-    const a = current[index] ?? {}
-    const b = expected[index] ?? {}
-    const sameDescription = String(a.description ?? '') === String(b.description ?? '')
-    const sameQuantity = Math.abs(toNumber(a.quantity, 0) - toNumber(b.quantity, 0)) <= 0.009
-    const sameUnitPrice = Math.abs(toNumber(a.unitPrice, 0) - toNumber(b.unitPrice, 0)) <= 0.009
-    const sameTotal = Math.abs(toNumber(a.total, a.amount, 0) - toNumber(b.total, b.amount, 0)) <= 0.009
-
-    if (!sameDescription || !sameQuantity || !sameUnitPrice || !sameTotal) {
-      return true
-    }
-  }
-
-  return false
-}
-
-function toNumber(...values: unknown[]): number {
-  for (const value of values) {
-    if (typeof value === 'number' && Number.isFinite(value)) return value
-    if (typeof value === 'string' && value.trim() !== '') {
-      const parsed = Number(value)
-      if (Number.isFinite(parsed)) return parsed
-    }
-  }
-  return 0
-}
-
-function buildInvoiceLine(
-  item: { productId: string; qty: number },
-  product?: ProductSnapshot,
-  fallbackUnitPrice?: number,
-) {
-  const unitPrice = fallbackUnitPrice
-    ?? product?.basePrice
-    ?? product?.pricePerUnit
-    ?? 0
-  const total = Number((item.qty * unitPrice).toFixed(2))
-
-  return {
-    description: product?.name || item.productId,
-    quantity: item.qty,
-    unitPrice,
-    amount: total,
-    total,
-  }
 }
 
 async function maybeCompleteRun(runId: string): Promise<void> {

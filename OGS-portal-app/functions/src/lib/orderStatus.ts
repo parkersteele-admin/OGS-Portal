@@ -9,7 +9,6 @@ export type OrderStatus =
   | 'delivered'
   | 'ready_to_invoice'
   | 'invoice_sent'
-  | 'invoiced'
   | 'paid'
   | 'cancelled'
   | 'archived'

@@ -19,7 +19,6 @@ import { OnboardingStepper } from '../../components/onboarding/OnboardingStepper
 import { Step1BusinessInfo } from '../../components/onboarding/steps/Step1BusinessInfo'
 import { Step2DeliverySetup } from '../../components/onboarding/steps/Step2DeliverySetup'
 import { Step3GasUsage } from '../../components/onboarding/steps/Step3GasUsage'
-import { Step4PaymentNotifications } from '../../components/onboarding/steps/Step4PaymentNotifications'
 import { Step5Review } from '../../components/onboarding/steps/Step5Review'
 import type { DeliveryLocation } from '../../types/company'
 import '../../components/onboarding/Onboarding.css'
@@ -97,7 +96,9 @@ const OnboardingPage: React.FC = () => {
 
   const handleStepComplete = (completedStep: number) => {
     setCompletedUpTo(Math.max(completedUpTo, completedStep))
-    goToStep(completedStep + 1)
+    // Skip step 4 (payment) — go directly from step 3 to step 5
+    const nextStep = completedStep === 3 ? 5 : completedStep + 1
+    goToStep(nextStep)
   }
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -145,17 +146,7 @@ const OnboardingPage: React.FC = () => {
           />
         )}
 
-        {activeStep === 4 && (
-          <Step4PaymentNotifications
-            company={company}
-            uid={user.id}
-            onNext={() => handleStepComplete(4)}
-            onBack={() => goToStep(3)}
-            onSkip={() => handleStepComplete(4)}
-          />
-        )}
-
-        {activeStep === 5 && (
+        {(activeStep === 4 || activeStep === 5) && (
           <Step5Review
             company={company}
             locations={locations}

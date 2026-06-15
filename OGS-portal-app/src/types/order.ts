@@ -52,7 +52,6 @@ export type OrderStatus =
   | 'delivered'
   | 'ready_to_invoice'
   | 'invoice_sent'
-  | 'invoiced'
   | 'paid'
   | 'cancelled'
   | 'archived'
@@ -156,4 +155,12 @@ export interface Order {
   requestedAt: Timestamp
   createdAt?: Timestamp
   scheduledAt?: Timestamp
+  /** QB invoice number entered by admin when marking invoice sent. */
+  qbInvoiceNumber?: string
+  /** Amount invoiced in QuickBooks. */
+  invoiceAmount?: number
+  /** Amount actually received from customer. */
+  paidAmount?: number
+  /** When payment was received. */
+  paidAt?: Timestamp
 }

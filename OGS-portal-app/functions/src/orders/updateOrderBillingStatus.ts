@@ -1,10 +1,16 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https'
+import { Timestamp } from 'firebase-admin/firestore'
 import { db, FieldValue } from '../admin'
 import { appendStatusHistory, type OrderStatus } from '../lib/orderStatus'
 
 interface UpdateOrderBillingStatusInput {
   orderId: string
   newStatus: 'invoice_sent' | 'paid'
+  qbInvoiceNumber?: string
+  invoiceAmount?: number
+  paidAmount?: number
+  /** ISO date string (YYYY-MM-DD or full ISO). */
+  paidAt?: string
 }
 
 const ALLOWED_PREDECESSOR: Record<UpdateOrderBillingStatusInput['newStatus'], OrderStatus> = {
@@ -28,6 +34,22 @@ export const updateOrderBillingStatus = onCall(async (request) => {
   }
   if (data.newStatus !== 'invoice_sent' && data.newStatus !== 'paid') {
     throw new HttpsError('invalid-argument', 'newStatus must be invoice_sent or paid.')
+  }
+
+  // Validate billing fields per status
+  if (data.newStatus === 'invoice_sent') {
+    if (!data.qbInvoiceNumber || data.qbInvoiceNumber.trim() === '') {
+      throw new HttpsError('invalid-argument', 'qbInvoiceNumber is required when marking invoice sent.')
+    }
+    if (typeof data.invoiceAmount !== 'number' || data.invoiceAmount <= 0) {
+      throw new HttpsError('invalid-argument', 'invoiceAmount must be a positive number when marking invoice sent.')
+    }
+  }
+
+  if (data.newStatus === 'paid') {
+    if (typeof data.paidAmount !== 'number' || data.paidAmount <= 0) {
+      throw new HttpsError('invalid-argument', 'paidAmount must be a positive number when marking as paid.')
+    }
   }
 
   const orderRef = db.collection('orders').doc(data.orderId)
@@ -58,6 +80,16 @@ export const updateOrderBillingStatus = onCall(async (request) => {
   await orderRef.update({
     status: data.newStatus,
     updatedAt: FieldValue.serverTimestamp(),
+    ...(data.newStatus === 'invoice_sent' && {
+      qbInvoiceNumber: data.qbInvoiceNumber,
+      invoiceAmount: data.invoiceAmount,
+    }),
+    ...(data.newStatus === 'paid' && {
+      paidAmount: data.paidAmount,
+      paidAt: data.paidAt
+        ? Timestamp.fromDate(new Date(data.paidAt))
+        : FieldValue.serverTimestamp(),
+    }),
   })
 
   await appendStatusHistory(

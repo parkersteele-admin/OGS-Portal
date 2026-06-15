@@ -309,15 +309,28 @@ export async function transitionOrderStatus(
 export async function updateOrderBillingStatus(
   orderId: string,
   newStatus: 'invoice_sent' | 'paid',
+  extra?: {
+    qbInvoiceNumber?: string
+    invoiceAmount?: number
+    paidAmount?: number
+    paidAt?: string
+  },
 ): Promise<{ success: true; newStatus: 'invoice_sent' | 'paid' }> {
   return serviceCall(async () => {
     const { httpsCallable } = await import('firebase/functions')
     const { functions } = await import('../lib/firebase')
     const fn = httpsCallable<
-      { orderId: string; newStatus: 'invoice_sent' | 'paid' },
+      {
+        orderId: string
+        newStatus: 'invoice_sent' | 'paid'
+        qbInvoiceNumber?: string
+        invoiceAmount?: number
+        paidAmount?: number
+        paidAt?: string
+      },
       { success: true; newStatus: 'invoice_sent' | 'paid' }
     >(functions, 'updateOrderBillingStatus')
-    const result = await fn({ orderId, newStatus })
+    const result = await fn({ orderId, newStatus, ...extra })
     return result.data
   })
 }

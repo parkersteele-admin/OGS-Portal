@@ -360,7 +360,7 @@ export default function AdminDashboard() {
           { to: '/admin/ops/orders', label: 'Orders' },
           { to: '/admin/ops/dispatch', label: 'Dispatch' },
           { to: '/admin/ops/tanks', label: 'Tanks' },
-          { to: '/admin/ops/billing', label: 'Billing' },
+          { to: '/admin/ops/billing', label: 'Revenue' },
         ]}
       >
         <div className="adash-grid adash-grid--4">

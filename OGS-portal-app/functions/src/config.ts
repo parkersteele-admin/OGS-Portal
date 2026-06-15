@@ -4,8 +4,6 @@
  * Firebase Secret references for ogs-portal.
  *
  * Before deploying, set each secret once:
- *   firebase functions:secrets:set STRIPE_SECRET_KEY
- *   firebase functions:secrets:set STRIPE_WEBHOOK_SECRET
  *   firebase functions:secrets:set RESEND_API_KEY
  *   firebase functions:secrets:set GOOGLE_MAPS_SERVER_KEY
  *
@@ -21,8 +19,6 @@
 
 import { defineSecret } from 'firebase-functions/params'
 
-export const STRIPE_SECRET_KEY     = defineSecret('STRIPE_SECRET_KEY')
-export const STRIPE_WEBHOOK_SECRET = defineSecret('STRIPE_WEBHOOK_SECRET')
 export const GOOGLE_MAPS_KEY       = defineSecret('GOOGLE_MAPS_SERVER_KEY')
 
 /**

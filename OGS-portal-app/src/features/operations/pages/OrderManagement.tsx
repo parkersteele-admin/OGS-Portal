@@ -212,14 +212,27 @@ function OrderDetailSheet({
   const canEdit = order.status === 'pending' || order.status === 'scheduled'
   const [billingBusy, setBillingBusy] = useState(false)
   const [billingToast, setBillingToast] = useState<string | null>(null)
+  // Invoice Sent form state
+  const [qbInvoiceNumber, setQbInvoiceNumber] = useState('')
+  const [invoiceAmountStr, setInvoiceAmountStr] = useState('')
+  // Paid form state
+  const [paidAmountStr, setPaidAmountStr] = useState(() =>
+    order.invoiceAmount != null ? order.invoiceAmount.toFixed(2) : '',
+  )
+  const [paidAtStr, setPaidAtStr] = useState(() => new Date().toISOString().slice(0, 10))
 
   const showBillingPanel = isAdmin && (order.status === 'ready_to_invoice' || order.status === 'invoice_sent')
 
   async function handleMarkInvoiceSent() {
-    if (!confirm('Mark this order as Invoice Sent?')) return
+    const invNum = qbInvoiceNumber.trim()
+    const invAmt = parseFloat(invoiceAmountStr)
+    if (!invNum || isNaN(invAmt) || invAmt <= 0) return
     setBillingBusy(true)
     try {
-      await updateOrderBillingStatus(order.id, 'invoice_sent')
+      await updateOrderBillingStatus(order.id, 'invoice_sent', {
+        qbInvoiceNumber: invNum,
+        invoiceAmount: invAmt,
+      })
       await onBillingStatusUpdated(order.id)
       setBillingToast('Invoice marked as sent.')
       setTimeout(() => setBillingToast(null), 2500)
@@ -231,10 +244,14 @@ function OrderDetailSheet({
   }
 
   async function handleMarkPaid() {
-    if (!confirm('Mark this order as Paid?')) return
+    const pAmt = parseFloat(paidAmountStr)
+    if (isNaN(pAmt) || pAmt <= 0) return
     setBillingBusy(true)
     try {
-      await updateOrderBillingStatus(order.id, 'paid')
+      await updateOrderBillingStatus(order.id, 'paid', {
+        paidAmount: pAmt,
+        paidAt: paidAtStr || new Date().toISOString().slice(0, 10),
+      })
       await onBillingStatusUpdated(order.id)
       setBillingToast('Order marked as paid.')
       setTimeout(() => setBillingToast(null), 2500)
@@ -294,23 +311,23 @@ function OrderDetailSheet({
                   : 'Once payment is received, mark this order as paid.'}
               </p>
               {order.status === 'ready_to_invoice' ? (
-                <Button className="om-billing-btn" onClick={handleMarkInvoiceSent} disabled={billingBusy}>
-                  {billingBusy ? 'Saving…' : 'Mark Invoice Sent'}
-                </Button>
+                <QBInvoiceSentForm
+                  qbInvoiceNumber={qbInvoiceNumber}
+                  invoiceAmountStr={invoiceAmountStr}
+                  busy={billingBusy}
+                  onChangeInvoiceNumber={setQbInvoiceNumber}
+                  onChangeInvoiceAmount={setInvoiceAmountStr}
+                  onSubmit={handleMarkInvoiceSent}
+                />
               ) : (
-                <div className="om-billing-actions">
-                  <Button
-                    className="om-billing-btn om-billing-btn--paid"
-                    onClick={handleMarkPaid}
-                    disabled={billingBusy}
-                  >
-                    {billingBusy ? 'Saving…' : 'Mark as Paid'}
-                  </Button>
-                  {/* TODO: partial payment status is not part of OrderStatus yet. */}
-                  <Button className="om-billing-btn" variant="secondary" disabled>
-                    Mark as Partial
-                  </Button>
-                </div>
+                <QBPaidForm
+                  paidAmountStr={paidAmountStr}
+                  paidAtStr={paidAtStr}
+                  busy={billingBusy}
+                  onChangePaidAmount={setPaidAmountStr}
+                  onChangePaidAt={setPaidAtStr}
+                  onSubmit={handleMarkPaid}
+                />
               )}
               {billingToast && <p className="om-billing-toast">{billingToast}</p>}
             </div>
@@ -367,6 +384,14 @@ function OrderDetailPanel({
   const [showInvoiceDetail, setShowInvoiceDetail] = useState(false)
   const [billingBusy, setBillingBusy] = useState(false)
   const [billingToast, setBillingToast] = useState<string | null>(null)
+  // Invoice Sent form state
+  const [qbInvoiceNumber, setQbInvoiceNumber] = useState('')
+  const [invoiceAmountStr, setInvoiceAmountStr] = useState('')
+  // Paid form state
+  const [paidAmountStr, setPaidAmountStr] = useState(() =>
+    order.invoiceAmount != null ? order.invoiceAmount.toFixed(2) : '',
+  )
+  const [paidAtStr, setPaidAtStr] = useState(() => new Date().toISOString().slice(0, 10))
   const [runStopInfo, setRunStopInfo] = useState<{
     runNumber: string
     stopOrder: number
@@ -464,10 +489,15 @@ function OrderDetailPanel({
   }
 
   async function handleMarkInvoiceSent() {
-    if (!confirm('Mark this order as Invoice Sent?')) return
+    const invNum = qbInvoiceNumber.trim()
+    const invAmt = parseFloat(invoiceAmountStr)
+    if (!invNum || isNaN(invAmt) || invAmt <= 0) return
     setBillingBusy(true)
     try {
-      await updateOrderBillingStatus(order.id, 'invoice_sent')
+      await updateOrderBillingStatus(order.id, 'invoice_sent', {
+        qbInvoiceNumber: invNum,
+        invoiceAmount: invAmt,
+      })
       await onBillingStatusUpdated(order.id)
       setBillingToast('Invoice marked as sent.')
       setTimeout(() => setBillingToast(null), 2500)
@@ -479,10 +509,14 @@ function OrderDetailPanel({
   }
 
   async function handleMarkPaid() {
-    if (!confirm('Mark this order as Paid?')) return
+    const pAmt = parseFloat(paidAmountStr)
+    if (isNaN(pAmt) || pAmt <= 0) return
     setBillingBusy(true)
     try {
-      await updateOrderBillingStatus(order.id, 'paid')
+      await updateOrderBillingStatus(order.id, 'paid', {
+        paidAmount: pAmt,
+        paidAt: paidAtStr || new Date().toISOString().slice(0, 10),
+      })
       await onBillingStatusUpdated(order.id)
       setBillingToast('Order marked as paid.')
       setTimeout(() => setBillingToast(null), 2500)
@@ -760,27 +794,31 @@ function OrderDetailPanel({
                     : 'Once payment is received, mark this order as paid.'}
                 </p>
                 {order.status === 'ready_to_invoice' ? (
-                  <Button className="om-billing-btn" onClick={handleMarkInvoiceSent} disabled={billingBusy}>
-                    {billingBusy ? 'Saving…' : 'Mark Invoice Sent'}
-                  </Button>
+                  <QBInvoiceSentForm
+                    qbInvoiceNumber={qbInvoiceNumber}
+                    invoiceAmountStr={invoiceAmountStr}
+                    busy={billingBusy}
+                    onChangeInvoiceNumber={setQbInvoiceNumber}
+                    onChangeInvoiceAmount={setInvoiceAmountStr}
+                    onSubmit={handleMarkInvoiceSent}
+                  />
                 ) : (
-                  <div className="om-billing-actions">
-                    <Button
-                      className="om-billing-btn om-billing-btn--paid"
-                      onClick={handleMarkPaid}
-                      disabled={billingBusy}
-                    >
-                      {billingBusy ? 'Saving…' : 'Mark as Paid'}
-                    </Button>
-                    {/* TODO: partial payment status is not part of OrderStatus yet. */}
-                    <Button className="om-billing-btn" variant="secondary" disabled>
-                      Mark as Partial
-                    </Button>
-                  </div>
+                  <QBPaidForm
+                    paidAmountStr={paidAmountStr}
+                    paidAtStr={paidAtStr}
+                    busy={billingBusy}
+                    onChangePaidAmount={setPaidAmountStr}
+                    onChangePaidAt={setPaidAtStr}
+                    onSubmit={handleMarkPaid}
+                  />
                 )}
                 {billingToast && <p className="om-billing-toast">{billingToast}</p>}
               </div>
             </section>
+          )}
+
+          {order.qbInvoiceNumber && (
+            <BillingSummary order={order} />
           )}
 
           {/* Timeline */}
@@ -858,6 +896,152 @@ function OrderDetailPanel({
         />
       )}
     </div>
+  )
+}
+
+// ── QB Billing Inline Forms ────────────────────────────────────────────────────
+
+interface QBInvoiceSentFormProps {
+  qbInvoiceNumber: string
+  invoiceAmountStr: string
+  busy: boolean
+  onChangeInvoiceNumber: (v: string) => void
+  onChangeInvoiceAmount: (v: string) => void
+  onSubmit: () => void
+}
+
+function QBInvoiceSentForm({
+  qbInvoiceNumber,
+  invoiceAmountStr,
+  busy,
+  onChangeInvoiceNumber,
+  onChangeInvoiceAmount,
+  onSubmit,
+}: QBInvoiceSentFormProps) {
+  const invAmt = parseFloat(invoiceAmountStr)
+  const canSubmit = qbInvoiceNumber.trim() !== '' && !isNaN(invAmt) && invAmt > 0 && !busy
+  return (
+    <div className="om-qb-form">
+      <div className="om-qb-form__field">
+        <label className="om-qb-form__label">QB Invoice Number</label>
+        <input
+          className="om-qb-form__input"
+          type="text"
+          placeholder="#1042"
+          value={qbInvoiceNumber}
+          onChange={(e) => onChangeInvoiceNumber(e.target.value)}
+          disabled={busy}
+        />
+      </div>
+      <div className="om-qb-form__field">
+        <label className="om-qb-form__label">Invoice Amount</label>
+        <input
+          className="om-qb-form__input"
+          type="number"
+          min="0.01"
+          step="0.01"
+          placeholder="0.00"
+          value={invoiceAmountStr}
+          onChange={(e) => onChangeInvoiceAmount(e.target.value)}
+          disabled={busy}
+        />
+      </div>
+      <button
+        className="om-billing-btn"
+        onClick={onSubmit}
+        disabled={!canSubmit}
+      >
+        {busy ? 'Saving…' : 'Mark Invoice Sent'}
+      </button>
+    </div>
+  )
+}
+
+interface QBPaidFormProps {
+  paidAmountStr: string
+  paidAtStr: string
+  busy: boolean
+  onChangePaidAmount: (v: string) => void
+  onChangePaidAt: (v: string) => void
+  onSubmit: () => void
+}
+
+function QBPaidForm({
+  paidAmountStr,
+  paidAtStr,
+  busy,
+  onChangePaidAmount,
+  onChangePaidAt,
+  onSubmit,
+}: QBPaidFormProps) {
+  const pAmt = parseFloat(paidAmountStr)
+  const canSubmit = !isNaN(pAmt) && pAmt > 0 && !busy
+  return (
+    <div className="om-qb-form">
+      <div className="om-qb-form__field">
+        <label className="om-qb-form__label">Amount Received</label>
+        <input
+          className="om-qb-form__input"
+          type="number"
+          min="0.01"
+          step="0.01"
+          placeholder="0.00"
+          value={paidAmountStr}
+          onChange={(e) => onChangePaidAmount(e.target.value)}
+          disabled={busy}
+        />
+      </div>
+      <div className="om-qb-form__field">
+        <label className="om-qb-form__label">Payment Date</label>
+        <input
+          className="om-qb-form__input"
+          type="date"
+          value={paidAtStr}
+          onChange={(e) => onChangePaidAt(e.target.value)}
+          disabled={busy}
+        />
+      </div>
+      <button
+        className="om-billing-btn om-billing-btn--paid"
+        onClick={onSubmit}
+        disabled={!canSubmit}
+      >
+        {busy ? 'Saving…' : 'Mark as Paid'}
+      </button>
+    </div>
+  )
+}
+
+// ── Billing Summary (read-only QB data) ────────────────────────────────────────
+
+function BillingSummary({ order }: { order: Order }) {
+  const fmtDateShort = (ts: import('firebase/firestore').Timestamp | string | undefined): string => {
+    if (!ts) return '—'
+    const d = typeof ts === 'string'
+      ? new Date(ts)
+      : (ts as import('firebase/firestore').Timestamp).toDate()
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }
+
+  const cols: { label: string; value: string }[] = []
+  if (order.qbInvoiceNumber) cols.push({ label: 'QB Invoice #', value: order.qbInvoiceNumber })
+  if (order.invoiceAmount != null) cols.push({ label: 'Amount Invoiced', value: `$${order.invoiceAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` })
+  if (order.paidAmount != null) cols.push({ label: 'Amount Received', value: `$${order.paidAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` })
+  if (order.paidAt) cols.push({ label: 'Payment Date', value: fmtDateShort(order.paidAt) })
+
+  if (cols.length === 0) return null
+
+  return (
+    <section className="om-billing-summary">
+      <div className="om-billing-summary__cols">
+        {cols.map((c) => (
+          <div key={c.label} className="om-billing-summary__col">
+            <div className="om-billing-summary__label">{c.label}</div>
+            <div className="om-billing-summary__value">{c.value}</div>
+          </div>
+        ))}
+      </div>
+    </section>
   )
 }
 
@@ -1305,6 +1489,15 @@ export default function OrderManagement() {
     media.addEventListener('change', onChange)
     return () => media.removeEventListener('change', onChange)
   }, [])
+
+  useEffect(() => {
+    if (allOrders.length === 0) return
+    const params = new URLSearchParams(location.search)
+    const orderId = params.get('orderId')
+    if (!orderId) return
+    const order = allOrders.find((item) => item.id === orderId)
+    if (order) setDetailOrder(order)
+  }, [allOrders, location.search])
 
   // ── Subscribe to all orders ───────────────────────────────────────────────────
   useEffect(() => {
