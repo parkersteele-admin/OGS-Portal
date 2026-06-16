@@ -207,9 +207,9 @@ jobs:
         working-directory: OGS-portal-app
         run: |
           if [ -n "$FIREBASE_CLI_TOKEN" ]; then
-            firebase deploy --only functions --project "$FIREBASE_PROJECT_ID" --token "$FIREBASE_CLI_TOKEN" --non-interactive
+            firebase deploy --only functions --project "$FIREBASE_PROJECT_ID" --token "$FIREBASE_CLI_TOKEN" --non-interactive --force
           else
-            firebase deploy --only functions --project "$FIREBASE_PROJECT_ID" --non-interactive
+            firebase deploy --only functions --project "$FIREBASE_PROJECT_ID" --non-interactive --force
           fi
 
       - name: Deploy Firestore security rules
