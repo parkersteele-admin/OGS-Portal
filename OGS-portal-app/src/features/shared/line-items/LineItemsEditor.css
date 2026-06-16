@@ -1,0 +1,132 @@
+.lie-items {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.lie-item {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  padding: var(--space-4);
+}
+
+.lie-item--warn {
+  border-color: color-mix(in srgb, var(--color-danger, #c0392b) 55%, white);
+}
+
+.lie-item__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+.lie-item__num {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.lie-item__remove {
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.lie-item__product {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.lie-item__controls {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+}
+
+.lie-item__label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.lie-item__amount {
+  align-self: end;
+  min-height: 42px;
+  border: 1px solid var(--color-border-subtle, #d6dde6);
+  border-radius: 8px;
+  padding: 10px;
+  background: var(--color-bg-soft, #f8fafc);
+}
+
+.lie-item__amount strong {
+  display: block;
+  font-size: 1rem;
+}
+
+.lie-item__details-toggle {
+  margin-top: var(--space-3);
+  border: none;
+  background: transparent;
+  color: var(--color-brand);
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+}
+
+.lie-item__details {
+  margin-top: var(--space-3);
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
+.lie-item__metric {
+  background: var(--color-bg-soft, #f8fafc);
+  border: 1px solid var(--color-border-subtle, #d6dde6);
+  border-radius: 8px;
+  padding: 8px 10px;
+  display: grid;
+  gap: 2px;
+}
+
+.lie-item__metric span {
+  font-size: 0.76rem;
+  color: var(--color-text-muted);
+}
+
+.lie-item__metric strong {
+  font-size: 0.88rem;
+}
+
+.lie-item__metric--danger strong {
+  color: var(--color-danger, #c0392b);
+}
+
+.lie-item__warning {
+  margin: 0;
+  color: var(--color-danger, #c0392b);
+  font-size: 0.78rem;
+}
+
+.lie-add-row {
+  border: 1px dashed var(--color-border);
+  border-radius: 10px;
+  background: transparent;
+  padding: 10px 12px;
+  color: var(--color-brand);
+  font-weight: 700;
+  cursor: pointer;
+  width: fit-content;
+}

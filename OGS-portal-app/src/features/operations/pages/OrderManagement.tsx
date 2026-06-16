@@ -25,7 +25,7 @@ import {
   collectionGroup,
 } from 'firebase/firestore'
 import { db } from '../../../lib/firebase'
-import { ordersCol, productsCol, invoicesCol } from '../../../lib/firestore'
+import { ordersCol, invoicesCol } from '../../../lib/firestore'
 import {
   createOrder,
   updateOrder,
@@ -38,6 +38,7 @@ import {
 } from '../../../services/orderService'
 import { generateInvoiceForOrder, sendInvoiceEmailForOrder } from '../../../services/invoiceService'
 import { subscribeToCustomers } from '../../../services/customerService'
+import { getProductDropdown, type ProductDropdownItem } from '../../../services/productService'
 import { useAuth } from '../../../hooks/useAuth'
 import { Button } from '../../../components/ui/Button'
 import { Input } from '../../../components/ui/Input'
@@ -45,10 +46,19 @@ import { Modal } from '../../../components/ui/Modal'
 import { InvoiceDetailDrawer } from '../components/InvoiceDetailDrawer'
 import { DeliveryCompleteModal } from '../../../components/delivery/DeliveryCompleteModal'
 import MobileOrderCard from '../../../components/orders/MobileOrderCard'
+import { LineItemsEditor } from '../../shared/line-items/LineItemsEditor'
+import {
+  EMPTY_LINE_ITEM,
+  calculateLineItemRollups,
+  recalculateLineItem,
+} from '../../shared/line-items/lineItemPricing'
+import { getLineItemPricingPermissions } from '../../shared/line-items/lineItemPermissions'
+import type { EditableLineItem } from '../../shared/line-items/types'
 import type { Order, OrderStatus, DeliveryTier } from '../../../types/order'
 import type { Customer } from '../../../types/customer'
 import type { Product } from '../../../types/product'
 import type { Invoice } from '../../../types/billing'
+import type { QuoteItem } from '../../../types/crm'
 import './OrderManagement.css'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -1050,13 +1060,14 @@ interface CreateOrderModalProps {
 }
 
 function CreateOrderModal({ onClose, onCreated }: CreateOrderModalProps) {
+  const { role } = useAuth()
+  const pricingPermissions = useMemo(() => getLineItemPricingPermissions(role), [role])
   const [customers, setCustomers] = useState<Customer[]>([])
-  const [products, setProducts] = useState<Product[]>([])
+  const [products, setProducts] = useState<ProductDropdownItem[]>([])
+  const [lineItems, setLineItems] = useState<EditableLineItem[]>([EMPTY_LINE_ITEM()])
   const [customerSearch, setCustomerSearch] = useState('')
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false)
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
-  const [quantity, setQuantity] = useState(100)
   const [tier, setTier] = useState<DeliveryTier>('standard')
   const [notes, setNotes] = useState('')
   const [scheduledDate, setScheduledDate] = useState(() => {
@@ -1070,14 +1081,9 @@ function CreateOrderModal({ onClose, onCreated }: CreateOrderModalProps) {
 
   // Load products on mount
   useEffect(() => {
-    getDocs(query(productsCol, where('active', '==', true)))
-      .then((snap) =>
-        setProducts(
-          snap.docs
-            .map((d) => ({ ...d.data(), id: d.id }) as Product)
-            .sort((a, b) => a.name.localeCompare(b.name)),
-        ),
-      )
+    getProductDropdown()
+      .then((items) => setProducts(items.filter((item) => item.id !== 'delivery')))
+      .catch(() => setProducts([]))
   }, [])
 
   // Load customers (subscribe for typeahead)
@@ -1102,35 +1108,110 @@ function CreateOrderModal({ onClose, onCreated }: CreateOrderModalProps) {
       .slice(0, 8)
   }, [customers, customerSearch])
 
-  // Pricing preview
-  const pricing = useMemo(() => {
-    if (!selectedProduct) return null
-    return calculateOrderPricing(
-      quantity,
-      selectedProduct.pricePerUnit,
-      tier,
-    )
-  }, [selectedProduct, quantity, tier])
+  const pricedLineItems = useMemo(
+    () => lineItems.filter((item) => item.productId && item.quantity > 0 && item.unitPrice >= 0),
+    [lineItems],
+  )
+
+  const revenueProducts = useMemo(
+    () => parseFloat(pricedLineItems.reduce((sum, item) => sum + item.amount, 0).toFixed(2)),
+    [pricedLineItems],
+  )
+
+  const totalCost = useMemo(
+    () => parseFloat(pricedLineItems.reduce((sum, item) => sum + (item.cost * item.quantity), 0).toFixed(2)),
+    [pricedLineItems],
+  )
+
+  const lineProfit = useMemo(
+    () => parseFloat(pricedLineItems.reduce((sum, item) => sum + item.profit, 0).toFixed(2)),
+    [pricedLineItems],
+  )
+
+  const tierPricing = useMemo(() => calculateOrderPricing(1, 1, tier), [tier])
+  const upchargePercent = tierPricing.upchargePercent
+  const deliveryFee = tierPricing.deliveryFee
+  const upchargeAmount = parseFloat((revenueProducts * upchargePercent).toFixed(2))
+
+  const rollups = useMemo(
+    () => calculateLineItemRollups({
+      revenueProducts,
+      totalCost,
+      lineProfit,
+      extraRevenue: upchargeAmount + deliveryFee,
+      applySalesTax: false,
+      salesTaxRate: 0,
+    }),
+    [revenueProducts, totalCost, lineProfit, upchargeAmount, deliveryFee],
+  )
+
+  const quoteLineItems = useMemo<QuoteItem[]>(
+    () => pricedLineItems.map((item) => ({
+      productId: item.productId,
+      description: item.description,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      amount: item.amount,
+    })),
+    [pricedLineItems],
+  )
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!selectedCustomer) return setError('Please select a customer.')
-    if (!selectedProduct) return setError('Please select a product.')
-    if (quantity <= 0) return setError('Quantity must be greater than 0.')
+
+    const eligibleItems = quoteLineItems.filter(
+      (item) => item.productId && item.quantity > 0 && item.productId !== 'delivery' && item.productId !== 'rental',
+    )
+    if (eligibleItems.length === 0) {
+      return setError('Add at least one valid line item.')
+    }
+
+    const [primary, ...rest] = eligibleItems
+    if (!primary) return setError('Add at least one valid line item.')
 
     setSubmitting(true)
     setError('')
     try {
-      await createOrder(
+      const orderId = await createOrder(
         {
           customerId: selectedCustomer.id,
-          productId: selectedProduct.id,
-          quantity,
+          productId: primary.productId,
+          quantity: primary.quantity,
           deliveryTier: tier,
           notes: notes || undefined,
         },
-        selectedProduct.pricePerUnit,
+        primary.unitPrice,
       )
+
+      const addOnAddedAt = new Date().toISOString()
+      await updateOrder(orderId, {
+        productId: primary.productId,
+        quantity: primary.quantity,
+        unitPrice: primary.unitPrice,
+        upchargePercent,
+        subtotal: parseFloat((revenueProducts + upchargeAmount).toFixed(2)),
+        deliveryFee,
+        total: rollups.preTaxTotal,
+        applySalesTax: false,
+        salesTaxRate: 0,
+        salesTaxAmount: 0,
+        taxRate: 0,
+        quotedLineItems: eligibleItems,
+        addOns: rest.map((item) => ({
+          productId: item.productId,
+          productName: item.description,
+          qty: item.quantity,
+          unitPrice: item.unitPrice,
+          addedBy: 'manual_create',
+          addedAt: addOnAddedAt,
+        })),
+        notes: notes || undefined,
+        scheduledAt: scheduledDate
+          ? (new Date(scheduledDate) as unknown as Order['scheduledAt'])
+          : undefined,
+      })
+
       onCreated()
       onClose()
     } catch (err) {
@@ -1226,43 +1307,6 @@ function CreateOrderModal({ onClose, onCreated }: CreateOrderModalProps) {
             )}
           </div>
 
-          {/* Product */}
-          <div className="om-field">
-            <label className="om-field__label" htmlFor="create-product">
-              Product *
-            </label>
-            <select
-              id="create-product"
-              className="om-select"
-              value={selectedProduct?.id ?? ''}
-              onChange={(e) => {
-                const p = products.find((p) => p.id === e.target.value) ?? null
-                setSelectedProduct(p)
-              }}
-              required
-            >
-              <option value="">Select a product…</option>
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} — {fmtCurrency(p.pricePerUnit)}/{p.unit}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Quantity */}
-          <div className="om-field">
-            <Input
-              label={`Quantity${selectedProduct ? ` (${selectedProduct.unit})` : ''} *`}
-              id="create-qty"
-              type="number"
-              min={1}
-              value={quantity}
-              onChange={(e) => setQuantity(Number(e.target.value))}
-              required
-            />
-          </div>
-
           {/* Delivery tier */}
           <div className="om-field">
             <label className="om-field__label" htmlFor="create-tier">
@@ -1307,34 +1351,62 @@ function CreateOrderModal({ onClose, onCreated }: CreateOrderModalProps) {
             />
           </div>
 
-          {/* Pricing preview */}
-          {pricing && (
+          <div className="om-field">
+            <label className="om-field__label">Line Items</label>
+            <LineItemsEditor
+              items={lineItems}
+              products={products}
+              disabled={submitting}
+              canViewInternalPricing={pricingPermissions.canViewInternalPricing}
+              canEditInternalPricing={pricingPermissions.canEditInternalPricing}
+              enforceMarginFloor={pricingPermissions.enforceMarginFloor}
+              onChange={(items) => setLineItems(items.map((item) => recalculateLineItem(item, 'other', pricingPermissions.enforceMarginFloor)))}
+            />
+          </div>
+
+          {/* Summary */}
+          {quoteLineItems.length > 0 && (
             <div className="om-pricing-preview">
-              <div className="om-pricing-preview__title">Price Preview</div>
+              <div className="om-pricing-preview__title">Summary</div>
               <div className="om-pricing-preview__row">
-                <span>Subtotal</span>
-                <span>{fmtCurrency(pricing.subtotal)}</span>
+                <span>Revenue (products)</span>
+                <span>{fmtCurrency(rollups.revenueProducts)}</span>
               </div>
-              {pricing.upchargePercent > 0 && (
+              <div className="om-pricing-preview__row">
+                <span>Total cost</span>
+                <span>{fmtCurrency(rollups.totalCost)}</span>
+              </div>
+              <div className="om-pricing-preview__row">
+                <span>Line profit</span>
+                <span>{fmtCurrency(rollups.lineProfit)}</span>
+              </div>
+              {upchargePercent > 0 && (
                 <div className="om-pricing-preview__row om-pricing-preview__row--upcharge">
                   <span>
-                    {TIER_LABELS[tier]} upcharge ({(pricing.upchargePercent * 100).toFixed(0)}%)
+                    {TIER_LABELS[tier]} upcharge ({(upchargePercent * 100).toFixed(0)}%)
                   </span>
-                  <span>
-                    {fmtCurrency(
-                      pricing.subtotal * pricing.upchargePercent /
-                        (1 + pricing.upchargePercent),
-                    )}
-                  </span>
+                  <span>{fmtCurrency(upchargeAmount)}</span>
                 </div>
               )}
               <div className="om-pricing-preview__row">
-                <span>Delivery fee</span>
-                <span>{fmtCurrency(pricing.deliveryFee)}</span>
+                <span>Pre-tax total</span>
+                <span>{fmtCurrency(rollups.preTaxTotal)}</span>
+              </div>
+              <div className="om-pricing-preview__row">
+                <span>Sales tax</span>
+                <span>{fmtCurrency(0)}</span>
               </div>
               <div className="om-pricing-preview__row om-pricing-preview__row--total">
-                <span>Total</span>
-                <span>{fmtCurrency(pricing.total)}</span>
+                <span>Total revenue</span>
+                <span>{fmtCurrency(rollups.totalRevenue)}</span>
+              </div>
+              <div className="om-pricing-preview__row">
+                <span>Total profit</span>
+                <span>{fmtCurrency(rollups.totalProfit)}</span>
+              </div>
+              <div className="om-pricing-preview__row">
+                <span>Overall margin %</span>
+                <span>{(rollups.overallMarginPercent * 100).toFixed(1)}%</span>
               </div>
             </div>
           )}

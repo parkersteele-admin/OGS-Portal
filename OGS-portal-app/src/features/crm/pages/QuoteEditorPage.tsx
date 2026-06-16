@@ -46,7 +46,6 @@ import { Badge } from '../../../components/ui/Badge'
 import { Button } from '../../../components/ui/Button'
 import { Input } from '../../../components/ui/Input'
 import { Modal } from '../../../components/ui/Modal'
-import { ProductCombobox } from '../../../components/ui/ProductCombobox'
 import { getProductDropdown, type ProductDropdownItem } from '../../../services/productService'
 import type { Quote, QuoteItem, QuoteStatus } from '../../../types/crm'
 import type { Customer } from '../../../types/customer'
@@ -54,28 +53,22 @@ import type { Lead } from '../../../types/crm'
 import type { ProductCategory } from '../../../types/product'
 import type { AppUser } from '../../../types/user'
 import CustomerCreateModal from '../components/CustomerCreateModal'
+import { LineItemsEditor } from '../../shared/line-items/LineItemsEditor'
+import {
+  EMPTY_LINE_ITEM,
+  calculateLineItemRollups,
+  calculateMarginPercent,
+  recalculateLineItem,
+} from '../../shared/line-items/lineItemPricing'
+import { getLineItemPricingPermissions } from '../../shared/line-items/lineItemPermissions'
+import type { EditableLineItem } from '../../shared/line-items/types'
 import './QuoteEditorPage.css'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 const PRODUCT_CATEGORIES: ProductCategory[] = ['CO₂ Cylinders', 'Nitrogen', 'Beer Gas', 'Propane', 'Rentals', 'Fees']
 
-interface DraftLineItem {
-  _id:         string
-  productId:   string
-  productName: string
-  skuLabel:    string
-  description: string
-  quantity:    number
-  basePrice:   number
-  cost:        number
-  minMarginPercent: number
-  minPrice:    number
-  marginPercent: number
-  profit:      number
-  unitPrice:   number
-  amount:      number
-}
+type DraftLineItem = EditableLineItem
 
 interface RecipientOption {
   type:    'customer' | 'lead'
@@ -152,205 +145,10 @@ const FlatIcon: React.FC<{ name: FlatIconName }> = ({ name }) => {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-const EMPTY_ROW = (): DraftLineItem => ({
-  _id:         crypto.randomUUID(),
-  productId:   '',
-  productName: '',
-  skuLabel:    '',
-  description: '',
-  quantity:    1,
-  basePrice:   0,
-  cost:        0,
-  minMarginPercent: 0.2,
-  minPrice:    0,
-  marginPercent: 0,
-  profit:      0,
-  unitPrice:   0,
-  amount:      0,
-})
-
 const DELIVERY_PRODUCT_ID = 'delivery'
-
-function normalizeMarginInput(value: number): number {
-  if (!Number.isFinite(value)) return 0
-  const normalized = value > 1 ? value / 100 : value
-  return Math.min(Math.max(normalized, 0), 0.95)
-}
-
-function calcMinPrice(cost: number, minMarginPercent: number): number {
-  const safeCost = Number.isFinite(cost) ? Math.max(cost, 0) : 0
-  const safeMargin = Math.min(Math.max(minMarginPercent, 0), 0.95)
-  return parseFloat((safeCost / (1 - safeMargin)).toFixed(2))
-}
-
-function calcMarginPercent(price: number, cost: number): number {
-  if (!Number.isFinite(price) || price <= 0) return 0
-  return (price - cost) / price
-}
-
-function recalcRow(row: DraftLineItem, source: 'margin' | 'unitPrice' | 'other' = 'other'): DraftLineItem {
-  const quantity = Number.isFinite(row.quantity) ? Math.max(row.quantity, 0) : 0
-  const cost = Number.isFinite(row.cost) ? Math.max(row.cost, 0) : 0
-  const minMarginPercent = normalizeMarginInput(row.minMarginPercent)
-  const minPrice = calcMinPrice(cost, minMarginPercent)
-
-  let marginPercent = normalizeMarginInput(row.marginPercent)
-  let unitPrice = Number.isFinite(row.unitPrice) ? parseFloat(Math.max(row.unitPrice, 0).toFixed(2)) : 0
-
-  if (source === 'margin') {
-    const calculatedUnitPrice = parseFloat((cost / (1 - marginPercent)).toFixed(2))
-    unitPrice = Number.isFinite(calculatedUnitPrice) ? calculatedUnitPrice : unitPrice
-  } else {
-    marginPercent = normalizeMarginInput(calcMarginPercent(unitPrice, cost))
-  }
-
-  const amount = parseFloat((quantity * unitPrice).toFixed(2))
-  const profit = parseFloat(((unitPrice - cost) * quantity).toFixed(2))
-
-  return {
-    ...row,
-    quantity,
-    cost,
-    minMarginPercent,
-    minPrice,
-    marginPercent,
-    unitPrice,
-    amount,
-    profit,
-  }
-}
 
 function toQuoteItem(r: DraftLineItem): QuoteItem {
   return { productId: r.productId, description: r.description, quantity: r.quantity, unitPrice: r.unitPrice, amount: r.amount }
-}
-
-// ── Line item row ─────────────────────────────────────────────────────────────
-
-interface LineItemRowProps {
-  row:             DraftLineItem
-  index:           number
-  onChange:        (id: string, field: keyof DraftLineItem, val: string | number) => void
-  onProductSelect: (id: string, p: ProductDropdownItem | null) => void
-  onRemove:        (id: string) => void
-  hasMarginViolation: boolean
-  products?:       ProductDropdownItem[]
-  disabled?:       boolean
-}
-
-const LineItemRow: React.FC<LineItemRowProps> = ({
-  row,
-  index,
-  onChange,
-  onProductSelect,
-  onRemove,
-  hasMarginViolation,
-  products,
-  disabled,
-}) => {
-  const [detailsOpen, setDetailsOpen] = useState(false)
-
-  const handleNum = (field: 'quantity' | 'marginPercent' | 'unitPrice') => (e: React.ChangeEvent<HTMLInputElement>) =>
-    onChange(row._id, field, parseFloat(e.target.value) || 0)
-
-  return (
-    <article className={`qep-item${hasMarginViolation ? ' qep-item--warn' : ''}`}>
-      <div className="qep-item__head">
-        <span className="qep-item__num">Line {index + 1}</span>
-        <button
-          className="qep-item__remove"
-          onClick={() => onRemove(row._id)}
-          disabled={disabled}
-          aria-label="Remove line item"
-          title="Remove line item"
-          type="button"
-        >
-          <span className="qep-icon" aria-hidden="true"><FlatIcon name="remove" /></span>
-        </button>
-      </div>
-
-      <div className="qep-item__product">
-        <ProductCombobox
-          value={row.productId}
-          onSelect={(p) => onProductSelect(row._id, p)}
-          label=""
-          placeholder="Select product..."
-          products={products}
-          disabled={disabled}
-        />
-        <input
-          className="ui-input qep-item__desc"
-          placeholder="Description (auto-filled or custom)"
-          value={row.description}
-          onChange={e => onChange(row._id, 'description', e.target.value)}
-          disabled={disabled}
-        />
-      </div>
-
-      <div className="qep-item__controls">
-        <label className="qep-item__field">
-          <span className="qep-item__label">Qty</span>
-          <input className="ui-input" type="number" min="0" step="0.01"
-            placeholder="0" value={row.quantity || ''} onChange={handleNum('quantity')} disabled={disabled} />
-        </label>
-
-        <label className="qep-item__field">
-          <span className="qep-item__label">Margin %</span>
-          <input
-            className="ui-input"
-            type="number"
-            min={0}
-            max={95}
-            step={0.1}
-            placeholder="0"
-            value={parseFloat((row.marginPercent * 100).toFixed(2)) || ''}
-            onChange={handleNum('marginPercent')}
-            disabled={disabled || !row.productId}
-          />
-        </label>
-
-        <label className="qep-item__field">
-          <span className="qep-item__label">Final price</span>
-          <input
-            className="ui-input"
-            type="number"
-            min={0}
-            step={0.01}
-            placeholder="0.00"
-            value={row.unitPrice || ''}
-            onChange={handleNum('unitPrice')}
-            disabled={disabled || !row.productId}
-          />
-        </label>
-
-        <div className="qep-item__amount-block" role="status" aria-live="polite">
-          <span className="qep-item__label">Amount</span>
-          <strong>{formatCurrency(row.amount)}</strong>
-        </div>
-      </div>
-
-      <button
-        className="qep-item__details-toggle"
-        onClick={() => setDetailsOpen((v) => !v)}
-        type="button"
-      >
-        {detailsOpen ? 'Hide pricing details' : 'Show pricing details'}
-      </button>
-
-      {detailsOpen && (
-        <div className="qep-item__details">
-          <div className="qep-item__metric"><span>Cost</span><strong>{formatCurrency(row.cost)}</strong></div>
-          <div className="qep-item__metric"><span>Base</span><strong>{formatCurrency(row.basePrice)}</strong></div>
-          <div className={`qep-item__metric${row.profit < 0 ? ' qep-item__metric--danger' : ''}`}><span>Profit</span><strong>{formatCurrency(row.profit)}</strong></div>
-          <div className={`qep-item__metric${hasMarginViolation ? ' qep-item__metric--danger' : ''}`}><span>Margin</span><strong>{(row.marginPercent * 100).toFixed(1)}%</strong></div>
-          <div className="qep-item__metric"><span>Min floor</span><strong>{(row.minMarginPercent * 100).toFixed(1)}% ({formatCurrency(row.minPrice)})</strong></div>
-          {hasMarginViolation && (
-            <p className="qep-item__warning">This line is below minimum margin floor.</p>
-          )}
-        </div>
-      )}
-    </article>
-  )
 }
 
 // ── PDF preview modal ─────────────────────────────────────────────────────────
@@ -379,8 +177,9 @@ const QuoteEditorPage: React.FC = () => {
   const [searchParams] = useSearchParams()
   const isNew         = !quoteId || quoteId === 'new'
   const prefillLeadId = isNew ? (searchParams.get('leadId') ?? '') : ''
-  const { user }      = useAuth()
+  const { user, role } = useAuth()
   const queryClient   = useQueryClient()
+  const pricingPermissions = useMemo(() => getLineItemPricingPermissions(role), [role])
 
   // ── Load recipients (customers + leads) ───────────────────────────────────
 
@@ -449,7 +248,7 @@ const QuoteEditorPage: React.FC = () => {
     return d.toISOString().slice(0, 10)
   })
   const [reference,      setReference]      = useState('')
-  const [rows,           setRows]           = useState<DraftLineItem[]>([EMPTY_ROW()])
+  const [rows,           setRows]           = useState<DraftLineItem[]>([EMPTY_LINE_ITEM()])
   const [salesRepId,     setSalesRepId]     = useState('')
   const [salesRepSnapshot, setSalesRepSnapshot] = useState<{
     id?: string
@@ -551,7 +350,7 @@ const QuoteEditorPage: React.FC = () => {
         profit:      0,
         unitPrice:   item.unitPrice,
         amount:      item.amount,
-      })).map((row) => recalcRow(row, 'unitPrice')))
+      })).map((row) => recalculateLineItem(row, 'unitPrice', pricingPermissions.enforceMarginFloor)))
       setNotes(q.notes ?? '')
       setSalesRepSnapshot({
         id: q.salesRepId,
@@ -590,7 +389,7 @@ const QuoteEditorPage: React.FC = () => {
       setLoadError(e.message)
       setLoadingQuote(false)
     })
-  }, [quoteId, user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [quoteId, user?.id, pricingPermissions.enforceMarginFloor]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!isNew || salesRepId || !user?.id) return
@@ -740,94 +539,31 @@ const QuoteEditorPage: React.FC = () => {
     [includeRental, rentalRate, rentalMonths],
   )
   const effectiveDelivery = includeDelivery ? deliveryFee : 0
-  const preTaxTotal = parseFloat((subtotal + effectiveDelivery + rentalTotal).toFixed(2))
   const parsedSalesTaxRatePercent = Number.parseFloat(salesTaxRatePercent)
   const safeSalesTaxRatePercent = Number.isFinite(parsedSalesTaxRatePercent)
     ? Math.max(parsedSalesTaxRatePercent, 0)
     : 0
   const salesTaxRate = applySalesTax ? (safeSalesTaxRatePercent / 100) : 0
-  const salesTaxAmount = parseFloat((preTaxTotal * salesTaxRate).toFixed(2))
-  const total = parseFloat((preTaxTotal + salesTaxAmount).toFixed(2))
-  const totalProfit = parseFloat((totalLineProfit + effectiveDelivery + rentalTotal).toFixed(2))
-  const overallMarginPercent = preTaxTotal > 0 ? totalProfit / preTaxTotal : 0
+  const rollups = useMemo(
+    () => calculateLineItemRollups({
+      revenueProducts: subtotal,
+      totalCost,
+      lineProfit: totalLineProfit,
+      extraRevenue: effectiveDelivery + rentalTotal,
+      applySalesTax,
+      salesTaxRate,
+    }),
+    [subtotal, totalCost, totalLineProfit, effectiveDelivery, rentalTotal, applySalesTax, salesTaxRate],
+  )
+  const preTaxTotal = rollups.preTaxTotal
+  const salesTaxAmount = rollups.salesTaxAmount
+  const total = rollups.totalRevenue
+  const totalProfit = rollups.totalProfit
+  const overallMarginPercent = rollups.overallMarginPercent
   const marginViolations = useMemo(
     () => productRows.filter((r) => r.productId && r.marginPercent + 0.0001 < r.minMarginPercent),
     [productRows],
   )
-
-  // ── Row helpers ───────────────────────────────────────────────────────────
-
-  const handleRowChange = useCallback((id: string, field: keyof DraftLineItem, value: string | number) => {
-    setRows(prev => prev.map(r => {
-      if (r._id !== id) return r
-      if (field === 'marginPercent') {
-        const nextMargin = normalizeMarginInput(Number(value))
-        return recalcRow({ ...r, marginPercent: nextMargin }, 'margin')
-      }
-      if (field === 'unitPrice') {
-        const nextPrice = Number.isFinite(Number(value)) ? Math.max(Number(value), 0) : 0
-        return recalcRow({ ...r, unitPrice: nextPrice }, 'unitPrice')
-      }
-      return recalcRow({ ...r, [field]: value }, 'other')
-    }))
-  }, [])
-
-  const handleProductSelect = useCallback((id: string, product: ProductDropdownItem | null) => {
-    setRows(prev => prev.map(r => {
-      if (r._id !== id) return r
-      if (!product) {
-        return recalcRow({
-          ...r,
-          productId: '',
-          productName: '',
-          skuLabel: '',
-          cost: 0,
-          basePrice: 0,
-          minMarginPercent: 0.2,
-          minPrice: 0,
-          marginPercent: 0,
-          unitPrice: 0,
-        })
-      }
-      if (product.id === DELIVERY_PRODUCT_ID) {
-        setIncludeDelivery(true)
-        setDeliveryFee(product.basePrice)
-        return recalcRow({
-          ...r,
-          productId: '',
-          productName: '',
-          skuLabel: '',
-          description: '',
-          cost: 0,
-          basePrice: 0,
-          minMarginPercent: 0.2,
-          minPrice: 0,
-          marginPercent: 0,
-          unitPrice: 0,
-        })
-      }
-
-      const baseMargin = calcMarginPercent(product.basePrice, product.cost)
-      const marginPercent = Math.max(baseMargin, product.minMarginPercent)
-
-      const updated: DraftLineItem = {
-        ...r,
-        productId:   product.id,
-        productName: product.name,
-        skuLabel:    product.sku,
-        description: `${product.name}${product.unit ? ` (${product.unit})` : ''}`,
-        basePrice:   product.basePrice,
-        cost:        product.cost,
-        minMarginPercent: product.minMarginPercent,
-        minPrice:    product.minPrice,
-        marginPercent,
-      }
-      return recalcRow(updated, 'margin')
-    }))
-  }, [])
-
-  const addRow  = () => setRows(prev => [...prev, EMPTY_ROW()])
-  const removeRow = (id: string) => setRows(prev => prev.filter(r => r._id !== id))
 
   useEffect(() => {
     if (Object.keys(productMap).length === 0) return
@@ -835,8 +571,8 @@ const QuoteEditorPage: React.FC = () => {
       if (!row.productId) return row
       const product = productMap[row.productId]
       if (!product) return row
-      const marginPercent = calcMarginPercent(row.unitPrice, product.cost)
-      return recalcRow({
+      const marginPercent = calculateMarginPercent(row.unitPrice, product.cost)
+      return recalculateLineItem({
         ...row,
         productName: product.name,
         basePrice: product.basePrice,
@@ -844,9 +580,9 @@ const QuoteEditorPage: React.FC = () => {
         minMarginPercent: product.minMarginPercent,
         minPrice: product.minPrice,
         marginPercent,
-      }, 'unitPrice')
+      }, 'unitPrice', pricingPermissions.enforceMarginFloor)
     }))
-  }, [productMap])
+  }, [productMap, pricingPermissions.enforceMarginFloor])
 
   // Compute filtered products based on selected category
   const filteredProducts = useMemo(() => {
@@ -1294,19 +1030,15 @@ const QuoteEditorPage: React.FC = () => {
                   ))}
                 </div>
               )}
-              <div className="qep-items" role="list" aria-label="Quote line items">
-                {productRows.map((row, i) => (
-                  <LineItemRow key={row._id} row={row} index={i}
-                    onChange={handleRowChange} onProductSelect={handleProductSelect}
-                    onRemove={removeRow}
-                    hasMarginViolation={Boolean(row.productId) && row.marginPercent + 0.0001 < row.minMarginPercent}
-                    products={filteredProducts}
-                    disabled={isReadOnly} />
-                ))}
-              </div>
-              {!isReadOnly && (
-                <button className="qep-add-row" onClick={addRow}>+ Add line item</button>
-              )}
+              <LineItemsEditor
+                items={productRows}
+                products={filteredProducts}
+                disabled={isReadOnly}
+                canViewInternalPricing={pricingPermissions.canViewInternalPricing}
+                canEditInternalPricing={pricingPermissions.canEditInternalPricing}
+                enforceMarginFloor={pricingPermissions.enforceMarginFloor}
+                onChange={setRows}
+              />
             </section>
 
             {/* Additional items */}
