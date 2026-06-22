@@ -8,6 +8,14 @@
     ],
     "rewrites": [
       {
+        "source": "/api/admin/debug/crew-assignment-health",
+        "function": "adminDebugCrewAssignmentHealth"
+      },
+      {
+        "source": "/api/notifications",
+        "function": "apiNotifications"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

@@ -15,8 +15,9 @@
  *    createStripePaymentIntent — Callable: create PaymentIntent for an invoice
  *
  *  Order lifecycle
- *    onOrderComplete    — Firestore trigger: draft invoice + confirmation email
+ *    onOrderComplete    — Firestore trigger: order-completion confirmation email
  *    onDeliveryComplete — Firestore trigger: complete order + run on last stop
+ *    onOrderReadyToInvoice — Firestore trigger: notify admins when order is ready to invoice in QB
  *
  *  Scheduled
  *    processAutopay      — Daily 02:00 ET: charge overdue autopay invoices
@@ -24,7 +25,6 @@
  *    certExpiryCheck     — Weekly Mon 07:00 ET: alert on upcoming inspections
  *
  *  Callables
- *    generateInvoicePdf — Build PDF invoice, upload to Storage, return signed URL
  *    generateQuotePdf   — Build PDF quote, upload to Storage, email to recipient, return signed URL
  *    optimizeRoute      — Reorder run stops via Google Maps Routes API
  *
@@ -44,7 +44,6 @@ export { clearAllTestData }                                      from './adminCl
 export { onOrderComplete }                                        from './orders'
 export { onDeliveryComplete }                                     from './triggers/onDeliveryComplete'
 export { onOrderReadyToInvoice }                                  from './triggers/onOrderReadyToInvoice'
-export { onReadyToInvoice }                                       from './triggers/onReadyToInvoice'
 export { finalizeSignedDelivery }        from './delivery/finalizeSignedDelivery'
 export { adminFinalizeDelivery }                                  from './delivery/adminFinalizeDelivery'
 export { updateOrderBillingStatus }                               from './orders/updateOrderBillingStatus'
@@ -55,10 +54,11 @@ export { overdueInvoiceCheck }    from './scheduled/overdueInvoiceCheck'
 export { certExpiryCheck }        from './scheduled/certExpiryCheck'
 export { purgeDeletedCustomers }  from './scheduled/purgeDeletedCustomers'
 export { scheduleRecurringOrders } from './scheduleRecurringOrders'
-export { generateInvoicePdf, generateQuotePdf, optimizeRoute, respondToQuote, backfillGeocodeCustomers, backfillMissingLeads, matchLeadsToCustomers, getPublicQuote, respondToQuotePublic } from './callables'
+export { generateQuotePdf, optimizeRoute, respondToQuote, backfillGeocodeCustomers, backfillMissingLeads, matchLeadsToCustomers, getPublicQuote, respondToQuotePublic } from './callables'
 export { optimizeOrderRoute }                                     from './maps/optimizeRoute'
 export { generateRunManifest }                                    from './generateRunManifest'
 export { onCylinderFlagged }                                      from './onCylinderFlagged'
+export { apiNotifications, adminDebugCrewAssignmentHealth }       from './api'
 
 // Onboarding callables
 export {
