@@ -76,24 +76,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <p className="sidebar__portal-label">{title}</p>
 
         <ul className="sidebar__nav" role="list" onClick={onMobileClose}>
-          {!hasAccordionGroups && items.map(({ label, to, icon, sectionLabel }) => (
+          {items.map(({ label, to, icon, sectionLabel }) => (
             <React.Fragment key={to}>
               {sectionLabel && (
                 <li className="sidebar__section-label" aria-hidden="true">
                   {sectionLabel}
                 </li>
               )}
-            <li key={to}>
-              <NavLink
-                to={to}
-                className={() =>
-                  `sidebar__link${isRouteMatch(location.pathname, to) ? ' sidebar__link--active' : ''}`
-                }
-              >
-                <span className="sidebar__icon" aria-hidden="true">{icon}</span>
-                <span className="sidebar__label">{label}</span>
-              </NavLink>
-            </li>
+              <li>
+                <NavLink
+                  to={to}
+                  className={() =>
+                    `sidebar__link${isRouteMatch(location.pathname, to) ? ' sidebar__link--active' : ''}`
+                  }
+                >
+                  <span className="sidebar__icon" aria-hidden="true">{icon}</span>
+                  <span className="sidebar__label">{label}</span>
+                </NavLink>
+              </li>
             </React.Fragment>
           ))}
 

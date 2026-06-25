@@ -13,7 +13,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { CheckCircle, DollarSign, Eye, FileText, Pencil, Send, Truck, XCircle, type LucideIcon } from 'lucide-react'
+import { Check, CheckCircle, DollarSign, Eye, FileText, Pencil, Send, Truck, XCircle, type LucideIcon } from 'lucide-react'
 import {
   onSnapshot,
   query,
@@ -127,7 +127,7 @@ const ORDER_LIFECYCLE_STEPS = [
   { key: 'pending', label: 'Order Created' },
   { key: 'scheduled', label: 'Run Scheduled' },
   { key: 'in_transit', label: 'In Transit' },
-  { key: 'delivered', label: 'Delivered + BOM Signed' },
+  { key: 'delivered', label: 'Delivered' },
   { key: 'invoice_sent', label: 'Invoice Sent' },
   { key: 'paid', label: 'Paid' },
 ] as const
@@ -259,17 +259,23 @@ function StatusBadge({ order }: { order: Order }) {
 function OrderStatusProgression({ status }: { status: OrderStatus }) {
   const current = lifecycleStepIndex(status)
   return (
-    <section className="om-progress" aria-label="Order lifecycle progression">
-      {ORDER_LIFECYCLE_STEPS.map((step, index) => {
-        const state = index < current ? 'complete' : index === current ? 'current' : 'future'
-        return (
-          <div key={step.key} className={`om-progress__step om-progress__step--${state}`}>
-            <span className="om-progress__dot" aria-hidden="true" />
-            <span className="om-progress__label">{step.label}</span>
-            {index < ORDER_LIFECYCLE_STEPS.length - 1 && <span className="om-progress__line" aria-hidden="true" />}
-          </div>
-        )
-      })}
+    <section className="om-progress-wrap" aria-label="Order lifecycle progression">
+      <div className="om-progress">
+        {ORDER_LIFECYCLE_STEPS.map((step, index) => {
+          const state = index < current ? 'complete' : index === current ? 'current' : 'future'
+          return (
+            <div key={step.key} className={`om-progress__step om-progress__step--${state}`}>
+              <div className="om-progress__node-row" aria-hidden="true">
+                <span className="om-progress__dot">
+                  {state === 'complete' && <Check size={10} strokeWidth={3} />}
+                </span>
+                {index < ORDER_LIFECYCLE_STEPS.length - 1 && <span className="om-progress__line" />}
+              </div>
+              <span className="om-progress__label">{step.label}</span>
+            </div>
+          )
+        })}
+      </div>
     </section>
   )
 }
@@ -317,8 +323,6 @@ function OrderDetailSheet({
   onClose,
   onCancelOrder,
   onReschedule,
-  canCompleteDelivery,
-  onCompleteDelivery,
   onBillingStatusUpdated,
 }: OrderDetailSheetProps) {
   const { isAdmin, user, realUser } = useAuth()
@@ -326,6 +330,7 @@ function OrderDetailSheet({
   const canEdit = order.status === 'pending' || order.status === 'scheduled'
   const [billingBusy, setBillingBusy] = useState(false)
   const [statusBusy, setStatusBusy] = useState(false)
+  const [sendingEstimate, setSendingEstimate] = useState(false)
   const [overrideStatus, setOverrideStatus] = useState<AdminOverrideStatus | ''>('')
   const [billingToast, setBillingToast] = useState<string | null>(null)
   // Invoice Sent form state
@@ -338,6 +343,8 @@ function OrderDetailSheet({
 
   const normalizedStatus = normalizeLifecycleStatus(order.status)
   const nextStatus = getNextLifecycleStatus(order.status)
+  const canSendEstimate =
+    order.status === 'pending' || order.status === 'scheduled' || order.status === 'assigned' || order.status === 'in-transit'
   const actingUserId = realUser?.id ?? user?.id
   const showBillingPanel = isAdmin && (normalizedStatus === 'invoice_sent_pending' || normalizedStatus === 'invoice_sent')
 
@@ -428,6 +435,25 @@ function OrderDetailSheet({
     }
   }
 
+  async function handleSendEstimate() {
+    setSendingEstimate(true)
+    try {
+      const { httpsCallable } = await import('firebase/functions')
+      const { functions } = await import('../../../lib/firebase')
+      const fn = httpsCallable<{ orderId: string }, { success: boolean }>(
+        functions,
+        'sendOrderEstimate',
+      )
+      await fn({ orderId: order.id })
+      alert(`Order estimate email sent to ${customer?.email || 'customer'}.`)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to send estimate email.'
+      alert(message)
+    } finally {
+      setSendingEstimate(false)
+    }
+  }
+
   return (
     <Modal open onClose={onClose} title={`Order ${order.id.slice(0, 8).toUpperCase()}`} size="lg">
       <div className="om-sheet">
@@ -510,63 +536,77 @@ function OrderDetailSheet({
         )}
 
         <div className="om-sheet__actions">
-          {isAdmin && (
-            <div className="om-manual-status om-manual-status--sheet">
-              {nextStatus && (
-                <Button
-                  variant="primary"
-                  onClick={() => { void handleManualStatusChange(nextStatus) }}
-                  disabled={statusBusy}
-                >
-                  {statusBusy ? 'Saving…' : getMarkAsLabel(nextStatus)}
-                </Button>
-              )}
-              <label className="om-manual-status__label" htmlFor={`sheet-override-status-${order.id}`}>
-                Override Status
-              </label>
-              <select
-                id={`sheet-override-status-${order.id}`}
-                className="om-manual-status__select"
-                value={overrideStatus}
-                onChange={(e) => {
-                  const selected = e.target.value as AdminOverrideStatus
-                  setOverrideStatus(selected)
-                  if (selected) {
-                    void handleManualStatusChange(selected)
-                  }
-                }}
+          {isAdmin && nextStatus && (
+            <div className="om-action-row om-action-row--primary">
+              <button
+                type="button"
+                className="om-panel-btn om-panel-btn--primary"
+                onClick={() => { void handleManualStatusChange(nextStatus) }}
                 disabled={statusBusy}
               >
-                <option value="">Override Status</option>
-                {ADMIN_OVERRIDE_STATUS_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+                {statusBusy ? 'Saving…' : getMarkAsLabel(nextStatus)}
+              </button>
             </div>
           )}
-          {canCompleteDelivery && (
-            <Button variant="primary" onClick={() => onCompleteDelivery(order)}>
-              <Truck size={14} /> Complete Delivery
-            </Button>
-          )}
-          {canEdit && (
-            <Button
-              variant="secondary"
-              onClick={() => onReschedule(order)}
-            >
-              Reschedule
-            </Button>
-          )}
-          {canCancel && (
-            <Button
-              variant="danger"
-              onClick={() => onCancelOrder(order.id)}
-            >
-              Cancel Order
-            </Button>
-          )}
+
+          <div className="om-action-row om-action-row--secondary">
+            {canSendEstimate && (
+              <button
+                type="button"
+                className="om-panel-btn om-panel-btn--secondary"
+                onClick={() => { void handleSendEstimate() }}
+                disabled={sendingEstimate}
+              >
+                {sendingEstimate ? 'Sending...' : 'Send Estimate'}
+              </button>
+            )}
+            {canEdit && (
+              <button
+                type="button"
+                className="om-panel-btn om-panel-btn--secondary"
+                onClick={() => onReschedule(order)}
+              >
+                Reschedule
+              </button>
+            )}
+          </div>
+
+          <div className="om-action-row om-action-row--tertiary">
+            {isAdmin && (
+              <div className="om-manual-status__inline om-manual-status__inline--action">
+                <select
+                  id={`sheet-override-status-${order.id}`}
+                  className="om-manual-status__select om-manual-status__select--inline"
+                  value={overrideStatus}
+                  onChange={(e) => {
+                    const selected = e.target.value as AdminOverrideStatus
+                    setOverrideStatus(selected)
+                    if (selected) {
+                      void handleManualStatusChange(selected)
+                    }
+                  }}
+                  disabled={statusBusy}
+                >
+                  <option value="">Override status</option>
+                  {ADMIN_OVERRIDE_STATUS_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <span className="om-manual-status__caret" aria-hidden="true">▾</span>
+              </div>
+            )}
+            {canCancel && (
+              <button
+                type="button"
+                className="om-panel-btn om-panel-btn--danger"
+                onClick={() => onCancelOrder(order.id)}
+              >
+                Cancel Order
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </Modal>
@@ -580,8 +620,6 @@ function OrderDetailPanel({
   onClose,
   onCancelOrder,
   onReschedule,
-  canCompleteDelivery,
-  onCompleteDelivery,
   onBillingStatusUpdated,
 }: OrderDetailPanelProps) {
   const navigate = useNavigate()
@@ -669,6 +707,8 @@ function OrderDetailPanel({
     order.status === 'pending' || order.status === 'scheduled'
   const normalizedStatus = normalizeLifecycleStatus(order.status)
   const nextStatus = getNextLifecycleStatus(order.status)
+  const canSendEstimate =
+    order.status === 'pending' || order.status === 'scheduled' || order.status === 'assigned' || order.status === 'in-transit'
   const actingUserId = realUser?.id ?? user?.id
   const showBillingPanel = isAdmin && (normalizedStatus === 'invoice_sent_pending' || normalizedStatus === 'invoice_sent')
 
@@ -705,20 +745,6 @@ function OrderDetailPanel({
     } finally {
       setStatusBusy(false)
       setOverrideStatus('')
-    }
-  }
-
-  async function handleMarkReadyForInvoice() {
-    setBillingBusy(true)
-    try {
-      await markOrderReadyForInvoice(order.id)
-      await onBillingStatusUpdated(order.id)
-      setBillingToast('Order marked ready for invoice.')
-      setTimeout(() => setBillingToast(null), 2500)
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to mark order ready for invoice.')
-    } finally {
-      setBillingBusy(false)
     }
   }
 
@@ -821,10 +847,11 @@ function OrderDetailPanel({
       >
         {/* Header */}
         <div className="om-panel__header">
-          <div>
+          <div className="om-panel__header-copy">
             <div className="om-panel__order-num">
-              {order.id.slice(0, 8).toUpperCase()}
+              Order #{order.id.slice(0, 8).toUpperCase()}
             </div>
+            <div className="om-panel__customer-name">{customer?.name ?? 'Unknown customer'}</div>
             {isRush(order) && (
               <span className="om-rush-flag">Rush</span>
             )}
@@ -840,8 +867,9 @@ function OrderDetailPanel({
 
         <div className="om-panel__body">
           <OrderStatusProgression status={order.status} />
-          {/* Customer + product */}
+          {/* Customer info */}
           <section className="om-panel__section">
+            <div className="om-panel__section-title">Customer Info</div>
             <div className="om-panel__row">
               <span className="om-panel__label">Customer</span>
               <span className="om-panel__val">{customer?.name ?? '—'}</span>
@@ -854,6 +882,11 @@ function OrderDetailPanel({
                   : '—'}
               </span>
             </div>
+          </section>
+
+          {/* Product + pricing */}
+          <section className="om-panel__section om-panel__section--pricing">
+            <div className="om-panel__section-title">Product & Pricing</div>
             <div className="om-panel__row">
               <span className="om-panel__label">Product</span>
               <span className="om-panel__val">
@@ -872,10 +905,6 @@ function OrderDetailPanel({
                 <StatusBadge order={order} />
               </span>
             </div>
-          </section>
-
-          {/* Pricing */}
-          <section className="om-panel__section om-panel__section--pricing">
             <div className="om-panel__row">
               <span className="om-panel__label">Unit price</span>
               <span className="om-panel__val">{fmtCurrency(order.unitPrice)}</span>
@@ -1129,99 +1158,80 @@ function OrderDetailPanel({
 
         {/* Actions */}
         <div className="om-panel__footer">
-          {isAdmin && (
-            <div className="om-manual-status">
-              {nextStatus && (
-                <Button
-                  variant="primary"
-                  size="sm"
+          <div className="om-action-stack">
+            {isAdmin && nextStatus && (
+              <div className="om-action-row om-action-row--primary">
+                <button
+                  type="button"
+                  className="om-panel-btn om-panel-btn--primary"
                   onClick={() => { void handleManualStatusChange(nextStatus) }}
                   disabled={statusBusy}
                 >
                   {statusBusy ? 'Saving…' : getMarkAsLabel(nextStatus)}
-                </Button>
+                </button>
+              </div>
+            )}
+
+            <div className="om-action-row om-action-row--secondary">
+              {canSendEstimate && (
+                <button
+                  type="button"
+                  className="om-panel-btn om-panel-btn--secondary"
+                  onClick={() => { void handleSendEstimate() }}
+                  disabled={sendingEstimate}
+                >
+                  {sendingEstimate ? 'Sending...' : 'Send Estimate'}
+                </button>
               )}
-              <label className="om-manual-status__label" htmlFor={`override-status-${order.id}`}>
-                Override Status
-              </label>
-              <select
-                id={`override-status-${order.id}`}
-                className="om-manual-status__select"
-                value={overrideStatus}
-                onChange={(e) => {
-                  const selected = e.target.value as AdminOverrideStatus
-                  setOverrideStatus(selected)
-                  if (selected) {
-                    void handleManualStatusChange(selected)
-                  }
-                }}
-                disabled={statusBusy}
-              >
-                <option value="">Override Status</option>
-                {ADMIN_OVERRIDE_STATUS_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              {canEdit && (
+                <button
+                  type="button"
+                  className="om-panel-btn om-panel-btn--secondary"
+                  onClick={() => onReschedule(order)}
+                >
+                  Reschedule
+                </button>
+              )}
             </div>
-          )}
-          {isAdmin && normalizedStatus === 'delivered' && (
-            <button
-              className="om-billing-btn om-billing-btn--ready"
-              onClick={() => { void handleMarkReadyForInvoice() }}
-              disabled={billingBusy}
-            >
-              {billingBusy ? 'Saving…' : 'Mark Ready for Invoice'}
-            </button>
-          )}
-          {canCompleteDelivery && (
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => onCompleteDelivery(order)}
-            >
-              <Truck size={14} /> Complete Delivery
-            </Button>
-          )}
-          {isAdminView && !invoice && (
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={handleGenerateInvoice}
-              disabled={generatingInvoice}
-            >
-              {generatingInvoice ? 'Generating...' : 'Generate Invoice'}
-            </Button>
-          )}
-          {(order.status === 'pending' || order.status === 'scheduled' || order.status === 'assigned' || order.status === 'in-transit') && (
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={handleSendEstimate}
-              disabled={sendingEstimate}
-            >
-              {sendingEstimate ? 'Sending...' : 'Send Estimate'}
-            </Button>
-          )}
-          {canEdit && (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => onReschedule(order)}
-            >
-              Reschedule
-            </Button>
-          )}
-          {canCancel && (
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={() => onCancelOrder(order.id)}
-            >
-              Cancel Order
-            </Button>
-          )}
+
+            <div className="om-action-row om-action-row--tertiary">
+              {isAdmin && (
+                <div className="om-manual-status__inline om-manual-status__inline--action">
+                  <select
+                    id={`override-status-${order.id}`}
+                    aria-label="Override status"
+                    className="om-manual-status__select om-manual-status__select--inline"
+                    value={overrideStatus}
+                    onChange={(e) => {
+                      const selected = e.target.value as AdminOverrideStatus
+                      setOverrideStatus(selected)
+                      if (selected) {
+                        void handleManualStatusChange(selected)
+                      }
+                    }}
+                    disabled={statusBusy}
+                  >
+                    <option value="">Override status</option>
+                    {ADMIN_OVERRIDE_STATUS_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="om-manual-status__caret" aria-hidden="true">▾</span>
+                </div>
+              )}
+              {canCancel && (
+                <button
+                  type="button"
+                  className="om-panel-btn om-panel-btn--danger"
+                  onClick={() => onCancelOrder(order.id)}
+                >
+                  Cancel Order
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 

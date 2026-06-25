@@ -1,7 +1,12 @@
+import { createElement } from 'react'
+import { LayoutDashboard } from 'lucide-react'
 import type { SidebarGroup, SidebarItem } from '../ui/Sidebar'
 
 export const ADMIN_SIDEBAR_OVERVIEW_ITEMS: SidebarItem[] = [
-  { to: '/admin/dashboard', label: 'Dashboard', icon: '⊞' },
+  { to: '/admin/dashboard', label: 'Dashboard', icon: createElement(LayoutDashboard, { size: 16 }) },
+]
+
+const ADMIN_SETTINGS_ITEMS: SidebarItem[] = [
   { to: '/admin/users', label: 'User Management', icon: '◎' },
   { to: '/admin/delivery-settings', label: 'Delivery Settings', icon: '⊞' },
   { to: '/admin/company-settings', label: 'Company Info', icon: '⊟' },
@@ -9,7 +14,7 @@ export const ADMIN_SIDEBAR_OVERVIEW_ITEMS: SidebarItem[] = [
 ]
 
 export const ADMIN_SIDEBAR_GROUPS: SidebarGroup[] = [
-  { label: 'ADMIN', items: ADMIN_SIDEBAR_OVERVIEW_ITEMS },
+  { label: 'ADMIN', items: ADMIN_SETTINGS_ITEMS },
   {
     label: 'CRM',
     items: [
