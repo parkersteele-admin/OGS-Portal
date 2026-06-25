@@ -104,7 +104,7 @@ export const AppRouter: React.FC = () => (
       <Route
         path="/portal/onboarding"
         element={
-          <ProtectedRoute role={['owner', 'manager', 'billing', 'delivery', 'viewer', 'customer', 'admin']}>
+          <ProtectedRoute role={['owner', 'manager', 'billing', 'delivery', 'viewer', 'customer']}>
             <OnboardingLayout />
           </ProtectedRoute>
         }
@@ -124,7 +124,7 @@ export const AppRouter: React.FC = () => (
       <Route
         path="/portal"
         element={
-          <ProtectedRoute role={['customer', 'owner', 'manager', 'billing', 'delivery', 'viewer', 'admin']}>
+          <ProtectedRoute role={['customer', 'owner', 'manager', 'billing', 'delivery', 'viewer']}>
             <CustomerLayout />
           </ProtectedRoute>
         }
