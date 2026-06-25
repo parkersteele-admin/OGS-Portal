@@ -53,46 +53,21 @@
   gap: 14px;
 }
 
-.bd__kpi-card {
-  padding: 20px;
-  border-radius: 12px;
-  border: 1px solid #2a2a2a;
-  background: #1a1a1a;
-}
-
-.bd__kpi-card--clickable {
+.bd__pending-stat {
+  border: 0;
+  background: transparent;
+  padding: 0;
   cursor: pointer;
+  text-align: left;
 }
 
-.bd__kpi-card--clickable:hover {
-  border-color: #4a4a4a;
+.bd__pending-stat:hover {
+  opacity: 0.95;
 }
 
-.bd__kpi-card--clickable:focus {
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.2);
-}
-
-.bd__kpi-label {
-  margin: 0 0 10px;
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-.bd__kpi-label--blue { color: #0066FF; }
-.bd__kpi-label--green { color: #22C55E; }
-.bd__kpi-label--orange { color: #FF6A00; }
-.bd__kpi-label--neutral { color: #999999; }
-
-.bd__kpi-value {
-  margin: 0;
-  font-size: 28px;
-  line-height: 1;
-  font-weight: 800;
-  color: #ffffff;
-  font-family: 'Barlow Condensed', var(--font-sans), sans-serif;
+.bd__pending-stat:focus-visible {
+  outline: 2px solid #FF6B1A;
+  outline-offset: 2px;
 }
 
 .bd__revenue-card {
@@ -121,29 +96,11 @@
   margin-bottom: 14px;
 }
 
-.bd__chip {
-  height: 32px;
-  border-radius: 999px;
-  border: 1px solid var(--color-border);
-  background: var(--color-bg);
-  color: var(--color-text-2);
-  font-size: 12px;
-  font-weight: 700;
-  padding: 0 12px;
-  cursor: pointer;
-}
-
-.bd__chip--active {
-  border-color: #0066FF;
-  color: #0066FF;
-  background: rgba(0, 102, 255, 0.08);
-}
-
 .bd__table-shell {
-  border: 1px solid var(--color-border);
-  border-radius: 18px;
-  overflow: hidden;
-  background: var(--color-bg);
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+  background: transparent;
 }
 
 .bd__table-wrap {
@@ -157,36 +114,7 @@
 .bd__table {
   width: 100%;
   min-width: 920px;
-  border-collapse: separate;
-  border-spacing: 0;
-}
-
-.bd__table thead th {
-  text-align: left;
-  padding: 0.85rem 1rem;
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--color-text-3);
-  background: var(--color-bg-3);
-  border-bottom: 1px solid var(--color-border);
-  white-space: nowrap;
-}
-
-.bd__table tbody td {
-  padding: 0.95rem 1rem;
-  border-bottom: 1px solid var(--color-divider);
-  color: var(--color-text-2);
-  vertical-align: middle;
-}
-
-.bd__table tbody tr:last-child td {
-  border-bottom: none;
-}
-
-.bd__table tbody tr:hover {
-  background: var(--color-bg-2);
+  border-collapse: collapse;
 }
 
 .bd__sort-btn {
@@ -287,16 +215,6 @@
 .bd__mobile-revenue-meta strong {
   font-size: 14px;
   color: var(--color-text);
-}
-
-.bd .ui-badge {
-  height: 24px;
-  padding: 0 0.6rem;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
 @media (max-width: 1023px) {

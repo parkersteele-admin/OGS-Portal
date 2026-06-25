@@ -9,11 +9,12 @@ import {
   query,
   where,
   orderBy,
+  arrayUnion,
   serverTimestamp,
   type QueryConstraint,
   type Unsubscribe,
 } from 'firebase/firestore'
-import { db } from '../lib/firebase'
+import { auth, db } from '../lib/firebase'
 import { ordersCol, deliverySettingsRef, routeScheduleRef, routeScheduleHistoryCol } from '../lib/firestore'
 import type { Order, OrderStatus, DeliveryTier, DeliveryTierConfig, DeliverySettings, RouteSchedule, AddOnItem } from '../types/order'
 import { DEFAULT_DELIVERY_SETTINGS } from '../types/order'
@@ -161,19 +162,33 @@ export function calculateOrderPricing(
 
 const VALID_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   pending:      ['scheduled', 'cancelled', 'archived'],
-  scheduled:    ['assigned',  'pending', 'cancelled', 'archived'],
-  assigned:     ['in-transit','scheduled', 'archived'],
-  'in-transit': ['delivered', 'archived'],
-  delivered:    ['ready_to_invoice', 'archived'],
-  ready_to_invoice: ['invoice_sent', 'paid', 'archived'],
-  invoice_sent: ['paid', 'archived'],
+  scheduled:    ['assigned', 'in-transit', 'in_transit', 'pending', 'cancelled', 'archived'],
+  assigned:     ['in-transit', 'in_transit', 'scheduled', 'cancelled', 'archived'],
+  'in-transit': ['delivered', 'cancelled', 'archived'],
+  in_transit:   ['delivered', 'cancelled', 'archived'],
+  delivered:    ['ready_to_invoice', 'invoice_sent_pending', 'invoice_sent', 'cancelled', 'archived'],
+  ready_to_invoice: ['invoice_sent_pending', 'invoice_sent', 'paid', 'cancelled', 'archived'],
+  invoice_sent_pending: ['invoice_sent', 'paid', 'cancelled', 'archived'],
+  invoice_sent: ['paid', 'cancelled', 'archived'],
   paid:         ['archived'],
   cancelled:    ['archived'],
   archived:     [],
 }
 
 export function canTransition(from: OrderStatus, to: OrderStatus): boolean {
-  return VALID_TRANSITIONS[from]?.includes(to) ?? false
+  const normalize = (status: OrderStatus): OrderStatus => (
+    status === 'in-transit' ? 'in_transit' : status
+  )
+  const normalizedFrom = normalize(from)
+  const normalizedTo = normalize(to)
+  return VALID_TRANSITIONS[normalizedFrom]?.includes(normalizedTo) ?? false
+}
+
+export interface TransitionOrderStatusOptions {
+  changedBy?: string
+  qbInvoiceNumber?: string
+  /** Allows explicit manual override writes without lifecycle validation guards. */
+  force?: boolean
 }
 
 // ── Read ──────────────────────────────────────────────────────────────────────
@@ -234,6 +249,10 @@ export async function createOrder(
       ...payload,
       ...pricing,
       status: 'pending' as OrderStatus,
+      qbInvoiceNumber: null,
+      invoiceSentAt: null,
+      readyForInvoiceAt: null,
+      paidAt: null,
       requestedAt: serverTimestamp(),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -266,6 +285,10 @@ export async function createBatchOrders(
           ...(groupId ? { groupId } : {}),
           orderType,
           status: 'pending' as OrderStatus,
+          qbInvoiceNumber: null,
+          invoiceSentAt: null,
+          readyForInvoiceAt: null,
+          paidAt: null,
           requestedAt: serverTimestamp(),
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
@@ -290,18 +313,49 @@ export async function updateOrder(
 export async function transitionOrderStatus(
   id: string,
   nextStatus: OrderStatus,
+  options: TransitionOrderStatusOptions = {},
 ): Promise<void> {
   return serviceCall(async () => {
     const order = await getOrder(id)
-    if (!canTransition(order.status, nextStatus)) {
+    if (!options.force && !canTransition(order.status, nextStatus)) {
       throw new OgsValidationError(
         `Cannot transition order from '${order.status}' to '${nextStatus}'`,
       )
     }
-    await updateDoc(doc(db, 'orders', id), sanitizeForFirestore({
+
+    const changedBy = options.changedBy?.trim() || auth.currentUser?.uid || 'system'
+    const qbInvoiceNumber = options.qbInvoiceNumber?.trim()
+
+    if (nextStatus === 'invoice_sent' && !qbInvoiceNumber) {
+      throw new OgsValidationError('QB Invoice Number is required when marking an order as invoice_sent.')
+    }
+
+    const patch: Record<string, unknown> = {
       status: nextStatus,
+      statusUpdatedAt: serverTimestamp(),
+      statusHistory: arrayUnion({
+        status: nextStatus,
+        changedAt: serverTimestamp(),
+        changedBy,
+      }),
       updatedAt: serverTimestamp(),
-    }))
+    }
+
+    if (nextStatus === 'cancelled') {
+      patch.cancelledAt = serverTimestamp()
+      patch.cancelledBy = changedBy
+    }
+
+    if (nextStatus === 'invoice_sent') {
+      patch.qbInvoiceNumber = qbInvoiceNumber
+      patch.invoiceSentAt = serverTimestamp()
+    }
+
+    if (nextStatus === 'paid' && !order.paidAt) {
+      patch.paidAt = serverTimestamp()
+    }
+
+    await updateDoc(doc(db, 'orders', id), sanitizeForFirestore(patch))
   })
 }
 
@@ -330,6 +384,19 @@ export async function updateOrderBillingStatus(
       { success: true; newStatus: 'invoice_sent' | 'paid' }
     >(functions, 'updateOrderBillingStatus')
     const result = await fn({ orderId, newStatus, ...extra })
+    return result.data
+  })
+}
+
+export async function markOrderReadyForInvoice(orderId: string): Promise<{ success: true; newStatus: 'invoice_sent_pending' }> {
+  return serviceCall(async () => {
+    const { httpsCallable } = await import('firebase/functions')
+    const { functions } = await import('../lib/firebase')
+    const fn = httpsCallable<{ orderId: string }, { success: true; newStatus: 'invoice_sent_pending' }>(
+      functions,
+      'markOrderReadyForInvoice',
+    )
+    const result = await fn({ orderId })
     return result.data
   })
 }

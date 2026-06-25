@@ -13,6 +13,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { Truck } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { onSnapshot, query, where } from 'firebase/firestore'
 import jsQR from 'jsqr'
@@ -407,7 +408,8 @@ const TruckPage: React.FC = () => {
       {/* Tanks on truck */}
       <section className="tp-section">
         <h2 className="tp-section__title">
-          🚛 On Truck {!loadingTanks && `(${truckTanks.length})`}
+          <Truck size={16} style={{ marginRight: 6, verticalAlign: 'text-bottom' }} />
+          On Truck {!loadingTanks && `(${truckTanks.length})`}
         </h2>
         {loadingTanks ? (
           <div className="tp-loading">Loading…</div>

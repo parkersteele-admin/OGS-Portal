@@ -48,6 +48,7 @@ export { onReadyToInvoice }                                       from './trigge
 export { finalizeSignedDelivery }        from './delivery/finalizeSignedDelivery'
 export { adminFinalizeDelivery }                                  from './delivery/adminFinalizeDelivery'
 export { updateOrderBillingStatus }                               from './orders/updateOrderBillingStatus'
+export { markOrderReadyForInvoice }                               from './orders/markOrderReadyForInvoice'
 export { onRunCreated }                                           from './triggers/onRunCreated'
 export { geocodeCustomerOnCreate, geocodeCustomerOnUpdate }       from './triggers/geocodeCustomer'
 export { lowLevelAlertCheck }     from './scheduled/lowLevelAlertCheck'

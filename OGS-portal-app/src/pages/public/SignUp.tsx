@@ -12,6 +12,7 @@
 
 import React, { useState, useId, useRef, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { Building2, Eye, EyeOff, Search } from 'lucide-react'
 import {
   createUserWithEmailAndPassword,
   sendEmailVerification,
@@ -353,7 +354,7 @@ const SignUp: React.FC = () => {
               {duplicateMatch.type === 'domain' ? (
                 <>
                   <p className="signup-dup__text">
-                    🏢 <strong>We found an existing account for {duplicateMatch.companyName}.</strong>{' '}
+                    <Building2 size={16} aria-hidden="true" /> <strong>We found an existing account for {duplicateMatch.companyName}.</strong>{' '}
                     Someone from your organization may have already set up an account.
                     You can request access to join it, or continue creating a separate one.
                   </p>
@@ -379,7 +380,7 @@ const SignUp: React.FC = () => {
               ) : (
                 <>
                   <p className="signup-dup__text">
-                    🔍 <strong>Did you mean {duplicateMatch.companyName}?</strong>{' '}
+                    <Search size={16} aria-hidden="true" /> <strong>Did you mean {duplicateMatch.companyName}?</strong>{' '}
                     An account with a similar name already exists.
                   </p>
                   <div className="signup-dup__actions">
@@ -470,7 +471,7 @@ const SignUp: React.FC = () => {
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
                 tabIndex={-1}
               >
-                {showPassword ? '🙈' : '👁'}
+                {showPassword ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
               </button>
             </div>
             {fieldErrors.password && (

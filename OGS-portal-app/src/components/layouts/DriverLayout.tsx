@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { Calendar, Crosshair, Truck } from 'lucide-react'
 import { Outlet } from 'react-router-dom'
 import { Sidebar } from '../ui/Sidebar'
 import { TopBar } from '../ui/TopBar'
@@ -10,8 +11,8 @@ import type { MobileNavItem } from '../ui/MobileNav'
 import './Layout.css'
 
 const NAV_ITEMS: SidebarItem[] = [
-  { to: '/driver/schedule', label: 'My Schedule', icon: '∷' },
-  { to: '/driver/truck',    label: 'My Truck',    icon: '🚛' },
+  { to: '/driver/schedule', label: 'My Schedule', icon: <Calendar size={16} /> },
+  { to: '/driver/truck',    label: 'My Truck',    icon: <Truck size={16} /> },
 ]
 
 const MOBILE_ITEMS: MobileNavItem[] = NAV_ITEMS.map(
@@ -19,8 +20,8 @@ const MOBILE_ITEMS: MobileNavItem[] = NAV_ITEMS.map(
 )
 
 const MORE_ITEMS: MobileNavItem[] = [
-  { to: '/driver/truck', label: 'Truck', icon: '◫' },
-  { to: '/ops/dispatch', label: 'Dispatch map', icon: '⌖' },
+  { to: '/driver/truck', label: 'Truck', icon: <Truck size={16} /> },
+  { to: '/ops/dispatch', label: 'Dispatch map', icon: <Crosshair size={16} /> },
 ]
 
 export const DriverLayout: React.FC = () => {

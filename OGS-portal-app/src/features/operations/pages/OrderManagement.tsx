@@ -35,10 +35,12 @@ import {
   archiveOrder,
   deleteOrder,
   updateOrderBillingStatus,
+  markOrderReadyForInvoice,
 } from '../../../services/orderService'
 import { generateInvoiceForOrder, sendInvoiceEmailForOrder } from '../../../services/invoiceService'
 import { subscribeToCustomers } from '../../../services/customerService'
 import { getProductDropdown, type ProductDropdownItem } from '../../../services/productService'
+import { updateQuote } from '../../../services/quoteService'
 import { useAuth } from '../../../hooks/useAuth'
 import { Button } from '../../../components/ui/Button'
 import { Input } from '../../../components/ui/Input'
@@ -68,7 +70,9 @@ const STATUS_LABELS: Record<OrderStatus, string> = {
   scheduled:  'Scheduled',
   assigned:   'Assigned',
   'in-transit': 'In Transit',
+  in_transit: 'In Transit',
   delivered:  'Delivered',
+  invoice_sent_pending: 'Invoice Pending',
   ready_to_invoice: 'Ready to Invoice',
   invoice_sent: 'Invoice Sent',
   paid:       'Paid',
@@ -81,7 +85,9 @@ const STATUS_ICONS: Record<OrderStatus, LucideIcon> = {
   scheduled: FileText,
   assigned: FileText,
   'in-transit': Send,
+  in_transit: Send,
   delivered: CheckCircle,
+  invoice_sent_pending: FileText,
   ready_to_invoice: FileText,
   invoice_sent: Send,
   paid: CheckCircle,
@@ -90,17 +96,63 @@ const STATUS_ICONS: Record<OrderStatus, LucideIcon> = {
 }
 
 const STATUS_ICON_COLORS: Record<OrderStatus, string> = {
-  pending: '#92400e',
-  scheduled: '#1e40af',
+  pending: '#f59e0b',
+  scheduled: '#64748b',
   assigned: '#3730a3',
-  'in-transit': '#9d174d',
+  'in-transit': '#facc15',
+  in_transit: '#facc15',
   delivered: '#065f46',
+  invoice_sent_pending: '#f59e0b',
   ready_to_invoice: '#FF6A00',
-  invoice_sent: '#0066FF',
-  paid: '#065f46',
+  invoice_sent: '#7c3aed',
+  paid: '#10b981',
   cancelled: '#6b7280',
   archived: '#6b7280',
 }
+
+type OrderLifecycleFilter = 'all' | 'pending' | 'scheduled' | 'in_transit' | 'delivered' | 'invoice_sent' | 'paid' | 'cancelled'
+
+const ORDER_STATUS_FILTERS: Array<{ value: OrderLifecycleFilter; label: string }> = [
+  { value: 'all', label: 'All' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'scheduled', label: 'Scheduled' },
+  { value: 'in_transit', label: 'In Transit' },
+  { value: 'delivered', label: 'Delivered' },
+  { value: 'invoice_sent', label: 'Invoice Sent' },
+  { value: 'paid', label: 'Paid' },
+  { value: 'cancelled', label: 'Cancelled' },
+]
+
+const ORDER_LIFECYCLE_STEPS = [
+  { key: 'pending', label: 'Order Created' },
+  { key: 'scheduled', label: 'Run Scheduled' },
+  { key: 'in_transit', label: 'In Transit' },
+  { key: 'delivered', label: 'Delivered + BOM Signed' },
+  { key: 'invoice_sent', label: 'Invoice Sent' },
+  { key: 'paid', label: 'Paid' },
+] as const
+
+type ManualLifecycleStatus = 'pending' | 'scheduled' | 'in_transit' | 'delivered' | 'invoice_sent' | 'paid'
+type AdminOverrideStatus = ManualLifecycleStatus | 'cancelled'
+
+const MANUAL_LIFECYCLE_SEQUENCE: ManualLifecycleStatus[] = [
+  'pending',
+  'scheduled',
+  'in_transit',
+  'delivered',
+  'invoice_sent',
+  'paid',
+]
+
+const ADMIN_OVERRIDE_STATUS_OPTIONS: Array<{ value: AdminOverrideStatus; label: string }> = [
+  { value: 'pending', label: 'Pending' },
+  { value: 'scheduled', label: 'Scheduled' },
+  { value: 'in_transit', label: 'In Transit' },
+  { value: 'delivered', label: 'Delivered' },
+  { value: 'invoice_sent', label: 'Invoice Sent' },
+  { value: 'paid', label: 'Paid' },
+  { value: 'cancelled', label: 'Cancelled' },
+]
 
 const TIER_LABELS: Record<DeliveryTier, string> = {
   standard:  'Standard',
@@ -155,15 +207,70 @@ function getOrderStatusLabel(order: Order): string {
   return STATUS_LABELS[order.status]
 }
 
+function normalizeLifecycleStatus(status: OrderStatus): OrderStatus {
+  if (status === 'in-transit') return 'in_transit'
+  if (status === 'ready_to_invoice') return 'invoice_sent_pending'
+  return status
+}
+
+function normalizeManualStatus(status: OrderStatus): ManualLifecycleStatus | 'cancelled' | null {
+  const normalized = normalizeLifecycleStatus(status)
+  if (normalized === 'assigned') return 'in_transit'
+  if (normalized === 'invoice_sent_pending') return 'invoice_sent'
+  if (normalized === 'pending' || normalized === 'scheduled' || normalized === 'in_transit' || normalized === 'delivered' || normalized === 'invoice_sent' || normalized === 'paid' || normalized === 'cancelled') {
+    return normalized
+  }
+  return null
+}
+
+function getNextLifecycleStatus(status: OrderStatus): ManualLifecycleStatus | null {
+  const normalized = normalizeManualStatus(status)
+  if (!normalized || normalized === 'cancelled') return null
+  const idx = MANUAL_LIFECYCLE_SEQUENCE.indexOf(normalized)
+  if (idx < 0 || idx >= MANUAL_LIFECYCLE_SEQUENCE.length - 1) return null
+  return MANUAL_LIFECYCLE_SEQUENCE[idx + 1]
+}
+
+function getMarkAsLabel(status: ManualLifecycleStatus): string {
+  return `Mark as ${STATUS_LABELS[status]}`
+}
+
+function lifecycleStepIndex(status: OrderStatus): number {
+  const normalized = normalizeLifecycleStatus(status)
+  if (normalized === 'assigned') return 2
+  if (normalized === 'invoice_sent_pending') return 3
+  const idx = ORDER_LIFECYCLE_STEPS.findIndex((step) => step.key === normalized)
+  return idx >= 0 ? idx : 0
+}
+
 // ── Status badge ───────────────────────────────────────────────────────────────
 
 function StatusBadge({ order }: { order: Order }) {
-  const StatusIcon = STATUS_ICONS[order.status]
+  const normalizedStatus = normalizeLifecycleStatus(order.status)
+  const StatusIcon = STATUS_ICONS[normalizedStatus]
   return (
-    <span className={`om-badge om-badge--${order.status}`}>
-      <StatusIcon size={12} aria-hidden="true" style={{ color: STATUS_ICON_COLORS[order.status] }} />
+    <span className={`om-badge om-badge--${normalizedStatus}`}>
+      <StatusIcon size={12} aria-hidden="true" style={{ color: STATUS_ICON_COLORS[normalizedStatus] }} />
       <span>{getOrderStatusLabel(order)}</span>
     </span>
+  )
+}
+
+function OrderStatusProgression({ status }: { status: OrderStatus }) {
+  const current = lifecycleStepIndex(status)
+  return (
+    <section className="om-progress" aria-label="Order lifecycle progression">
+      {ORDER_LIFECYCLE_STEPS.map((step, index) => {
+        const state = index < current ? 'complete' : index === current ? 'current' : 'future'
+        return (
+          <div key={step.key} className={`om-progress__step om-progress__step--${state}`}>
+            <span className="om-progress__dot" aria-hidden="true" />
+            <span className="om-progress__label">{step.label}</span>
+            {index < ORDER_LIFECYCLE_STEPS.length - 1 && <span className="om-progress__line" aria-hidden="true" />}
+          </div>
+        )
+      })}
+    </section>
   )
 }
 
@@ -214,31 +321,83 @@ function OrderDetailSheet({
   onCompleteDelivery,
   onBillingStatusUpdated,
 }: OrderDetailSheetProps) {
-  const { isAdmin } = useAuth()
+  const { isAdmin, user, realUser } = useAuth()
   const canCancel = canTransition(order.status, 'cancelled')
   const canEdit = order.status === 'pending' || order.status === 'scheduled'
   const [billingBusy, setBillingBusy] = useState(false)
+  const [statusBusy, setStatusBusy] = useState(false)
+  const [overrideStatus, setOverrideStatus] = useState<AdminOverrideStatus | ''>('')
   const [billingToast, setBillingToast] = useState<string | null>(null)
   // Invoice Sent form state
   const [qbInvoiceNumber, setQbInvoiceNumber] = useState('')
-  const [invoiceAmountStr, setInvoiceAmountStr] = useState('')
   // Paid form state
   const [paidAmountStr, setPaidAmountStr] = useState(() =>
     order.invoiceAmount != null ? order.invoiceAmount.toFixed(2) : '',
   )
   const [paidAtStr, setPaidAtStr] = useState(() => new Date().toISOString().slice(0, 10))
 
-  const showBillingPanel = isAdmin && (order.status === 'ready_to_invoice' || order.status === 'invoice_sent')
+  const normalizedStatus = normalizeLifecycleStatus(order.status)
+  const nextStatus = getNextLifecycleStatus(order.status)
+  const actingUserId = realUser?.id ?? user?.id
+  const showBillingPanel = isAdmin && (normalizedStatus === 'invoice_sent_pending' || normalizedStatus === 'invoice_sent')
+
+  async function handleManualStatusChange(next: AdminOverrideStatus) {
+    let qbInvoiceNumber: string | undefined
+
+    if (next === 'invoice_sent') {
+      const value = window.prompt('Enter QB Invoice # to mark this order as Invoice Sent:', order.qbInvoiceNumber ?? '')
+      if (value === null) return
+      qbInvoiceNumber = value.trim()
+      if (!qbInvoiceNumber) {
+        alert('QB Invoice # is required to mark an order as Invoice Sent.')
+        return
+      }
+      if (!confirm(`Mark this order as Invoice Sent with QB Invoice # ${qbInvoiceNumber}?`)) return
+    }
+
+    if ((next === 'delivered' || next === 'paid') && !confirm(`Mark this order as ${STATUS_LABELS[next]}? This action is irreversible.`)) {
+      return
+    }
+
+    setStatusBusy(true)
+    try {
+      await transitionOrderStatus(order.id, next, {
+        changedBy: actingUserId,
+        qbInvoiceNumber,
+        force: true,
+      })
+      await onBillingStatusUpdated(order.id)
+      setBillingToast(`Order status updated to ${STATUS_LABELS[next]}.`)
+      setTimeout(() => setBillingToast(null), 2500)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to update order status.')
+    } finally {
+      setStatusBusy(false)
+      setOverrideStatus('')
+    }
+  }
+
+  async function handleMarkReadyForInvoice() {
+    setBillingBusy(true)
+    try {
+      await markOrderReadyForInvoice(order.id)
+      await onBillingStatusUpdated(order.id)
+      setBillingToast('Order marked ready for invoice.')
+      setTimeout(() => setBillingToast(null), 2500)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to mark order ready for invoice.')
+    } finally {
+      setBillingBusy(false)
+    }
+  }
 
   async function handleMarkInvoiceSent() {
     const invNum = qbInvoiceNumber.trim()
-    const invAmt = parseFloat(invoiceAmountStr)
-    if (!invNum || isNaN(invAmt) || invAmt <= 0) return
+    if (!invNum) return
     setBillingBusy(true)
     try {
       await updateOrderBillingStatus(order.id, 'invoice_sent', {
         qbInvoiceNumber: invNum,
-        invoiceAmount: invAmt,
       })
       await onBillingStatusUpdated(order.id)
       setBillingToast('Invoice marked as sent.')
@@ -272,6 +431,7 @@ function OrderDetailSheet({
   return (
     <Modal open onClose={onClose} title={`Order ${order.id.slice(0, 8).toUpperCase()}`} size="lg">
       <div className="om-sheet">
+        <OrderStatusProgression status={order.status} />
         <div className="om-sheet__row">
           <span>Customer</span>
           <strong>{customer?.name ?? '—'}</strong>
@@ -303,6 +463,16 @@ function OrderDetailSheet({
 
         {order.notes && <p className="om-sheet__notes">{order.notes}</p>}
 
+        {isAdmin && normalizedStatus === 'delivered' && (
+          <button
+            className="om-billing-btn om-billing-btn--ready"
+            onClick={() => { void handleMarkReadyForInvoice() }}
+            disabled={billingBusy}
+          >
+            {billingBusy ? 'Saving…' : 'Mark Ready for Invoice'}
+          </button>
+        )}
+
         {showBillingPanel && (
           <section className="om-billing-panel">
             <div className="om-billing-panel__header">
@@ -310,20 +480,18 @@ function OrderDetailSheet({
             </div>
             <div className="om-billing-panel__body">
               <span className={`om-billing-badge om-billing-badge--${order.status}`}>
-                {order.status === 'ready_to_invoice' ? 'Ready to Invoice' : 'Invoice Sent'}
+                {normalizedStatus === 'invoice_sent_pending' ? 'Invoice Pending' : 'Invoice Sent'}
               </span>
               <p className="om-billing-copy">
-                {order.status === 'ready_to_invoice'
-                  ? 'Create the invoice in QuickBooks, then mark it sent below.'
+                {normalizedStatus === 'invoice_sent_pending'
+                  ? 'Enter the QuickBooks invoice number, then confirm invoice sent.'
                   : 'Once payment is received, mark this order as paid.'}
               </p>
-              {order.status === 'ready_to_invoice' ? (
+              {normalizedStatus === 'invoice_sent_pending' ? (
                 <QBInvoiceSentForm
                   qbInvoiceNumber={qbInvoiceNumber}
-                  invoiceAmountStr={invoiceAmountStr}
                   busy={billingBusy}
                   onChangeInvoiceNumber={setQbInvoiceNumber}
-                  onChangeInvoiceAmount={setInvoiceAmountStr}
                   onSubmit={handleMarkInvoiceSent}
                 />
               ) : (
@@ -342,6 +510,42 @@ function OrderDetailSheet({
         )}
 
         <div className="om-sheet__actions">
+          {isAdmin && (
+            <div className="om-manual-status om-manual-status--sheet">
+              {nextStatus && (
+                <Button
+                  variant="primary"
+                  onClick={() => { void handleManualStatusChange(nextStatus) }}
+                  disabled={statusBusy}
+                >
+                  {statusBusy ? 'Saving…' : getMarkAsLabel(nextStatus)}
+                </Button>
+              )}
+              <label className="om-manual-status__label" htmlFor={`sheet-override-status-${order.id}`}>
+                Override Status
+              </label>
+              <select
+                id={`sheet-override-status-${order.id}`}
+                className="om-manual-status__select"
+                value={overrideStatus}
+                onChange={(e) => {
+                  const selected = e.target.value as AdminOverrideStatus
+                  setOverrideStatus(selected)
+                  if (selected) {
+                    void handleManualStatusChange(selected)
+                  }
+                }}
+                disabled={statusBusy}
+              >
+                <option value="">Override Status</option>
+                {ADMIN_OVERRIDE_STATUS_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           {canCompleteDelivery && (
             <Button variant="primary" onClick={() => onCompleteDelivery(order)}>
               <Truck size={14} /> Complete Delivery
@@ -382,18 +586,20 @@ function OrderDetailPanel({
 }: OrderDetailPanelProps) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { isAdmin } = useAuth()
+  const { isAdmin, user, realUser } = useAuth()
   const opsBase  = location.pathname.startsWith('/admin') ? '/admin/ops' : '/ops'
   const isAdminView = location.pathname.startsWith('/admin')
   const [invoice, setInvoice] = useState<Invoice | null>(null)
+  const [showInvoiceDetail, setShowInvoiceDetail] = useState(false)
   const [generatingInvoice, setGeneratingInvoice] = useState(false)
   const [sendingInvoiceEmail, setSendingInvoiceEmail] = useState(false)
-  const [showInvoiceDetail, setShowInvoiceDetail] = useState(false)
+  const [sendingEstimate, setSendingEstimate] = useState(false)
   const [billingBusy, setBillingBusy] = useState(false)
+  const [statusBusy, setStatusBusy] = useState(false)
+  const [overrideStatus, setOverrideStatus] = useState<AdminOverrideStatus | ''>('')
   const [billingToast, setBillingToast] = useState<string | null>(null)
   // Invoice Sent form state
   const [qbInvoiceNumber, setQbInvoiceNumber] = useState('')
-  const [invoiceAmountStr, setInvoiceAmountStr] = useState('')
   // Paid form state
   const [paidAmountStr, setPaidAmountStr] = useState(() =>
     order.invoiceAmount != null ? order.invoiceAmount.toFixed(2) : '',
@@ -452,6 +658,7 @@ function OrderDetailPanel({
   if (
     order.status === 'assigned' ||
     order.status === 'in-transit' ||
+    order.status === 'in_transit' ||
     order.status === 'delivered'
   ) {
     timeline.push({ label: STATUS_LABELS[order.status], time: 'Today' })
@@ -460,7 +667,60 @@ function OrderDetailPanel({
   const canCancel = canTransition(order.status, 'cancelled')
   const canEdit =
     order.status === 'pending' || order.status === 'scheduled'
-  const showBillingPanel = isAdmin && (order.status === 'ready_to_invoice' || order.status === 'invoice_sent')
+  const normalizedStatus = normalizeLifecycleStatus(order.status)
+  const nextStatus = getNextLifecycleStatus(order.status)
+  const actingUserId = realUser?.id ?? user?.id
+  const showBillingPanel = isAdmin && (normalizedStatus === 'invoice_sent_pending' || normalizedStatus === 'invoice_sent')
+
+  async function handleManualStatusChange(next: AdminOverrideStatus) {
+    let qbInvoiceNumber: string | undefined
+
+    if (next === 'invoice_sent') {
+      const value = window.prompt('Enter QB Invoice # to mark this order as Invoice Sent:', order.qbInvoiceNumber ?? '')
+      if (value === null) return
+      qbInvoiceNumber = value.trim()
+      if (!qbInvoiceNumber) {
+        alert('QB Invoice # is required to mark an order as Invoice Sent.')
+        return
+      }
+      if (!confirm(`Mark this order as Invoice Sent with QB Invoice # ${qbInvoiceNumber}?`)) return
+    }
+
+    if ((next === 'delivered' || next === 'paid') && !confirm(`Mark this order as ${STATUS_LABELS[next]}? This action is irreversible.`)) {
+      return
+    }
+
+    setStatusBusy(true)
+    try {
+      await transitionOrderStatus(order.id, next, {
+        changedBy: actingUserId,
+        qbInvoiceNumber,
+        force: true,
+      })
+      await onBillingStatusUpdated(order.id)
+      setBillingToast(`Order status updated to ${STATUS_LABELS[next]}.`)
+      setTimeout(() => setBillingToast(null), 2500)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to update order status.')
+    } finally {
+      setStatusBusy(false)
+      setOverrideStatus('')
+    }
+  }
+
+  async function handleMarkReadyForInvoice() {
+    setBillingBusy(true)
+    try {
+      await markOrderReadyForInvoice(order.id)
+      await onBillingStatusUpdated(order.id)
+      setBillingToast('Order marked ready for invoice.')
+      setTimeout(() => setBillingToast(null), 2500)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to mark order ready for invoice.')
+    } finally {
+      setBillingBusy(false)
+    }
+  }
 
   async function handleGenerateInvoice() {
     setGeneratingInvoice(true)
@@ -497,13 +757,11 @@ function OrderDetailPanel({
 
   async function handleMarkInvoiceSent() {
     const invNum = qbInvoiceNumber.trim()
-    const invAmt = parseFloat(invoiceAmountStr)
-    if (!invNum || isNaN(invAmt) || invAmt <= 0) return
+    if (!invNum) return
     setBillingBusy(true)
     try {
       await updateOrderBillingStatus(order.id, 'invoice_sent', {
         qbInvoiceNumber: invNum,
-        invoiceAmount: invAmt,
       })
       await onBillingStatusUpdated(order.id)
       setBillingToast('Invoice marked as sent.')
@@ -531,6 +789,25 @@ function OrderDetailPanel({
       alert(err instanceof Error ? err.message : 'Failed to update billing status.')
     } finally {
       setBillingBusy(false)
+    }
+  }
+
+  async function handleSendEstimate() {
+    setSendingEstimate(true)
+    try {
+      const { httpsCallable } = await import('firebase/functions')
+      const { functions } = await import('../../../lib/firebase')
+      const fn = httpsCallable<{ orderId: string }, { success: boolean }>(
+        functions,
+        'sendOrderEstimate',
+      )
+      await fn({ orderId: order.id })
+      alert(`Order estimate email sent to ${customer?.email || 'customer'}.`)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to send estimate email.'
+      alert(message)
+    } finally {
+      setSendingEstimate(false)
     }
   }
 
@@ -562,6 +839,7 @@ function OrderDetailPanel({
         </div>
 
         <div className="om-panel__body">
+          <OrderStatusProgression status={order.status} />
           {/* Customer + product */}
           <section className="om-panel__section">
             <div className="om-panel__row">
@@ -752,7 +1030,7 @@ function OrderDetailPanel({
                     size="sm"
                     onClick={() => window.open(invoice.pdfUrl, '_blank')}
                   >
-                    📄 View PDF
+                    <FileText size={14} aria-hidden="true" /> View PDF
                   </Button>
                 )}
                 <Button
@@ -793,20 +1071,18 @@ function OrderDetailPanel({
               </div>
               <div className="om-billing-panel__body">
                 <span className={`om-billing-badge om-billing-badge--${order.status}`}>
-                  {order.status === 'ready_to_invoice' ? 'Ready to Invoice' : 'Invoice Sent'}
+                  {normalizedStatus === 'invoice_sent_pending' ? 'Invoice Pending' : 'Invoice Sent'}
                 </span>
                 <p className="om-billing-copy">
-                  {order.status === 'ready_to_invoice'
-                    ? 'Create the invoice in QuickBooks, then mark it sent below.'
+                  {normalizedStatus === 'invoice_sent_pending'
+                    ? 'Enter the QuickBooks invoice number, then confirm invoice sent.'
                     : 'Once payment is received, mark this order as paid.'}
                 </p>
-                {order.status === 'ready_to_invoice' ? (
+                {normalizedStatus === 'invoice_sent_pending' ? (
                   <QBInvoiceSentForm
                     qbInvoiceNumber={qbInvoiceNumber}
-                    invoiceAmountStr={invoiceAmountStr}
                     busy={billingBusy}
                     onChangeInvoiceNumber={setQbInvoiceNumber}
-                    onChangeInvoiceAmount={setInvoiceAmountStr}
                     onSubmit={handleMarkInvoiceSent}
                   />
                 ) : (
@@ -853,6 +1129,52 @@ function OrderDetailPanel({
 
         {/* Actions */}
         <div className="om-panel__footer">
+          {isAdmin && (
+            <div className="om-manual-status">
+              {nextStatus && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => { void handleManualStatusChange(nextStatus) }}
+                  disabled={statusBusy}
+                >
+                  {statusBusy ? 'Saving…' : getMarkAsLabel(nextStatus)}
+                </Button>
+              )}
+              <label className="om-manual-status__label" htmlFor={`override-status-${order.id}`}>
+                Override Status
+              </label>
+              <select
+                id={`override-status-${order.id}`}
+                className="om-manual-status__select"
+                value={overrideStatus}
+                onChange={(e) => {
+                  const selected = e.target.value as AdminOverrideStatus
+                  setOverrideStatus(selected)
+                  if (selected) {
+                    void handleManualStatusChange(selected)
+                  }
+                }}
+                disabled={statusBusy}
+              >
+                <option value="">Override Status</option>
+                {ADMIN_OVERRIDE_STATUS_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          {isAdmin && normalizedStatus === 'delivered' && (
+            <button
+              className="om-billing-btn om-billing-btn--ready"
+              onClick={() => { void handleMarkReadyForInvoice() }}
+              disabled={billingBusy}
+            >
+              {billingBusy ? 'Saving…' : 'Mark Ready for Invoice'}
+            </button>
+          )}
           {canCompleteDelivery && (
             <Button
               variant="primary"
@@ -870,6 +1192,16 @@ function OrderDetailPanel({
               disabled={generatingInvoice}
             >
               {generatingInvoice ? 'Generating...' : 'Generate Invoice'}
+            </Button>
+          )}
+          {(order.status === 'pending' || order.status === 'scheduled' || order.status === 'assigned' || order.status === 'in-transit') && (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleSendEstimate}
+              disabled={sendingEstimate}
+            >
+              {sendingEstimate ? 'Sending...' : 'Send Estimate'}
             </Button>
           )}
           {canEdit && (
@@ -910,23 +1242,18 @@ function OrderDetailPanel({
 
 interface QBInvoiceSentFormProps {
   qbInvoiceNumber: string
-  invoiceAmountStr: string
   busy: boolean
   onChangeInvoiceNumber: (v: string) => void
-  onChangeInvoiceAmount: (v: string) => void
   onSubmit: () => void
 }
 
 function QBInvoiceSentForm({
   qbInvoiceNumber,
-  invoiceAmountStr,
   busy,
   onChangeInvoiceNumber,
-  onChangeInvoiceAmount,
   onSubmit,
 }: QBInvoiceSentFormProps) {
-  const invAmt = parseFloat(invoiceAmountStr)
-  const canSubmit = qbInvoiceNumber.trim() !== '' && !isNaN(invAmt) && invAmt > 0 && !busy
+  const canSubmit = qbInvoiceNumber.trim() !== '' && !busy
   return (
     <div className="om-qb-form">
       <div className="om-qb-form__field">
@@ -940,25 +1267,12 @@ function QBInvoiceSentForm({
           disabled={busy}
         />
       </div>
-      <div className="om-qb-form__field">
-        <label className="om-qb-form__label">Invoice Amount</label>
-        <input
-          className="om-qb-form__input"
-          type="number"
-          min="0.01"
-          step="0.01"
-          placeholder="0.00"
-          value={invoiceAmountStr}
-          onChange={(e) => onChangeInvoiceAmount(e.target.value)}
-          disabled={busy}
-        />
-      </div>
       <button
         className="om-billing-btn"
         onClick={onSubmit}
         disabled={!canSubmit}
       >
-        {busy ? 'Saving…' : 'Mark Invoice Sent'}
+        {busy ? 'Saving…' : 'Confirm Invoice Sent'}
       </button>
     </div>
   )
@@ -1055,16 +1369,19 @@ function BillingSummary({ order }: { order: Order }) {
 // ── Create Order Modal ─────────────────────────────────────────────────────────
 
 interface CreateOrderModalProps {
+  initialCustomerId?: string | null
+  initialLineItems?: EditableLineItem[] | null
+  convertingQuoteId?: string | null
   onClose: () => void
   onCreated: () => void
 }
 
-function CreateOrderModal({ onClose, onCreated }: CreateOrderModalProps) {
+function CreateOrderModal({ initialCustomerId, initialLineItems, convertingQuoteId, onClose, onCreated }: CreateOrderModalProps) {
   const { role } = useAuth()
   const pricingPermissions = useMemo(() => getLineItemPricingPermissions(role), [role])
   const [customers, setCustomers] = useState<Customer[]>([])
   const [products, setProducts] = useState<ProductDropdownItem[]>([])
-  const [lineItems, setLineItems] = useState<EditableLineItem[]>([EMPTY_LINE_ITEM()])
+  const [lineItems, setLineItems] = useState<EditableLineItem[]>(initialLineItems ?? [EMPTY_LINE_ITEM()])
   const [customerSearch, setCustomerSearch] = useState('')
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false)
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
@@ -1094,6 +1411,18 @@ function CreateOrderModal({ onClose, onCreated }: CreateOrderModalProps) {
     )
     return unsub
   }, [])
+
+  // Pre-fill customer if initialCustomerId is provided
+  useEffect(() => {
+    if (initialCustomerId && customers.length > 0 && !selectedCustomer) {
+      const customer = customers.find((c) => c.id === initialCustomerId)
+      if (customer) {
+        setSelectedCustomer(customer)
+        setCustomerSearch('')
+        setShowCustomerDropdown(false)
+      }
+    }
+  }, [initialCustomerId, customers, selectedCustomer])
 
   // Typeahead filter
   const filteredCustomers = useMemo(() => {
@@ -1211,6 +1540,11 @@ function CreateOrderModal({ onClose, onCreated }: CreateOrderModalProps) {
           ? (new Date(scheduledDate) as unknown as Order['scheduledAt'])
           : undefined,
       })
+
+      // Mark quote as accepted if converting from a quote
+      if (convertingQuoteId) {
+        await updateQuote(convertingQuoteId, { status: 'accepted' })
+      }
 
       onCreated()
       onClose()
@@ -1523,7 +1857,7 @@ export default function OrderManagement() {
   const navigate = useNavigate()
   const location = useLocation()
   const opsBase  = location.pathname.startsWith('/admin') ? '/admin/ops' : '/ops'
-  const { isAdmin, isDispatch } = useAuth()
+  const { isAdmin, isDispatch, user, realUser } = useAuth()
 
   // ── Data ──────────────────────────────────────────────────────────────────────
   const [allOrders, setAllOrders] = useState<Order[]>([])
@@ -1533,7 +1867,7 @@ export default function OrderManagement() {
 
   // ── Filters ───────────────────────────────────────────────────────────────────
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all')
+  const [statusFilter, setStatusFilter] = useState<OrderLifecycleFilter>('all')
   const [tierFilter, setTierFilter] = useState<DeliveryTier | 'all'>('all')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
@@ -1545,6 +1879,9 @@ export default function OrderManagement() {
   // ── Panels / modals ───────────────────────────────────────────────────────────
   const [detailOrder, setDetailOrder] = useState<Order | null>(null)
   const [showCreate, setShowCreate] = useState(false)
+  const [initialCreateCustomerId, setInitialCreateCustomerId] = useState<string | null>(null)
+  const [initialCreateLineItems, setInitialCreateLineItems] = useState<EditableLineItem[] | null>(null)
+  const [convertingQuoteId, setConvertingQuoteId] = useState<string | null>(null)
   const [rescheduleOrder, setRescheduleOrder] = useState<Order | null>(null)
   const [deliveryModalOrder, setDeliveryModalOrder] = useState<Order | null>(null)
   const [isMobile, setIsMobile] = useState(() =>
@@ -1567,6 +1904,66 @@ export default function OrderManagement() {
     const order = allOrders.find((item) => item.id === orderId)
     if (order) setDetailOrder(order)
   }, [allOrders, location.search])
+
+  // Handle query params for opening create modal with pre-filled customer
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const newParam = params.get('new')
+    const customerId = params.get('customerId')
+    const convertQuoteId = params.get('convertQuoteId')
+    
+    if (newParam === '1') {
+      setShowCreate(true)
+      if (customerId) {
+        setInitialCreateCustomerId(customerId)
+      }
+      // Clean up URL params
+      window.history.replaceState({}, '', location.pathname)
+    } else if (convertQuoteId) {
+      // Handle quote-to-order conversion
+      const loadQuote = async () => {
+        try {
+          const quoteSnap = await getDoc(doc(db, 'quotes', convertQuoteId))
+          if (quoteSnap.exists()) {
+            const quoteData = { ...quoteSnap.data() } as any
+            setInitialCreateCustomerId(quoteData.customerId || '')
+            setConvertingQuoteId(convertQuoteId)
+            
+            // Convert quote line items to EditableLineItem format
+            const editableItems: EditableLineItem[] = (quoteData.lineItems || [])
+              .filter((item: QuoteItem) => item.productId && item.productId !== 'delivery' && item.productId !== 'rental')
+              .map((item: QuoteItem) => ({
+                _id: crypto.randomUUID(),
+                productId: item.productId,
+                productName: item.description,
+                skuLabel: '',
+                description: item.description,
+                quantity: item.quantity,
+                basePrice: item.unitPrice,
+                cost: 0, // Cost not available from quote
+                minMarginPercent: 0.2,
+                minPrice: 0,
+                marginPercent: 0,
+                profit: 0,
+                unitPrice: item.unitPrice,
+                amount: item.amount,
+              }))
+            
+            if (editableItems.length > 0) {
+              setInitialCreateLineItems(editableItems)
+            }
+            setShowCreate(true)
+          }
+        } catch (err) {
+          console.error('Failed to load quote for conversion:', err)
+        }
+      }
+      
+      loadQuote()
+      // Clean up URL params
+      window.history.replaceState({}, '', location.pathname)
+    }
+  }, [location])
 
   // ── Subscribe to all orders ───────────────────────────────────────────────────
   useEffect(() => {
@@ -1651,8 +2048,9 @@ export default function OrderManagement() {
 
     if (rushOnly) result = result.filter(isRush)
 
-    if (statusFilter !== 'all')
-      result = result.filter((o) => o.status === statusFilter)
+    if (statusFilter !== 'all') {
+      result = result.filter((o) => normalizeLifecycleStatus(o.status) === statusFilter)
+    }
 
     if (tierFilter !== 'all')
       result = result.filter((o) => o.deliveryTier === tierFilter)
@@ -1692,7 +2090,7 @@ export default function OrderManagement() {
   function canCompleteDelivery(order: Order): boolean {
     return (
       canManageDelivery
-      && (order.status === 'in-transit' || order.status === 'assigned')
+      && (order.status === 'in-transit' || order.status === 'in_transit' || order.status === 'assigned')
       && !!order.runId
       && !!order.runStopId
     )
@@ -1736,7 +2134,10 @@ export default function OrderManagement() {
   async function handleCancel(id: string) {
     if (!confirm('Cancel this order? This cannot be undone.')) return
     try {
-      await transitionOrderStatus(id, 'cancelled')
+      await transitionOrderStatus(id, 'cancelled', {
+        changedBy: realUser?.id ?? user?.id,
+        force: true,
+      })
       if (detailOrder?.id === id) setDetailOrder(null)
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to cancel order.')
@@ -1868,21 +2269,14 @@ export default function OrderManagement() {
           {/* Status */}
           {isMobile ? (
             <div className="om-filters__chips" aria-label="Filter by status">
-              <button
-                type="button"
-                className={`om-filters__chip${statusFilter === 'all' ? ' om-filters__chip--active' : ''}`}
-                onClick={() => setStatusFilter('all')}
-              >
-                All
-              </button>
-              {(Object.keys(STATUS_LABELS) as OrderStatus[]).map((s) => (
+              {ORDER_STATUS_FILTERS.map((item) => (
                 <button
-                  key={s}
+                  key={item.value}
                   type="button"
-                  className={`om-filters__chip${statusFilter === s ? ' om-filters__chip--active' : ''}`}
-                  onClick={() => setStatusFilter(s)}
+                  className={`om-filters__chip${statusFilter === item.value ? ' om-filters__chip--active' : ''}`}
+                  onClick={() => setStatusFilter(item.value)}
                 >
-                  {STATUS_LABELS[s]}
+                  {item.label}
                 </button>
               ))}
             </div>
@@ -1890,13 +2284,12 @@ export default function OrderManagement() {
             <select
               className="om-filters__select"
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as OrderStatus | 'all')}
+              onChange={(e) => setStatusFilter(e.target.value as OrderLifecycleFilter)}
               aria-label="Filter by status"
             >
-              <option value="all">All Statuses</option>
-              {(Object.keys(STATUS_LABELS) as OrderStatus[]).map((s) => (
-                <option key={s} value={s}>
-                  {STATUS_LABELS[s]}
+              {ORDER_STATUS_FILTERS.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
                 </option>
               ))}
             </select>
@@ -2166,8 +2559,9 @@ export default function OrderManagement() {
               {filtered.map((order) => {
                 const cust = customerMap[order.customerId]
                 const prod = productMap[order.productId]
-                const isActiveDelivery = order.status === 'scheduled' || order.status === 'assigned' || order.status === 'in-transit'
-                const isBillingStage = order.status === 'ready_to_invoice' || order.status === 'invoice_sent'
+                const normalizedStatus = normalizeLifecycleStatus(order.status)
+                const isActiveDelivery = normalizedStatus === 'scheduled' || normalizedStatus === 'assigned' || normalizedStatus === 'in_transit'
+                const isBillingStage = normalizedStatus === 'invoice_sent_pending' || normalizedStatus === 'invoice_sent'
                 const isClosed = order.status === 'paid' || order.status === 'archived'
                 const canEditOrder = order.status === 'pending' || order.status === 'scheduled'
                 const canCancelOrder = canTransition(order.status, 'cancelled')
@@ -2186,11 +2580,11 @@ export default function OrderManagement() {
                         onClick: () => setDetailOrder(order),
                       }
                   : isBillingStage
-                    ? order.status === 'ready_to_invoice'
+                    ? normalizedStatus === 'invoice_sent_pending'
                       ? {
-                          label: 'Mark Invoice Sent',
-                          icon: Send,
-                          onClick: () => { void handleMobileBillingStatus(order.id, 'invoice_sent') },
+                          label: 'View Details',
+                          icon: Eye,
+                          onClick: () => setDetailOrder(order),
                         }
                       : {
                           label: 'Mark as Paid',
@@ -2236,13 +2630,14 @@ export default function OrderManagement() {
                     <MobileOrderCard
                       order={{
                         ...order,
+                        status: normalizeLifecycleStatus(order.status),
                         customerName: cust?.name ?? 'Customer',
                         productName: prod?.name ?? 'Product',
                         productUnit: prod?.unit ?? 'gal',
                       } as Order}
                       primaryAction={primaryAction}
                       secondaryActions={secondaryActions}
-                      expanded={!['delivered', 'ready_to_invoice', 'invoice_sent', 'paid'].includes(order.status)}
+                      expanded={!['delivered', 'ready_to_invoice', 'invoice_sent_pending', 'invoice_sent', 'paid'].includes(normalizedStatus)}
                     />
                   </div>
                 )
@@ -2309,7 +2704,15 @@ export default function OrderManagement() {
       {/* ── Create order modal ── */}
       {showCreate && (
         <CreateOrderModal
-          onClose={() => setShowCreate(false)}
+          initialCustomerId={initialCreateCustomerId}
+          initialLineItems={initialCreateLineItems}
+          convertingQuoteId={convertingQuoteId}
+          onClose={() => {
+            setShowCreate(false)
+            setInitialCreateCustomerId(null)
+            setInitialCreateLineItems(null)
+            setConvertingQuoteId(null)
+          }}
           onCreated={() => {}}
         />
       )}

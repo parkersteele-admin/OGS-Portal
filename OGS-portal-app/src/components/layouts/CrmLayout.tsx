@@ -7,6 +7,7 @@ import { ViewAsBanner } from '../ui/ViewAsBanner'
 import { useAuth } from '../../hooks/useAuth'
 import type { SidebarItem } from '../ui/Sidebar'
 import type { MobileNavItem } from '../ui/MobileNav'
+import { ADMIN_SIDEBAR_GROUPS, ADMIN_SIDEBAR_OVERVIEW_ITEMS } from './adminSidebarConfig'
 import './Layout.css'
 
 const NAV_ITEMS: SidebarItem[] = [
@@ -34,11 +35,17 @@ const MORE_ITEMS: MobileNavItem[] = [
 
 export const CrmLayout: React.FC = () => {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
-  const { role } = useAuth()
+  const { role, isAdmin } = useAuth()
 
   return (
     <div className="layout">
-      <Sidebar title="CRM" items={NAV_ITEMS} mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />
+      <Sidebar
+        title={isAdmin ? 'Admin' : 'CRM'}
+        items={isAdmin ? ADMIN_SIDEBAR_OVERVIEW_ITEMS : NAV_ITEMS}
+        groups={isAdmin ? ADMIN_SIDEBAR_GROUPS : undefined}
+        mobileOpen={mobileNavOpen}
+        onMobileClose={() => setMobileNavOpen(false)}
+      />
       <div className="layout__main">
         <ViewAsBanner />
         <TopBar title="CRM" onMenuClick={() => setMobileNavOpen(true)} />

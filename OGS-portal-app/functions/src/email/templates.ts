@@ -100,3 +100,22 @@ export const TEMPLATE_PAYMENT_FAILED = 'd-PAYMENT_FAILED_TEMPLATE_ID'
  *   orderLink     string  — full URL to the new-order page
  */
 export const TEMPLATE_LOW_TANK_ALERT = 'd-LOW_TANK_ALERT_TEMPLATE_ID'
+
+/**
+ * Order estimate sent to the customer.
+ *
+ * Subject: "Order estimate from Ohio Gas Supply"
+ *
+ * Dynamic data variables:
+ *   customerName    string  — "Alice Nguyen"
+ *   orderNumber     string  — "ORD-00042"
+ *   product         string  — "Propane"
+ *   quantity        number  — 200
+ *   deliveryTier    string  — "standard" | "next-day" | "same-day"
+ *   estimatedDate   string  — human-readable date, e.g. "March 18, 2026"
+ *   subtotal        string  — formatted currency, e.g. "$500.00"
+ *   deliveryFee     string  — formatted currency, e.g. "$0.00"
+ *   total           string  — formatted currency, e.g. "$500.00"
+ *   lineItems       object[] — [{ description, quantity, unitPrice, amount }]
+ */
+export const TEMPLATE_ORDER_ESTIMATE = 'd-ORDER_ESTIMATE_TEMPLATE_ID'

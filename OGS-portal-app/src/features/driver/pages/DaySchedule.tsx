@@ -20,6 +20,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ClipboardList, MapPinned, PartyPopper, Truck } from 'lucide-react'
 import {
   getDocs,
   query,
@@ -184,7 +185,7 @@ function StopCard({ stop, isCurrent, runId, customer, order, product }: StopCard
                 className="ds-btn ds-btn--nav"
                 onClick={(e) => { e.stopPropagation(); launchNav(customer) }}
               >
-                🗺 Navigate
+                <MapPinned size={16} aria-hidden="true" /> Navigate
               </button>
             )}
             <button
@@ -356,7 +357,7 @@ export default function DaySchedule() {
     return (
       <div className="ds-page">
         <div className="ds-no-run">
-          <div className="ds-no-run__icon">📋</div>
+          <div className="ds-no-run__icon"><ClipboardList size={24} aria-hidden="true" /></div>
           <h2 className="ds-no-run__title">No run scheduled today</h2>
           <p className="ds-no-run__sub">
             {fmtDate()} — check back later or contact dispatch.
@@ -423,7 +424,7 @@ export default function DaySchedule() {
       {/* ── All complete banner ── */}
       {allDone && (
         <div className="ds-all-done">
-          <div className="ds-all-done__icon">🎉</div>
+          <div className="ds-all-done__icon"><PartyPopper size={24} aria-hidden="true" /></div>
           <div className="ds-all-done__text">
             <div className="ds-all-done__title">All stops complete!</div>
             <div className="ds-all-done__sub">Great work today. Ready to submit your end-of-day report.</div>
@@ -443,7 +444,7 @@ export default function DaySchedule() {
         || run.loadStatus === 'pending'
         || run.loadStatus === 'loading' ? (
         <div className="ds-load-prompt">
-          <div className="ds-load-prompt__icon" aria-hidden="true">🚚</div>
+          <div className="ds-load-prompt__icon" aria-hidden="true"><Truck size={22} /></div>
           <div className="ds-load-prompt__body">
             <div className="ds-load-prompt__title">Load your truck before starting your run.</div>
             <div className="ds-load-prompt__sub">

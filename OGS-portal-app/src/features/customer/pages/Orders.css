@@ -635,6 +635,16 @@
     min-width: 680px;
   }
 
+  .oh-action-btn {
+    height: 28px;
+    padding: 0 10px;
+    font-size: 12px;
+  }
+
+  .oh-action-btn--primary {
+    height: 28px;
+  }
+
   .oh-detail-overlay {
     display: block;
     position: fixed;

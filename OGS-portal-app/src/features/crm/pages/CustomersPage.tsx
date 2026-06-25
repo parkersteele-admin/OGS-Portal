@@ -69,6 +69,14 @@ const CustomersPage: React.FC = () => {
     })()
   }, [])
 
+  useEffect(() => {
+    const shouldOpenCreate = new URLSearchParams(location.search).get('new') === '1'
+    if (!shouldOpenCreate) return
+
+    setShowAdd(true)
+    navigate(location.pathname, { replace: true })
+  }, [location.pathname, location.search, navigate])
+
   const getAccountType = useMemo(
     () => (customer: Customer) => {
       const notes = (customer.notes ?? '').toLowerCase()

@@ -7,6 +7,7 @@
  */
 
 import React, { useState, useRef, useCallback } from 'react'
+import { Activity, Circle, Flame, HelpCircle, Wind, Wrench } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { getDocs } from 'firebase/firestore'
 import { productsCol } from '../../../lib/firestore'
@@ -25,18 +26,18 @@ interface Props {
 interface CategoryCard {
   value: string
   label: string
-  icon: string
+  icon: React.ReactNode
   useCases: string
 }
 
 const CATEGORIES: CategoryCard[] = [
-  { value: 'co2', label: 'CO₂', icon: '🫧', useCases: 'Beverage dispensing, brewing, carbonation' },
-  { value: 'nitrogen', label: 'Nitrogen', icon: '💨', useCases: 'Brewing, purging, laser cutting' },
-  { value: 'oxygen', label: 'Oxygen', icon: '🩺', useCases: 'Medical, welding, cutting' },
-  { value: 'argon', label: 'Argon / Mix', icon: '🔩', useCases: 'Welding, fabrication' },
-  { value: 'propane', label: 'Propane', icon: '🔥', useCases: 'Cooking, heating' },
-  { value: 'helium', label: 'Helium', icon: '🎈', useCases: 'Balloons, lab' },
-  { value: 'not_sure', label: 'Not Sure', icon: '❓', useCases: '' },
+  { value: 'co2', label: 'CO₂', icon: <Circle size={16} />, useCases: 'Beverage dispensing, brewing, carbonation' },
+  { value: 'nitrogen', label: 'Nitrogen', icon: <Wind size={16} />, useCases: 'Brewing, purging, laser cutting' },
+  { value: 'oxygen', label: 'Oxygen', icon: <Activity size={16} />, useCases: 'Medical, welding, cutting' },
+  { value: 'argon', label: 'Argon / Mix', icon: <Wrench size={16} />, useCases: 'Welding, fabrication' },
+  { value: 'propane', label: 'Propane', icon: <Flame size={16} />, useCases: 'Cooking, heating' },
+  { value: 'helium', label: 'Helium', icon: <Circle size={16} />, useCases: 'Balloons, lab' },
+  { value: 'not_sure', label: 'Not Sure', icon: <HelpCircle size={16} />, useCases: '' },
 ]
 
 const MONTHLY_OPTIONS = [

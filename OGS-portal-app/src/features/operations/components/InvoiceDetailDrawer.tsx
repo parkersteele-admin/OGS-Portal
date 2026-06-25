@@ -6,6 +6,7 @@
  */
 
 import { useState } from 'react'
+import { FileText } from 'lucide-react'
 import type { Invoice, InvoiceStatus } from '../../../types/billing'
 import { updateInvoice } from '../../../services/invoiceService'
 import { Button } from '../../../components/ui/Button'
@@ -115,10 +116,10 @@ export function InvoiceDetailDrawer({
   }
 
   const statusOptions: Array<{ value: InvoiceStatus; label: string }> = [
-    { value: 'sent', label: '✉️ Sent' },
-    { value: 'delivered', label: '✓ Delivered' },
-    { value: 'paid', label: '💰 Paid' },
-    { value: 'void', label: '✗ Void' },
+    { value: 'sent', label: 'Sent' },
+    { value: 'delivered', label: 'Delivered' },
+    { value: 'paid', label: 'Paid' },
+    { value: 'void', label: 'Void' },
   ]
 
   return (
@@ -287,7 +288,7 @@ export function InvoiceDetailDrawer({
               size="sm"
               onClick={handleViewPdf}
             >
-              📄 View PDF
+              <FileText size={14} aria-hidden="true" /> View PDF
             </Button>
           )}
           <Button

@@ -59,7 +59,7 @@ async function createUser(
 }
 
 async function seed() {
-  console.log('\n🌱  Seeding OGS Portal emulators…\n')
+  console.log('\n[INFO] Seeding OGS Portal emulators…\n')
 
   // ── Test Users ──────────────────────────────────────────────────────────────
   console.log('── Users ──')

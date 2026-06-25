@@ -12,6 +12,7 @@
 
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { Camera } from 'lucide-react'
 import { doc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore'
 import { db } from '../../../lib/firebase'
 import { useAuth } from '../../../hooks/useAuth'
@@ -102,7 +103,7 @@ function CylinderRow({ item, scanned, canOverride, onOverride, onScanClick }: Cy
           onClick={onScanClick}
           aria-label={`Scan QR code for ${item.productName} ${item.sizeLabel}`}
         >
-          📷 Scan
+          <Camera size={16} aria-hidden="true" /> Scan
         </button>
       )}
       {canOverride && !scanned && (
@@ -477,7 +478,7 @@ export default function TruckLoadPage() {
               className="tl-adhoc-scan-btn"
               onClick={() => { setLastResult(null); setScanTargetId('') }}
             >
-              📷 Scan additional cylinder
+              <Camera size={16} aria-hidden="true" /> Scan additional cylinder
             </button>
           )}
         </div>
@@ -500,7 +501,7 @@ export default function TruckLoadPage() {
               className="tl-adhoc-scan-btn"
               onClick={() => { setLastResult(null); setScanTargetId('') }}
             >
-              📷 Scan cylinder
+              <Camera size={16} aria-hidden="true" /> Scan cylinder
             </button>
           )}
         </div>

@@ -1335,3 +1335,99 @@ export const respondToQuotePublic = onCall(async (request) => {
 
   return { success: true };
 });
+
+// ── sendOrderEstimate ──────────────────────────────────────────────────────────
+
+/**
+ * Sends an order estimate email to the customer.
+ *
+ * Accepts:
+ *   orderId: string         — Order document ID
+ *
+ * Returns:
+ *   { success: true }
+ */
+export const sendOrderEstimate = onCall(async (request) => {
+  const { orderId } = request.data as { orderId?: string };
+
+  if (!request.auth?.uid) {
+    throw new HttpsError('unauthenticated', 'You must be signed in.');
+  }
+
+  if (!orderId || typeof orderId !== 'string') {
+    throw new HttpsError('invalid-argument', 'orderId is required and must be a string.');
+  }
+
+  // Fetch the order
+  const orderSnap = await db.collection('orders').doc(orderId).get();
+  if (!orderSnap.exists) {
+    throw new HttpsError('not-found', `Order ${orderId} not found.`);
+  }
+
+  const order = orderSnap.data() as any;
+
+  // Fetch the customer
+  const customerSnap = await db.collection('customers').doc(order.customerId).get();
+  if (!customerSnap.exists) {
+    throw new HttpsError('not-found', `Customer ${order.customerId} not found.`);
+  }
+
+  const customer = customerSnap.data() as any;
+
+  // Format line items for the email
+  const lineItems = (order.quotedLineItems || []).map((item: any) => ({
+    description: item.description || 'Product',
+    quantity: item.quantity || 0,
+    unitPrice: item.unitPrice || 0,
+    amount: item.amount || 0,
+  }));
+
+  // Prepare dynamic data for the email template
+  const dynamicData = {
+    customerName: customer.name || 'Valued Customer',
+    orderNumber: order.id || orderId,
+    product: (order.quotedLineItems?.[0]?.description) || 'Gas',
+    quantity: order.quotedLineItems?.[0]?.quantity || 0,
+    deliveryTier: order.deliveryTier || 'standard',
+    estimatedDate: order.scheduledAt?.toDate?.()?.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    }) || new Date().toLocaleDateString('en-US'),
+    subtotal: (order.subtotal || 0).toLocaleString('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }),
+    deliveryFee: (order.deliveryFee || 0).toLocaleString('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }),
+    total: (order.total || 0).toLocaleString('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }),
+    lineItems,
+  };
+
+  // Send the email
+  const { sendTemplateEmail } = await import('./email/sendEmail');
+  const { TEMPLATE_ORDER_ESTIMATE } = await import('./email/templates');
+
+  await sendTemplateEmail(
+    customer.email,
+    TEMPLATE_ORDER_ESTIMATE,
+    dynamicData,
+  );
+
+  console.log(
+    `[sendOrderEstimate] Order estimate sent to ${customer.email} for order ${orderId}`
+  );
+
+  return { success: true };
+});

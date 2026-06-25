@@ -114,7 +114,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 >
                   <span className="sidebar__section-toggle-label">{group.label}</span>
                   <span className="sidebar__section-toggle-icon" aria-hidden="true">
-                    {isOpen ? '−' : '+'}
+                    {isOpen ? '▾' : '▸'}
                   </span>
                 </button>
 

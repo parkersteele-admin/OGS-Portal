@@ -29,7 +29,6 @@ import {
   updateQuote,
   generateQuotePdf,
   sendQuote,
-  convertQuoteToOrder,
   duplicateQuote,
 } from '../../../services/quoteService'
 import { subscribeToCustomers, getCustomer } from '../../../services/customerService'
@@ -695,12 +694,12 @@ const QuoteEditorPage: React.FC = () => {
       if (selectedRecipient?.type !== 'customer') throw new Error('Convert requires a customer (not a lead).')
       const firstRow = rows.find(r => r.unitPrice > 0)
       if (!firstRow) throw new Error('No line item with a unit price.')
-      return convertQuoteToOrder(savedId, selectedRecipient.id, firstRow.unitPrice, user?.id)
+      // Navigate to order management with quote ID to pre-fill modal
+      return savedId
     },
-    onSuccess: () => {
-      setStatus('accepted')
-      queryClient.invalidateQueries({ queryKey: ['quotes'] })
-      navigate('/ops/orders')
+    onSuccess: (quoteId) => {
+      const opsBase = location.pathname.startsWith('/admin') ? '/admin/ops' : '/ops'
+      navigate(`${opsBase}/orders?convertQuoteId=${quoteId}`)
     },
     onError: (e: Error) => setError(e.message),
   })

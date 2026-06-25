@@ -12,6 +12,7 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { Truck } from 'lucide-react'
 import {
   onSnapshot,
   query,
@@ -707,7 +708,7 @@ export default function DispatchMapPage() {
             {/* Run header */}
             <div className="dm-run-header">
               <div className="dm-run-header__driver">
-                🚛 {driver?.name ?? run.driverId} ·{' '}
+                <Truck size={14} aria-hidden="true" /> {driver?.name ?? run.driverId} ·{' '}
                 {run.truckId ?? 'Truck TBD'}
               </div>
               <div className="dm-run-header__progress">

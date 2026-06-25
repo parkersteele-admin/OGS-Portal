@@ -10,6 +10,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { Ban, Camera } from 'lucide-react'
 import jsQR from 'jsqr'
 import './QRScanner.css'
 
@@ -137,7 +138,7 @@ export function QRScanner({ onScan, onError, isActive, className = '' }: QRScann
   if (viewfinderState === 'error') {
     return (
       <div className={`qrs-error ${className}`.trim()}>
-        <span className="qrs-error__icon" aria-hidden="true">🚫</span>
+        <span className="qrs-error__icon" aria-hidden="true"><Ban size={18} /></span>
         <p className="qrs-error__msg">{errorMsg}</p>
         <p className="qrs-error__hint">
           On iOS: Settings → Safari → Camera → Allow.<br />
@@ -171,7 +172,7 @@ export function QRScanner({ onScan, onError, isActive, className = '' }: QRScann
       {/* Idle overlay */}
       {!isActive && (
         <div className="qrs-idle-overlay" aria-hidden="true">
-          <span className="qrs-idle-overlay__icon">📷</span>
+          <span className="qrs-idle-overlay__icon"><Camera size={20} /></span>
         </div>
       )}
 

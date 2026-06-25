@@ -13,7 +13,22 @@
 
 import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { CheckCircle, FileText, Send, type LucideIcon } from 'lucide-react'
+import {
+  Ban,
+  CheckCircle,
+  FileText,
+  Handshake,
+  Lock,
+  Mail,
+  MapPin,
+  MessageSquare,
+  Paperclip,
+  Phone,
+  Send,
+  StickyNote,
+  Unlock,
+  type LucideIcon,
+} from 'lucide-react'
 import {
   useQuery,
   useMutation,
@@ -110,12 +125,12 @@ const STATUS_BADGE: Record<CustomerStatus, { label: string; variant: 'success' |
   deleted:  { label: 'Deleted',  variant: 'danger'  },
 }
 
-const METHOD_ICONS: Record<ContactMethod, string> = {
-  call:       '📞',
-  email:      '✉️',
-  text:       '💬',
-  'in-person':'🤝',
-  other:      '📝',
+const METHOD_ICONS: Record<ContactMethod, LucideIcon> = {
+  call: Phone,
+  email: Mail,
+  text: MessageSquare,
+  'in-person': Handshake,
+  other: StickyNote,
 }
 
 const METHOD_LABELS: Record<ContactMethod, string> = {
@@ -139,7 +154,9 @@ const ORDER_BADGE: Record<OrderStatus, 'success' | 'warning' | 'danger' | 'info'
   scheduled:  'info',
   assigned:   'info',
   'in-transit':'brand',
+  in_transit: 'brand',
   delivered:  'success',
+  invoice_sent_pending: 'warning',
   ready_to_invoice: 'warning',
   invoice_sent: 'info',
   paid:       'success',
@@ -152,7 +169,9 @@ const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
   scheduled: 'Scheduled',
   assigned: 'Assigned',
   'in-transit': 'In Transit',
+  in_transit: 'In Transit',
   delivered: 'Delivered',
+  invoice_sent_pending: 'Invoice Pending',
   ready_to_invoice: 'Ready to Invoice',
   invoice_sent: 'Invoice Sent',
   paid: 'Paid',
@@ -165,7 +184,9 @@ const ORDER_STATUS_ICON: Record<OrderStatus, LucideIcon> = {
   scheduled: FileText,
   assigned: FileText,
   'in-transit': Send,
+  in_transit: Send,
   delivered: CheckCircle,
+  invoice_sent_pending: FileText,
   ready_to_invoice: FileText,
   invoice_sent: Send,
   paid: CheckCircle,
@@ -178,7 +199,9 @@ const ORDER_STATUS_ICON_COLOR: Record<OrderStatus, string> = {
   scheduled: '#1e40af',
   assigned: '#3730a3',
   'in-transit': '#9d174d',
+  in_transit: '#9d174d',
   delivered: '#065f46',
+  invoice_sent_pending: '#FF6A00',
   ready_to_invoice: '#FF6A00',
   invoice_sent: '#0066FF',
   paid: '#065f46',
@@ -1966,7 +1989,7 @@ const CustomerRecord: React.FC = () => {
             <Badge variant={statusCfg.variant}>{statusCfg.label}</Badge>
             {!(cr as unknown as { pricingUnlocked?: boolean }).pricingUnlocked && (
               <span className="cr-flag cr-flag--locked" title="Pricing not yet unlocked for this account">
-                🔒 Pricing Locked
+                <Lock size={14} aria-hidden="true" /> Pricing Locked
               </span>
             )}
             {cr.isPriority && (
@@ -1976,7 +1999,7 @@ const CustomerRecord: React.FC = () => {
             )}
             {cr.status === 'hold' && (
               <span className="cr-flag cr-flag--hold" title="Account on hold">
-                🚫 Credit Hold
+                <Ban size={14} aria-hidden="true" /> Credit Hold
               </span>
             )}
           </div>
@@ -1999,7 +2022,11 @@ const CustomerRecord: React.FC = () => {
               ? 'Pricing is unlocked — click to lock'
               : 'Pricing is locked — click to unlock for this company'}
           >
-            {(cr as unknown as { pricingUnlocked?: boolean }).pricingUnlocked ? '🔓 Pricing' : '🔒 Pricing'}
+            {(cr as unknown as { pricingUnlocked?: boolean }).pricingUnlocked ? (
+              <><Unlock size={14} aria-hidden="true" /> Pricing</>
+            ) : (
+              <><Lock size={14} aria-hidden="true" /> Pricing</>
+            )}
           </Button>
           <Button variant="secondary" size="sm" onClick={() => setShowEdit(true)}>
             Edit
@@ -2012,15 +2039,15 @@ const CustomerRecord: React.FC = () => {
         <CardBody>
           <div className="cr-contact-grid">
             <div className="cr-contact-item">
-              <span className="cr-contact-item__icon">✉️</span>
+              <span className="cr-contact-item__icon"><Mail size={14} aria-hidden="true" /></span>
               <a href={`mailto:${resolveEmail(cr)}`} className="cr-contact-item__value">{resolveEmail(cr) || <span style={{color:'#bbb'}}>No email on file</span>}</a>
             </div>
             <div className="cr-contact-item">
-              <span className="cr-contact-item__icon">📞</span>
+              <span className="cr-contact-item__icon"><Phone size={14} aria-hidden="true" /></span>
               <a href={`tel:${resolvePhone(cr)}`} className="cr-contact-item__value">{resolvePhone(cr) || <span style={{color:'#bbb'}}>No phone on file</span>}</a>
             </div>
             <div className="cr-contact-item">
-              <span className="cr-contact-item__icon">📍</span>
+              <span className="cr-contact-item__icon"><MapPin size={14} aria-hidden="true" /></span>
               <a
                 href={mapsUrl}
                 target="_blank"
@@ -2630,7 +2657,10 @@ const CustomerRecord: React.FC = () => {
               {contactLogs.map(log => (
                 <div key={log.id} className="cr-timeline-item">
                   <div className="cr-timeline-item__icon" aria-hidden="true">
-                    {METHOD_ICONS[log.method] ?? '📝'}
+                    {(() => {
+                      const MethodIcon = METHOD_ICONS[log.method] ?? StickyNote
+                      return <MethodIcon size={14} aria-hidden="true" />
+                    })()}
                   </div>
                   <div className="cr-timeline-item__content">
                     <div className="cr-timeline-item__meta">
@@ -3366,13 +3396,14 @@ function FileRow({
   const docuSealStatus = file.metadata?.docuSealStatus as string | undefined
   const isContract = ['contract', 'quote', 'invoice', 'receipt'].includes(file.fileType)
   const isSigned   = file.fileType === 'signature' || docuSealStatus === 'completed'
+  const FileKindIcon = isContract ? FileText : isSigned ? CheckCircle : Paperclip
 
   return (
     <Card className="cr-file-row">
       <CardBody>
         <div className="cr-file-row__body">
           <div className="cr-file-row__icon" aria-hidden="true">
-            {isContract ? '📄' : isSigned ? '✅' : '📎'}
+            <FileKindIcon size={16} aria-hidden="true" />
           </div>
           <div className="cr-file-row__info">
             <span className="cr-file-row__name">{getFileDisplayName(file)}</span>

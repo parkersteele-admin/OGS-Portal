@@ -47,9 +47,9 @@
 }
 
 .qb-list-tab {
-  border: 1px solid var(--color-border);
-  background: var(--color-bg);
-  color: var(--color-text-2);
+  border: 1px solid #e4e4e7;
+  background: #fff;
+  color: #6b7280;
   border-radius: 999px;
   padding: 8px 12px;
   font-size: 0.8rem;
@@ -60,9 +60,9 @@
 }
 
 .qb-list-tab--active {
-  border-color: #f59e0b;
-  background: rgba(245, 158, 11, 0.12);
-  color: #9a5d06;
+  border-color: #FF6B1A;
+  background: #fff7ed;
+  color: #FF6B1A;
 }
 
 /* ── Status filter ─────────────────────────────────────────────────────────── */
@@ -105,13 +105,13 @@
 }
 
 .qb-mobile-card {
-  border: 0.5px solid #2a2a2a;
-  background: #1a1a1a;
+  border: 1px solid #e4e4e7;
+  background: #ffffff;
   border-radius: 12px;
   padding: 14px 16px;
   display: grid;
   gap: 10px;
-  color: #f3f4f6;
+  color: #111111;
 }
 
 .qb-mobile-card__top {
@@ -125,21 +125,21 @@
   margin: 0;
   font-size: 0.95rem;
   font-weight: 700;
-  color: #ffffff;
+  color: #111111;
   line-height: 1.35;
 }
 
 .qb-mobile-card__amount {
   font-size: 1rem;
   font-weight: 800;
-  color: #ffffff;
+  color: #111111;
   text-align: right;
   white-space: nowrap;
 }
 
 .qb-mobile-card__meta {
   font-size: 0.82rem;
-  color: #d1d5db;
+  color: #6b7280;
 }
 
 .qb-mobile-card__bottom {
@@ -148,7 +148,7 @@
   align-items: center;
   gap: var(--space-3);
   font-size: 0.8rem;
-  color: #d1d5db;
+  color: #6b7280;
 }
 
 .qb-mobile-card__actions {
@@ -162,32 +162,7 @@
 }
 
 .qb-mobile-card__status {
-  border-radius: 999px;
-  padding: 4px 8px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.qb-mobile-card__status--pending {
-  background: rgba(245, 158, 11, 0.2);
-  color: #fbbf24;
-}
-
-.qb-mobile-card__status--approved {
-  background: rgba(34, 197, 94, 0.2);
-  color: #4ade80;
-}
-
-.qb-mobile-card__status--expired {
-  background: rgba(239, 68, 68, 0.2);
-  color: #f87171;
-}
-
-.qb-mobile-card__status--neutral {
-  background: rgba(148, 163, 184, 0.2);
-  color: #cbd5e1;
+  text-transform: none;
 }
 
 .qb-table {

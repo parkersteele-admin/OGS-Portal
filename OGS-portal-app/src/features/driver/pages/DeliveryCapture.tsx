@@ -22,6 +22,7 @@ import {
   useCallback,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
+import { Camera } from 'lucide-react'
 import { useParams, useLocation, useNavigate } from 'react-router-dom'
 import { getDoc, doc } from 'firebase/firestore'
 import { db } from '../../../lib/firebase'
@@ -604,7 +605,7 @@ export default function DeliveryCapture() {
               className="dc-cta dc-cta--photo"
               onClick={() => photoInputRef.current?.click()}
             >
-              📷  Take photo
+              <Camera size={18} aria-hidden="true" /> Take photo
             </button>
           ) : (
             <div className="dc-photo-preview">

@@ -257,20 +257,6 @@ export const finalizeSignedDelivery = onCall(
       'Signed delivery finalized.',
     )
 
-    await orderSnap.ref.update({
-      status: 'ready_to_invoice',
-      updatedAt: FieldValue.serverTimestamp(),
-    })
-
-    await appendStatusHistory(
-      db,
-      orderId,
-      'ready_to_invoice',
-      request.auth.uid,
-      driverName,
-      'Delivery complete and ready for invoicing.',
-    )
-
     await maybeCompleteRun(data.runId)
 
     const recipients = await resolveDeliveryRecipients(customerId, customer)

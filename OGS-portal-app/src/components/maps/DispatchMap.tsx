@@ -9,11 +9,11 @@
  *   driverName — Display name for the truck pin tooltip
  *
  * Marker types:
- *   🔵 Truck       — animated brand-blue pin; shows driver name; positioned at
- *                    the driver's current location via useDriverLocation
- *   🟢 Completed   — green checkmark pin
- *   🔵 Current     — pulsing brand-blue pin (first 'arrived' or first 'pending' stop)
- *   ⚪ Pending     — gray numbered circle pin
+ *   Truck       — animated brand-blue pin; shows driver name; positioned at
+ *                 the driver's current location via useDriverLocation
+ *   Completed   — green checkmark pin
+ *   Current     — pulsing brand-blue pin (first 'arrived' or first 'pending' stop)
+ *   Pending     — gray numbered circle pin
  *   Click any stop pin → StopDetailPopover
  *
  * Map style:
@@ -22,6 +22,7 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react'
+import { Truck } from 'lucide-react'
 import {
   APIProvider,
   Map,
@@ -165,7 +166,10 @@ function TruckMarker({ lat, lng, driverName }: TruckMarkerProps) {
 
       {open && marker && (
         <InfoWindow anchor={marker} onClose={() => setOpen(false)}>
-          <div style={{ fontWeight: 600, fontSize: 13 }}>🚛 {driverName}</div>
+          <div style={{ fontWeight: 600, fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <Truck size={14} aria-hidden="true" />
+            <span>{driverName}</span>
+          </div>
           <div style={{ fontSize: 12, color: '#6b7280' }}>Current position (last stop proxy)</div>
         </InfoWindow>
       )}

@@ -1,19 +1,15 @@
 import { type ReactElement, useEffect, useMemo, useState } from 'react'
 import { Timestamp, collection, getDocs, query, where } from 'firebase/firestore'
 import {
-	AlertTriangle,
 	BarChart2,
 	CalendarDays,
 	CheckCircle,
 	ClipboardList,
-	Droplets,
 	FileStack,
 	FileText,
 	Map,
-	MapPin,
 	Menu,
-	MessageSquare,
-	Phone,
+	Send,
 	Tag,
 	Truck,
 	UserCheck,
@@ -52,34 +48,29 @@ const ROLE_ORDER: OgsRole[] = ['admin', 'sales', 'dispatch', 'driver']
 
 const ROLE_TILES: Record<OgsRole, QuickTile[]> = {
 	admin: [
-		{ label: 'New Customer', sub: 'Create company profile', icon: UserPlus, to: '/admin/crm/customers', primary: true },
-		{ label: 'New Quote', sub: 'Build and send quote', icon: FileText, to: '/admin/crm/quotes' },
+		{ label: 'New Customer', sub: 'Create company profile', icon: UserPlus, to: '/admin/crm/customers?new=1', primary: true },
+		{ label: 'New Quote', sub: 'Build and send quote', icon: FileText, to: '/admin/crm/quotes/new' },
+		{ label: 'New Order', sub: 'Create and assign order', icon: ClipboardList, to: '/admin/ops/orders?new=1' },
 		{ label: 'Dispatch Board', sub: 'Assign routes', icon: Truck, to: '/admin/ops/dispatch' },
-		{ label: 'Billing', sub: 'Review invoices', icon: ClipboardList, to: '/admin/billing' },
+		{ label: 'Billing', sub: 'Review invoices', icon: FileStack, to: '/admin/ops/billing' },
 		{ label: 'KPI Snapshot', sub: 'View performance trends', icon: BarChart2, to: '/admin/dashboard' },
-		{ label: 'Manage Pricing', sub: 'Update product tags', icon: Tag, to: '/admin/company-settings' },
+		{ label: 'Manage Pricing', sub: 'Update product tags', icon: Tag, to: '/admin/pricing' },
 	],
 	sales: [
-		{ label: 'New Lead', sub: 'Capture prospect', icon: UserPlus, to: '/crm/leads', primary: true },
-		{ label: 'Create Quote', sub: 'Draft quote', icon: FileText, to: '/crm/quotes' },
-		{ label: 'Quote Stack', sub: 'Manage revisions', icon: FileStack, to: '/crm/quotes' },
-		{ label: 'Aging', sub: 'Follow up AR', icon: BarChart2, to: '/crm/aging' },
-		{ label: 'Price List', sub: 'Review product tags', icon: Tag, to: '/crm/price-list' },
-		{ label: 'Call Queue', sub: 'Daily follow-up calls', icon: Phone, to: '/crm/leads' },
+		{ label: 'New Customer', sub: 'Create company profile', icon: UserPlus, to: '/crm/customers?new=1', primary: true },
+		{ label: 'New Quote', sub: 'Build and send quote', icon: FileText, to: '/crm/quotes/new' },
+		{ label: 'New Order', sub: 'Create and assign order', icon: ClipboardList, to: '/ops/orders?new=1' },
+		{ label: 'Send Estimate', sub: 'From an existing order', icon: Send, to: '/ops/orders' },
 	],
 	dispatch: [
-		{ label: 'Orders Queue', sub: 'Queue and triage', icon: ClipboardList, to: '/ops/orders', primary: true },
-		{ label: 'Driver Check-In', sub: 'Confirm assignment status', icon: UserCheck, to: '/ops/runs' },
-		{ label: 'Gallons Watch', sub: 'Track delivered volume', icon: Droplets, to: '/ops/dashboard' },
-		{ label: 'Completion Board', sub: 'Resolve exceptions', icon: CheckCircle, to: '/ops/dashboard' },
-		{ label: 'Dispatch Map', sub: 'View active drivers', icon: Map, to: '/ops/dispatch' },
+		{ label: 'View Dispatch Board', sub: 'Track and manage routes', icon: Map, to: '/ops/dispatch', primary: true },
+		{ label: 'Assign Run', sub: 'Build and assign a run', icon: UserCheck, to: '/ops/runs/new' },
+		{ label: 'View Active Runs', sub: 'Monitor current run status', icon: Truck, to: '/ops/runs' },
 	],
 	driver: [
-		{ label: 'Today Run', sub: 'Open current schedule', icon: CalendarDays, to: '/driver/schedule', primary: true },
-		{ label: 'Stop Completion', sub: 'Mark completed deliveries', icon: CheckCircle, to: '/driver/schedule' },
-		{ label: 'Dispatch Map', sub: 'Navigation and status', icon: MapPin, to: '/ops/dispatch' },
-		{ label: 'Issue Alert', sub: 'Flag delivery exceptions', icon: AlertTriangle, to: '/ops/orders' },
-		{ label: 'Driver Notes', sub: 'Send dispatch updates', icon: MessageSquare, to: '/driver/truck' },
+		{ label: 'View My Runs', sub: 'Open current schedule', icon: CalendarDays, to: '/driver/schedule', primary: true },
+		{ label: 'Mark Delivery Complete', sub: 'Complete active stops', icon: CheckCircle, to: '/driver/schedule?focus=complete' },
+		{ label: 'View BOM / Sign Delivery', sub: 'Open run load and signatures', icon: FileText, to: '/driver/schedule?focus=sign' },
 	],
 }
 
@@ -193,9 +184,27 @@ function useQuickStats(role: OgsRole, userId: string | null): { stats: QuickStat
 						return (status === 'draft' || status === 'sent') && (!validUntil || validUntil >= now)
 					}).length
 
+					const ordersSnap = await getDocs(collection(db, 'orders'))
+					const pendingOrders = ordersSnap.docs.filter((docSnap) => {
+						const status = (docSnap.data() as { status?: unknown }).status
+						return status === 'pending' || status === 'scheduled' || status === 'assigned'
+					}).length
+
+					const outstandingInvoices = ordersSnap.docs.reduce((sum, docSnap) => {
+						const data = docSnap.data() as { status?: unknown; invoiceAmount?: unknown; paidAmount?: unknown }
+						if (data.status !== 'invoice_sent') return sum
+						const invoiceAmount = Number(data.invoiceAmount)
+						const paidAmount = Number(data.paidAmount)
+						if (!Number.isFinite(invoiceAmount) || invoiceAmount <= 0) return sum
+						const net = invoiceAmount - (Number.isFinite(paidAmount) ? paidAmount : 0)
+						return sum + Math.max(net, 0)
+					}, 0)
+
 					nextStats = [
-						{ label: 'Paid today', value: String(paidCount), delta: `${formatCurrency(paidRevenue)} collected`, tone: 'positive' },
-						{ label: 'Open quotes', value: String(openQuotes), delta: 'Draft and sent pipeline', tone: 'neutral' },
+						{ label: 'Paid Today ($)', value: formatCurrency(paidRevenue), delta: `${paidCount} paid invoices`, tone: 'positive' },
+						{ label: 'Open Quotes (#)', value: String(openQuotes), delta: 'Draft and sent pipeline', tone: 'neutral' },
+						{ label: 'Pending Orders (#)', value: String(pendingOrders), delta: 'Pending, scheduled, assigned', tone: 'warning' },
+						{ label: 'Outstanding Invoices ($)', value: formatCurrency(outstandingInvoices), delta: 'Invoice sent and unpaid', tone: 'warning' },
 					]
 				}
 
@@ -332,6 +341,7 @@ export default function QuickActionsPage(): ReactElement {
 	const { role, user } = useAuth()
 	const [drawerOpen, setDrawerOpen] = useState(false)
 	const [activeRole, setActiveRole] = useState<OgsRole>('dispatch')
+	const [showStatsCue, setShowStatsCue] = useState(false)
 
 	useEffect(() => {
 		if (role === 'admin' || role === 'sales' || role === 'dispatch' || role === 'driver') {
@@ -342,6 +352,27 @@ export default function QuickActionsPage(): ReactElement {
 	const statsRole = activeRole
 	const statsUserId = role === activeRole ? (user?.id ?? null) : null
 	const { stats, isLoading } = useQuickStats(statsRole, statsUserId)
+
+	useEffect(() => {
+		function updateStatsCue(): void {
+			const statsSection = document.getElementById('qa-stats')
+			if (!statsSection) {
+				setShowStatsCue(false)
+				return
+			}
+			const statsTop = statsSection.getBoundingClientRect().top
+			setShowStatsCue(statsTop > window.innerHeight - 120)
+		}
+
+		updateStatsCue()
+		window.addEventListener('scroll', updateStatsCue, { passive: true })
+		window.addEventListener('resize', updateStatsCue)
+
+		return () => {
+			window.removeEventListener('scroll', updateStatsCue)
+			window.removeEventListener('resize', updateStatsCue)
+		}
+	}, [activeRole, stats, isLoading])
 
 	const tiles = useMemo(() => ROLE_TILES[activeRole], [activeRole])
 	const drawerLinks = useMemo(() => ROLE_DRAWER_LINKS[activeRole], [activeRole])
@@ -417,8 +448,20 @@ export default function QuickActionsPage(): ReactElement {
 				))}
 			</section>
 
+			{showStatsCue && (
+				<button
+					type="button"
+					className="qa-stats-cue"
+					onClick={() => {
+						document.getElementById('qa-stats')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+					}}
+				>
+					View stats ↓
+				</button>
+			)}
+
 			<div className="qa-section-label" style={{ marginTop: '14px' }}>Stats</div>
-			<section className="qa-stats" aria-label="Quick stats strip">
+			<section id="qa-stats" className="qa-stats" aria-label="Quick stats strip">
 				{isLoading && (
 					<div className="qa-stat-card">
 						<div className="qa-stat-card__value">...</div>

@@ -21,7 +21,7 @@ async function fixInvoiceDeliveryFee() {
   const invoiceNumber = 'INV-2026-928306'
 
   try {
-    console.log(`🔍 Finding invoice ${invoiceNumber}...`)
+    console.log(`[INFO] Finding invoice ${invoiceNumber}...`)
 
     // Query for the invoice
     const query = db.collection('invoices').where('invoiceNumber', '==', invoiceNumber)
@@ -55,7 +55,7 @@ async function fixInvoiceDeliveryFee() {
     const orderData = orderDoc.data()
     const deliveryFee = orderData?.deliveryFee ?? 0
 
-    console.log(`\n📦 Found linked order ${orderId}`)
+    console.log(`\n[INFO] Found linked order ${orderId}`)
     console.log(`  Order delivery fee: $${deliveryFee.toFixed(2)}`)
 
     // Update line items
@@ -83,7 +83,7 @@ async function fixInvoiceDeliveryFee() {
     const newSubtotal = updatedLineItems.reduce((sum: number, item: any) => sum + (item.total || 0), 0)
     const newTotal = 231.66 // As specified in the bug report
 
-    console.log(`\n💰 Updated totals:`)
+    console.log(`\n[INFO] Updated totals:`)
     console.log(`  Subtotal (recalculated): $${newSubtotal.toFixed(2)}`)
     console.log(`  Total: $${newTotal.toFixed(2)}`)
 

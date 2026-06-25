@@ -54,7 +54,9 @@ const STATUS_VARIANT: Record<OrderStatus, BadgeVariant> = {
   scheduled: 'info',
   assigned: 'info',
   'in-transit': 'brand',
+  in_transit: 'brand',
   delivered: 'success',
+  invoice_sent_pending: 'warning',
   ready_to_invoice: 'warning',
   invoice_sent: 'info',
   paid: 'success',
@@ -67,7 +69,9 @@ const STATUS_LABEL: Record<OrderStatus, string> = {
   scheduled: 'Scheduled',
   assigned: 'Assigned',
   'in-transit': 'In Transit',
+  in_transit: 'In Transit',
   delivered: 'Delivered',
+  invoice_sent_pending: 'Invoice Pending',
   ready_to_invoice: 'Ready to Invoice',
   invoice_sent: 'Invoice Sent',
   paid: 'Paid',
@@ -80,7 +84,9 @@ const STATUS_ICON: Record<OrderStatus, LucideIcon> = {
   scheduled: FileText,
   assigned: FileText,
   'in-transit': Send,
+  in_transit: Send,
   delivered: CheckCircle,
+  invoice_sent_pending: FileText,
   ready_to_invoice: FileText,
   invoice_sent: Send,
   paid: CheckCircle,
@@ -93,7 +99,9 @@ const STATUS_ICON_COLOR: Record<OrderStatus, string> = {
   scheduled: '#1e40af',
   assigned: '#3730a3',
   'in-transit': '#9d174d',
+  in_transit: '#9d174d',
   delivered: '#065f46',
+  invoice_sent_pending: '#FF6A00',
   ready_to_invoice: '#FF6A00',
   invoice_sent: '#0066FF',
   paid: '#065f46',
@@ -136,7 +144,7 @@ const ORDER_TYPE_STYLE: Record<OrderType, React.CSSProperties> = {
 }
 
 const TIMELINE_STEPS: OrderStatus[] = [
-  'pending', 'scheduled', 'in-transit', 'delivered', 'ready_to_invoice', 'invoice_sent', 'paid',
+  'pending', 'scheduled', 'in_transit', 'delivered', 'invoice_sent_pending', 'invoice_sent', 'paid',
 ]
 
 function timelineState(current: OrderStatus, step: OrderStatus): 'done' | 'active' | 'upcoming' {

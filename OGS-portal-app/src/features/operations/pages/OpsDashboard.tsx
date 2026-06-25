@@ -11,6 +11,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { Truck } from 'lucide-react'
 import {
   onSnapshot,
   query,
@@ -576,7 +577,7 @@ const OpsDashboard: React.FC = () => {
               <div className="od-table-loading">Loading runs…</div>
             ) : runIds.length === 0 ? (
               <div className="od-empty">
-                <span className="od-empty__icon">🚛</span>
+                <span className="od-empty__icon"><Truck size={18} aria-hidden="true" /></span>
                 <p>No active runs</p>
               </div>
             ) : (

@@ -1,5 +1,5 @@
 import React from 'react'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { ROLE_HOME } from '../../types/auth'
 import { ProtectedRoute } from '../guards/ProtectedRoute'
@@ -84,6 +84,41 @@ const RootRedirect: React.FC = () => {
   return <Navigate to={ROLE_HOME[role]} replace />
 }
 
+const DispatchRedirect: React.FC = () => {
+  const { loading, role, realUser } = useAuth()
+
+  if (loading) {
+    return <div className="layout-loading"><span className="layout-loading__spinner" /></div>
+  }
+
+  const authRole = realUser?.role ?? role
+  if (!authRole) return <Navigate to="/login" replace />
+
+  if (authRole === 'admin') return <Navigate to="/admin/ops/dispatch" replace />
+  if (authRole === 'dispatch') return <Navigate to="/ops/dispatch" replace />
+  if (authRole === 'driver') return <Navigate to="/driver/schedule" replace />
+
+  return <Navigate to={ROLE_HOME[authRole]} replace />
+}
+
+const DispatchRunRedirect: React.FC = () => {
+  const { loading, role, realUser } = useAuth()
+  const { runId } = useParams<{ runId?: string }>()
+
+  if (loading) {
+    return <div className="layout-loading"><span className="layout-loading__spinner" /></div>
+  }
+
+  const authRole = realUser?.role ?? role
+  if (!authRole) return <Navigate to="/login" replace />
+
+  if (authRole === 'admin' && runId) return <Navigate to={`/admin/ops/dispatch/${runId}`} replace />
+  if (authRole === 'dispatch' && runId) return <Navigate to={`/ops/dispatch/${runId}`} replace />
+  if (authRole === 'driver') return <Navigate to="/driver/schedule" replace />
+
+  return <Navigate to={ROLE_HOME[authRole]} replace />
+}
+
 export const AppRouter: React.FC = () => (
   <BrowserRouter>
     <Routes>
@@ -117,6 +152,24 @@ export const AppRouter: React.FC = () => (
         element={
           <ProtectedRoute role={['admin', 'sales', 'driver', 'dispatch']}>
             <QuickActionsPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/dispatch"
+        element={
+          <ProtectedRoute role={['admin', 'dispatch', 'driver']}>
+            <DispatchRedirect />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/dispatch/:runId"
+        element={
+          <ProtectedRoute role={['admin', 'dispatch', 'driver']}>
+            <DispatchRunRedirect />
           </ProtectedRoute>
         }
       />
@@ -223,6 +276,7 @@ export const AppRouter: React.FC = () => (
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<AdminDashboard />} />
         <Route path="users" element={<UserManagement />} />
+        <Route path="pricing" element={<PriceList />} />
         <Route path="delivery-settings" element={<DeliverySettingsPage />} />
         <Route path="company-settings"  element={<CompanySettingsPage />} />
         <Route path="email-templates"   element={<EmailTemplatesPage />} />

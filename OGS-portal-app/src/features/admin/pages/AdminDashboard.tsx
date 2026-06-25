@@ -34,6 +34,7 @@ import type { Invoice } from '../../../types/billing'
 import type { Tank } from '../../../types/tank'
 import type { Lead } from '../../../types/models'
 import type { Quote } from '../../../types/models'
+import { StatCard } from '../../../components/ui/StatCard'
 import './AdminDashboard.css'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -239,28 +240,6 @@ function useAdminMetrics(): { data: AdminMetrics | null; loading: boolean } {
 
 // ── Stat Card ──────────────────────────────────────────────────────────────
 
-interface StatCardProps {
-  label: string
-  value: string | number
-  sub?: string
-  accent?: 'brand' | 'success' | 'warning' | 'danger' | 'purple' | 'neutral'
-  loading?: boolean
-}
-
-function StatCard({ label, value, sub, accent = 'neutral', loading = false }: StatCardProps) {
-  return (
-    <div className={`adash-stat adash-stat--${accent}`}>
-      <p className="adash-stat__label">{label}</p>
-      {loading ? (
-        <div className="adash-stat__skeleton" />
-      ) : (
-        <p className="adash-stat__value">{value}</p>
-      )}
-      {sub && !loading && <p className="adash-stat__sub">{sub}</p>}
-    </div>
-  )
-}
-
 // ── Section ────────────────────────────────────────────────────────────────
 
 interface SectionProps {
@@ -302,13 +281,18 @@ export default function AdminDashboard() {
 
   return (
     <div className="adash">
-      {/* Header */}
-      <div className="adash__header">
-        <div>
-          <h1 className="adash__title">Admin Dashboard</h1>
-          <p className="adash__subtitle">{fmtDate(new Date())} · Oversight across CRM, Operations &amp; Admin</p>
+      <header className="page-header">
+        <div className="page-header__hero">
+          <div className="page-header__title-section">
+            <p className="page-header__eyebrow">Revenue Operations</p>
+            <h1 className="page-header__title">Admin Dashboard</h1>
+            <p className="page-header__description">{fmtDate(new Date())} · Oversight across CRM, Operations &amp; Admin</p>
+          </div>
+          <div className="page-header__actions">
+            <span className="page-header__meta-tag">Admin</span>
+          </div>
         </div>
-      </div>
+      </header>
 
       {/* CRM Overview */}
       <Section
@@ -321,34 +305,10 @@ export default function AdminDashboard() {
         ]}
       >
         <div className="adash-grid adash-grid--4">
-          <StatCard
-            label="Active Customers"
-            value={crm.data?.activeCustomers ?? 0}
-            sub={crm.data ? `${crm.data.totalCustomers} total` : undefined}
-            accent="success"
-            loading={crm.loading}
-          />
-          <StatCard
-            label="Open Leads"
-            value={crm.data?.openLeads ?? 0}
-            sub="New / contacted / qualified"
-            accent="brand"
-            loading={crm.loading}
-          />
-          <StatCard
-            label="Pending Setup"
-            value={crm.data?.pendingSetup ?? 0}
-            sub="Awaiting account creation"
-            accent={crm.data && crm.data.pendingSetup > 0 ? 'warning' : 'neutral'}
-            loading={crm.loading}
-          />
-          <StatCard
-            label="Open Quotes"
-            value={crm.data ? fmtCurrency(crm.data.openQuoteValue) : '—'}
-            sub={crm.data ? `${crm.data.openQuoteCount} quote${crm.data.openQuoteCount !== 1 ? 's' : ''}` : undefined}
-            accent="purple"
-            loading={crm.loading}
-          />
+          <StatCard label="Active Customers" value={crm.loading ? '—' : (crm.data?.activeCustomers ?? 0)} subLabel={crm.data ? `${crm.data.totalCustomers} total` : undefined} accent />
+          <StatCard label="Open Leads" value={crm.loading ? '—' : (crm.data?.openLeads ?? 0)} subLabel="New / contacted / qualified" accent />
+          <StatCard label="Pending Setup" value={crm.loading ? '—' : (crm.data?.pendingSetup ?? 0)} subLabel="Awaiting account creation" accent />
+          <StatCard label="Open Quotes" value={crm.loading ? '—' : (crm.data ? fmtCurrency(crm.data.openQuoteValue) : '—')} subLabel={crm.data ? `${crm.data.openQuoteCount} quote${crm.data.openQuoteCount !== 1 ? 's' : ''}` : undefined} accent />
         </div>
       </Section>
 
@@ -364,34 +324,10 @@ export default function AdminDashboard() {
         ]}
       >
         <div className="adash-grid adash-grid--4">
-          <StatCard
-            label="Pending Orders"
-            value={ops.data?.pendingOrders ?? 0}
-            sub="Awaiting dispatch"
-            accent={ops.data && ops.data.pendingOrders > 0 ? 'warning' : 'neutral'}
-            loading={ops.loading}
-          />
-          <StatCard
-            label="Active Runs"
-            value={ops.data?.activeRuns ?? 0}
-            sub="Scheduled + in-progress"
-            accent={ops.data && ops.data.activeRuns > 0 ? 'success' : 'neutral'}
-            loading={ops.loading}
-          />
-          <StatCard
-            label="Low Tanks"
-            value={ops.data?.lowTanks ?? 0}
-            sub="≤ 30% level deployed"
-            accent={ops.data && ops.data.lowTanks > 0 ? 'danger' : 'neutral'}
-            loading={ops.loading}
-          />
-          <StatCard
-            label="Outstanding Invoices"
-            value={ops.data ? fmtCurrency(ops.data.outstandingInvoiceTotal) : '—'}
-            sub={ops.data ? `${ops.data.outstandingInvoiceCount} unpaid` : undefined}
-            accent={ops.data && ops.data.outstandingInvoiceCount > 0 ? 'warning' : 'neutral'}
-            loading={ops.loading}
-          />
+          <StatCard label="Pending Orders" value={ops.loading ? '—' : (ops.data?.pendingOrders ?? 0)} subLabel="Awaiting dispatch" accent />
+          <StatCard label="Active Runs" value={ops.loading ? '—' : (ops.data?.activeRuns ?? 0)} subLabel="Scheduled + in-progress" accent />
+          <StatCard label="Low Tanks" value={ops.loading ? '—' : (ops.data?.lowTanks ?? 0)} subLabel="≤ 30% level deployed" accent />
+          <StatCard label="Outstanding Invoices" value={ops.loading ? '—' : (ops.data ? fmtCurrency(ops.data.outstandingInvoiceTotal) : '—')} subLabel={ops.data ? `${ops.data.outstandingInvoiceCount} unpaid` : undefined} accent />
         </div>
       </Section>
 
@@ -405,26 +341,9 @@ export default function AdminDashboard() {
         ]}
       >
         <div className="adash-grid adash-grid--3">
-          <StatCard
-            label="Total Portal Users"
-            value={admin.data?.totalUsers ?? 0}
-            accent="neutral"
-            loading={admin.loading}
-          />
-          <StatCard
-            label="OGS Staff"
-            value={admin.data?.ogsStaff ?? 0}
-            sub="Admin · Dispatch · Driver · Sales"
-            accent="brand"
-            loading={admin.loading}
-          />
-          <StatCard
-            label="Customer Accounts"
-            value={admin.data?.customerAccounts ?? 0}
-            sub="Owner · Manager · Billing · Delivery"
-            accent="success"
-            loading={admin.loading}
-          />
+          <StatCard label="Total Portal Users" value={admin.loading ? '—' : (admin.data?.totalUsers ?? 0)} accent />
+          <StatCard label="OGS Staff" value={admin.loading ? '—' : (admin.data?.ogsStaff ?? 0)} subLabel="Admin · Dispatch · Driver · Sales" accent />
+          <StatCard label="Customer Accounts" value={admin.loading ? '—' : (admin.data?.customerAccounts ?? 0)} subLabel="Owner · Manager · Billing · Delivery" accent />
         </div>
       </Section>
     </div>

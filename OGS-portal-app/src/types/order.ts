@@ -49,8 +49,10 @@ export type OrderStatus =
   | 'scheduled'
   | 'assigned'
   | 'in-transit'
+  | 'in_transit'
   | 'delivered'
   | 'ready_to_invoice'
+  | 'invoice_sent_pending'
   | 'invoice_sent'
   | 'paid'
   | 'cancelled'
@@ -60,7 +62,7 @@ export type OrderStatusEvent = {
   status: OrderStatus
   changedAt: Timestamp
   changedBy: string
-  changedByName: string
+  changedByName?: string
   note?: string
 }
 
@@ -101,6 +103,7 @@ export interface Order {
   quoteTotal?: number
   status: OrderStatus
   statusHistory?: OrderStatusEvent[]
+  statusUpdatedAt?: Timestamp
   notes?: string
   /** Links all items from a single customer checkout into one order reference. */
   groupId?: string
@@ -156,11 +159,19 @@ export interface Order {
   createdAt?: Timestamp
   scheduledAt?: Timestamp
   /** QB invoice number entered by admin when marking invoice sent. */
-  qbInvoiceNumber?: string
+  qbInvoiceNumber?: string | null
+  /** When invoice was sent from QuickBooks and confirmed in OGS. */
+  invoiceSentAt?: Timestamp | null
   /** Amount invoiced in QuickBooks. */
   invoiceAmount?: number
   /** Amount actually received from customer. */
   paidAmount?: number
+  /** Timestamp when order was marked ready for invoice. */
+  readyForInvoiceAt?: Timestamp | null
   /** When payment was received. */
-  paidAt?: Timestamp
+  paidAt?: Timestamp | null
+  /** Timestamp when the order was cancelled. */
+  cancelledAt?: Timestamp | null
+  /** UID of the user who cancelled the order. */
+  cancelledBy?: string | null
 }

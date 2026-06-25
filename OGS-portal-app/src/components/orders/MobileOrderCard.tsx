@@ -5,13 +5,15 @@ import type { Order, OrderStatus } from '../../types/order'
 import './MobileOrderCard.css'
 
 const STATUS_COLORS: Record<OrderStatus, string> = {
-  pending: '#92400e',
-  scheduled: '#1e40af',
+  pending: '#f59e0b',
+  scheduled: '#64748b',
   assigned: '#3730a3',
-  'in-transit': '#9d174d',
+  'in-transit': '#facc15',
+  in_transit: '#facc15',
   delivered: '#065f46',
+  invoice_sent_pending: '#f59e0b',
   ready_to_invoice: '#FF6A00',
-  invoice_sent: '#0066FF',
+  invoice_sent: '#7c3aed',
   paid: '#16a34a',
   cancelled: '#6b7280',
   archived: '#6b7280',
@@ -22,7 +24,9 @@ const STATUS_LABELS: Record<OrderStatus, string> = {
   scheduled: 'Scheduled',
   assigned: 'Assigned',
   'in-transit': 'In Transit',
+  in_transit: 'In Transit',
   delivered: 'Delivered',
+  invoice_sent_pending: 'Invoice Pending',
   ready_to_invoice: 'Ready to Invoice',
   invoice_sent: 'Invoice Sent',
   paid: 'Paid',
@@ -30,7 +34,7 @@ const STATUS_LABELS: Record<OrderStatus, string> = {
   archived: 'Archived',
 }
 
-const COLLAPSED_DEFAULT: OrderStatus[] = ['delivered', 'ready_to_invoice', 'invoice_sent', 'paid']
+const COLLAPSED_DEFAULT: OrderStatus[] = ['delivered', 'ready_to_invoice', 'invoice_sent_pending', 'invoice_sent', 'paid']
 
 function fmtCurrency(n: number) {
   return new Intl.NumberFormat('en-US', {

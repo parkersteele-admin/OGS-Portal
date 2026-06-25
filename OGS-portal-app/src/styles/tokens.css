@@ -1,14 +1,14 @@
 :root {
   /* OGS brand palette */
-  --color-brand: #0066FF;
-  --color-brand-light: #E6F0FF;
+  --color-brand: #FF6B1A;
+  --color-brand-light: #FFF7ED;
   --color-brand-dark: #0A1B33;
-  --color-brand-border: rgba(0, 102, 255, 0.22);
+  --color-brand-border: rgba(255, 107, 26, 0.24);
   --color-brand-secondary: #00B7FF;
   --color-brand-secondary-light: #E6FAFF;
-  --color-accent: #FF6A00;
-  --color-accent-light: #FFF0E5;
-  --color-accent-border: rgba(255, 106, 0, 0.26);
+  --color-accent: #FF6B1A;
+  --color-accent-light: #FFF7ED;
+  --color-accent-border: rgba(255, 107, 26, 0.24);
 
   /* Semantic Colors */
   --color-success: #13815D;
@@ -18,15 +18,15 @@
 
   /* Neutrals */
   --color-bg: #FFFFFF;
-  --color-bg-2: #F4F8FC;
-  --color-bg-3: #E7EEF7;
-  --color-bg-shell: #EDF3FA;
-  --color-text: #0A1B33;
-  --color-text-2: #1E3554;
-  --color-text-3: #5D708A;
-  --color-border: #D5E0EC;
-  --color-border-2: #A9B9CC;
-  --color-divider: #E3EBF4;
+  --color-bg-2: #F8F8F9;
+  --color-bg-3: #F4F4F5;
+  --color-bg-shell: #F4F4F5;
+  --color-text: #111111;
+  --color-text-2: #374151;
+  --color-text-3: #6B7280;
+  --color-border: #E4E4E7;
+  --color-border-2: #D4D4D8;
+  --color-divider: #E4E4E7;
 
   /* Typography */
   --font-sans: 'IBM Plex Sans', system-ui, sans-serif;

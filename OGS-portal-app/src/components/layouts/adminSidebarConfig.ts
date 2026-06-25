@@ -2,10 +2,14 @@ import type { SidebarGroup, SidebarItem } from '../ui/Sidebar'
 
 export const ADMIN_SIDEBAR_OVERVIEW_ITEMS: SidebarItem[] = [
   { to: '/admin/dashboard', label: 'Dashboard', icon: '⊞' },
+  { to: '/admin/users', label: 'User Management', icon: '◎' },
+  { to: '/admin/delivery-settings', label: 'Delivery Settings', icon: '⊞' },
+  { to: '/admin/company-settings', label: 'Company Info', icon: '⊟' },
+  { to: '/admin/email-templates', label: 'Email Templates', icon: '✉' },
 ]
 
 export const ADMIN_SIDEBAR_GROUPS: SidebarGroup[] = [
-  { label: 'Overview', items: ADMIN_SIDEBAR_OVERVIEW_ITEMS },
+  { label: 'ADMIN', items: ADMIN_SIDEBAR_OVERVIEW_ITEMS },
   {
     label: 'CRM',
     items: [
@@ -19,7 +23,7 @@ export const ADMIN_SIDEBAR_GROUPS: SidebarGroup[] = [
     ],
   },
   {
-    label: 'Operations',
+    label: 'OPERATIONS',
     items: [
       { to: '/admin/ops/dashboard', label: 'Ops Dashboard', icon: '⊞' },
       { to: '/admin/ops/orders', label: 'Orders', icon: '≡' },
@@ -27,15 +31,6 @@ export const ADMIN_SIDEBAR_GROUPS: SidebarGroup[] = [
       { to: '/admin/ops/dispatch', label: 'Dispatch', icon: '⊕' },
       { to: '/admin/ops/tanks', label: 'Tanks', icon: '⊙' },
       { to: '/admin/ops/inventory', label: 'Inventory', icon: '⊟' },
-    ],
-  },
-  {
-    label: 'Admin',
-    items: [
-      { to: '/admin/users', label: 'User Management', icon: '◎' },
-      { to: '/admin/delivery-settings', label: 'Delivery Settings', icon: '⊞' },
-      { to: '/admin/company-settings', label: 'Company Info', icon: '⊟' },
-      { to: '/admin/email-templates', label: 'Email Templates', icon: '✉' },
     ],
   },
 ]

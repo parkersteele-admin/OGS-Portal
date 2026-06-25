@@ -390,17 +390,81 @@
   white-space: nowrap;
 }
 
-.om-badge--pending    { background: #fef3c7; color: #92400e; }
-.om-badge--scheduled  { background: #dbeafe; color: #1e40af; }
+.om-badge--pending    { background: #ffedd5; color: #9a3412; }
+.om-badge--scheduled  { background: #e2e8f0; color: #334155; }
 .om-badge--assigned   { background: #e0e7ff; color: #3730a3; }
-.om-badge--in-transit { background: #fce7f3; color: #9d174d; }
+.om-badge--in-transit { background: #fef9c3; color: #854d0e; }
+.om-badge--in_transit { background: #fef9c3; color: #854d0e; }
 .om-badge--delivered  { background: #d1fae5; color: #065f46; }
+.om-badge--invoice_sent_pending { background: #ffedd5; color: #9a3412; }
 .om-badge--ready_to_invoice { background: #FF6A00; color: #ffffff; }
-.om-badge--invoice_sent { background: #0066FF; color: #ffffff; }
+.om-badge--invoice_sent { background: #ede9fe; color: #6d28d9; }
 .om-badge--invoiced   { background: #00B7FF; color: #ffffff; }
-.om-badge--paid       { background: #d1fae5; color: #065f46; }
+.om-badge--paid       { background: #d1fae5; color: #047857; }
 .om-badge--cancelled  { background: var(--color-bg-3); color: var(--color-text-3); }
 .om-badge--archived   { background: var(--color-bg-3); color: var(--color-text-3); opacity: 0.6; }
+
+/* ── Order Lifecycle Progress ─────────────────────────────────────────────── */
+
+.om-progress {
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+  padding: 10px 0 6px;
+  margin-bottom: 4px;
+}
+
+.om-progress__step {
+  display: flex;
+  align-items: center;
+  min-width: 150px;
+}
+
+.om-progress__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.om-progress__label {
+  margin-left: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.om-progress__line {
+  height: 2px;
+  width: 26px;
+  margin-left: 10px;
+  background: #333;
+  border-radius: 999px;
+}
+
+.om-progress__step--current .om-progress__dot {
+  background: #FF6A00;
+}
+
+.om-progress__step--current .om-progress__label {
+  color: #FF6A00;
+}
+
+.om-progress__step--complete .om-progress__dot {
+  background: #e5e7eb;
+}
+
+.om-progress__step--complete .om-progress__label {
+  color: #e5e7eb;
+}
+
+.om-progress__step--future .om-progress__dot {
+  background: #333;
+}
+
+.om-progress__step--future .om-progress__label {
+  color: #333;
+}
 
 /* ── Tier badge ────────────────────────────────────────────────────────────── */
 
@@ -605,6 +669,41 @@
   display: flex;
   justify-content: flex-end;
   gap: var(--space-2);
+}
+
+.om-manual-status {
+  margin-right: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.om-manual-status--sheet {
+  margin-right: 0;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.om-manual-status__label {
+  font-size: var(--font-size-11);
+  font-weight: 700;
+  color: var(--color-text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.om-manual-status__select {
+  height: 32px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-2);
+  color: var(--color-text-2);
+  font-size: var(--font-size-12);
+  padding: 0 var(--space-2);
+}
+
+.om-manual-status__select:disabled {
+  opacity: 0.7;
 }
 
 /* ── Timeline ──────────────────────────────────────────────────────────────── */
@@ -1157,6 +1256,11 @@
   color: #111111;
 }
 
+.om-billing-badge--invoice_sent_pending {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
 .om-billing-badge--invoice_sent {
   background: #0066FF;
   color: #ffffff;
@@ -1190,6 +1294,12 @@
 
 .om-billing-btn--paid:hover {
   background: #2cd86b;
+}
+
+.om-billing-btn--ready {
+  background: #FF6A00;
+  color: #111111;
+  font-weight: 700;
 }
 
 .om-billing-toast {

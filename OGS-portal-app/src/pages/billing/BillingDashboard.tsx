@@ -11,8 +11,9 @@ import { FileText } from 'lucide-react'
 import { getDocs, orderBy, query } from 'firebase/firestore'
 import { customersCol, ordersCol } from '../../lib/firestore'
 import { Card } from '../../components/ui/Card'
-import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
+import { StatCard } from '../../components/ui/StatCard'
+import { StatusBadge } from '../../components/ui/StatusBadge'
 import MobileOrderCard from '../../components/orders/MobileOrderCard'
 import type { Customer } from '../../types/customer'
 import type { Order, OrderStatus } from '../../types/order'
@@ -21,27 +22,15 @@ import './BillingDashboard.css'
 type RevenueStatusFilter = 'all' | 'ready_to_invoice' | 'invoice_sent' | 'paid'
 type SortKey = 'date' | 'amount' | 'received'
 type SortDirection = 'asc' | 'desc'
-type BadgeVariant = 'brand' | 'success' | 'warning' | 'danger' | 'info' | 'neutral'
-
-const STATUS_VARIANT: Record<OrderStatus, BadgeVariant> = {
-  pending: 'warning',
-  scheduled: 'info',
-  assigned: 'info',
-  'in-transit': 'brand',
-  delivered: 'success',
-  ready_to_invoice: 'warning',
-  invoice_sent: 'info',
-  paid: 'success',
-  cancelled: 'danger',
-  archived: 'neutral',
-}
 
 const STATUS_LABEL: Record<OrderStatus, string> = {
   pending: 'Pending',
   scheduled: 'Scheduled',
   assigned: 'Assigned',
   'in-transit': 'In Transit',
+  in_transit: 'In Transit',
   delivered: 'Delivered',
+  invoice_sent_pending: 'Invoice Pending',
   ready_to_invoice: 'Ready to Invoice',
   invoice_sent: 'Invoice Sent',
   paid: 'Paid',
@@ -91,9 +80,20 @@ function fetchAllCustomers(): Promise<Customer[]> {
     .then((snap) => snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Customer))
 }
 
-const StatusBadge: React.FC<{ status: OrderStatus }> = ({ status }) => (
-  <Badge variant={STATUS_VARIANT[status]}>{STATUS_LABEL[status]}</Badge>
-)
+const STATUS_TONE: Partial<Record<OrderStatus, string>> = {
+  pending: 'pending',
+  scheduled: 'scheduled',
+  assigned: 'scheduled',
+  'in-transit': 'in_transit',
+  in_transit: 'in_transit',
+  delivered: 'delivered',
+  invoice_sent_pending: 'pending',
+  ready_to_invoice: 'pending',
+  invoice_sent: 'invoice_sent',
+  paid: 'paid',
+  cancelled: 'cancelled',
+  archived: 'draft',
+}
 
 const BillingDashboard: React.FC = () => {
   const navigate = useNavigate()
@@ -216,12 +216,18 @@ const BillingDashboard: React.FC = () => {
 
   return (
     <div className="bd page-layout">
-      <div className="page-header">
-        <div className="page-header__title-section">
-          <h1 className="page-header__title">Revenue</h1>
-          <p className="page-header__description">Track invoiced and collected revenue aligned with QuickBooks workflow.</p>
+      <header className="page-header">
+        <div className="page-header__hero">
+          <div className="page-header__title-section">
+            <p className="page-header__eyebrow">Revenue Operations</p>
+            <h1 className="page-header__title">Revenue</h1>
+            <p className="page-header__description">Track invoiced and collected revenue aligned with QuickBooks workflow.</p>
+          </div>
+          <div className="page-header__actions">
+            <span className="page-header__meta-tag">Admin + Billing</span>
+          </div>
         </div>
-      </div>
+      </header>
 
       <div className="bd__controls">
         <div className="bd__date-range">
@@ -245,33 +251,17 @@ const BillingDashboard: React.FC = () => {
       </div>
 
       <div className="bd__kpis">
-        <Card className="bd__kpi-card">
-          <p className="bd__kpi-label bd__kpi-label--blue">TOTAL INVOICED</p>
-          <p className="bd__kpi-value">{formatCurrency(kpis.totalInvoiced)}</p>
-        </Card>
-        <Card className="bd__kpi-card">
-          <p className="bd__kpi-label bd__kpi-label--green">TOTAL COLLECTED</p>
-          <p className="bd__kpi-value">{formatCurrency(kpis.totalCollected)}</p>
-        </Card>
-        <Card className="bd__kpi-card">
-          <p className="bd__kpi-label bd__kpi-label--orange">OUTSTANDING</p>
-          <p className="bd__kpi-value">{formatCurrency(kpis.outstanding)}</p>
-        </Card>
-        <Card
-          className="bd__kpi-card bd__kpi-card--clickable"
+        <StatCard label="Total Invoiced" value={formatCurrency(kpis.totalInvoiced)} accent />
+        <StatCard label="Total Collected" value={formatCurrency(kpis.totalCollected)} accent />
+        <StatCard label="Outstanding" value={formatCurrency(kpis.outstanding)} accent />
+        <button
+          type="button"
+          className="bd__pending-stat"
           role="button"
-          tabIndex={0}
           onClick={() => setStatusFilter('ready_to_invoice')}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault()
-              setStatusFilter('ready_to_invoice')
-            }
-          }}
         >
-          <p className="bd__kpi-label bd__kpi-label--neutral">ORDERS PENDING INVOICE</p>
-          <p className="bd__kpi-value">{kpis.pendingInvoiceCount}</p>
-        </Card>
+          <StatCard label="Orders Pending Invoice" value={kpis.pendingInvoiceCount} subLabel="Click to filter" accent />
+        </button>
       </div>
 
       <Card className="bd__revenue-card">
@@ -285,7 +275,7 @@ const BillingDashboard: React.FC = () => {
             <button
               key={filter.key}
               type="button"
-              className={`bd__chip${statusFilter === filter.key ? ' bd__chip--active' : ''}`}
+              className={`page-filters__preset${statusFilter === filter.key ? ' page-filters__preset--active' : ''}`}
               onClick={() => setStatusFilter(filter.key)}
             >
               {filter.label}
@@ -300,35 +290,35 @@ const BillingDashboard: React.FC = () => {
             </div>
           ) : null}
 
-          <div className="bd__table-wrap">
-            <table className="bd__table">
-              <thead>
+          <div className="page-table-wrap bd__table-wrap">
+            <table className="page-table bd__table">
+              <thead className="page-table__head">
                 <tr>
-                  <th>
+                  <th className="page-table__th">
                     <button type="button" className="bd__sort-btn" onClick={() => toggleSort('date')}>
                       Date
                     </button>
                   </th>
-                  <th>Customer</th>
-                  <th>QB Invoice #</th>
-                  <th className="bd__col-r">
+                  <th className="page-table__th">Customer</th>
+                  <th className="page-table__th">QB Invoice #</th>
+                  <th className="page-table__th page-table__th--right">
                     <button type="button" className="bd__sort-btn bd__sort-btn--right" onClick={() => toggleSort('amount')}>
                       Invoiced
                     </button>
                   </th>
-                  <th className="bd__col-r">
+                  <th className="page-table__th page-table__th--right">
                     <button type="button" className="bd__sort-btn bd__sort-btn--right" onClick={() => toggleSort('received')}>
                       Received
                     </button>
                   </th>
-                  <th>Status</th>
-                  <th>Actions</th>
+                  <th className="page-table__th">Status</th>
+                  <th className="page-table__th">Actions</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="page-table__tbody">
                 {!isLoading && sortedOrders.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="bd__empty-cell">
+                  <tr className="page-table__tr">
+                    <td colSpan={7} className="page-table__td bd__empty-cell">
                       <div className="bd__empty-state">
                         <p className="bd__empty">No orders match the current filters.</p>
                       </div>
@@ -339,14 +329,16 @@ const BillingDashboard: React.FC = () => {
                 {!isLoading && sortedOrders.map((order) => {
                   const customerName = customerMap.get(order.customerId) ?? order.customerId
                   return (
-                    <tr key={order.id}>
-                      <td className="bd__date">{formatDate(order.deliveredAt ?? order.scheduledAt)}</td>
-                      <td>{customerName}</td>
-                      <td className="bd__inv-num">{order.qbInvoiceNumber || '—'}</td>
-                      <td className="bd__col-r">{formatCurrency(order.invoiceAmount)}</td>
-                      <td className="bd__col-r">{formatCurrency(order.paidAmount)}</td>
-                      <td><StatusBadge status={order.status} /></td>
-                      <td>
+                    <tr key={order.id} className="page-table__tr">
+                      <td className="page-table__td bd__date">{formatDate(order.deliveredAt ?? order.scheduledAt)}</td>
+                      <td className="page-table__td">{customerName}</td>
+                      <td className="page-table__td bd__inv-num">{order.qbInvoiceNumber || '—'}</td>
+                      <td className="page-table__td page-table__td--right">{formatCurrency(order.invoiceAmount)}</td>
+                      <td className="page-table__td page-table__td--right">{formatCurrency(order.paidAmount)}</td>
+                      <td className="page-table__td">
+                        <StatusBadge status={STATUS_TONE[order.status] ?? 'draft'} label={STATUS_LABEL[order.status]} />
+                      </td>
+                      <td className="page-table__td">
                         <Button
                           variant="secondary"
                           size="sm"
@@ -394,7 +386,7 @@ const BillingDashboard: React.FC = () => {
                       </div>
                       <div>
                         <span>Status</span>
-                        <StatusBadge status={order.status} />
+                        <StatusBadge status={STATUS_TONE[order.status] ?? 'draft'} label={STATUS_LABEL[order.status]} />
                       </div>
                     </div>
                   </div>

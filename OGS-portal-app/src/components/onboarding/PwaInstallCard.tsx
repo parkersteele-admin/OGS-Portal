@@ -8,6 +8,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react'
+import { Smartphone } from 'lucide-react'
 import { doc, updateDoc } from 'firebase/firestore'
 import { db } from '../../lib/firebase'
 
@@ -84,7 +85,7 @@ export const PwaInstallCard: React.FC<Props> = ({ uid }) => {
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
       >
-        <span className="pwa-card__title">📱 Add app to your phone</span>
+        <span className="pwa-card__title"><Smartphone size={16} aria-hidden="true" /> Add app to your phone</span>
         <span className="pwa-card__chevron" aria-hidden="true">
           {expanded ? '▲' : '▼'}
         </span>

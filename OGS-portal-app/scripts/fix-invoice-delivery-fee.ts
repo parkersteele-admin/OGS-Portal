@@ -29,7 +29,7 @@ admin.initializeApp({
 const db = admin.firestore()
 
 async function fixInvoice(invoiceNumber: string, correctTotal: number, deliveryFee: number) {
-  console.log(`\n📋 Fixing invoice ${invoiceNumber}...`)
+  console.log(`\n[INFO] Fixing invoice ${invoiceNumber}...`)
   console.log(`   Target total: $${correctTotal.toFixed(2)}`)
   console.log(`   Delivery fee: $${deliveryFee.toFixed(2)}`)
 
@@ -78,7 +78,7 @@ async function fixInvoice(invoiceNumber: string, correctTotal: number, deliveryF
       return sum + (typeof item.total === 'number' ? item.total : 0)
     }, 0)
 
-    console.log(`\n📊 Updated totals:`)
+    console.log(`\n[INFO] Updated totals:`)
     console.log(`  Old subtotal: $${currentInvoice.subtotal ?? 0}`)
     console.log(`  New subtotal: $${newSubtotal.toFixed(2)}`)
     console.log(`  Old total: $${currentInvoice.total ?? 0}`)
@@ -96,7 +96,7 @@ async function fixInvoice(invoiceNumber: string, correctTotal: number, deliveryF
     console.log(`\n✅ Firestore record updated successfully`)
 
     // Attempt to regenerate PDF
-    console.log(`\n🖨️  Regenerating PDF with corrected total...`)
+    console.log(`\n[INFO] Regenerating PDF with corrected total...`)
     try {
       const { httpsCallable } = await import('firebase-functions')
       const { functions } = await import('../lib/firebase')

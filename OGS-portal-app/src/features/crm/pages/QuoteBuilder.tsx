@@ -41,6 +41,7 @@ import { Button } from '../../../components/ui/Button'
 import { Input } from '../../../components/ui/Input'
 import { Modal } from '../../../components/ui/Modal'
 import { ProductCombobox } from '../../../components/ui/ProductCombobox'
+import { StatusBadge } from '../../../components/ui/StatusBadge'
 import type { ProductDropdownItem } from '../../../services/productService'
 import type { Quote, QuoteItem, QuoteStatus } from '../../../types/crm'
 import type { Customer } from '../../../types/customer'
@@ -1140,40 +1141,40 @@ const QuoteTable: React.FC<QuoteTableProps> = ({
 
   return (
     <>
-    <div className="qb-table-wrap">
-      <table className="qb-table">
-        <thead>
+    <div className="page-table-wrap qb-table-wrap">
+      <table className="page-table qb-table">
+        <thead className="page-table__head">
           <tr>
-            <th className="qb-th">Quote #</th>
-            <th className="qb-th">Customer / Lead</th>
-            <th className="qb-th qb-th--right">Total</th>
-            <th className="qb-th">Status</th>
-            <th className="qb-th">Sent</th>
-            <th className="qb-th">Valid Until</th>
-            <th className="qb-th">Actions</th>
+            <th className="page-table__th">Quote #</th>
+            <th className="page-table__th">Customer / Lead</th>
+            <th className="page-table__th page-table__th--right">Total</th>
+            <th className="page-table__th">Status</th>
+            <th className="page-table__th">Sent</th>
+            <th className="page-table__th">Valid Until</th>
+            <th className="page-table__th">Actions</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody className="page-table__tbody">
           {quotes.map(q => {
             const cfg = STATUS_BADGE[q.status]
             return (
-              <tr key={q.id} className="qb-tr" onClick={() => onEdit(q)}>
-                <td className="qb-td qb-td--mono">{q.quoteNumber}</td>
-                <td className="qb-td">{nameMap[q.customerId ?? q.leadId ?? ''] ?? q.customerId ?? q.leadId ?? '—'}</td>
-                <td className="qb-td qb-td--right qb-td--bold">{formatCurrency(q.total)}</td>
-                <td className="qb-td">
-                  <Badge variant={cfg.variant}>{cfg.label}</Badge>
+              <tr key={q.id} className="page-table__tr qb-tr" onClick={() => onEdit(q)}>
+                <td className="page-table__td qb-td--mono">{q.quoteNumber}</td>
+                <td className="page-table__td">{nameMap[q.customerId ?? q.leadId ?? ''] ?? q.customerId ?? q.leadId ?? '—'}</td>
+                <td className="page-table__td page-table__td--right qb-td--bold">{formatCurrency(q.total)}</td>
+                <td className="page-table__td">
+                  <StatusBadge status={q.status} label={cfg.label} />
                   {q.status === 'accepted' && (q as Quote & { needsOrderSetup?: boolean }).needsOrderSetup && (
                     <span className="qb-needs-order" title="Standing order not yet set up">⚡ Needs order</span>
                   )}
                 </td>
-                <td className="qb-td">
+                <td className="page-table__td">
                   {'sentAt' in q && q.sentAt
                     ? formatRelative(q.sentAt as { toDate(): Date })
                     : '—'}
                 </td>
-                <td className="qb-td">{q.validUntil ? formatDate(q.validUntil) : '—'}</td>
-                <td className="qb-td qb-td--actions" onClick={e => e.stopPropagation()}>
+                <td className="page-table__td">{q.validUntil ? formatDate(q.validUntil) : '—'}</td>
+                <td className="page-table__td qb-td--actions" onClick={e => e.stopPropagation()}>
                   <Button variant="ghost" size="sm" onClick={() => onEdit(q)}>Edit</Button>
                   <Button
                     variant="secondary"
@@ -1228,11 +1229,6 @@ const QuoteTable: React.FC<QuoteTableProps> = ({
           q.status === 'expired' ? 'Expired' :
           q.status === 'draft' || q.status === 'sent' ? 'Pending' :
           STATUS_BADGE[q.status].label
-        const statusClass =
-          q.status === 'accepted' ? 'qb-mobile-card__status--approved' :
-          q.status === 'expired' ? 'qb-mobile-card__status--expired' :
-          q.status === 'draft' || q.status === 'sent' ? 'qb-mobile-card__status--pending' :
-          'qb-mobile-card__status--neutral'
         const firstLine = q.lineItems[0]
         const owner = nameMap[q.customerId ?? q.leadId ?? ''] ?? q.customerId ?? q.leadId ?? '—'
         const mineLabel = currentUserId && q.createdBy === currentUserId ? 'Mine' : ''
@@ -1252,7 +1248,7 @@ const QuoteTable: React.FC<QuoteTableProps> = ({
             </div>
             <div className="qb-mobile-card__meta">{firstLine?.description ?? 'No line items'}</div>
             <div className="qb-mobile-card__bottom">
-              <span className={`qb-mobile-card__status ${statusClass}`}>{statusLabel}</span>
+              <StatusBadge status={q.status} label={statusLabel} className="qb-mobile-card__status" />
               <span>{q.validUntil ? `Valid ${formatDate(q.validUntil)}` : 'No expiry'} {mineLabel && `· ${mineLabel}`}</span>
             </div>
             <div className="qb-mobile-card__actions" onClick={(e) => e.stopPropagation()}>
@@ -1499,10 +1495,15 @@ const QuoteBuilder: React.FC = () => {
     <div className="qb-page">
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <header className="qb-header">
-        <h1 className="qb-header__title">Quotes</h1>
-        <div className="qb-header__controls">
-          <div className="qb-list-tabs" role="tablist" aria-label="Quote filters">
+      <header className="page-header">
+        <div className="page-header__hero">
+          <div className="page-header__title-section">
+            <p className="page-header__eyebrow">Revenue Operations</p>
+            <h1 className="page-header__title">Quotes</h1>
+            <p className="page-header__description">Manage draft, sent, accepted, and archived quotes in one queue.</p>
+          </div>
+          <div className="page-header__actions qb-header__controls">
+            <div className="qb-list-tabs" role="tablist" aria-label="Quote filters">
             {([
               ['all', 'All'],
               ['mine', 'Mine'],
@@ -1514,16 +1515,17 @@ const QuoteBuilder: React.FC = () => {
                 type="button"
                 role="tab"
                 aria-selected={listFilter === key}
-                className={`qb-list-tab${listFilter === key ? ' qb-list-tab--active' : ''}`}
+                className={`page-filters__preset${listFilter === key ? ' page-filters__preset--active' : ''}`}
                 onClick={() => setListFilter(key)}
               >
                 {label}
               </button>
             ))}
+            </div>
+            <Button variant="primary" size="sm" onClick={handleNew}>
+              + New quote
+            </Button>
           </div>
-          <Button variant="primary" size="sm" onClick={handleNew}>
-            + New quote
-          </Button>
         </div>
       </header>
 

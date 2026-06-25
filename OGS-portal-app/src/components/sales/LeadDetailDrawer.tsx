@@ -9,6 +9,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { formatDistanceToNow, format, addDays, nextMonday } from 'date-fns'
+import { Handshake, Mail, MessageSquare, Phone, Settings, StickyNote, Trophy } from 'lucide-react'
 import {
   callAdvanceLeadStage,
   callLogLeadActivity,
@@ -49,13 +50,18 @@ function setupProgress(lead: PipelineLead): number {
 
 function ActivityItem({ entry }: { entry: ActivityEntry }) {
   const date    = tsToDate(entry.createdAt)
-  const typeIcons: Record<ActivityType, string> = {
-    note: '📝', call: '📞', email: '✉️', meeting: '🤝',
-    stage_change: '→', system: '⚙',
+  const typeIcons: Record<ActivityType, React.ComponentType<{ size?: number }>> = {
+    note: StickyNote,
+    call: Phone,
+    email: Mail,
+    meeting: Handshake,
+    stage_change: MessageSquare,
+    system: Settings,
   }
+  const TypeIcon = typeIcons[entry.type]
   return (
     <li className="ldd-activity-item">
-      <span className="ldd-activity-icon">{typeIcons[entry.type] ?? '•'}</span>
+      <span className="ldd-activity-icon" aria-hidden="true"><TypeIcon size={14} /></span>
       <div className="ldd-activity-body">
         <p className="ldd-activity-text">{entry.body}</p>
         {date && (
@@ -308,7 +314,7 @@ function WonModal({ onConfirm, onCancel }: { onConfirm: (note: string) => void; 
   return (
     <div className="ldd-modal-overlay" role="dialog" aria-modal>
       <div className="ldd-modal">
-        <h3 className="ldd-modal-title">Mark as Won 🎉</h3>
+        <h3 className="ldd-modal-title"><Trophy size={16} aria-hidden="true" /> Mark as Won</h3>
         <label className="ldd-label">
           Win note (optional)
           <textarea

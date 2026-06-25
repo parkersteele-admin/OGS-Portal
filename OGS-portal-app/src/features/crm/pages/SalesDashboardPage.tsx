@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Badge } from '../../../components/ui/Badge'
 import { Card } from '../../../components/ui/Card'
+import { StatCard } from '../../../components/ui/StatCard'
 import {
   buildSalesDashboardData,
   fetchSalesDashboardSnapshot,
@@ -120,19 +121,21 @@ const SalesDashboardPage: React.FC = () => {
 
   return (
     <div className="sdash-page">
-      <section className="sdash-hero">
-        <div>
-          <p className="sdash-hero__eyebrow">Revenue Operations</p>
-          <h1 className="sdash-hero__title">Sales Dashboard</h1>
-          <p className="sdash-hero__copy">
-            Internal performance view for pipeline health, wins, and rep execution across the CRM.
-          </p>
+      <header className="page-header">
+        <div className="page-header__hero">
+          <div className="page-header__title-section">
+            <p className="page-header__eyebrow">Revenue Operations</p>
+            <h1 className="page-header__title">Sales Dashboard</h1>
+            <p className="page-header__description">
+              Internal performance view for pipeline health, wins, and rep execution across the CRM.
+            </p>
+          </div>
+          <div className="page-header__actions">
+            <span className="page-header__meta-tag">Admin + Sales</span>
+            <span className="sdash-hero__date">Updated from live CRM data</span>
+          </div>
         </div>
-        <div className="sdash-hero__meta">
-          <Badge variant="brand">Admin + Sales</Badge>
-          <span className="sdash-hero__date">Updated from live CRM data</span>
-        </div>
-      </section>
+      </header>
 
       <Card className="sdash-filterbar">
         <div className="sdash-filterbar__top">
@@ -239,11 +242,7 @@ const SalesDashboardPage: React.FC = () => {
 
       <section className="sdash-kpis">
         {kpiCards.map((card) => (
-          <Card key={card.label} className="sdash-kpi">
-            <p className="sdash-kpi__label">{card.label}</p>
-            <p className="sdash-kpi__value">{card.value}</p>
-            <p className="sdash-kpi__meta">{card.meta}</p>
-          </Card>
+          <StatCard key={card.label} label={card.label} value={card.value} subLabel={card.meta} accent />
         ))}
       </section>
 

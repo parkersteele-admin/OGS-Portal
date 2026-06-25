@@ -14,7 +14,7 @@ interface UpdateOrderBillingStatusInput {
 }
 
 const ALLOWED_PREDECESSOR: Record<UpdateOrderBillingStatusInput['newStatus'], OrderStatus> = {
-  invoice_sent: 'ready_to_invoice',
+  invoice_sent: 'invoice_sent_pending',
   paid: 'invoice_sent',
 }
 
@@ -40,9 +40,6 @@ export const updateOrderBillingStatus = onCall(async (request) => {
   if (data.newStatus === 'invoice_sent') {
     if (!data.qbInvoiceNumber || data.qbInvoiceNumber.trim() === '') {
       throw new HttpsError('invalid-argument', 'qbInvoiceNumber is required when marking invoice sent.')
-    }
-    if (typeof data.invoiceAmount !== 'number' || data.invoiceAmount <= 0) {
-      throw new HttpsError('invalid-argument', 'invoiceAmount must be a positive number when marking invoice sent.')
     }
   }
 
@@ -81,8 +78,11 @@ export const updateOrderBillingStatus = onCall(async (request) => {
     status: data.newStatus,
     updatedAt: FieldValue.serverTimestamp(),
     ...(data.newStatus === 'invoice_sent' && {
-      qbInvoiceNumber: data.qbInvoiceNumber,
-      invoiceAmount: data.invoiceAmount,
+      qbInvoiceNumber: data.qbInvoiceNumber?.trim() ?? null,
+      ...(typeof data.invoiceAmount === 'number' && data.invoiceAmount > 0
+        ? { invoiceAmount: data.invoiceAmount }
+        : {}),
+      invoiceSentAt: FieldValue.serverTimestamp(),
     }),
     ...(data.newStatus === 'paid' && {
       paidAmount: data.paidAmount,
