@@ -131,7 +131,6 @@
 .adash-linechart__svg {
   width: 100%;
   height: auto;
-  min-width: 320px;
 }
 
 .adash-linechart__grid {

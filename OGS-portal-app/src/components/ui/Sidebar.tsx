@@ -73,7 +73,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <BrandLogo className="sidebar__logo-image" variant="white" />
         </div>
 
-        <p className="sidebar__portal-label">{title}</p>
+        {!hasAccordionGroups && (
+          <p className="sidebar__portal-label">{title}</p>
+        )}
 
         <ul className="sidebar__nav" role="list" onClick={onMobileClose}>
           {items.map(({ label, to, icon, sectionLabel }) => (
