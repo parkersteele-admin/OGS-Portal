@@ -783,12 +783,17 @@
 }
 
 .om-manual-status__inline {
-  position: relative;
   display: inline-flex;
   align-items: center;
+  gap: 8px;
 }
 
 .om-manual-status__inline--action {
+  flex: 1;
+}
+
+.om-manual-status__select-wrap {
+  position: relative;
   flex: 1;
 }
 
@@ -818,10 +823,17 @@
 
 .om-manual-status__caret {
   position: absolute;
-  right: 8px;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
   color: #6b7280;
   font-size: 11px;
   pointer-events: none;
+}
+
+.om-panel-btn--status-apply {
+  flex: 0 0 auto;
+  min-width: 108px;
 }
 
 .om-manual-status__select:disabled {

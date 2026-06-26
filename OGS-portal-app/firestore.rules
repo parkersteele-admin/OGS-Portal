@@ -197,7 +197,8 @@ service cloud.firestore {
       allow create: if isDispatch() || isSales() || isCustomer();
       // Dispatch may change any field.
       // Drivers may only record delivery outcome — no financial fields.
-      allow update: if isDispatch()
+      allow update: if isAdmin()
+        || isDispatch()
         || (isDriver()
             && onlyUpdatesFields(['status', 'gallonsDelivered', 'deliveredAt', 'notes', 'updatedAt']));
       allow delete: if isAdmin();

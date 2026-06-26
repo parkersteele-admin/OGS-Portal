@@ -154,6 +154,26 @@ const ADMIN_OVERRIDE_STATUS_OPTIONS: Array<{ value: AdminOverrideStatus; label: 
   { value: 'cancelled', label: 'Cancelled' },
 ]
 
+function getAdminStatusOptions(status: OrderStatus): Array<{ value: AdminOverrideStatus; label: string }> {
+  const current = normalizeManualStatus(status)
+  const next = getNextLifecycleStatus(status)
+
+  const options = ADMIN_OVERRIDE_STATUS_OPTIONS
+    .filter((option) => option.value !== current)
+    .map((option) => ({
+      ...option,
+      label: option.value === next ? `Next: ${option.label}` : option.label,
+    }))
+
+  options.sort((a, b) => {
+    if (a.value === next) return -1
+    if (b.value === next) return 1
+    return 0
+  })
+
+  return options
+}
+
 const TIER_LABELS: Record<DeliveryTier, string> = {
   standard:  'Standard',
   'next-day': 'Next Day',
@@ -229,10 +249,6 @@ function getNextLifecycleStatus(status: OrderStatus): ManualLifecycleStatus | nu
   const idx = MANUAL_LIFECYCLE_SEQUENCE.indexOf(normalized)
   if (idx < 0 || idx >= MANUAL_LIFECYCLE_SEQUENCE.length - 1) return null
   return MANUAL_LIFECYCLE_SEQUENCE[idx + 1]
-}
-
-function getMarkAsLabel(status: ManualLifecycleStatus): string {
-  return `Mark as ${STATUS_LABELS[status]}`
 }
 
 function lifecycleStepIndex(status: OrderStatus): number {
@@ -342,7 +358,7 @@ function OrderDetailSheet({
   const [paidAtStr, setPaidAtStr] = useState(() => new Date().toISOString().slice(0, 10))
 
   const normalizedStatus = normalizeLifecycleStatus(order.status)
-  const nextStatus = getNextLifecycleStatus(order.status)
+  const adminStatusOptions = useMemo(() => getAdminStatusOptions(order.status), [order.status])
   const canSendEstimate =
     order.status === 'pending' || order.status === 'scheduled' || order.status === 'assigned' || order.status === 'in-transit'
   const actingUserId = realUser?.id ?? user?.id
@@ -536,19 +552,6 @@ function OrderDetailSheet({
         )}
 
         <div className="om-sheet__actions">
-          {isAdmin && nextStatus && (
-            <div className="om-action-row om-action-row--primary">
-              <button
-                type="button"
-                className="om-panel-btn om-panel-btn--primary"
-                onClick={() => { void handleManualStatusChange(nextStatus) }}
-                disabled={statusBusy}
-              >
-                {statusBusy ? 'Saving…' : getMarkAsLabel(nextStatus)}
-              </button>
-            </div>
-          )}
-
           <div className="om-action-row om-action-row--secondary">
             {canSendEstimate && (
               <button
@@ -574,27 +577,37 @@ function OrderDetailSheet({
           <div className="om-action-row om-action-row--tertiary">
             {isAdmin && (
               <div className="om-manual-status__inline om-manual-status__inline--action">
-                <select
-                  id={`sheet-override-status-${order.id}`}
-                  className="om-manual-status__select om-manual-status__select--inline"
-                  value={overrideStatus}
-                  onChange={(e) => {
-                    const selected = e.target.value as AdminOverrideStatus
-                    setOverrideStatus(selected)
-                    if (selected) {
-                      void handleManualStatusChange(selected)
+                <div className="om-manual-status__select-wrap">
+                  <select
+                    id={`sheet-override-status-${order.id}`}
+                    className="om-manual-status__select om-manual-status__select--inline"
+                    value={overrideStatus}
+                    onChange={(e) => {
+                      setOverrideStatus(e.target.value as AdminOverrideStatus | '')
+                    }}
+                    disabled={statusBusy}
+                  >
+                    <option value="">Select status change</option>
+                    {adminStatusOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="om-manual-status__caret" aria-hidden="true">▾</span>
+                </div>
+                <button
+                  type="button"
+                  className="om-panel-btn om-panel-btn--secondary om-panel-btn--status-apply"
+                  onClick={() => {
+                    if (overrideStatus) {
+                      void handleManualStatusChange(overrideStatus)
                     }
                   }}
-                  disabled={statusBusy}
+                  disabled={!overrideStatus || statusBusy}
                 >
-                  <option value="">Override status</option>
-                  {ADMIN_OVERRIDE_STATUS_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-                <span className="om-manual-status__caret" aria-hidden="true">▾</span>
+                  {statusBusy ? 'Saving…' : 'Update Status'}
+                </button>
               </div>
             )}
             {canCancel && (
@@ -706,11 +719,11 @@ function OrderDetailPanel({
   const canEdit =
     order.status === 'pending' || order.status === 'scheduled'
   const normalizedStatus = normalizeLifecycleStatus(order.status)
-  const nextStatus = getNextLifecycleStatus(order.status)
   const canSendEstimate =
     order.status === 'pending' || order.status === 'scheduled' || order.status === 'assigned' || order.status === 'in-transit'
   const actingUserId = realUser?.id ?? user?.id
   const showBillingPanel = isAdmin && (normalizedStatus === 'invoice_sent_pending' || normalizedStatus === 'invoice_sent')
+  const adminStatusOptions = useMemo(() => getAdminStatusOptions(order.status), [order.status])
 
   async function handleManualStatusChange(next: AdminOverrideStatus) {
     let qbInvoiceNumber: string | undefined
@@ -1159,19 +1172,6 @@ function OrderDetailPanel({
         {/* Actions */}
         <div className="om-panel__footer">
           <div className="om-action-stack">
-            {isAdmin && nextStatus && (
-              <div className="om-action-row om-action-row--primary">
-                <button
-                  type="button"
-                  className="om-panel-btn om-panel-btn--primary"
-                  onClick={() => { void handleManualStatusChange(nextStatus) }}
-                  disabled={statusBusy}
-                >
-                  {statusBusy ? 'Saving…' : getMarkAsLabel(nextStatus)}
-                </button>
-              </div>
-            )}
-
             <div className="om-action-row om-action-row--secondary">
               {canSendEstimate && (
                 <button
@@ -1197,28 +1197,38 @@ function OrderDetailPanel({
             <div className="om-action-row om-action-row--tertiary">
               {isAdmin && (
                 <div className="om-manual-status__inline om-manual-status__inline--action">
-                  <select
-                    id={`override-status-${order.id}`}
-                    aria-label="Override status"
-                    className="om-manual-status__select om-manual-status__select--inline"
-                    value={overrideStatus}
-                    onChange={(e) => {
-                      const selected = e.target.value as AdminOverrideStatus
-                      setOverrideStatus(selected)
-                      if (selected) {
-                        void handleManualStatusChange(selected)
+                  <div className="om-manual-status__select-wrap">
+                    <select
+                      id={`override-status-${order.id}`}
+                      aria-label="Override status"
+                      className="om-manual-status__select om-manual-status__select--inline"
+                      value={overrideStatus}
+                      onChange={(e) => {
+                        setOverrideStatus(e.target.value as AdminOverrideStatus | '')
+                      }}
+                      disabled={statusBusy}
+                    >
+                      <option value="">Select status change</option>
+                      {adminStatusOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="om-manual-status__caret" aria-hidden="true">▾</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="om-panel-btn om-panel-btn--secondary om-panel-btn--status-apply"
+                    onClick={() => {
+                      if (overrideStatus) {
+                        void handleManualStatusChange(overrideStatus)
                       }
                     }}
-                    disabled={statusBusy}
+                    disabled={!overrideStatus || statusBusy}
                   >
-                    <option value="">Override status</option>
-                    {ADMIN_OVERRIDE_STATUS_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="om-manual-status__caret" aria-hidden="true">▾</span>
+                    {statusBusy ? 'Saving…' : 'Update Status'}
+                  </button>
                 </div>
               )}
               {canCancel && (
