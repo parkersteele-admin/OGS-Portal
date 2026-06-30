@@ -32,16 +32,6 @@ const INVOICE_STATUS_LABEL: Record<InvoiceStatus, string> = {
   void: 'Void',
 }
 
-function isoDate(d: Date): string {
-  return d.toISOString().slice(0, 10)
-}
-
-function monthRange() {
-  const now = new Date()
-  const start = new Date(now.getFullYear(), now.getMonth(), 1)
-  return { from: isoDate(start), to: isoDate(now) }
-}
-
 function formatCurrency(value: number | null | undefined): string {
   if (typeof value !== 'number') return '—'
   return new Intl.NumberFormat('en-US', {
@@ -86,11 +76,11 @@ const INVOICE_TONE_MAP: Record<InvoiceStatus, string> = {
 const BillingDashboard: React.FC = () => {
   const navigate = useNavigate()
   const location = useLocation()
-  const range = monthRange()
-  const opsBase = location.pathname.startsWith('/admin') ? '/admin/ops' : '/ops'
+  const crmBase = location.pathname.startsWith('/admin') ? '/admin/crm' : '/crm'
 
-  const [fromDate, setFromDate] = useState(range.from)
-  const [toDate, setToDate] = useState(range.to)
+  // Default to all-time so billing and orders counts align unless user narrows dates.
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
   const [statusFilter, setStatusFilter] = useState<RevenueStatusFilter>('all')
   const [sortKey, setSortKey] = useState<SortKey>('date')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
@@ -332,7 +322,7 @@ const BillingDashboard: React.FC = () => {
                         <Button
                           variant="secondary"
                           size="sm"
-                          onClick={() => navigate(`${opsBase}/crm/customers/${invoice.customerId}`)}
+                          onClick={() => navigate(`${crmBase}/customers/${invoice.customerId}`)}
                         >
                           View
                         </Button>
@@ -375,7 +365,7 @@ const BillingDashboard: React.FC = () => {
                       <Button
                         variant="secondary"
                         size="sm"
-                        onClick={() => navigate(`${opsBase}/crm/customers/${invoice.customerId}`)}
+                        onClick={() => navigate(`${crmBase}/customers/${invoice.customerId}`)}
                       >
                         View Details
                       </Button>
