@@ -17,7 +17,7 @@ import { Button } from '../../../components/ui/Button'
 import { Input } from '../../../components/ui/Input'
 import { Modal } from '../../../components/ui/Modal'
 import { useAuth } from '../../../hooks/useAuth'
-import { clearAllTestData } from '../../../services/adminService'
+import { clearAllTestData, importC3Orders } from '../../../services/adminService'
 import './CompanySettings.css'
 
 const CompanySettingsPage: React.FC = () => {
@@ -33,6 +33,9 @@ const CompanySettingsPage: React.FC = () => {
   const [showClearModal, setShowClearModal] = useState(false)
   const [clearConfirmText, setClearConfirmText] = useState('')
   const [clearing, setClearing] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [importConfirmText, setImportConfirmText] = useState('')
+  const [importing, setImporting] = useState(false)
   const [clearStatus, setClearStatus] = useState<string | null>(null)
   const fileInputRef                    = useRef<HTMLInputElement>(null)
 
@@ -100,6 +103,24 @@ const CompanySettingsPage: React.FC = () => {
       setError(`Clear test data failed: ${message}`)
     } finally {
       setClearing(false)
+    }
+  }
+
+  async function handleImportC3Orders() {
+    setImporting(true)
+    setError(null)
+    setClearStatus(null)
+    try {
+      const result = await importC3Orders()
+      setClearStatus(`Import complete — ${result.message}`)
+      setShowImportModal(false)
+      setImportConfirmText('')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to import C3 orders.'
+      setClearStatus(message)
+      setError(`C3 import failed: ${message}`)
+    } finally {
+      setImporting(false)
     }
   }
 
@@ -308,6 +329,18 @@ const CompanySettingsPage: React.FC = () => {
         </section>
 
         {isAdmin && (
+          <section className="cs-card">
+            <h2 className="cs-card__title">Data Tools</h2>
+            <p className="cs-card__sub">
+              One-time utility for importing the four historical C3 invoices/orders (1001-1004) via callable function.
+            </p>
+            <Button variant="secondary" size="md" onClick={() => setShowImportModal(true)}>
+              Import C3 Historical Orders
+            </Button>
+          </section>
+        )}
+
+        {isAdmin && (
           <section className="cs-card cs-card--danger">
             <h2 className="cs-card__title">Danger Zone</h2>
             <p className="cs-card__sub">
@@ -343,6 +376,34 @@ const CompanySettingsPage: React.FC = () => {
               disabled={clearConfirmText !== 'DELETE'}
             >
               Clear All Test Data
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={showImportModal} onClose={() => !importing && setShowImportModal(false)} title="Import C3 Historical Orders" size="md">
+        <div className="cs-danger-modal">
+          <p className="cs-danger-modal__warning">
+            This runs the importC3Orders callable and creates four historical orders for C3 Solutions LLC.
+            Use only once unless duplicates are expected.
+          </p>
+          <Input
+            label='Type "IMPORT C3" to confirm'
+            value={importConfirmText}
+            onChange={(e) => setImportConfirmText(e.target.value)}
+            placeholder="IMPORT C3"
+          />
+          <div className="cs-danger-modal__actions">
+            <Button variant="secondary" onClick={() => setShowImportModal(false)} disabled={importing}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleImportC3Orders}
+              loading={importing}
+              disabled={importConfirmText !== 'IMPORT C3'}
+            >
+              Run C3 Import
             </Button>
           </div>
         </div>
