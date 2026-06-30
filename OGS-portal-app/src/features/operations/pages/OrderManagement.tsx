@@ -374,7 +374,7 @@ function OrderDetailSheet({
   const canSendEstimate =
     order.status === 'pending' || order.status === 'scheduled' || order.status === 'assigned' || order.status === 'in-transit'
   const actingUserId = realUser?.id ?? user?.id
-  const showBillingPanel = isAdmin && (normalizedStatus === 'invoice_sent_pending' || normalizedStatus === 'invoice_sent')
+  const showBillingPanel = isAdmin && (normalizedStatus === 'invoice_sent_pending' || normalizedStatus === 'invoice_sent' || normalizedStatus === 'paid')
 
   useEffect(() => {
     setQbInvoiceNumber(order.qbInvoiceNumber ?? '')
@@ -478,11 +478,7 @@ function OrderDetailSheet({
     if (!invNum) return
     setBillingBusy(true)
     try {
-      await transitionOrderStatus(order.id, 'invoice_sent', {
-        changedBy: actingUserId,
-        qbInvoiceNumber: invNum,
-        force: true,
-      })
+      await updateOrder(order.id, { qbInvoiceNumber: invNum })
       await onBillingStatusUpdated(order.id)
       setBillingToast('QB invoice number updated.')
       setTimeout(() => setBillingToast(null), 2500)
@@ -1195,7 +1191,9 @@ function OrderDetailPanel({
                 <p className="om-billing-copy">
                   {normalizedStatus === 'invoice_sent_pending'
                     ? 'Enter the QuickBooks invoice number, then confirm invoice sent.'
-                    : 'Once payment is received, mark this order as paid.'}
+                    : normalizedStatus === 'invoice_sent'
+                      ? 'Once payment is received, mark this order as paid or update the QB invoice number.'
+                      : 'Update the QB invoice number if needed.'}
                 </p>
                 {normalizedStatus === 'invoice_sent_pending' ? (
                   <QBInvoiceSentForm
@@ -1204,7 +1202,7 @@ function OrderDetailPanel({
                     onChangeInvoiceNumber={setQbInvoiceNumber}
                     onSubmit={handleMarkInvoiceSent}
                   />
-                ) : (
+                ) : normalizedStatus === 'invoice_sent' ? (
                   <QBPaidForm
                     qbInvoiceNumber={qbInvoiceNumber}
                     paidAmountStr={paidAmountStr}
@@ -1215,6 +1213,13 @@ function OrderDetailPanel({
                     onChangePaidAt={setPaidAtStr}
                     onSubmitInvoiceNumber={handleSaveInvoiceNumber}
                     onSubmit={handleMarkPaid}
+                  />
+                ) : (
+                  <QBInvoiceNumberForm
+                    qbInvoiceNumber={qbInvoiceNumber}
+                    busy={billingBusy}
+                    onChangeInvoiceNumber={setQbInvoiceNumber}
+                    onSubmit={handleSaveInvoiceNumber}
                   />
                 )}
                 {billingToast && <p className="om-billing-toast">{billingToast}</p>}
@@ -1456,6 +1461,47 @@ function QBPaidForm({
       >
         {busy ? 'Saving…' : 'Mark as Paid'}
       </button>
+    </div>
+  )
+}
+
+interface QBInvoiceNumberFormProps {
+  qbInvoiceNumber: string
+  busy: boolean
+  onChangeInvoiceNumber: (v: string) => void
+  onSubmit: () => void
+}
+
+function QBInvoiceNumberForm({
+  qbInvoiceNumber,
+  busy,
+  onChangeInvoiceNumber,
+  onSubmit,
+}: QBInvoiceNumberFormProps) {
+  const canSave = qbInvoiceNumber.trim() !== '' && !busy
+
+  return (
+    <div className="om-qb-form">
+      <div className="om-qb-form__field om-qb-form__field--row">
+        <div className="om-qb-form__field-grow">
+          <label className="om-qb-form__label">QB Invoice Number</label>
+          <input
+            className="om-qb-form__input"
+            type="text"
+            placeholder="#1042"
+            value={qbInvoiceNumber}
+            onChange={(e) => onChangeInvoiceNumber(e.target.value)}
+            disabled={busy}
+          />
+        </div>
+        <button
+          className="om-billing-btn om-billing-btn--secondary"
+          onClick={onSubmit}
+          disabled={!canSave}
+        >
+          {busy ? 'Saving…' : 'Save #'}
+        </button>
+      </div>
     </div>
   )
 }
