@@ -21,6 +21,7 @@ import './BillingDashboard.css'
 type RevenueStatusFilter = 'all' | 'sent' | 'overdue' | 'paid'
 type SortKey = 'date' | 'amount' | 'received'
 type SortDirection = 'asc' | 'desc'
+type DatePreset = 'all_time' | 'last_30_days' | 'this_month' | 'custom'
 
 // Map Invoice status to display label
 const INVOICE_STATUS_LABEL: Record<InvoiceStatus, string> = {
@@ -54,6 +55,10 @@ function getInvoiceDate(invoice: Invoice): Date | null {
   return invoice.issuedAt?.toDate?.() ?? null
 }
 
+function toInputDate(value: Date): string {
+  return value.toISOString().slice(0, 10)
+}
+
 function fetchAllInvoices(): Promise<Invoice[]> {
   return getDocs(query(invoicesCol, orderBy('issuedAt', 'desc')))
     .then((snap) => snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Invoice))
@@ -81,9 +86,41 @@ const BillingDashboard: React.FC = () => {
   // Default to all-time so billing and orders counts align unless user narrows dates.
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const [datePreset, setDatePreset] = useState<DatePreset>('all_time')
   const [statusFilter, setStatusFilter] = useState<RevenueStatusFilter>('all')
   const [sortKey, setSortKey] = useState<SortKey>('date')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
+
+  const applyDatePreset = (preset: DatePreset) => {
+    const now = new Date()
+    const today = toInputDate(now)
+
+    if (preset === 'all_time') {
+      setFromDate('')
+      setToDate('')
+      setDatePreset('all_time')
+      return
+    }
+
+    if (preset === 'last_30_days') {
+      const start = new Date(now)
+      start.setDate(start.getDate() - 30)
+      setFromDate(toInputDate(start))
+      setToDate(today)
+      setDatePreset('last_30_days')
+      return
+    }
+
+    if (preset === 'this_month') {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1)
+      setFromDate(toInputDate(start))
+      setToDate(today)
+      setDatePreset('this_month')
+      return
+    }
+
+    setDatePreset('custom')
+  }
 
   const invoicesQuery = useQuery({
     queryKey: ['billing', 'invoices'],
@@ -210,13 +247,39 @@ const BillingDashboard: React.FC = () => {
       </header>
 
       <div className="bd__controls">
+        <div className="bd__date-presets" aria-label="Date presets">
+          <button
+            type="button"
+            className={`page-filters__preset${datePreset === 'all_time' ? ' page-filters__preset--active' : ''}`}
+            onClick={() => applyDatePreset('all_time')}
+          >
+            All Time
+          </button>
+          <button
+            type="button"
+            className={`page-filters__preset${datePreset === 'last_30_days' ? ' page-filters__preset--active' : ''}`}
+            onClick={() => applyDatePreset('last_30_days')}
+          >
+            Last 30 Days
+          </button>
+          <button
+            type="button"
+            className={`page-filters__preset${datePreset === 'this_month' ? ' page-filters__preset--active' : ''}`}
+            onClick={() => applyDatePreset('this_month')}
+          >
+            This Month
+          </button>
+        </div>
         <div className="bd__date-range">
           <input
             type="date"
             className="bd__filter-date"
             value={fromDate}
             max={toDate || undefined}
-            onChange={(e) => setFromDate(e.target.value)}
+            onChange={(e) => {
+              setFromDate(e.target.value)
+              setDatePreset('custom')
+            }}
             aria-label="From date"
           />
           <input
@@ -224,9 +287,15 @@ const BillingDashboard: React.FC = () => {
             className="bd__filter-date"
             value={toDate}
             min={fromDate || undefined}
-            onChange={(e) => setToDate(e.target.value)}
+            onChange={(e) => {
+              setToDate(e.target.value)
+              setDatePreset('custom')
+            }}
             aria-label="To date"
           />
+          {datePreset === 'custom' && (
+            <span className="bd__range-note">Custom range</span>
+          )}
         </div>
       </div>
 
