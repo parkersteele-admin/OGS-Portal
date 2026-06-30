@@ -330,12 +330,14 @@ export async function transitionOrderStatus(
       throw new OgsValidationError('QB Invoice Number is required when marking an order as invoice_sent.')
     }
 
+    const changedAt = new Date()
+
     const patch: Record<string, unknown> = {
       status: nextStatus,
       statusUpdatedAt: serverTimestamp(),
       statusHistory: arrayUnion({
         status: nextStatus,
-        changedAt: serverTimestamp(),
+        changedAt,
         changedBy,
       }),
       updatedAt: serverTimestamp(),

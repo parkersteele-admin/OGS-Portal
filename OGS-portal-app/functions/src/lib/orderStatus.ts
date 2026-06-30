@@ -23,10 +23,12 @@ export async function appendStatusHistory(
   changedByName: string,
   note?: string,
 ): Promise<void> {
+  const changedAt = new Date()
+
   await db.collection('orders').doc(orderId).update({
     statusHistory: FieldValue.arrayUnion({
       status,
-      changedAt: FieldValue.serverTimestamp(),
+      changedAt,
       changedBy: changedByUid,
       changedByName,
       ...(note ? { note } : {}),
