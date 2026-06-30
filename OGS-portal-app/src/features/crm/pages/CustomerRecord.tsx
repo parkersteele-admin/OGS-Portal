@@ -11,7 +11,7 @@
  *   4. Documents   — contracts, signed agreements, upload
  */
 
-import React, { useState, useRef, useCallback, useEffect } from 'react'
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import {
   Ban,
@@ -1293,10 +1293,19 @@ const CustomerRecord: React.FC = () => {
   // Recent orders (last 5)
   const { data: ordersPage } = useCustomerOrders(customerId, 5)
   const recentOrders = ordersPage?.data ?? []
+  const recentOrderIds = useMemo(
+    () => new Set(recentOrders.map((order) => order.id)),
+    [recentOrders],
+  )
 
   // Recent invoices (last 5)
   const { data: invoicesPage } = useCustomerInvoices(customerId, 5)
-  const recentInvoices = invoicesPage?.data ?? []
+  const recentInvoices: Invoice[] = useMemo(
+    () => (invoicesPage?.data ?? [])
+      .filter((inv) => inv.status !== 'void' && !!inv.orderId && recentOrderIds.has(inv.orderId))
+      .slice(0, 5),
+    [invoicesPage?.data, recentOrderIds],
+  )
 
   const { data: quotesPage } = useQuery({
     queryKey: ['quotes', 'customer', customerId],
@@ -1304,7 +1313,18 @@ const CustomerRecord: React.FC = () => {
     enabled: !!customerId && (activeTab === 'overview' || activeTab === 'orderHistory'),
     staleTime: 60_000,
   })
-  const recentQuotes = (quotesPage?.data ?? []).slice(0, 5)
+  const recentQuotes: Quote[] = useMemo(
+    () => (quotesPage?.data ?? [])
+      .filter((quote) => {
+        const linkedOrderIds = [
+          quote.convertedOrderId,
+          ...(quote.convertedOrderIds ?? []),
+        ].filter((id): id is string => typeof id === 'string' && id.length > 0)
+        return linkedOrderIds.some((id) => recentOrderIds.has(id))
+      })
+      .slice(0, 5),
+    [quotesPage?.data, recentOrderIds],
+  )
 
   // Outstanding balance — fetch all sent + overdue
   const { data: outstandingInvoices } = useQuery({
@@ -1346,7 +1366,21 @@ const CustomerRecord: React.FC = () => {
     staleTime: 60_000,
   })
   const orderHistoryOrders = orderHistoryPage?.data ?? []
-  const orderHistoryQuotes = quotesPage?.data ?? []
+  const orderHistoryOrderIds = useMemo(
+    () => new Set(orderHistoryOrders.map((order) => order.id)),
+    [orderHistoryOrders],
+  )
+  const orderHistoryQuotes: Quote[] = useMemo(
+    () => (quotesPage?.data ?? []).filter((quote) => {
+      const linkedOrderIds = [
+        quote.convertedOrderId,
+        ...(quote.convertedOrderIds ?? []),
+      ].filter((id): id is string => typeof id === 'string' && id.length > 0)
+      if (linkedOrderIds.length === 0) return false
+      return linkedOrderIds.some((id) => orderHistoryOrderIds.has(id))
+    }),
+    [quotesPage?.data, orderHistoryOrderIds],
+  )
   const canManageQuotes = user?.role === 'admin' || user?.role === 'sales'
 
   const { data: invoiceHistoryPage } = useQuery({
@@ -1355,7 +1389,11 @@ const CustomerRecord: React.FC = () => {
     enabled: !!customerId && activeTab === 'orderHistory',
     staleTime: 60_000,
   })
-  const orderHistoryInvoices = invoiceHistoryPage?.data ?? []
+  const orderHistoryInvoices: Invoice[] = useMemo(
+    () => (invoiceHistoryPage?.data ?? [])
+      .filter((invoice) => invoice.status !== 'void' && !!invoice.orderId && orderHistoryOrderIds.has(invoice.orderId)),
+    [invoiceHistoryPage?.data, orderHistoryOrderIds],
+  )
 
   const openDraftEditor = useCallback((invoice: Invoice) => {
     if (invoice.status !== 'draft') return
