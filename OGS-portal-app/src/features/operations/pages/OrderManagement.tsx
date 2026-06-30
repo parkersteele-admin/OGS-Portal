@@ -259,6 +259,16 @@ function lifecycleStepIndex(status: OrderStatus): number {
   return idx >= 0 ? idx : 0
 }
 
+function toDateInputValue(ts: { toDate?: () => Date } | string | null | undefined): string {
+  if (!ts) return new Date().toISOString().slice(0, 10)
+  const parsed = typeof ts === 'string'
+    ? new Date(ts)
+    : ts.toDate?.() ?? new Date()
+
+  if (Number.isNaN(parsed.getTime())) return new Date().toISOString().slice(0, 10)
+  return parsed.toISOString().slice(0, 10)
+}
+
 // ── Status badge ───────────────────────────────────────────────────────────────
 
 function StatusBadge({ order }: { order: Order }) {
@@ -350,12 +360,14 @@ function OrderDetailSheet({
   const [overrideStatus, setOverrideStatus] = useState<AdminOverrideStatus | ''>('')
   const [billingToast, setBillingToast] = useState<string | null>(null)
   // Invoice Sent form state
-  const [qbInvoiceNumber, setQbInvoiceNumber] = useState('')
+  const [qbInvoiceNumber, setQbInvoiceNumber] = useState(order.qbInvoiceNumber ?? '')
   // Paid form state
   const [paidAmountStr, setPaidAmountStr] = useState(() =>
-    order.invoiceAmount != null ? order.invoiceAmount.toFixed(2) : '',
+    (order.paidAmount ?? order.invoiceAmount) != null
+      ? Number(order.paidAmount ?? order.invoiceAmount).toFixed(2)
+      : '',
   )
-  const [paidAtStr, setPaidAtStr] = useState(() => new Date().toISOString().slice(0, 10))
+  const [paidAtStr, setPaidAtStr] = useState(() => toDateInputValue(order.paidAt))
 
   const normalizedStatus = normalizeLifecycleStatus(order.status)
   const adminStatusOptions = useMemo(() => getAdminStatusOptions(order.status), [order.status])
@@ -363,6 +375,16 @@ function OrderDetailSheet({
     order.status === 'pending' || order.status === 'scheduled' || order.status === 'assigned' || order.status === 'in-transit'
   const actingUserId = realUser?.id ?? user?.id
   const showBillingPanel = isAdmin && (normalizedStatus === 'invoice_sent_pending' || normalizedStatus === 'invoice_sent')
+
+  useEffect(() => {
+    setQbInvoiceNumber(order.qbInvoiceNumber ?? '')
+    setPaidAmountStr(
+      (order.paidAmount ?? order.invoiceAmount) != null
+        ? Number(order.paidAmount ?? order.invoiceAmount).toFixed(2)
+        : '',
+    )
+    setPaidAtStr(toDateInputValue(order.paidAt))
+  }, [order.id, order.qbInvoiceNumber, order.paidAmount, order.invoiceAmount, order.paidAt])
 
   async function handleManualStatusChange(next: AdminOverrideStatus) {
     let qbInvoiceNumber: string | undefined
@@ -446,6 +468,26 @@ function OrderDetailSheet({
       setTimeout(() => setBillingToast(null), 2500)
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to update billing status.')
+    } finally {
+      setBillingBusy(false)
+    }
+  }
+
+  async function handleSaveInvoiceNumber() {
+    const invNum = qbInvoiceNumber.trim()
+    if (!invNum) return
+    setBillingBusy(true)
+    try {
+      await transitionOrderStatus(order.id, 'invoice_sent', {
+        changedBy: actingUserId,
+        qbInvoiceNumber: invNum,
+        force: true,
+      })
+      await onBillingStatusUpdated(order.id)
+      setBillingToast('QB invoice number updated.')
+      setTimeout(() => setBillingToast(null), 2500)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to update invoice number.')
     } finally {
       setBillingBusy(false)
     }
@@ -538,11 +580,14 @@ function OrderDetailSheet({
                 />
               ) : (
                 <QBPaidForm
+                  qbInvoiceNumber={qbInvoiceNumber}
                   paidAmountStr={paidAmountStr}
                   paidAtStr={paidAtStr}
                   busy={billingBusy}
+                  onChangeInvoiceNumber={setQbInvoiceNumber}
                   onChangePaidAmount={setPaidAmountStr}
                   onChangePaidAt={setPaidAtStr}
+                  onSubmitInvoiceNumber={handleSaveInvoiceNumber}
                   onSubmit={handleMarkPaid}
                 />
               )}
@@ -650,12 +695,14 @@ function OrderDetailPanel({
   const [overrideStatus, setOverrideStatus] = useState<AdminOverrideStatus | ''>('')
   const [billingToast, setBillingToast] = useState<string | null>(null)
   // Invoice Sent form state
-  const [qbInvoiceNumber, setQbInvoiceNumber] = useState('')
+  const [qbInvoiceNumber, setQbInvoiceNumber] = useState(order.qbInvoiceNumber ?? '')
   // Paid form state
   const [paidAmountStr, setPaidAmountStr] = useState(() =>
-    order.invoiceAmount != null ? order.invoiceAmount.toFixed(2) : '',
+    (order.paidAmount ?? order.invoiceAmount) != null
+      ? Number(order.paidAmount ?? order.invoiceAmount).toFixed(2)
+      : '',
   )
-  const [paidAtStr, setPaidAtStr] = useState(() => new Date().toISOString().slice(0, 10))
+  const [paidAtStr, setPaidAtStr] = useState(() => toDateInputValue(order.paidAt))
   const [runStopInfo, setRunStopInfo] = useState<{
     runNumber: string
     stopOrder: number
@@ -724,6 +771,16 @@ function OrderDetailPanel({
   const actingUserId = realUser?.id ?? user?.id
   const showBillingPanel = isAdmin && (normalizedStatus === 'invoice_sent_pending' || normalizedStatus === 'invoice_sent')
   const adminStatusOptions = useMemo(() => getAdminStatusOptions(order.status), [order.status])
+
+  useEffect(() => {
+    setQbInvoiceNumber(order.qbInvoiceNumber ?? '')
+    setPaidAmountStr(
+      (order.paidAmount ?? order.invoiceAmount) != null
+        ? Number(order.paidAmount ?? order.invoiceAmount).toFixed(2)
+        : '',
+    )
+    setPaidAtStr(toDateInputValue(order.paidAt))
+  }, [order.id, order.qbInvoiceNumber, order.paidAmount, order.invoiceAmount, order.paidAt])
 
   async function handleManualStatusChange(next: AdminOverrideStatus) {
     let qbInvoiceNumber: string | undefined
@@ -826,6 +883,26 @@ function OrderDetailPanel({
       setTimeout(() => setBillingToast(null), 2500)
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to update billing status.')
+    } finally {
+      setBillingBusy(false)
+    }
+  }
+
+  async function handleSaveInvoiceNumber() {
+    const invNum = qbInvoiceNumber.trim()
+    if (!invNum) return
+    setBillingBusy(true)
+    try {
+      await transitionOrderStatus(order.id, 'invoice_sent', {
+        changedBy: actingUserId,
+        qbInvoiceNumber: invNum,
+        force: true,
+      })
+      await onBillingStatusUpdated(order.id)
+      setBillingToast('QB invoice number updated.')
+      setTimeout(() => setBillingToast(null), 2500)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to update invoice number.')
     } finally {
       setBillingBusy(false)
     }
@@ -1129,11 +1206,14 @@ function OrderDetailPanel({
                   />
                 ) : (
                   <QBPaidForm
+                    qbInvoiceNumber={qbInvoiceNumber}
                     paidAmountStr={paidAmountStr}
                     paidAtStr={paidAtStr}
                     busy={billingBusy}
+                    onChangeInvoiceNumber={setQbInvoiceNumber}
                     onChangePaidAmount={setPaidAmountStr}
                     onChangePaidAt={setPaidAtStr}
+                    onSubmitInvoiceNumber={handleSaveInvoiceNumber}
                     onSubmit={handleMarkPaid}
                   />
                 )}
@@ -1299,26 +1379,53 @@ function QBInvoiceSentForm({
 }
 
 interface QBPaidFormProps {
+  qbInvoiceNumber: string
   paidAmountStr: string
   paidAtStr: string
   busy: boolean
+  onChangeInvoiceNumber: (v: string) => void
   onChangePaidAmount: (v: string) => void
   onChangePaidAt: (v: string) => void
+  onSubmitInvoiceNumber: () => void
   onSubmit: () => void
 }
 
 function QBPaidForm({
+  qbInvoiceNumber,
   paidAmountStr,
   paidAtStr,
   busy,
+  onChangeInvoiceNumber,
   onChangePaidAmount,
   onChangePaidAt,
+  onSubmitInvoiceNumber,
   onSubmit,
 }: QBPaidFormProps) {
   const pAmt = parseFloat(paidAmountStr)
+  const canSaveInvoice = qbInvoiceNumber.trim() !== '' && !busy
   const canSubmit = !isNaN(pAmt) && pAmt > 0 && !busy
   return (
     <div className="om-qb-form">
+      <div className="om-qb-form__field om-qb-form__field--row">
+        <div className="om-qb-form__field-grow">
+          <label className="om-qb-form__label">QB Invoice Number</label>
+          <input
+            className="om-qb-form__input"
+            type="text"
+            placeholder="#1042"
+            value={qbInvoiceNumber}
+            onChange={(e) => onChangeInvoiceNumber(e.target.value)}
+            disabled={busy}
+          />
+        </div>
+        <button
+          className="om-billing-btn om-billing-btn--secondary"
+          onClick={onSubmitInvoiceNumber}
+          disabled={!canSaveInvoice}
+        >
+          {busy ? 'Saving…' : 'Save #'}
+        </button>
+      </div>
       <div className="om-qb-form__field">
         <label className="om-qb-form__label">Amount Received</label>
         <input
