@@ -2,40 +2,34 @@
  * src/pages/billing/BillingDashboard.tsx
  *
  * Revenue dashboard (QuickBooks-aligned) accessible at /ops/billing and /admin/ops/billing.
+ * Displays invoices from the invoices collection (source of truth for billing).
  */
 
 import React, { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { FileText } from 'lucide-react'
 import { getDocs, orderBy, query } from 'firebase/firestore'
-import { customersCol, ordersCol } from '../../lib/firestore'
+import { customersCol, invoicesCol } from '../../lib/firestore'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { StatCard } from '../../components/ui/StatCard'
 import { StatusBadge } from '../../components/ui/StatusBadge'
-import MobileOrderCard from '../../components/orders/MobileOrderCard'
 import type { Customer } from '../../types/customer'
-import type { Order, OrderStatus } from '../../types/order'
+import type { Invoice, InvoiceStatus } from '../../types/billing'
 import './BillingDashboard.css'
 
-type RevenueStatusFilter = 'all' | 'ready_to_invoice' | 'invoice_sent' | 'paid'
+type RevenueStatusFilter = 'all' | 'sent' | 'overdue' | 'paid'
 type SortKey = 'date' | 'amount' | 'received'
 type SortDirection = 'asc' | 'desc'
 
-const STATUS_LABEL: Record<OrderStatus, string> = {
-  pending: 'Pending',
-  scheduled: 'Scheduled',
-  assigned: 'Assigned',
-  'in-transit': 'In Transit',
-  in_transit: 'In Transit',
+// Map Invoice status to display label
+const INVOICE_STATUS_LABEL: Record<InvoiceStatus, string> = {
+  draft: 'Draft',
+  sent: 'Sent',
   delivered: 'Delivered',
-  invoice_sent_pending: 'Invoice Pending',
-  ready_to_invoice: 'Ready to Invoice',
-  invoice_sent: 'Invoice Sent',
   paid: 'Paid',
-  cancelled: 'Cancelled',
-  archived: 'Archived',
+  overdue: 'Overdue',
+  void: 'Void',
 }
 
 function isoDate(d: Date): string {
@@ -66,13 +60,13 @@ function formatDate(ts: { toDate?: () => Date } | null | undefined): string {
   })
 }
 
-function getOrderDate(order: Order): Date | null {
-  return order.deliveredAt?.toDate?.() ?? order.scheduledAt?.toDate?.() ?? null
+function getInvoiceDate(invoice: Invoice): Date | null {
+  return invoice.issuedAt?.toDate?.() ?? null
 }
 
-function fetchAllOrders(): Promise<Order[]> {
-  return getDocs(query(ordersCol, orderBy('requestedAt', 'desc')))
-    .then((snap) => snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Order))
+function fetchAllInvoices(): Promise<Invoice[]> {
+  return getDocs(query(invoicesCol, orderBy('issuedAt', 'desc')))
+    .then((snap) => snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Invoice))
 }
 
 function fetchAllCustomers(): Promise<Customer[]> {
@@ -80,19 +74,13 @@ function fetchAllCustomers(): Promise<Customer[]> {
     .then((snap) => snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Customer))
 }
 
-const STATUS_TONE: Partial<Record<OrderStatus, string>> = {
-  pending: 'pending',
-  scheduled: 'scheduled',
-  assigned: 'scheduled',
-  'in-transit': 'in_transit',
-  in_transit: 'in_transit',
-  delivered: 'delivered',
-  invoice_sent_pending: 'pending',
-  ready_to_invoice: 'pending',
-  invoice_sent: 'invoice_sent',
+const INVOICE_TONE_MAP: Record<InvoiceStatus, string> = {
+  draft: 'draft',
+  sent: 'invoice_sent',
+  delivered: 'invoice_sent',
   paid: 'paid',
-  cancelled: 'cancelled',
-  archived: 'draft',
+  overdue: 'pending',
+  void: 'draft',
 }
 
 const BillingDashboard: React.FC = () => {
@@ -107,9 +95,9 @@ const BillingDashboard: React.FC = () => {
   const [sortKey, setSortKey] = useState<SortKey>('date')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
 
-  const ordersQuery = useQuery({
-    queryKey: ['billing', 'orders'],
-    queryFn: fetchAllOrders,
+  const invoicesQuery = useQuery({
+    queryKey: ['billing', 'invoices'],
+    queryFn: fetchAllInvoices,
     staleTime: 2 * 60 * 1000,
   })
 
@@ -119,9 +107,9 @@ const BillingDashboard: React.FC = () => {
     staleTime: 5 * 60 * 1000,
   })
 
-  const orders = ordersQuery.data ?? []
+  const invoices = invoicesQuery.data ?? []
   const customers = customersQuery.data ?? []
-  const isLoading = ordersQuery.isPending || customersQuery.isPending
+  const isLoading = invoicesQuery.isPending || customersQuery.isPending
 
   const customerMap = useMemo(
     () => new Map(customers.map((c) => [c.id, c.name])),
@@ -131,29 +119,27 @@ const BillingDashboard: React.FC = () => {
   const fromTime = fromDate ? new Date(`${fromDate}T00:00:00`).getTime() : null
   const toTime = toDate ? new Date(`${toDate}T23:59:59`).getTime() : null
 
-  const dateFilteredOrders = useMemo(() => orders.filter((order) => {
-    const orderDate = getOrderDate(order)
-    if (!orderDate) return false
-    const value = orderDate.getTime()
+  const dateFilteredInvoices = useMemo(() => invoices.filter((invoice) => {
+    const invoiceDate = getInvoiceDate(invoice)
+    if (!invoiceDate) return false
+    const value = invoiceDate.getTime()
 
     if (fromTime !== null && value < fromTime) return false
     if (toTime !== null && value > toTime) return false
     return true
-  }), [orders, fromTime, toTime])
+  }), [invoices, fromTime, toTime])
 
   const kpis = useMemo(() => {
     let totalInvoiced = 0
     let totalCollected = 0
     let pendingInvoiceCount = 0
 
-    for (const order of dateFilteredOrders) {
-      if (order.status === 'invoice_sent' || order.status === 'paid') {
-        totalInvoiced += order.invoiceAmount ?? 0
+    for (const invoice of dateFilteredInvoices) {
+      totalInvoiced += invoice.total ?? 0
+      if (invoice.status === 'paid') {
+        totalCollected += invoice.total ?? 0
       }
-      if (order.status === 'paid') {
-        totalCollected += order.paidAmount ?? 0
-      }
-      if (order.status === 'ready_to_invoice') {
+      if (invoice.status === 'sent' || invoice.status === 'overdue') {
         pendingInvoiceCount += 1
       }
     }
@@ -164,39 +150,43 @@ const BillingDashboard: React.FC = () => {
       outstanding: totalInvoiced - totalCollected,
       pendingInvoiceCount,
     }
-  }, [dateFilteredOrders])
+  }, [dateFilteredInvoices])
 
-  const statusFilteredOrders = useMemo(() => {
-    if (statusFilter === 'all') return dateFilteredOrders
-    return dateFilteredOrders.filter((order) => order.status === statusFilter)
-  }, [dateFilteredOrders, statusFilter])
+  const statusFilteredInvoices = useMemo(() => {
+    if (statusFilter === 'all') return dateFilteredInvoices
+    // Filter out draft invoices unless specifically requested
+    if (statusFilter === 'sent') {
+      return dateFilteredInvoices.filter((inv) => inv.status === 'sent' || inv.status === 'delivered')
+    }
+    return dateFilteredInvoices.filter((inv) => inv.status === statusFilter)
+  }, [dateFilteredInvoices, statusFilter])
 
-  const sortedOrders = useMemo(() => {
-    const sorted = [...statusFilteredOrders]
+  const sortedInvoices = useMemo(() => {
+    const sorted = [...statusFilteredInvoices]
     sorted.sort((a, b) => {
       let aValue = 0
       let bValue = 0
 
       if (sortKey === 'date') {
-        aValue = getOrderDate(a)?.getTime() ?? 0
-        bValue = getOrderDate(b)?.getTime() ?? 0
+        aValue = getInvoiceDate(a)?.getTime() ?? 0
+        bValue = getInvoiceDate(b)?.getTime() ?? 0
       }
 
       if (sortKey === 'amount') {
-        aValue = a.invoiceAmount ?? Number.NEGATIVE_INFINITY
-        bValue = b.invoiceAmount ?? Number.NEGATIVE_INFINITY
+        aValue = a.total ?? Number.NEGATIVE_INFINITY
+        bValue = b.total ?? Number.NEGATIVE_INFINITY
       }
 
       if (sortKey === 'received') {
-        aValue = a.paidAmount ?? Number.NEGATIVE_INFINITY
-        bValue = b.paidAmount ?? Number.NEGATIVE_INFINITY
+        aValue = a.status === 'paid' ? a.total ?? 0 : 0
+        bValue = b.status === 'paid' ? b.total ?? 0 : 0
       }
 
       return sortDirection === 'asc' ? aValue - bValue : bValue - aValue
     })
 
     return sorted
-  }, [statusFilteredOrders, sortKey, sortDirection])
+  }, [statusFilteredInvoices, sortKey, sortDirection])
 
   const toggleSort = (nextKey: SortKey) => {
     if (sortKey === nextKey) {
@@ -209,8 +199,8 @@ const BillingDashboard: React.FC = () => {
 
   const statusFilters: Array<{ key: RevenueStatusFilter; label: string }> = [
     { key: 'all', label: 'All' },
-    { key: 'ready_to_invoice', label: 'Ready to Invoice' },
-    { key: 'invoice_sent', label: 'Invoice Sent' },
+    { key: 'sent', label: 'Outstanding' },
+    { key: 'overdue', label: 'Overdue' },
     { key: 'paid', label: 'Paid' },
   ]
 
@@ -221,7 +211,7 @@ const BillingDashboard: React.FC = () => {
           <div className="page-header__title-section">
             <p className="page-header__eyebrow">Revenue Operations</p>
             <h1 className="page-header__title">Revenue</h1>
-            <p className="page-header__description">Track invoiced and collected revenue aligned with QuickBooks workflow.</p>
+            <p className="page-header__description">Track invoiced and collected revenue from the invoices collection.</p>
           </div>
           <div className="page-header__actions">
             <span className="page-header__meta-tag">Admin + Billing</span>
@@ -258,16 +248,16 @@ const BillingDashboard: React.FC = () => {
           type="button"
           className="bd__pending-stat"
           role="button"
-          onClick={() => setStatusFilter('ready_to_invoice')}
+          onClick={() => setStatusFilter('sent')}
         >
-          <StatCard label="Orders Pending Invoice" value={kpis.pendingInvoiceCount} subLabel="Click to filter" accent />
+          <StatCard label="Outstanding Invoices" value={kpis.pendingInvoiceCount} subLabel="Click to filter" accent />
         </button>
       </div>
 
       <Card className="bd__revenue-card">
         <div className="bd__revenue-header">
-          <h2 className="bd__section-title">Revenue Orders</h2>
-          <span className="bd__invoice-count">{sortedOrders.length} order{sortedOrders.length !== 1 ? 's' : ''}</span>
+          <h2 className="bd__section-title">Invoices</h2>
+          <span className="bd__invoice-count">{sortedInvoices.length} invoice{sortedInvoices.length !== 1 ? 's' : ''}</span>
         </div>
 
         <div className="bd__chips" aria-label="Revenue status filters">
@@ -299,16 +289,16 @@ const BillingDashboard: React.FC = () => {
                       Date
                     </button>
                   </th>
+                  <th className="page-table__th">Invoice #</th>
                   <th className="page-table__th">Customer</th>
-                  <th className="page-table__th">QB Invoice #</th>
                   <th className="page-table__th page-table__th--right">
                     <button type="button" className="bd__sort-btn bd__sort-btn--right" onClick={() => toggleSort('amount')}>
-                      Invoiced
+                      Total
                     </button>
                   </th>
                   <th className="page-table__th page-table__th--right">
                     <button type="button" className="bd__sort-btn bd__sort-btn--right" onClick={() => toggleSort('received')}>
-                      Received
+                      Collected
                     </button>
                   </th>
                   <th className="page-table__th">Status</th>
@@ -316,35 +306,35 @@ const BillingDashboard: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="page-table__tbody">
-                {!isLoading && sortedOrders.length === 0 ? (
+                {!isLoading && sortedInvoices.length === 0 ? (
                   <tr className="page-table__tr">
                     <td colSpan={7} className="page-table__td bd__empty-cell">
                       <div className="bd__empty-state">
-                        <p className="bd__empty">No orders match the current filters.</p>
+                        <p className="bd__empty">No invoices match the current filters.</p>
                       </div>
                     </td>
                   </tr>
                 ) : null}
 
-                {!isLoading && sortedOrders.map((order) => {
-                  const customerName = customerMap.get(order.customerId) ?? order.customerId
+                {!isLoading && sortedInvoices.map((invoice) => {
+                  const customerName = customerMap.get(invoice.customerId) ?? invoice.customerId
                   return (
-                    <tr key={order.id} className="page-table__tr">
-                      <td className="page-table__td bd__date">{formatDate(order.deliveredAt ?? order.scheduledAt)}</td>
+                    <tr key={invoice.id} className="page-table__tr">
+                      <td className="page-table__td bd__date">{formatDate(invoice.issuedAt)}</td>
+                      <td className="page-table__td">{invoice.invoiceNumber || '—'}</td>
                       <td className="page-table__td">{customerName}</td>
-                      <td className="page-table__td bd__inv-num">{order.qbInvoiceNumber || '—'}</td>
-                      <td className="page-table__td page-table__td--right">{formatCurrency(order.invoiceAmount)}</td>
-                      <td className="page-table__td page-table__td--right">{formatCurrency(order.paidAmount)}</td>
+                      <td className="page-table__td page-table__td--right">{formatCurrency(invoice.total)}</td>
+                      <td className="page-table__td page-table__td--right">{formatCurrency(invoice.status === 'paid' ? invoice.total : 0)}</td>
                       <td className="page-table__td">
-                        <StatusBadge status={STATUS_TONE[order.status] ?? 'draft'} label={STATUS_LABEL[order.status]} />
+                        <StatusBadge status={INVOICE_TONE_MAP[invoice.status]} label={INVOICE_STATUS_LABEL[invoice.status]} />
                       </td>
                       <td className="page-table__td">
                         <Button
                           variant="secondary"
                           size="sm"
-                          onClick={() => navigate(`${opsBase}/orders?orderId=${order.id}`)}
+                          onClick={() => navigate(`${opsBase}/crm/customers/${invoice.customerId}`)}
                         >
-                          Update Billing
+                          View
                         </Button>
                       </td>
                     </tr>
@@ -354,40 +344,41 @@ const BillingDashboard: React.FC = () => {
             </table>
           </div>
 
-          {!isLoading && sortedOrders.length > 0 && (
+          {!isLoading && sortedInvoices.length > 0 && (
             <div className="bd__mobile-cards">
-              {sortedOrders.map((order) => {
-                const customerName = customerMap.get(order.customerId) ?? order.customerId
+              {sortedInvoices.map((invoice) => {
+                const customerName = customerMap.get(invoice.customerId) ?? invoice.customerId
                 return (
-                  <div key={`mobile-${order.id}`} className="bd__mobile-card-wrap">
-                    <MobileOrderCard
-                      order={{
-                        ...order,
-                        customerName,
-                        productName: `QB Invoice # ${order.qbInvoiceNumber || '—'}`,
-                        productUnit: '',
-                        quantityLabel: 0,
-                      } as Order}
-                      primaryAction={{
-                        label: 'Update Billing',
-                        icon: FileText,
-                        onClick: () => navigate(`${opsBase}/orders?orderId=${order.id}`),
-                      }}
-                      expanded
-                    />
-                    <div className="bd__mobile-revenue-meta">
-                      <div>
-                        <span>Invoiced</span>
-                        <strong>{formatCurrency(order.invoiceAmount)}</strong>
+                  <div key={`mobile-${invoice.id}`} className="bd__mobile-card-wrap">
+                    <div className="bd__mobile-card">
+                      <div className="bd__mobile-card-header">
+                        <div>
+                          <strong>{invoice.invoiceNumber}</strong>
+                          <small>{customerName}</small>
+                        </div>
+                        <StatusBadge status={INVOICE_TONE_MAP[invoice.status]} label={INVOICE_STATUS_LABEL[invoice.status]} />
                       </div>
-                      <div>
-                        <span>Received</span>
-                        <strong>{formatCurrency(order.paidAmount)}</strong>
+                      <div className="bd__mobile-revenue-meta">
+                        <div>
+                          <span>Date</span>
+                          <strong>{formatDate(invoice.issuedAt)}</strong>
+                        </div>
+                        <div>
+                          <span>Total</span>
+                          <strong>{formatCurrency(invoice.total)}</strong>
+                        </div>
+                        <div>
+                          <span>Collected</span>
+                          <strong>{formatCurrency(invoice.status === 'paid' ? invoice.total : 0)}</strong>
+                        </div>
                       </div>
-                      <div>
-                        <span>Status</span>
-                        <StatusBadge status={STATUS_TONE[order.status] ?? 'draft'} label={STATUS_LABEL[order.status]} />
-                      </div>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => navigate(`${opsBase}/crm/customers/${invoice.customerId}`)}
+                      >
+                        View Details
+                      </Button>
                     </div>
                   </div>
                 )
