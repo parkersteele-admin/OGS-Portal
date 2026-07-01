@@ -163,7 +163,12 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ salesReps, onClose, onSave,
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    await onSave({ ...form, name: form.name.trim(), email: form.email.trim() })
+    await onSave({
+      ...form,
+      name: form.name.trim(),
+      email: form.email.trim(),
+      phone: form.phone?.trim() ?? '',
+    })
   }
 
   return (
@@ -174,7 +179,7 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ salesReps, onClose, onSave,
           <Input label="Company"      value={form.company} onChange={set('company')} />
         </div>
         <div className="lp-form-row">
-          <Input label="Email" type="email" value={form.email} onChange={set('email')} required />
+          <Input label="Email" type="email" value={form.email} onChange={set('email')} />
           <Input label="Phone" type="tel"   value={form.phone} onChange={set('phone')} />
         </div>
         <div className="lp-form-row">
