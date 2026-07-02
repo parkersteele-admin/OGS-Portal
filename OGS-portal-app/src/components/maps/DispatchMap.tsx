@@ -363,6 +363,130 @@ interface MapContentProps {
   onPositionsResolved?: (positions: Record<string, LatLngLiteral>) => void
 }
 
+function buildCustomerAddress(customer: Customer | undefined): string {
+  if (!customer) return ''
+  return [
+    customer.formattedAddress,
+    customer.address,
+    customer.city,
+    customer.state,
+    customer.zip,
+  ]
+    .filter(Boolean)
+    .join(', ')
+    .trim()
+}
+
+function buildGoogleMapsDirectionsUrl(stops: RunStop[], customers: Record<string, Customer>): string | null {
+  const ordered = [...stops]
+    .sort((a, b) => a.order - b.order)
+    .map((stop) => customers[stop.customerId])
+    .filter(Boolean) as Customer[]
+
+  const addresses = ordered
+    .map((customer) => buildCustomerAddress(customer))
+    .filter(Boolean)
+
+  if (addresses.length < 2) return null
+
+  const origin = addresses[0]
+  const destination = addresses[addresses.length - 1]
+  const waypoints = addresses.slice(1, -1).join('|')
+
+  const base =
+    `https://www.google.com/maps/dir/?api=1&travelmode=driving` +
+    `&origin=${encodeURIComponent(origin)}` +
+    `&destination=${encodeURIComponent(destination)}`
+
+  return waypoints
+    ? `${base}&waypoints=${encodeURIComponent(waypoints)}`
+    : base
+}
+
+function GoogleMapsFallback({
+  height,
+  stops,
+  customers,
+}: {
+  height: string
+  stops: RunStop[]
+  customers: Record<string, Customer>
+}) {
+  const orderedStops = [...stops].sort((a, b) => a.order - b.order)
+  const routeUrl = buildGoogleMapsDirectionsUrl(orderedStops, customers)
+
+  return (
+    <div
+      style={{
+        width: '100%',
+        height,
+        borderRadius: 8,
+        border: '1px solid #f59e0b',
+        background: '#fffbeb',
+        color: '#92400e',
+        padding: 16,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 12,
+        overflow: 'auto',
+      }}
+    >
+      <div style={{ fontSize: 14, fontWeight: 700 }}>Google Maps key missing</div>
+      <div style={{ fontSize: 13, lineHeight: 1.5 }}>
+        Set VITE_GOOGLE_MAPS_API_KEY in .env.local and restart Vite to restore
+        the live map. Route details are shown below so dispatch is still usable.
+      </div>
+      {routeUrl && (
+        <a
+          href={routeUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            alignSelf: 'flex-start',
+            background: '#ffffff',
+            color: '#92400e',
+            border: '1px solid #f59e0b',
+            borderRadius: 6,
+            padding: '8px 12px',
+            textDecoration: 'none',
+            fontSize: 12,
+            fontWeight: 600,
+          }}
+        >
+          Open route in Google Maps
+        </a>
+      )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {orderedStops.length === 0 && (
+          <div style={{ fontSize: 13, opacity: 0.8 }}>No stops on this run yet.</div>
+        )}
+        {orderedStops.map((stop) => {
+          const customer = customers[stop.customerId]
+          const address = buildCustomerAddress(customer)
+          return (
+            <div
+              key={stop.id}
+              style={{
+                border: '1px solid rgba(146, 64, 14, 0.25)',
+                background: '#fffdf5',
+                borderRadius: 6,
+                padding: '8px 10px',
+              }}
+            >
+              <div style={{ fontSize: 12, fontWeight: 700 }}>
+                Stop {stop.order} - {customer?.name ?? stop.customerId}
+              </div>
+              <div style={{ fontSize: 12, marginTop: 2 }}>
+                {address || 'Address unavailable'}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function MapContent({ stops, customers, driverName, cameraTarget, currentStop, driverPosition, onPositionsResolved }: MapContentProps) {
   const isLoaded = useApiIsLoaded()
   const map = useMap()
@@ -438,25 +562,7 @@ export function DispatchMap({
   }, [])
 
   if (!hasUsableGoogleMapsKey) {
-    return (
-      <div
-        style={{
-          width: '100%',
-          height,
-          borderRadius: 8,
-          border: '1px solid #f59e0b',
-          background: '#fffbeb',
-          color: '#92400e',
-          padding: 16,
-          fontSize: 13,
-          lineHeight: 1.5,
-          display: 'flex',
-          alignItems: 'center',
-        }}
-      >
-        Google Maps is not configured. Set a real VITE_GOOGLE_MAPS_API_KEY in .env.local and restart Vite.
-      </div>
-    )
+    return <GoogleMapsFallback height={height} stops={stops} customers={customers} />
   }
 
   return (

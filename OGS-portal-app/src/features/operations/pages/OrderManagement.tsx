@@ -1660,6 +1660,7 @@ function CreateOrderModal({ initialCustomerId, initialLineItems, convertingQuote
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (submitting) return
     if (!selectedCustomer) return setError('Please select a customer.')
 
     const eligibleItems = quoteLineItems.filter(
@@ -1675,6 +1676,25 @@ function CreateOrderModal({ initialCustomerId, initialLineItems, convertingQuote
     setSubmitting(true)
     setError('')
     try {
+      if (convertingQuoteId) {
+        const quoteSnap = await getDoc(doc(db, 'quotes', convertingQuoteId))
+        if (quoteSnap.exists()) {
+          const quoteData = quoteSnap.data() as {
+            convertedOrderId?: string
+            convertedOrderIds?: string[]
+          }
+          const existingConvertedIds = [
+            quoteData.convertedOrderId,
+            ...(quoteData.convertedOrderIds ?? []),
+          ].filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
+
+          if (existingConvertedIds.length > 0) {
+            const shortId = existingConvertedIds[0].slice(0, 8).toUpperCase()
+            throw new Error(`This quote is already linked to order ${shortId}.`)
+          }
+        }
+      }
+
       const orderId = await createOrder(
         {
           customerId: selectedCustomer.id,
@@ -1716,7 +1736,12 @@ function CreateOrderModal({ initialCustomerId, initialLineItems, convertingQuote
 
       // Mark quote as accepted if converting from a quote
       if (convertingQuoteId) {
-        await updateQuote(convertingQuoteId, { status: 'accepted' })
+        await updateQuote(convertingQuoteId, {
+          status: 'accepted',
+          convertedOrderId: orderId,
+          convertedOrderIds: [orderId],
+          needsOrderSetup: false,
+        })
       }
 
       onCreated()

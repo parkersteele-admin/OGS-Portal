@@ -345,6 +345,20 @@ export async function convertQuoteToOrder(
       throw new OgsValidationError('Quote customer does not match provided customerId')
     }
 
+    // Make conversion idempotent: if this quote already has a converted order,
+    // return it instead of creating a duplicate order document.
+    const existingConvertedIds = [
+      quote.convertedOrderId,
+      ...(quote.convertedOrderIds ?? []),
+    ].filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
+    if (existingConvertedIds.length > 0) {
+      const existingOrderId = existingConvertedIds[0]
+      const existingOrderSnap = await getDoc(doc(db, 'orders', existingOrderId))
+      if (existingOrderSnap.exists()) {
+        return existingOrderId
+      }
+    }
+
     const eligibleItems = quote.lineItems.filter(
       (item) => item.productId !== 'delivery' && item.productId !== 'rental' && item.quantity > 0,
     )

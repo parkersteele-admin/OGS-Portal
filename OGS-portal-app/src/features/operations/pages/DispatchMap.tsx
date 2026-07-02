@@ -26,7 +26,9 @@ import { runsCol, notificationsCol } from '../../../lib/firestore'
 import { useActiveRun } from '../../../hooks/useActiveRun'
 import { usePendingOrders } from '../../../hooks/usePendingOrders'
 import { addRunStop, updateRun } from '../../../services/runService'
+import { updateOrder } from '../../../services/orderService'
 import { DispatchMap as MapComponent } from '../../../components/maps/DispatchMap'
+import { DeliveryCompleteModal } from '../../../components/delivery/DeliveryCompleteModal'
 import { Button } from '../../../components/ui/Button'
 import type { Run, RunStop, RunStatus } from '../../../types/run'
 import type { Customer } from '../../../types/customer'
@@ -181,11 +183,13 @@ function StopIcon({ stop }: { stop: RunStop }) {
 interface StopRowProps {
   stop: RunStop
   customer?: Customer
+  order?: Order
   isCurrent: boolean
   onClick: () => void
+  onCompleteDelivery?: () => void
 }
 
-function StopRow({ stop, customer, isCurrent, onClick }: StopRowProps) {
+function StopRow({ stop, customer, order, isCurrent, onClick, onCompleteDelivery }: StopRowProps) {
   const cls = [
     'dm-stop-item',
     stop.status === 'completed' ? 'dm-stop-item--completed' : '',
@@ -233,6 +237,21 @@ function StopRow({ stop, customer, isCurrent, onClick }: StopRowProps) {
         {isCurrent && stop.status === 'pending' && (
           <div className="dm-stop-item__status">En route</div>
         )}
+
+        {(stop.status === 'pending' || stop.status === 'arrived') && (
+          <div className="dm-stop-item__actions">
+            <Button
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation()
+                onCompleteDelivery?.()
+              }}
+              disabled={!order || !onCompleteDelivery}
+            >
+              {order ? 'Complete Delivery' : 'Loading order…'}
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -254,10 +273,11 @@ function FeedRow({ event }: { event: FeedEvent }) {
 interface AddStopModalProps {
   runId: string
   currentStopCount: number
+  runStatus: RunStatus
   onClose: () => void
 }
 
-function AddStopModal({ runId, currentStopCount, onClose }: AddStopModalProps) {
+function AddStopModal({ runId, currentStopCount, runStatus, onClose }: AddStopModalProps) {
   const { orders } = usePendingOrders()
   const [customerNames, setCustomerNames] = useState<Record<string, string>>({})
   const [search, setSearch] = useState('')
@@ -308,6 +328,10 @@ function AddStopModal({ runId, currentStopCount, onClose }: AddStopModalProps) {
         orderId: order.id,
         customerId: order.customerId,
         tankId: order.tankId,
+      })
+      await updateOrder(order.id, {
+        status: runStatus === 'in-progress' ? 'in_transit' : 'scheduled',
+        runId,
       })
       setAdded((prev) => [...prev, order.id])
     } catch (err) {
@@ -376,26 +400,50 @@ function AddStopModal({ runId, currentStopCount, onClose }: AddStopModalProps) {
 
 interface EndRunDialogProps {
   run: Run
-  onConfirm: () => void
+  remainingStops: number
+  onConfirmDelivered: () => void
+  onConfirmCancelled: () => void
   onCancel: () => void
   busy: boolean
 }
 
-function EndRunDialog({ run, onConfirm, onCancel, busy }: EndRunDialogProps) {
+function EndRunDialog({
+  run,
+  remainingStops,
+  onConfirmDelivered,
+  onConfirmCancelled,
+  onCancel,
+  busy,
+}: EndRunDialogProps) {
   return (
     <div className="dm-overlay" onClick={onCancel}>
       <div className="dm-confirm" onClick={(e) => e.stopPropagation()}>
-        <h2 className="dm-confirm__title">End Run?</h2>
+        <h2 className="dm-confirm__title">Close Run?</h2>
         <p className="dm-confirm__body">
-          Mark <strong>{run.runNumber}</strong> as completed? This cannot be
-          undone.
+          {remainingStops > 0 ? (
+            <>
+              <strong>{run.runNumber}</strong> still has {remainingStops}{' '}
+              stop{remainingStops === 1 ? '' : 's'} in progress.
+              <br />
+              Choose whether to mark it delivered or cancel it.
+            </>
+          ) : (
+            <>
+              Mark <strong>{run.runNumber}</strong> as delivered?
+            </>
+          )}
         </p>
         <div className="dm-confirm__actions">
           <Button variant="secondary" onClick={onCancel} disabled={busy}>
             Cancel
           </Button>
-          <Button variant="danger" onClick={onConfirm} disabled={busy}>
-            {busy ? 'Ending…' : 'End Run'}
+          {remainingStops > 0 && (
+            <Button variant="danger" onClick={onConfirmCancelled} disabled={busy}>
+              {busy ? 'Saving…' : 'Cancel Run'}
+            </Button>
+          )}
+          <Button onClick={onConfirmDelivered} disabled={busy}>
+            {busy ? 'Saving…' : 'Mark Delivered'}
           </Button>
         </div>
       </div>
@@ -501,8 +549,11 @@ export default function DispatchMapPage() {
   const [showAddStop, setShowAddStop] = useState(false)
   const [showEndRun, setShowEndRun] = useState(false)
   const [endingRun, setEndingRun] = useState(false)
+  const [orders, setOrders] = useState<Record<string, Order>>({})
+  const [deliveryTarget, setDeliveryTarget] = useState<{ stop: RunStop; order: Order } | null>(null)
   const feedRef = useRef<HTMLDivElement>(null)
   const loadedCustomerIds = useRef<Set<string>>(new Set())
+  const loadedOrderIds = useRef<Set<string>>(new Set())
 
   // Load driver doc when run.driverId changes
   useEffect(() => {
@@ -575,6 +626,32 @@ export default function DispatchMapPage() {
     return unsub
   }, [])
 
+  // Load order docs needed for delivery completion actions.
+  useEffect(() => {
+    const ids = [...new Set(stops.map((s) => s.orderId).filter(Boolean))]
+    const missing = ids.filter((id) => !loadedOrderIds.current.has(id))
+    if (!missing.length) return
+    missing.forEach((id) => loadedOrderIds.current.add(id))
+
+    Promise.all(
+      missing.map((id) =>
+        getDoc(doc(db, 'orders', id)).then((snap) =>
+          snap.exists()
+            ? ({ id: snap.id, ...(snap.data() as Omit<Order, 'id'>) } as Order)
+            : null,
+        ),
+      ),
+    ).then((docs) => {
+      const map: Record<string, Order> = {}
+      docs.forEach((o) => {
+        if (o) map[o.id] = o
+      })
+      if (Object.keys(map).length) {
+        setOrders((prev) => ({ ...prev, ...map }))
+      }
+    })
+  }, [stops])
+
   // Determine the "current" stop: arrived first, otherwise first pending
   const currentStop =
     stops.find((s) => s.status === 'arrived') ??
@@ -586,18 +663,37 @@ export default function DispatchMapPage() {
     [run, stops, customers],
   )
 
+  const remainingStops = stops.filter(
+    (s) => s.status === 'pending' || s.status === 'arrived',
+  ).length
+
   // Auto-scroll feed to top when new events arrive
   useEffect(() => {
     if (feedRef.current) feedRef.current.scrollTop = 0
   }, [events.length])
 
-  async function handleEndRun() {
+  async function handleEndRun(nextStatus: RunStatus) {
     if (!runId) return
     setEndingRun(true)
     try {
-      const hasPending = stops.some((s) => s.status === 'pending' || s.status === 'arrived')
-      const newStatus: RunStatus = hasPending ? 'cancelled' : 'completed'
-      await updateRun(runId, { status: newStatus })
+      const unresolvedStops = stops.filter((s) => s.status === 'pending' || s.status === 'arrived')
+      const unresolvedOrderIds = [...new Set(unresolvedStops.map((s) => s.orderId).filter(Boolean))]
+
+      if (unresolvedOrderIds.length) {
+        await Promise.all(
+          unresolvedOrderIds.map(async (orderId) => {
+            const cached = orders[orderId]
+            const order = cached ?? await getDoc(doc(db, 'orders', orderId)).then((snap) =>
+              (snap.exists() ? ({ id: snap.id, ...(snap.data() as Omit<Order, 'id'>) } as Order) : null),
+            )
+            if (!order) return
+            if (order.status === 'delivered' || order.status === 'paid') return
+            await updateOrder(orderId, { status: 'pending' })
+          }),
+        )
+      }
+
+      await updateRun(runId, { status: nextStatus })
       navigate(`${opsBase}/dashboard`)
     } catch {
       setEndingRun(false)
@@ -689,7 +785,7 @@ export default function DispatchMapPage() {
                 size="sm"
                 onClick={() => setShowEndRun(true)}
               >
-                End Run
+                Mark Delivered
               </Button>
             </>
           )}
@@ -733,8 +829,14 @@ export default function DispatchMapPage() {
                   key={stop.id}
                   stop={stop}
                   customer={customers[stop.customerId]}
+                  order={orders[stop.orderId]}
                   isCurrent={stop.id === currentStop?.id}
                   onClick={() => handleStopClick(stop)}
+                  onCompleteDelivery={
+                    orders[stop.orderId]
+                      ? () => setDeliveryTarget({ stop, order: orders[stop.orderId] })
+                      : undefined
+                  }
                 />
               ))}
               {stops.length === 0 && (
@@ -775,6 +877,7 @@ export default function DispatchMapPage() {
         <AddStopModal
           runId={runId}
           currentStopCount={stops.length}
+          runStatus={run?.status ?? 'scheduled'}
           onClose={() => setShowAddStop(false)}
         />
       )}
@@ -783,9 +886,24 @@ export default function DispatchMapPage() {
       {showEndRun && run && (
         <EndRunDialog
           run={run}
-          onConfirm={handleEndRun}
+          remainingStops={remainingStops}
+          onConfirmDelivered={() => handleEndRun('completed')}
+          onConfirmCancelled={() => handleEndRun('cancelled')}
           onCancel={() => setShowEndRun(false)}
           busy={endingRun}
+        />
+      )}
+
+      {/* Complete delivery modal (BOM/signature workflow) */}
+      {deliveryTarget && runId && (
+        <DeliveryCompleteModal
+          order={deliveryTarget.order}
+          runId={runId}
+          stopId={deliveryTarget.stop.id}
+          onClose={() => setDeliveryTarget(null)}
+          onSuccess={() => {
+            setDeliveryTarget(null)
+          }}
         />
       )}
     </div>

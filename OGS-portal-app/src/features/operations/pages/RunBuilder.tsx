@@ -84,6 +84,14 @@ function fmtDate(dateStr: string): string {
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 }
 
+function isSameLocalDate(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear()
+    && a.getMonth() === b.getMonth()
+    && a.getDate() === b.getDate()
+  )
+}
+
 // ── StepIndicator ─────────────────────────────────────────────────────────────
 
 const STEP_LABELS = ['Setup', 'Select orders', 'Route', 'Review']
@@ -950,10 +958,15 @@ export default function RunBuilder() {
       await batch.commit()
 
       // 3. Mark each order as scheduled
+      const scheduledDate = new Date(setup.date + 'T08:00:00')
+      const deliveryDayStatus = isSameLocalDate(scheduledDate, new Date())
+        ? 'in_transit'
+        : 'scheduled'
+
       await Promise.all(
         stops.map((stop, index) =>
           updateOrder(stop.orderId, {
-            status:      'scheduled',
+            status:      deliveryDayStatus,
             scheduledAt: serverTimestamp() as never,
             runId,
             runStopId: stopRefs[index].id,
