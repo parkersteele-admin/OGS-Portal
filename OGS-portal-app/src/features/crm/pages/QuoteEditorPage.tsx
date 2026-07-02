@@ -187,10 +187,13 @@ const QuoteEditorPage: React.FC = () => {
 
   useEffect(() => {
     let mounted = true
-    // Load customers real-time
-    const unsub = subscribeToCustomers({ status: 'active' }, (customers) => {
+    // Load customers real-time. Do not hard-filter to status=active because
+    // legacy/imported docs may not have status set yet.
+    const unsub = subscribeToCustomers({}, (customers) => {
       if (!mounted) return
-      const customerOpts: RecipientOption[] = customers.map((c: Customer) => ({
+      const customerOpts: RecipientOption[] = customers
+        .filter((c: Customer) => c.status !== 'archived' && c.status !== 'deleted')
+        .map((c: Customer) => ({
         type:    'customer',
         id:      c.id,
         label:   c.name ?? '',
@@ -198,6 +201,10 @@ const QuoteEditorPage: React.FC = () => {
         phone:   c.phone ?? '',
         address: [c.address, c.city, c.state, c.zip].filter(Boolean).join(', '),
       }))
+
+      // Always show customers even if leads fetch fails.
+      setRecipients(customerOpts)
+
       // Merge leads once
       getLeads({}, { pageSize: 200 }).then((page) => {
         if (!mounted) return
@@ -210,6 +217,9 @@ const QuoteEditorPage: React.FC = () => {
           address: '',
         }))
         setRecipients([...customerOpts, ...leadOpts])
+      }).catch(() => {
+        if (!mounted) return
+        setRecipients(customerOpts)
       })
     })
     return () => { mounted = false; unsub() }
