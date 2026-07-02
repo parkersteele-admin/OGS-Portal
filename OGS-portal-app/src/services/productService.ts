@@ -71,6 +71,12 @@ function chunkArray<T>(values: T[], chunkSize: number): T[][] {
   return chunks
 }
 
+function stripUndefinedFields<T extends Record<string, unknown>>(obj: T): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([, value]) => value !== undefined),
+  ) as Partial<T>
+}
+
 function invalidateProductCaches(): void {
   pricingMapCache = null
   pricingMapCacheUntil = 0
@@ -472,17 +478,18 @@ export async function createProduct(data: CreateProductInput): Promise<string> {
     }
 
     const { cost: _cost, minMarginPercent: _minMarginPercent, ...publicData } = data
+    const cleanPublicData = stripUndefinedFields(publicData as Record<string, unknown>)
 
     const ref = await addDoc(productsCol, {
-      ...publicData,
+      ...cleanPublicData,
       // Keep pricePerUnit in sync for legacy compatibility
       basePrice,
       pricePerUnit: basePrice,
-      active: publicData.active ?? true,
-      isVisible: publicData.isVisible ?? false,
-      isFeatured: publicData.isFeatured ?? false,
-      sortOrder: publicData.sortOrder ?? 0,
-      tags: publicData.tags ?? [],
+      active: cleanPublicData.active ?? true,
+      isVisible: cleanPublicData.isVisible ?? false,
+      isFeatured: cleanPublicData.isFeatured ?? false,
+      sortOrder: cleanPublicData.sortOrder ?? 0,
+      tags: cleanPublicData.tags ?? [],
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     } as unknown as Product)
@@ -572,12 +579,13 @@ export async function updateProduct(
     } as unknown as ProductPricingInternal, { merge: true })
 
     const { cost: _cost, minMarginPercent: _minMarginPercent, ...publicData } = data
+    const cleanPublicData = stripUndefinedFields(publicData as Record<string, unknown>)
     const cleanBasePrice = publicData.basePrice !== undefined
       ? parseFloat(publicData.basePrice.toFixed(2))
       : undefined
 
     await updateDoc(ref, {
-      ...publicData,
+      ...cleanPublicData,
       ...(cleanBasePrice !== undefined ? { basePrice: cleanBasePrice } : {}),
       // Keep pricePerUnit in sync
       ...(cleanBasePrice !== undefined ? { pricePerUnit: cleanBasePrice } : {}),
