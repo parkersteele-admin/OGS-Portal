@@ -22,7 +22,7 @@ import { usePendingOrders } from '../../../hooks/usePendingOrders'
 import { useRunBuilderData } from '../../../hooks/useRunBuilderData'
 import { createRun } from '../../../services/runService'
 import { updateOrder } from '../../../services/orderService'
-import { getActiveUsers } from '../../../services/userService'
+import { getActiveRunAssignableUsers } from '../../../services/userService'
 import { Badge } from '../../../components/ui/Badge'
 import { Button } from '../../../components/ui/Button'
 import { Modal } from '../../../components/ui/Modal'
@@ -193,7 +193,7 @@ const Step1Setup: React.FC<Step1Props> = ({ setup, onChange, onNext, drivers, dr
           >
             <option value="">{driversLoading ? 'Loading…' : 'Select driver'}</option>
             {drivers.map(d => (
-              <option key={d.id} value={d.id}>{d.name}</option>
+              <option key={d.id} value={d.id}>{d.name} ({d.role})</option>
             ))}
           </select>
         </div>
@@ -806,7 +806,7 @@ export default function RunBuilder() {
   // ── Data loading ────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    getActiveUsers()
+    getActiveRunAssignableUsers()
       .then(ds => { 
         setDrivers(ds); 
         setDriversLoading(false) 

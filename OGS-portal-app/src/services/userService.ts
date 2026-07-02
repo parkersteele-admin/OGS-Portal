@@ -48,6 +48,20 @@ export async function getActiveUsers(): Promise<AppUser[]> {
 }
 
 /**
+ * Returns active internal OGS users that can be assigned to runs.
+ * Includes admin/dispatch/driver/sales (not customer portal roles).
+ */
+export async function getActiveRunAssignableUsers(): Promise<AppUser[]> {
+  return serviceCall(async () => {
+    const snap = await getDocs(query(usersCol, orderBy('name'), getLimitConstraint('users')))
+    const users = snap.docs.map((d) => ({ ...d.data(), id: d.id }) as AppUser)
+    const assignableRoles = new Set<UserRole>(['admin', 'dispatch', 'driver', 'sales'])
+
+    return users.filter((u) => u.active === true && assignableRoles.has(u.role))
+  })
+}
+
+/**
  * Fetches all users belonging to a company (either via `companyId` or the
  * legacy `customerId` field). Sorts by name client-side to avoid composite
  * index requirements and the silent-exclusion problem with orderBy.

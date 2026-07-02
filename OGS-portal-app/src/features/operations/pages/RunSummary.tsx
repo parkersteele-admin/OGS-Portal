@@ -30,7 +30,7 @@ import { db } from '../../../lib/firebase'
 import { ordersCol, customersCol, invoicesCol, productsCol } from '../../../lib/firestore'
 import { getRun, getRunStops, updateRun } from '../../../services/runService'
 import { updateOrder } from '../../../services/orderService'
-import { getActiveUsers } from '../../../services/userService'
+import { getActiveRunAssignableUsers } from '../../../services/userService'
 import { useAuth } from '../../../hooks/useAuth'
 import type { AppUser } from '../../../types/user'
 import type { Run, RunStop } from '../../../types/run'
@@ -185,7 +185,7 @@ export default function RunSummary() {
 
   useEffect(() => {
     if (!isDispatch) return
-    getActiveUsers()
+    getActiveRunAssignableUsers()
       .then((ds) => setDrivers(ds))
       .catch(() => { /* non-critical */ })
   }, [isDispatch])
