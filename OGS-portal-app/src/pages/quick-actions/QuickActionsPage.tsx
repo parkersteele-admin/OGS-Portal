@@ -48,7 +48,7 @@ const ROLE_ORDER: OgsRole[] = ['admin', 'sales', 'dispatch', 'driver']
 
 const ROLE_TILES: Record<OgsRole, QuickTile[]> = {
 	admin: [
-		{ label: 'New Customer', sub: 'Create company profile', icon: UserPlus, to: '/admin/crm/customers?new=1', primary: true },
+		{ label: 'New Lead', sub: 'Create new opportunity', icon: UserPlus, to: '/admin/crm/leads', primary: true },
 		{ label: 'New Quote', sub: 'Build and send quote', icon: FileText, to: '/admin/crm/quotes/new' },
 		{ label: 'New Order', sub: 'Create and assign order', icon: ClipboardList, to: '/admin/ops/orders?new=1' },
 		{ label: 'Dispatch Board', sub: 'Assign routes', icon: Truck, to: '/admin/ops/dispatch' },
@@ -57,7 +57,7 @@ const ROLE_TILES: Record<OgsRole, QuickTile[]> = {
 		{ label: 'Manage Pricing', sub: 'Update product tags', icon: Tag, to: '/admin/pricing' },
 	],
 	sales: [
-		{ label: 'New Customer', sub: 'Create company profile', icon: UserPlus, to: '/crm/customers?new=1', primary: true },
+		{ label: 'New Lead', sub: 'Create new opportunity', icon: UserPlus, to: '/crm/leads', primary: true },
 		{ label: 'New Quote', sub: 'Build and send quote', icon: FileText, to: '/crm/quotes/new' },
 		{ label: 'New Order', sub: 'Create and assign order', icon: ClipboardList, to: '/ops/orders?new=1' },
 		{ label: 'Send Estimate', sub: 'From an existing order', icon: Send, to: '/ops/orders' },
