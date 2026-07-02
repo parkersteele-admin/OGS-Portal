@@ -188,17 +188,118 @@
   padding-left: 18px;
 }
 
+.dcm-instructions {
+  background: linear-gradient(135deg, #1a3a3a 0%, #1f2a2a 100%);
+  border: 1px solid #2a5a5a;
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.dcm-instructions__title {
+  margin: 0 0 10px;
+  color: #7ef9e3;
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dcm-instructions__list {
+  margin: 0;
+  padding-left: 20px;
+  list-style: none;
+}
+
+.dcm-instructions__list li {
+  color: #d4d4d4;
+  font-size: 13px;
+  margin-bottom: 6px;
+  padding-left: 18px;
+  position: relative;
+}
+
+.dcm-instructions__list li:before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: #7ef9e3;
+  font-weight: bold;
+}
+
+.dcm-signature-section {
+  margin-top: 12px;
+}
+
+.dcm-signature-label {
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+.dcm-sig-instructions {
+  background: #1a1a1a;
+  border: 1px solid #333333;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.dcm-sig-instructions p {
+  margin: 0;
+  color: #d4d4d4;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .dcm-signature-preview {
-  width: 220px;
-  max-width: 100%;
+  width: 100%;
+  max-width: 280px;
+  height: auto;
   border-radius: 8px;
   border: 1px solid #303030;
   background: #fff;
+  display: block;
+}
+
+.dcm-signature-placeholder {
+  width: 100%;
+  min-height: 180px;
+  border-radius: 8px;
+  border: 1px dashed #555555;
+  background: #0a0a0a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #999999;
+  font-size: 13px;
+  text-align: center;
+  padding: 20px;
+}
+
+.dcm-signature-preview--canvas {
+  width: 100%;
+  display: block;
+  background: #ffffff;
+  border-radius: 8px;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.dcm-error-box {
+  background: #3a1a1a;
+  border: 1px solid #6b3333;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
 }
 
 .dcm-error {
   color: #ff9f9f;
   margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .dcm-success {
@@ -244,11 +345,18 @@
   border: none;
   cursor: pointer;
   font-weight: 700;
+  font-size: 13px;
+  transition: all 0.2s ease;
 }
 
 .dcm-primary {
   background: #ff6a00;
   color: #111111;
+  flex: 1;
+}
+
+.dcm-primary:hover:not(:disabled) {
+  background: #ff7722;
 }
 
 .dcm-primary:disabled {
@@ -260,6 +368,12 @@
   background: #222222;
   color: #ffffff;
   border: 1px solid #343434;
+  min-width: 100px;
+}
+
+.dcm-secondary:hover:not(:disabled) {
+  background: #2d2d2d;
+  border-color: #444444;
 }
 
 .dcm-spin {

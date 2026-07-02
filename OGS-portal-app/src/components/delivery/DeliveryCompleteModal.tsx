@@ -150,6 +150,7 @@ export function DeliveryCompleteModal({
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [hasSignature, setHasSignature] = useState(false)
+  const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -214,9 +215,25 @@ export function DeliveryCompleteModal({
   }
 
   function getSignatureDataUrl() {
+    // Use stored signature data URL if available
+    if (signatureDataUrl) return signatureDataUrl
+    
+    // Fallback: try to get from canvas (for Step 3)
     const canvas = canvasRef.current
     if (!canvas || !hasSignature) return null
     return canvas.toDataURL('image/png')
+  }
+
+  function handleNextStep() {
+    if (step === 3 && hasSignature) {
+      // Capture signature before moving to Step 4
+      const canvas = canvasRef.current
+      if (canvas) {
+        const dataUrl = canvas.toDataURL('image/png')
+        setSignatureDataUrl(dataUrl)
+      }
+    }
+    setStep((s) => (s + 1) as Step)
   }
 
   async function handleCompleteDelivery() {
@@ -351,6 +368,9 @@ export function DeliveryCompleteModal({
           {step === 3 && (
             <section>
               <h3 className="dcm-step-title">Signature Capture</h3>
+              <div className="dcm-sig-instructions">
+                <p>Have the customer sign below to confirm delivery. They must sign with their finger or a stylus.</p>
+              </div>
               <SignatureCanvas canvasRef={canvasRef} onSignedChange={setHasSignature} />
             </section>
           )}
@@ -358,6 +378,17 @@ export function DeliveryCompleteModal({
           {step === 4 && (
             <section>
               <h3 className="dcm-step-title">Confirm & Submit</h3>
+              
+              <div className="dcm-instructions">
+                <p className="dcm-instructions__title">What happens next:</p>
+                <ul className="dcm-instructions__list">
+                  <li>Order status will be marked as <strong>Delivered</strong></li>
+                  <li>Bill of Lading PDF will be generated</li>
+                  <li>Delivery confirmation email with PDF will be sent to the customer</li>
+                  <li>Customer signature will be securely stored</li>
+                </ul>
+              </div>
+
               <div className="dcm-summary">
                 <p><strong>Receiver:</strong> {receivedByName}</p>
                 <p><strong>Primary Item:</strong> {primaryProductName} · {primaryQty}</p>
@@ -374,15 +405,24 @@ export function DeliveryCompleteModal({
                 {deliveryNotes.trim() && <p><strong>Notes:</strong> {deliveryNotes}</p>}
               </div>
 
-              {canvasRef.current && (
-                <img
-                  className="dcm-signature-preview"
-                  src={canvasRef.current.toDataURL('image/png')}
-                  alt="Signature preview"
-                />
-              )}
+              <div className="dcm-signature-section">
+                <p className="dcm-signature-label">Customer Signature:</p>
+                {signatureDataUrl ? (
+                  <img
+                    className="dcm-signature-preview"
+                    src={signatureDataUrl}
+                    alt="Customer signature"
+                  />
+                ) : (
+                  <div className="dcm-signature-placeholder">No signature captured</div>
+                )}
+              </div>
 
-              {error && <p className="dcm-error">{error}</p>}
+              {error && (
+                <div className="dcm-error-box">
+                  <p className="dcm-error">{error}</p>
+                </div>
+              )}
               {success && (
                 <p className="dcm-success">
                   <CheckCircle2 size={16} /> Delivery Complete
@@ -396,26 +436,26 @@ export function DeliveryCompleteModal({
                 disabled={submitting}
               >
                 {submitting ? <Loader2 size={16} className="dcm-spin" /> : null}
-                {submitting ? 'Completing…' : 'Complete Delivery'}
+                {submitting ? 'Completing…' : 'Complete Delivery & Send PDF'}
               </button>
             </section>
           )}
         </div>
 
         <footer className="dcm-footer">
-          {step > 1 && step < 4 && (
+          {step > 1 && (
             <button type="button" className="dcm-secondary" onClick={() => setStep((s) => (s - 1) as Step)}>
-              Back
+              ← Back
             </button>
           )}
           {step < 4 && (
             <button
               type="button"
               className="dcm-primary"
-              onClick={() => setStep((s) => (s + 1) as Step)}
+              onClick={handleNextStep}
               disabled={!canNext}
             >
-              Next
+              Next →
             </button>
           )}
         </footer>
