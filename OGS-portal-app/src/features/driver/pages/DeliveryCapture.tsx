@@ -136,15 +136,23 @@ function SignatureCanvas({ onSigned, canvasRef }: SignatureCanvasProps) {
     if (!canvas) return
     const resize = () => {
       const { width, height } = canvas.getBoundingClientRect()
+      const cssWidth = Math.max(1, Math.round(width))
+      const cssHeight = Math.max(1, Math.round(height))
       const dpr = window.devicePixelRatio || 1
-      canvas.width  = width  * dpr
-      canvas.height = height * dpr
+      const pixelWidth = Math.round(cssWidth * dpr)
+      const pixelHeight = Math.round(cssHeight * dpr)
+      if (canvas.width === pixelWidth && canvas.height === pixelHeight) {
+        return
+      }
+
+      canvas.width = pixelWidth
+      canvas.height = pixelHeight
       const ctx = canvas.getContext('2d')!
-      ctx.scale(dpr, dpr)
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     }
     resize()
     const ro = new ResizeObserver(resize)
-    ro.observe(canvas)
+    ro.observe(canvas.parentElement ?? canvas)
     return () => ro.disconnect()
   }, [canvasRef])
 

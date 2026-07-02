@@ -44,7 +44,7 @@ export async function generateBillOfLadingPdf(
 
   const safeDate = input.date.toISOString().slice(0, 10)
   const fileName = `Bill-of-Lading-${safeDate}.pdf`
-  const storagePath = `ogs-portal/orders/${input.orderId}/bill-of-lading/${safeDate}.pdf`
+  const storagePath = `ogs-portal/customers/${input.customerId}/documents/bill-of-lading/${safeDate}.pdf`
   const fileRef = storage.bucket().file(storagePath)
   const downloadToken = crypto.randomUUID()
 

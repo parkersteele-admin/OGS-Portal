@@ -238,7 +238,7 @@ function StopRow({ stop, customer, order, isCurrent, onClick, onCompleteDelivery
           <div className="dm-stop-item__status">En route</div>
         )}
 
-        {(stop.status === 'pending' || stop.status === 'arrived') && (
+        {isCurrent && stop.status === 'arrived' && (
           <div className="dm-stop-item__actions">
             <Button
               size="sm"
@@ -550,10 +550,15 @@ export default function DispatchMapPage() {
   const [showEndRun, setShowEndRun] = useState(false)
   const [endingRun, setEndingRun] = useState(false)
   const [orders, setOrders] = useState<Record<string, Order>>({})
+  const [optimisticCompletedStops, setOptimisticCompletedStops] = useState<Set<string>>(new Set())
   const [deliveryTarget, setDeliveryTarget] = useState<{ stop: RunStop; order: Order } | null>(null)
   const feedRef = useRef<HTMLDivElement>(null)
   const loadedCustomerIds = useRef<Set<string>>(new Set())
   const loadedOrderIds = useRef<Set<string>>(new Set())
+
+  useEffect(() => {
+    setOptimisticCompletedStops(new Set())
+  }, [runId])
 
   // Load driver doc when run.driverId changes
   useEffect(() => {
@@ -652,18 +657,33 @@ export default function DispatchMapPage() {
     })
   }, [stops])
 
+  const effectiveStops = useMemo(
+    () =>
+      stops.map((stop) => {
+        if (
+          optimisticCompletedStops.has(stop.id) &&
+          stop.status !== 'completed' &&
+          stop.status !== 'skipped'
+        ) {
+          return { ...stop, status: 'completed' as const }
+        }
+        return stop
+      }),
+    [stops, optimisticCompletedStops],
+  )
+
   // Determine the "current" stop: arrived first, otherwise first pending
   const currentStop =
-    stops.find((s) => s.status === 'arrived') ??
-    stops.find((s) => s.status === 'pending')
+    effectiveStops.find((s) => s.status === 'arrived') ??
+    effectiveStops.find((s) => s.status === 'pending')
 
   // Build event feed from stop timestamps (newest first)
   const events = useMemo(
-    () => buildEvents(run, stops, customers),
-    [run, stops, customers],
+    () => buildEvents(run, effectiveStops, customers),
+    [run, effectiveStops, customers],
   )
 
-  const remainingStops = stops.filter(
+  const remainingStops = effectiveStops.filter(
     (s) => s.status === 'pending' || s.status === 'arrived',
   ).length
 
@@ -722,7 +742,7 @@ export default function DispatchMapPage() {
     [],
   )
 
-  const completedCount = stops.filter(
+  const completedCount = effectiveStops.filter(
     (s) => s.status === 'completed' || s.status === 'skipped',
   ).length
 
@@ -808,14 +828,14 @@ export default function DispatchMapPage() {
                 {run.truckId ?? 'Truck TBD'}
               </div>
               <div className="dm-run-header__progress">
-                {completedCount} of {stops.length} stops
+                {completedCount} of {effectiveStops.length} stops
               </div>
               <div className="dm-run-header__bar">
                 <div
                   className="dm-run-header__bar-fill"
                   style={{
-                    width: stops.length
-                      ? `${(completedCount / stops.length) * 100}%`
+                    width: effectiveStops.length
+                      ? `${(completedCount / effectiveStops.length) * 100}%`
                       : '0%',
                   }}
                 />
@@ -824,7 +844,7 @@ export default function DispatchMapPage() {
 
             {/* Stop list */}
             <div className="dm-stop-list">
-              {stops.map((stop) => (
+              {effectiveStops.map((stop) => (
                 <StopRow
                   key={stop.id}
                   stop={stop}
@@ -839,7 +859,7 @@ export default function DispatchMapPage() {
                   }
                 />
               ))}
-              {stops.length === 0 && (
+              {effectiveStops.length === 0 && (
                 <div className="dm-stop-list__empty">No stops on this run</div>
               )}
             </div>
@@ -861,7 +881,7 @@ export default function DispatchMapPage() {
           {/* Right panel — map */}
           <div className="dm-right">
             <MapComponent
-              stops={stops}
+              stops={effectiveStops}
               customers={customers}
               driverName={driver?.name ?? 'Driver'}
               cameraTarget={cameraTarget}
@@ -902,6 +922,11 @@ export default function DispatchMapPage() {
           stopId={deliveryTarget.stop.id}
           onClose={() => setDeliveryTarget(null)}
           onSuccess={() => {
+            setOptimisticCompletedStops((prev) => {
+              const next = new Set(prev)
+              next.add(deliveryTarget.stop.id)
+              return next
+            })
             setDeliveryTarget(null)
           }}
         />

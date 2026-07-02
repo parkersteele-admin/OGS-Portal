@@ -4,7 +4,7 @@
  * Builds an OGS-branded PDF invoice, uploads to Firebase Storage, persists the
  * signed download URL to Firestore, and returns that URL.
  *
- * Storage path:  ogs-portal/invoices/{customerId}/{invoiceId}.pdf
+ * Storage path:  ogs-portal/customers/{customerId}/documents/invoices/{invoiceId}.pdf
  * Signed URL:    valid 7 days
  *
  * Usage:
@@ -61,7 +61,7 @@ export async function generateInvoicePdf(invoiceId: string): Promise<string> {
   const pdfBuffer = await buildInvoicePdf(invoiceId, invoice, customer, company, logoAsset)
 
   // ── Upload to Firebase Storage ─────────────────────────────────────────────
-  const storagePath = `ogs-portal/invoices/${customerId ?? '_unknown'}/${invoiceId}.pdf`
+  const storagePath = `ogs-portal/customers/${customerId ?? '_unknown'}/documents/invoices/${invoiceId}.pdf`
   const fileRef     = storage.bucket().file(storagePath)
 
   // Store the PDF with a stable Firebase Storage download token.

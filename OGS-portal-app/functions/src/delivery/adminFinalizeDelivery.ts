@@ -179,7 +179,7 @@ export const adminFinalizeDelivery = onCall(
       ? {
           url: order.billOfLadingUrl as string,
           fileName: `Bill-of-Lading-${deliveryDate.toISOString().slice(0, 10)}.pdf`,
-          storagePath: `ogs-portal/orders/${orderId}/bill-of-lading/${deliveryDate.toISOString().slice(0, 10)}.pdf`,
+          storagePath: `ogs-portal/customers/${customerId}/documents/bill-of-lading/${deliveryDate.toISOString().slice(0, 10)}.pdf`,
           buffer: await downloadBuffer(order.billOfLadingUrl as string),
         }
       : await generateBillOfLadingPdf({
