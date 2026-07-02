@@ -1,7 +1,6 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https'
 import { db, FieldValue, storage, Timestamp } from '../admin'
 import { sendEmail, type MailAttachment } from '../email/sendEmail'
-import { generateInvoicePdf } from '../pdf/generateInvoicePdf'
 import { generateBillOfLadingPdf } from '../pdf/generateBillOfLadingPdf'
 import { getCompanySettings } from '../pdf/companySettings'
 import { registerGeneratedFile } from '../files/registerGeneratedFile'
@@ -22,17 +21,7 @@ interface ProductSnapshot {
   id: string
   name: string
   unit: string
-  basePrice?: number
-  pricePerUnit?: number
 }
-
-interface InvoiceRecord {
-  id: string
-  pdfUrl?: string
-  invoiceNumber?: string
-}
-
-const DEFAULT_SALES_TAX_RATE = 0.08
 
 export const adminFinalizeDelivery = onCall(
   async (request) => {
@@ -101,8 +90,6 @@ export const adminFinalizeDelivery = onCall(
           id: productId,
           name: (docData?.name as string | undefined) || productId,
           unit: (docData?.unit as string | undefined) || 'unit',
-          basePrice: docData?.basePrice as number | undefined,
-          pricePerUnit: docData?.pricePerUnit as number | undefined,
         } satisfies ProductSnapshot,
       ] as const
     }))
@@ -140,21 +127,6 @@ export const adminFinalizeDelivery = onCall(
         receivedByName,
       },
     })
-
-    let invoice = await findInvoiceForOrder(orderId)
-    if (!invoice) {
-      invoice = await createInvoiceForDelivery({
-        orderId,
-        customerId,
-        deliveryDate,
-        primaryItems: data.deliveredLineItems,
-        addOnItems: data.deliveredAddOns ?? [],
-        order,
-        productMap,
-      })
-    }
-
-    const invoicePdfUrl = invoice.pdfUrl || await generateInvoicePdf(invoice.id)
 
     const bolItems = [
       ...data.deliveredLineItems.map((item) => {
@@ -210,7 +182,6 @@ export const adminFinalizeDelivery = onCall(
         metadata: {
           linkedEntityType: 'order',
           linkedEntityId: orderId,
-          invoiceId: invoice.id,
           documentKind: 'delivery-receipt',
         },
       })
@@ -231,8 +202,6 @@ export const adminFinalizeDelivery = onCall(
       deliveryDate: Timestamp.fromDate(deliveryDate),
       receivedByName,
       signatureUrl: signatureUpload.url,
-      invoiceId: invoice.id,
-      invoicePdfUrl,
       billOfLadingUrl: billOfLading.url,
       deliveryNotes: deliveryNotes || null,
       createdByUid: request.auth.uid,
@@ -248,12 +217,11 @@ export const adminFinalizeDelivery = onCall(
       signedByName: receivedByName,
       signatureUrl: signatureUpload.url,
       billOfLadingUrl: billOfLading.url,
-      invoicePdfUrl,
       ...(deliveryNotes ? { notes: deliveryNotes } : {}),
     })
 
     await orderSnap.ref.update({
-      status: 'ready_to_invoice',
+      status: 'delivered',
       deliveryStatus: 'signed',
       deliveredAt: signedAt,
       signedAt,
@@ -262,7 +230,6 @@ export const adminFinalizeDelivery = onCall(
       receivedByName,
       signatureUrl: signatureUpload.url,
       billOfLadingUrl: billOfLading.url,
-      invoicePdfUrl,
       deliveredLineItems: data.deliveredLineItems,
       deliveredAddOns: data.deliveredAddOns ?? [],
       ...(deliveryNotes ? { deliveryNotes } : {}),
@@ -276,15 +243,6 @@ export const adminFinalizeDelivery = onCall(
       request.auth.uid,
       actorName,
       'Delivery marked delivered by admin/dispatch.',
-    )
-
-    await appendStatusHistory(
-      db,
-      orderId,
-      'ready_to_invoice',
-      request.auth.uid,
-      actorName,
-      'Delivery complete and ready for invoicing.',
     )
 
     await maybeCompleteRun(data.runId)
@@ -307,13 +265,6 @@ export const adminFinalizeDelivery = onCall(
       })
     }
 
-    const invoiceBuffer = await downloadBuffer(invoicePdfUrl)
-    attachments.push({
-      content: invoiceBuffer.toString('base64'),
-      filename: `Invoice-${invoice.invoiceNumber || invoice.id}.pdf`,
-      type: 'application/pdf',
-    })
-
     const company = await getCompanySettings()
     const html = `
       <div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;color:#222">
@@ -327,7 +278,7 @@ export const adminFinalizeDelivery = onCall(
           <p style="margin:0 0 14px">A signed delivery has been completed by ${actorName}.</p>
           ${orderSummaryHtml}
           <p style="margin:18px 0 0">
-            The Bill of Lading and Invoice PDFs are attached for your records.
+            The Bill of Lading PDF is attached for your records.
           </p>
           <p style="margin:18px 0 0;color:#666;font-size:12px">
             ${company.name || 'OGS Gas Services'}
@@ -344,14 +295,6 @@ export const adminFinalizeDelivery = onCall(
       } catch (err) {
         console.error(`adminFinalizeDelivery: failed to send email to ${email} —`, err)
       }
-    }
-
-    if (deliveredEmailCount > 0) {
-      await db.collection('invoices').doc(invoice.id).update({
-        status: 'sent',
-        sentAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
-      })
     }
 
     await orderSnap.ref.update({
@@ -373,8 +316,6 @@ export const adminFinalizeDelivery = onCall(
     return {
       signatureUrl: signatureUpload.url,
       billOfLadingUrl: billOfLading.url,
-      invoicePdfUrl,
-      invoiceId: invoice.id,
     }
   },
 )
@@ -416,186 +357,6 @@ async function uploadOrderAsset(args: {
   return { url, storagePath }
 }
 
-async function findInvoiceForOrder(orderId: string): Promise<InvoiceRecord | null> {
-  const snap = await db.collection('invoices').where('orderId', '==', orderId).limit(1).get()
-  if (snap.empty) return null
-  const doc = snap.docs[0]
-  const data = doc.data() as Record<string, unknown>
-  return {
-    id: doc.id,
-    pdfUrl: data.pdfUrl as string | undefined,
-    invoiceNumber: data.invoiceNumber as string | undefined,
-  }
-}
-
-async function createInvoiceForDelivery(args: {
-  orderId: string
-  customerId: string
-  deliveryDate: Date
-  primaryItems: Array<{ productId: string; qty: number }>
-  addOnItems: Array<{ productId: string; qty: number }>
-  order: Record<string, unknown>
-  productMap: Map<string, ProductSnapshot>
-}): Promise<InvoiceRecord> {
-  const lineItems = buildInvoiceLineItemsForOrder({
-    primaryItems: args.primaryItems,
-    addOnItems: args.addOnItems,
-    order: args.order,
-    productMap: args.productMap,
-  })
-
-  const deliveryFee = toNumber(args.order.deliveryFee, 0)
-
-  const subtotal = lineItems.reduce((sum, item) => sum + item.total, 0)
-  const orderTaxRate = toNumber(args.order.salesTaxRate, args.order.taxRate, DEFAULT_SALES_TAX_RATE)
-  const applySalesTax = typeof args.order.applySalesTax === 'boolean'
-    ? args.order.applySalesTax
-    : orderTaxRate > 0
-  const taxRate = applySalesTax ? orderTaxRate : 0
-  const taxAmount = Number((subtotal * taxRate).toFixed(2))
-  const totalAmount = Number((subtotal + taxAmount).toFixed(2))
-
-  // ── GUARD: Verify delivery fee is included in total if order has one ──
-  if (deliveryFee > 0) {
-    const hasDeliveryFeeLine = lineItems.some((item) => /delivery\s*fee/i.test(item.description))
-    if (!hasDeliveryFeeLine) {
-      console.error(`[INVOICE ERROR] Order ${args.orderId} has deliveryFee $${deliveryFee.toFixed(2)} but no delivery fee line item in invoice!`)
-      throw new Error(`Order ${args.orderId} has delivery fee but invoice does not include it. This is a critical bug.`)
-    }
-    const deliveryFeeLineTotal = lineItems.find((item) => /delivery\s*fee/i.test(item.description))?.total ?? 0
-    if (deliveryFeeLineTotal !== deliveryFee) {
-      console.error(`[INVOICE ERROR] Order ${args.orderId} delivery fee mismatch: order has $${deliveryFee.toFixed(2)}, invoice line has $${deliveryFeeLineTotal.toFixed(2)}`)
-      throw new Error(`Delivery fee mismatch in invoice for order ${args.orderId}`)
-    }
-  }
-
-  const invoiceRef = db.collection('invoices').doc()
-  const invoiceNumber = `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`
-  const dueAt = Timestamp.fromDate(new Date(args.deliveryDate.getTime() + 30 * 24 * 60 * 60 * 1000))
-
-  await invoiceRef.set({
-    invoiceNumber,
-    customerId: args.customerId,
-    orderId: args.orderId,
-    quoteId: args.order.quoteId ?? null,
-    quoteNumber: args.order.quoteNumber ?? null,
-    salesRepId: args.order.salesRepId ?? null,
-    salesRepName: args.order.salesRepName ?? null,
-    salesRepEmail: args.order.salesRepEmail ?? null,
-    salesRepPhone: args.order.salesRepPhone ?? null,
-    status: 'pending',
-    lineItems,
-    applySalesTax,
-    salesTaxRate: taxRate,
-    salesTaxAmount: taxAmount,
-    subtotal,
-    tax: taxAmount,
-    total: totalAmount,
-    taxRate,
-    taxAmount,
-    totalAmount,
-    issuedAt: FieldValue.serverTimestamp(),
-    dueAt,
-    createdAt: FieldValue.serverTimestamp(),
-    updatedAt: FieldValue.serverTimestamp(),
-  })
-
-  return { id: invoiceRef.id, invoiceNumber }
-}
-
-function buildInvoiceLineItemsForOrder(args: {
-  primaryItems: Array<{ productId: string; qty: number }>
-  addOnItems: Array<{ productId: string; qty: number }>
-  order: Record<string, unknown>
-  productMap: Map<string, ProductSnapshot>
-}) {
-  const quotedUnitPrices = getQuotedUnitPrices(args.order)
-  const primaryFallbackPrice = toNumber(args.order.unitPrice, 0)
-
-  const lineItems = [
-    ...args.primaryItems.map((item) => {
-      const quotedPrice = quotedUnitPrices.get(item.productId)
-      return buildInvoiceLine(item, args.productMap.get(item.productId), quotedPrice ?? primaryFallbackPrice)
-    }),
-    ...args.addOnItems.map((item) => {
-      const quotedPrice = quotedUnitPrices.get(item.productId)
-      return buildInvoiceLine(item, args.productMap.get(item.productId), quotedPrice)
-    }),
-  ]
-
-  const deliveryFee = toNumber(args.order.deliveryFee, 0)
-  if (deliveryFee > 0) {
-    lineItems.push({
-      description: 'Delivery fee',
-      quantity: 1,
-      unitPrice: deliveryFee,
-      amount: deliveryFee,
-      total: deliveryFee,
-    })
-  }
-
-  return lineItems
-}
-
-function getQuotedUnitPrices(order: Record<string, unknown>): Map<string, number> {
-  const prices = new Map<string, number>()
-
-  const quotedLineItems = Array.isArray(order.quotedLineItems)
-    ? (order.quotedLineItems as Array<Record<string, unknown>>)
-    : []
-  for (const item of quotedLineItems) {
-    const productId = item.productId as string | undefined
-    const unitPrice = toNumber(item.unitPrice, 0)
-    if (productId && unitPrice > 0) {
-      prices.set(productId, unitPrice)
-    }
-  }
-
-  const addOns = Array.isArray(order.addOns)
-    ? (order.addOns as Array<Record<string, unknown>>)
-    : []
-  for (const item of addOns) {
-    const productId = item.productId as string | undefined
-    const unitPrice = toNumber(item.unitPrice, 0)
-    if (productId && unitPrice > 0) {
-      prices.set(productId, unitPrice)
-    }
-  }
-
-  return prices
-}
-
-function toNumber(...values: unknown[]): number {
-  for (const value of values) {
-    if (typeof value === 'number' && Number.isFinite(value)) return value
-    if (typeof value === 'string' && value.trim() !== '') {
-      const parsed = Number(value)
-      if (Number.isFinite(parsed)) return parsed
-    }
-  }
-  return 0
-}
-
-function buildInvoiceLine(
-  item: { productId: string; qty: number },
-  product?: ProductSnapshot,
-  fallbackUnitPrice?: number,
-) {
-  const unitPrice = fallbackUnitPrice
-    ?? product?.basePrice
-    ?? product?.pricePerUnit
-    ?? 0
-  const total = Number((item.qty * unitPrice).toFixed(2))
-
-  return {
-    description: product?.name || item.productId,
-    quantity: item.qty,
-    unitPrice,
-    amount: total,
-    total,
-  }
-}
-
 async function maybeCompleteRun(runId: string): Promise<void> {
   const stopsSnap = await db.collection('runs').doc(runId).collection('stops').get()
   const allDone = stopsSnap.docs.every((doc) => {
@@ -617,8 +378,6 @@ async function resolveDeliveryRecipients(
   customer: Record<string, unknown>,
 ): Promise<string[]> {
   const recipients = new Set<string>()
-  const customerEmail = customer.email as string | undefined
-  if (customerEmail) recipients.add(customerEmail)
 
   const adminUsers = await db.collection('users').where('role', '==', 'admin').where('active', '==', true).get()
   adminUsers.docs.forEach((doc) => {
@@ -628,15 +387,6 @@ async function resolveDeliveryRecipients(
 
   const company = await getCompanySettings()
   if (company.email) recipients.add(company.email)
-
-  // Best effort fallback for accounts that route through company-scoped admins later.
-  if (recipients.size === 0 && customerId) {
-    const companyUsers = await db.collection('users').where('customerId', '==', customerId).limit(5).get()
-    companyUsers.docs.forEach((doc) => {
-      const email = doc.data().email as string | undefined
-      if (email) recipients.add(email)
-    })
-  }
 
   return [...recipients]
 }

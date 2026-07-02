@@ -383,8 +383,6 @@ async function resolveDeliveryRecipients(
   customer: Record<string, unknown>,
 ): Promise<string[]> {
   const recipients = new Set<string>()
-  const customerEmail = customer.email as string | undefined
-  if (customerEmail) recipients.add(customerEmail)
 
   const adminUsers = await db.collection('users').where('role', '==', 'admin').where('active', '==', true).get()
   adminUsers.docs.forEach((doc) => {
@@ -394,15 +392,6 @@ async function resolveDeliveryRecipients(
 
   const company = await getCompanySettings()
   if (company.email) recipients.add(company.email)
-
-  // Best effort fallback for accounts that route through company-scoped admins later.
-  if (recipients.size === 0 && customerId) {
-    const companyUsers = await db.collection('users').where('customerId', '==', customerId).limit(5).get()
-    companyUsers.docs.forEach((doc) => {
-      const email = doc.data().email as string | undefined
-      if (email) recipients.add(email)
-    })
-  }
 
   return [...recipients]
 }

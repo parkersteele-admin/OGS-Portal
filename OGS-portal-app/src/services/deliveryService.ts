@@ -17,8 +17,8 @@ export interface FinalizeSignedDeliveryInput {
 export interface FinalizeSignedDeliveryResult {
   signatureUrl: string
   billOfLadingUrl: string
-  invoicePdfUrl: string
-  invoiceId: string
+  invoicePdfUrl?: string
+  invoiceId?: string
 }
 
 export interface AdminFinalizeDeliveryInput {
