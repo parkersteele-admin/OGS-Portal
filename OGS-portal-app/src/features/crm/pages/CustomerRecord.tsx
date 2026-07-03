@@ -74,7 +74,12 @@ import { Button } from '../../../components/ui/Button'
 import { Modal } from '../../../components/ui/Modal'
 import { Input } from '../../../components/ui/Input'
 import { CreateUserModal } from '../../../components/ui/CreateUserModal'
-import type { Customer, CustomerStatus } from '../../../types/customer'
+import type {
+  Customer,
+  CustomerStatus,
+  CompanyContact,
+  CompanyLocation,
+} from '../../../types/customer'
 import type { ContactLog, ContactMethod } from '../../../types/crm'
 import type { Quote } from '../../../types/crm'
 import type { AppFile } from '../../../types/file'
@@ -104,10 +109,11 @@ interface ContactLogWithFollowUp extends ContactLog {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-type TabKey = 'overview' | 'orderHistory' | 'history' | 'notes' | 'documents' | 'access' | 'productPricing' | 'standingOrder'
+type TabKey = 'overview' | 'company' | 'orderHistory' | 'history' | 'notes' | 'documents' | 'access' | 'productPricing' | 'standingOrder'
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'overview',       label: 'Overview' },
+  { key: 'company',        label: 'Company Structure' },
   { key: 'orderHistory',   label: 'Order History' },
   { key: 'history',        label: 'Contact History' },
   { key: 'notes',          label: 'Account Notes' },
@@ -1223,6 +1229,15 @@ const CustomerRecord: React.FC = () => {
   const [holdReason,        setHoldReason]        = useState('')
   const [onHold,            setOnHold]            = useState(false)
   const [notesSaved,        setNotesSaved]        = useState(false)
+  const [companyType,       setCompanyType]       = useState<'prospect' | 'customer' | 'inactive'>('customer')
+  const [industry,          setIndustry]          = useState('')
+  const [taxStatus,         setTaxStatus]         = useState<'taxable' | 'tax_exempt' | 'unknown'>('unknown')
+  const [paymentTerms,      setPaymentTerms]      = useState('')
+  const [agreementStatus,   setAgreementStatus]   = useState<'none' | 'draft' | 'signed' | 'expired'>('none')
+  const [mainPhone,         setMainPhone]         = useState('')
+  const [contacts,          setContacts]          = useState<CompanyContact[]>([])
+  const [locations,         setLocations]         = useState<CompanyLocation[]>([])
+  const [defaultLocationId, setDefaultLocationId] = useState('')
   const notesInitialised = useRef(false)
 
   // File upload progress
@@ -1284,6 +1299,15 @@ const CustomerRecord: React.FC = () => {
     setCreditLimit(String(cr.creditLimit ?? ''))
     setHoldReason(cr.holdReason ?? '')
     setOnHold(cr.status === 'hold')
+    setCompanyType(cr.companyType ?? 'customer')
+    setIndustry(cr.industry ?? '')
+    setTaxStatus(cr.taxStatus ?? 'unknown')
+    setPaymentTerms(cr.paymentTerms ?? '')
+    setAgreementStatus(cr.agreementStatus ?? 'none')
+    setMainPhone(cr.mainPhone ?? cr.phone ?? '')
+    setContacts(cr.contacts ?? [])
+    setLocations(cr.locations ?? [])
+    setDefaultLocationId(cr.defaultLocationId ?? '')
   }, [customer])
 
   // Real-time tanks (live level updates)
@@ -1861,11 +1885,47 @@ const CustomerRecord: React.FC = () => {
 
   const handleSaveAccountFields = useCallback(() => {
     const newStatus: CustomerStatus = onHold ? 'hold' : (customer?.status === 'hold' ? 'active' : customer?.status ?? 'active')
+    const cleanedContacts = contacts
+      .map((contact) => ({
+        ...contact,
+        name: contact.name.trim(),
+        role: contact.role.trim(),
+        phone: contact.phone?.trim() || undefined,
+        email: contact.email?.trim() || undefined,
+      }))
+      .filter((contact) => contact.name.length > 0)
+
+    const cleanedLocations = locations
+      .map((location) => ({
+        ...location,
+        name: location.name.trim(),
+        shipToAddress: {
+          line1: location.shipToAddress.line1.trim(),
+          city: location.shipToAddress.city.trim(),
+          state: location.shipToAddress.state.trim(),
+          zip: location.shipToAddress.zip.trim(),
+        },
+        gateAccessNotes: location.gateAccessNotes?.trim() || undefined,
+        deliveryWindow: location.deliveryWindow?.trim() || undefined,
+        storageLocation: location.storageLocation?.trim() || undefined,
+        safetyNotes: location.safetyNotes?.trim() || undefined,
+      }))
+      .filter((location) => location.name.length > 0 && location.shipToAddress.line1.length > 0)
+
     saveMutation.mutate(
       {
         notes,
         creditLimit: Number(creditLimit) || 0,
         status: newStatus,
+        companyType,
+        industry: industry.trim() || undefined,
+        taxStatus,
+        paymentTerms: paymentTerms.trim() || undefined,
+        agreementStatus,
+        mainPhone: mainPhone.trim() || undefined,
+        contacts: cleanedContacts,
+        locations: cleanedLocations,
+        defaultLocationId: defaultLocationId || undefined,
         // Extra CRM fields saved directly to Firestore doc
       } as Partial<CustomerRecord>,
       {
@@ -1883,7 +1943,7 @@ const CustomerRecord: React.FC = () => {
         },
       },
     )
-  }, [onHold, customer, notes, creditLimit, deliveryNotes, accessInstructions, holdReason, saveMutation, customerId, queryClient])
+  }, [onHold, customer, notes, creditLimit, companyType, industry, taxStatus, paymentTerms, agreementStatus, mainPhone, contacts, locations, defaultLocationId, deliveryNotes, accessInstructions, holdReason, saveMutation, customerId, queryClient])
 
   const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -1960,6 +2020,63 @@ const CustomerRecord: React.FC = () => {
     )
   }, [customer, customerId, queryClient])
 
+  const addContact = useCallback(() => {
+    const id = `ct_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
+    setContacts((prev) => [
+      ...prev,
+      { id, name: '', role: '', phone: '', email: '', isPrimary: prev.length === 0 },
+    ])
+  }, [])
+
+  const updateContactField = useCallback((id: string, field: keyof CompanyContact, value: string | boolean) => {
+    setContacts((prev) => prev.map((contact) => {
+      if (contact.id !== id) return contact
+      return { ...contact, [field]: value }
+    }))
+  }, [])
+
+  const removeContact = useCallback((id: string) => {
+    setContacts((prev) => prev.filter((contact) => contact.id !== id))
+  }, [])
+
+  const addLocation = useCallback(() => {
+    const id = `loc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
+    setLocations((prev) => [
+      ...prev,
+      {
+        id,
+        name: '',
+        shipToAddress: { line1: '', city: '', state: '', zip: '' },
+      },
+    ])
+  }, [])
+
+  const updateLocationField = useCallback((id: string, field: keyof CompanyLocation, value: string) => {
+    setLocations((prev) => prev.map((location) => {
+      if (location.id !== id) return location
+      if (field === 'shipToAddress') return location
+      return { ...location, [field]: value }
+    }))
+  }, [])
+
+  const updateLocationAddressField = useCallback((id: string, field: 'line1' | 'city' | 'state' | 'zip', value: string) => {
+    setLocations((prev) => prev.map((location) => {
+      if (location.id !== id) return location
+      return {
+        ...location,
+        shipToAddress: {
+          ...location.shipToAddress,
+          [field]: value,
+        },
+      }
+    }))
+  }, [])
+
+  const removeLocation = useCallback((id: string) => {
+    setLocations((prev) => prev.filter((location) => location.id !== id))
+    setDefaultLocationId((prev) => (prev === id ? '' : prev))
+  }, [])
+
   // ── Render guards ─────────────────────────────────────────────────────────────
 
   if (customerLoading) {
@@ -2003,6 +2120,7 @@ const CustomerRecord: React.FC = () => {
     || file.metadata?.documentKind === 'delivery-receipt'
     || file.metadata?.documentKind === 'terms-acceptance',
   )
+  const defaultLocation = locations.find((location) => location.id === defaultLocationId) ?? locations[0]
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
@@ -2095,6 +2213,34 @@ const CustomerRecord: React.FC = () => {
                 {resolveAddress(cr) || <span style={{color:'#bbb'}}>No address on file</span>}
               </a>
             </div>
+          </div>
+        </CardBody>
+      </Card>
+
+      <Card className="cr-contact-card">
+        <CardBody>
+          <div className="cr-contact-grid">
+            <div className="cr-contact-item">
+              <span className="cr-contact-item__icon"><Handshake size={14} aria-hidden="true" /></span>
+              <span className="cr-contact-item__value">Contacts: {contacts.length}</span>
+            </div>
+            <div className="cr-contact-item">
+              <span className="cr-contact-item__icon"><MapPin size={14} aria-hidden="true" /></span>
+              <span className="cr-contact-item__value">Locations: {locations.length}</span>
+            </div>
+            <div className="cr-contact-item">
+              <span className="cr-contact-item__icon"><FileText size={14} aria-hidden="true" /></span>
+              <span className="cr-contact-item__value">
+                {defaultLocation
+                  ? `Default Ship-to: ${defaultLocation.name} · ${defaultLocation.shipToAddress.line1}`
+                  : 'Default Ship-to: Not set'}
+              </span>
+            </div>
+          </div>
+          <div style={{ marginTop: 10 }}>
+            <Button variant="secondary" size="sm" onClick={() => setActiveTab('company')}>
+              Manage Company, Contacts, and Locations
+            </Button>
           </div>
         </CardBody>
       </Card>
@@ -2723,11 +2869,12 @@ const CustomerRecord: React.FC = () => {
         </div>
       )}
 
-      {/* ── Tab: Account Notes ────────────────────────────────────────────── */}
-      {activeTab === 'notes' && (
+      {/* ── Tab: Account Notes / Company Structure ───────────────────────── */}
+      {(activeTab === 'notes' || activeTab === 'company') && (
         <div className="cr-tab-panel" role="tabpanel">
 
-          <Card>
+          {activeTab === 'notes' && (
+            <Card>
             <CardHeader>
               <h3 className="cr-section-title">Account notes</h3>
               {notesSaved && <span className="cr-saved-indicator">✓ Saved</span>}
@@ -2746,9 +2893,11 @@ const CustomerRecord: React.FC = () => {
                 <span className="ui-field__hint">Auto-saved when you leave this field.</span>
               </div>
             </CardBody>
-          </Card>
+            </Card>
+          )}
 
-          <Card>
+          {activeTab === 'notes' && (
+            <Card>
             <CardHeader>
               <h3 className="cr-section-title">Delivery &amp; access</h3>
             </CardHeader>
@@ -2774,9 +2923,11 @@ const CustomerRecord: React.FC = () => {
                 />
               </div>
             </CardBody>
-          </Card>
+            </Card>
+          )}
 
-          <Card>
+          {activeTab === 'notes' && (
+            <Card>
             <CardHeader>
               <h3 className="cr-section-title">Account flags</h3>
             </CardHeader>
@@ -2817,6 +2968,126 @@ const CustomerRecord: React.FC = () => {
                     placeholder="Why is this account on hold?"
                   />
                 </div>
+              )}
+            </CardBody>
+            </Card>
+          )}
+
+          <Card>
+            <CardHeader>
+              <h3 className="cr-section-title">Company structure</h3>
+            </CardHeader>
+            <CardBody>
+              <div className="cr-flags-grid">
+                <div className="ui-field">
+                  <label className="ui-field__label">Company type</label>
+                  <select className="ui-input" value={companyType} onChange={(e) => setCompanyType(e.target.value as 'prospect' | 'customer' | 'inactive')}>
+                    <option value="prospect">Prospect</option>
+                    <option value="customer">Customer</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+                <div className="ui-field">
+                  <label className="ui-field__label">Tax status</label>
+                  <select className="ui-input" value={taxStatus} onChange={(e) => setTaxStatus(e.target.value as 'taxable' | 'tax_exempt' | 'unknown')}>
+                    <option value="unknown">Unknown</option>
+                    <option value="taxable">Taxable</option>
+                    <option value="tax_exempt">Tax Exempt</option>
+                  </select>
+                </div>
+              </div>
+              <div className="cr-flags-grid">
+                <Input label="Industry" value={industry} onChange={(e) => setIndustry(e.target.value)} />
+                <Input label="Main phone" value={mainPhone} onChange={(e) => setMainPhone(e.target.value)} />
+              </div>
+              <div className="cr-flags-grid">
+                <Input label="Payment terms" value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} />
+                <div className="ui-field">
+                  <label className="ui-field__label">Agreement status</label>
+                  <select className="ui-input" value={agreementStatus} onChange={(e) => setAgreementStatus(e.target.value as 'none' | 'draft' | 'signed' | 'expired')}>
+                    <option value="none">None</option>
+                    <option value="draft">Draft</option>
+                    <option value="signed">Signed</option>
+                    <option value="expired">Expired</option>
+                  </select>
+                </div>
+              </div>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <h3 className="cr-section-title">Contacts</h3>
+              <Button variant="ghost" size="sm" onClick={addContact}>+ Add contact</Button>
+            </CardHeader>
+            <CardBody>
+              {contacts.length === 0 ? (
+                <p className="cr-empty">No contacts added yet.</p>
+              ) : (
+                contacts.map((contact) => (
+                  <div key={contact.id} className="cr-field-spacer" style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: 12, marginBottom: 12 }}>
+                    <div className="cr-flags-grid">
+                      <Input label="Name" value={contact.name} onChange={(e) => updateContactField(contact.id, 'name', e.target.value)} />
+                      <Input label="Role" value={contact.role} onChange={(e) => updateContactField(contact.id, 'role', e.target.value)} />
+                    </div>
+                    <div className="cr-flags-grid">
+                      <Input label="Phone" value={contact.phone ?? ''} onChange={(e) => updateContactField(contact.id, 'phone', e.target.value)} />
+                      <Input label="Email" type="email" value={contact.email ?? ''} onChange={(e) => updateContactField(contact.id, 'email', e.target.value)} />
+                    </div>
+                    <div className="cr-flags-grid">
+                      <label className="cr-toggle">
+                        <input type="checkbox" checked={!!contact.isPrimary} onChange={(e) => updateContactField(contact.id, 'isPrimary', e.target.checked)} />
+                        <span className="cr-toggle__track" />
+                        <span className="cr-toggle__label">Primary contact</span>
+                      </label>
+                      <Button variant="danger" size="sm" onClick={() => removeContact(contact.id)}>Remove</Button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <h3 className="cr-section-title">Locations</h3>
+              <Button variant="ghost" size="sm" onClick={addLocation}>+ Add location</Button>
+            </CardHeader>
+            <CardBody>
+              <div className="ui-field">
+                <label className="ui-field__label">Default location</label>
+                <select className="ui-input" value={defaultLocationId} onChange={(e) => setDefaultLocationId(e.target.value)}>
+                  <option value="">None selected</option>
+                  {locations.map((location) => (
+                    <option key={location.id} value={location.id}>{location.name || 'Untitled location'}</option>
+                  ))}
+                </select>
+              </div>
+              {locations.length === 0 ? (
+                <p className="cr-empty">No delivery locations added yet.</p>
+              ) : (
+                locations.map((location) => (
+                  <div key={location.id} className="cr-field-spacer" style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: 12, marginBottom: 12 }}>
+                    <Input label="Location name" value={location.name} onChange={(e) => updateLocationField(location.id, 'name', e.target.value)} />
+                    <div className="cr-flags-grid">
+                      <Input label="Ship-to address" value={location.shipToAddress.line1} onChange={(e) => updateLocationAddressField(location.id, 'line1', e.target.value)} />
+                      <Input label="City" value={location.shipToAddress.city} onChange={(e) => updateLocationAddressField(location.id, 'city', e.target.value)} />
+                    </div>
+                    <div className="cr-flags-grid">
+                      <Input label="State" value={location.shipToAddress.state} onChange={(e) => updateLocationAddressField(location.id, 'state', e.target.value)} />
+                      <Input label="ZIP" value={location.shipToAddress.zip} onChange={(e) => updateLocationAddressField(location.id, 'zip', e.target.value)} />
+                    </div>
+                    <div className="cr-flags-grid">
+                      <Input label="Gate/access notes" value={location.gateAccessNotes ?? ''} onChange={(e) => updateLocationField(location.id, 'gateAccessNotes', e.target.value)} />
+                      <Input label="Delivery window" value={location.deliveryWindow ?? ''} onChange={(e) => updateLocationField(location.id, 'deliveryWindow', e.target.value)} />
+                    </div>
+                    <div className="cr-flags-grid">
+                      <Input label="Storage/cage location" value={location.storageLocation ?? ''} onChange={(e) => updateLocationField(location.id, 'storageLocation', e.target.value)} />
+                      <Input label="Safety notes" value={location.safetyNotes ?? ''} onChange={(e) => updateLocationField(location.id, 'safetyNotes', e.target.value)} />
+                    </div>
+                    <Button variant="danger" size="sm" onClick={() => removeLocation(location.id)}>Remove</Button>
+                  </div>
+                ))
               )}
             </CardBody>
           </Card>

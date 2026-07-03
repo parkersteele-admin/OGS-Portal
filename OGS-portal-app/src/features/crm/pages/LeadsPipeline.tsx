@@ -70,7 +70,7 @@ const ACTIVE_STAGES: StageConfig[] = [
 ]
 
 const ARCHIVED_STAGES: StageConfig[] = [
-  { key: 'won',  label: 'Won',  accent: true },
+  { key: 'won',  label: 'Converted',  accent: true },
   { key: 'lost', label: 'Lost' },
 ]
 
@@ -147,6 +147,7 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ salesReps, onClose, onSave,
     state:          '',
     zip:            '',
     source:         '',
+    productInterest:'',
     assignedTo:     user?.id ?? '',
     estimatedValue: undefined,
     notes:          '',
@@ -192,12 +193,20 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ salesReps, onClose, onSave,
         </div>
         <div className="lp-form-row">
           <div className="ui-field">
-            <label className="ui-field__label">Source</label>
+            <label className="ui-field__label">Lead source</label>
             <select className="ui-input" value={form.source} onChange={set('source')}>
               <option value="">— Select source —</option>
               {SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
+          <Input
+            label="Product interest"
+            value={form.productInterest ?? ''}
+            onChange={set('productInterest')}
+            placeholder="Oxygen, Nitrogen, CO2, etc."
+          />
+        </div>
+        <div className="lp-form-row">
           <Input
             label="Estimated value ($)"
             type="number"
@@ -245,11 +254,11 @@ interface ConvertModalProps {
 }
 
 const ConvertModal: React.FC<ConvertModalProps> = ({ lead, onClose, onConfirm, saving }) => (
-  <Modal open onClose={onClose} title="Convert to customer" size="sm">
+  <Modal open onClose={onClose} title="Convert to company" size="sm">
     <div className="lp-modal-form">
       <p className="lp-convert-body">
-        This will create a new customer account for{' '}
-        <strong>{lead.company ?? lead.name}</strong> and archive this lead as Won.
+        This will create a new company customer record for{' '}
+        <strong>{lead.company ?? lead.name}</strong> and archive this lead as Converted.
       </p>
       <div className="lp-convert-preview">
         <span>{lead.email}</span>
@@ -261,7 +270,7 @@ const ConvertModal: React.FC<ConvertModalProps> = ({ lead, onClose, onConfirm, s
       <div className="lp-modal-actions">
         <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>Cancel</Button>
         <Button type="button" variant="success" loading={saving} onClick={onConfirm}>
-          ✓ Convert &amp; create customer
+          ✓ Convert &amp; create company customer
         </Button>
       </div>
     </div>
@@ -394,6 +403,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
   const [estValue,  setEstValue]  = useState(String(lead.estimatedValue ?? ''))
   const [assigned,  setAssigned]  = useState(lead.assignedTo ?? '')
   const [source,    setSource]    = useState(lead.source ?? '')
+  const [productInterest, setProductInterest] = useState(lead.productInterest ?? '')
   const [address,   setAddress]   = useState(lead.address ?? '')
   const [city,      setCity]      = useState(lead.city    ?? '')
   const [stateVal,  setStateVal]  = useState(lead.state   ?? '')
@@ -410,6 +420,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
     setEstValue(String(lead.estimatedValue ?? ''))
     setAssigned(lead.assignedTo ?? '')
     setSource(lead.source ?? '')
+    setProductInterest(lead.productInterest ?? '')
     setAddress(lead.address ?? '')
     setCity(lead.city    ?? '')
     setStateVal(lead.state   ?? '')
@@ -427,6 +438,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
         estimatedValue: estValue ? Number(estValue) : undefined,
         assignedTo:     assigned || undefined,
         source:         source || undefined,
+        productInterest: productInterest.trim() || undefined,
         address:        address.trim() || undefined,
         city:           city.trim()    || undefined,
         state:          stateVal.trim() || undefined,
@@ -450,6 +462,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
     estValue !== String(lead.estimatedValue ?? '') ||
     (assigned || '') !== (lead.assignedTo ?? '') ||
     (source || '') !== (lead.source ?? '') ||
+    (productInterest.trim() || '') !== (lead.productInterest ?? '') ||
     (address.trim() || '') !== (lead.address ?? '') ||
     (city.trim() || '') !== (lead.city ?? '') ||
     (stateVal.trim() || '') !== (lead.state ?? '') ||
@@ -506,8 +519,14 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
             )}
             {lead.source && (
               <>
-                <span className="lp-panel__info-label">Source</span>
+                <span className="lp-panel__info-label">Lead source</span>
                 <span className="lp-panel__info-value">{lead.source}</span>
+              </>
+            )}
+            {lead.productInterest && (
+              <>
+                <span className="lp-panel__info-label">Product interest</span>
+                <span className="lp-panel__info-value">{lead.productInterest}</span>
               </>
             )}
             {repName && (
@@ -557,12 +576,17 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
               <Input label="ZIP"   value={zip}      onChange={e => setZip(e.target.value)}      />
             </div>
             <div className="ui-field">
-              <label className="ui-field__label">Source</label>
+              <label className="ui-field__label">Lead source</label>
               <select className="ui-input" value={source} onChange={e => setSource(e.target.value)}>
                 <option value="">— Select —</option>
                 {SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
+            <Input
+              label="Product interest"
+              value={productInterest}
+              onChange={e => setProductInterest(e.target.value)}
+            />
             <Input
               label="Estimated value ($)"
               type="number"
@@ -632,7 +656,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
             size="sm"
             onClick={() => navigate(`${crmBase}/customers/${lead.convertedToCustomerId}`)}
           >
-            View customer
+            View company
           </Button>
         ) : (
           <Button
@@ -640,7 +664,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
             size="sm"
             onClick={onConvert}
           >
-            ✓ Convert to customer
+            ✓ Convert to company
           </Button>
         )}
       </div>
@@ -672,10 +696,11 @@ interface LeadCardProps {
   onSelect:  (lead: Lead) => void
   onMoveTo:  (leadId: string, status: LeadStatus) => void
   onQuote:   (lead: Lead) => void
+  onDelete:  (lead: Lead) => void
 }
 
 const LeadCard: React.FC<LeadCardProps> = ({
-  lead, salesReps, isSelected, onSelect, onMoveTo, onQuote,
+  lead, salesReps, isSelected, onSelect, onMoveTo, onQuote, onDelete,
 }) => {
   const rep = salesReps.find(r => r.id === lead.assignedTo)
   const canQuote = ['qualified', 'proposal', 'won'].includes(lead.status)
@@ -726,6 +751,13 @@ const LeadCard: React.FC<LeadCardProps> = ({
           {STAGES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
         </select>
         <button
+          className="lp-card__delete-btn"
+          title="Delete lead"
+          onClick={e => { e.stopPropagation(); onDelete(lead) }}
+        >
+          Delete
+        </button>
+        <button
           className="lp-card__quote-btn"
           title={canQuote ? 'Send quote' : 'Qualify lead first'}
           disabled={!canQuote}
@@ -752,12 +784,13 @@ interface KanbanColumnProps {
   onSelect:   (lead: Lead) => void
   onMoveTo:   (leadId: string, status: LeadStatus) => void
   onQuote:    (lead: Lead) => void
+  onDelete:   (lead: Lead) => void
 }
 
 const KanbanColumn: React.FC<KanbanColumnProps> = ({
   stage, leads, salesReps, isDragOver,
   selectedId, onDragOver, onDrop, onDragLeave,
-  onSelect, onMoveTo, onQuote,
+  onSelect, onMoveTo, onQuote, onDelete,
 }) => {
   const totalValue = leads.reduce((s, l) => s + (l.estimatedValue ?? 0), 0)
 
@@ -793,6 +826,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
               onSelect={onSelect}
               onMoveTo={onMoveTo}
               onQuote={onQuote}
+              onDelete={onDelete}
             />
           ))
         )}
@@ -813,11 +847,12 @@ interface ListTableProps {
   onSelect:   (lead: Lead) => void
   onMoveTo:   (leadId: string, status: LeadStatus) => void
   onQuote:    (lead: Lead) => void
+  onDelete:   (lead: Lead) => void
 }
 
 const ListTable: React.FC<ListTableProps> = ({
   leads, salesReps, sortCol, sortDir, selectedId,
-  onSort, onSelect, onMoveTo, onQuote,
+  onSort, onSelect, onMoveTo, onQuote, onDelete,
 }) => {
   const arrow = (col: SortCol) =>
     sortCol === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''
@@ -830,7 +865,7 @@ const ListTable: React.FC<ListTableProps> = ({
             <th onClick={() => onSort('company')}   className="lp-th lp-th--sort">Company{arrow('company')}</th>
             <th onClick={() => onSort('name')}      className="lp-th lp-th--sort">Contact{arrow('name')}</th>
             <th onClick={() => onSort('status')}    className="lp-th lp-th--sort">Stage{arrow('status')}</th>
-            <th onClick={() => onSort('source')}    className="lp-th lp-th--sort">Source{arrow('source')}</th>
+            <th onClick={() => onSort('source')}    className="lp-th lp-th--sort">Lead Source{arrow('source')}</th>
             <th                                     className="lp-th">Assigned</th>
             <th onClick={() => onSort('estimatedValue')} className="lp-th lp-th--sort lp-th--right">Est. Value{arrow('estimatedValue')}</th>
             <th onClick={() => onSort('updatedAt')} className="lp-th lp-th--sort">Last Activity{arrow('updatedAt')}</th>
@@ -878,6 +913,13 @@ const ListTable: React.FC<ListTableProps> = ({
                     onClick={() => onQuote(lead)}
                   >
                     Quote
+                  </button>
+                  <button
+                    className="lp-card__delete-btn"
+                    title="Delete lead"
+                    onClick={() => onDelete(lead)}
+                  >
+                    Delete
                   </button>
                 </td>
               </tr>
@@ -1009,6 +1051,12 @@ const LeadsPipeline: React.FC = () => {
   const handleQuoteLead = useCallback((lead: Lead) => {
     navigate(`${crmBase}/quotes/new?leadId=${lead.id}`)
   }, [navigate, crmBase])
+
+  const handleDeleteLead = useCallback(async (lead: Lead) => {
+    if (!confirm(`Delete lead "${lead.company ?? lead.name}"? This cannot be undone.`)) return
+    await deleteLead(lead.id)
+    setSelectedId((prev) => (prev === lead.id ? null : prev))
+  }, [])
 
   // Add lead mutation
   const addMutation = useMutation({
@@ -1156,6 +1204,7 @@ const LeadsPipeline: React.FC = () => {
                   onSelect={handleSelectLead}
                   onMoveTo={handleMoveTo}
                   onQuote={handleQuoteLead}
+                  onDelete={handleDeleteLead}
                 />
               ))}
             </div>
@@ -1170,6 +1219,7 @@ const LeadsPipeline: React.FC = () => {
               onSelect={handleSelectLead}
               onMoveTo={handleMoveTo}
               onQuote={handleQuoteLead}
+              onDelete={handleDeleteLead}
             />
           )}
         </div>
@@ -1186,8 +1236,7 @@ const LeadsPipeline: React.FC = () => {
             onMoveTo={status => handleMoveTo(selectedLead.id, status)}
             onConvert={() => setShowConvert(true)}
             onDelete={async () => {
-              await deleteLead(selectedLead.id)
-              setSelectedId(null)
+              await handleDeleteLead(selectedLead)
             }}
             navigate={navigate}
             crmBase={crmBase}

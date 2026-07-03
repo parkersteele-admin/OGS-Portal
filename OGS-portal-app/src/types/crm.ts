@@ -5,9 +5,11 @@ export type LeadStatus = 'pending_setup' | 'new' | 'contacted' | 'qualified' | '
 
 export interface Lead {
   id: string
+  /** Person-level lead name (individual). */
   name: string
   email: string
   phone?: string
+  /** Business name attached during qualification. */
   company?: string
   address?: string
   city?: string
@@ -15,6 +17,8 @@ export interface Lead {
   zip?: string
   status: LeadStatus
   source?: string
+  /** Products or services the lead is interested in. */
+  productInterest?: string
   /** True when this lead was created automatically from a website signup. */
   isWebSignup?: boolean
   /** UID of the sales rep assigned to this lead. */

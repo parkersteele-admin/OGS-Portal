@@ -83,7 +83,11 @@ export const DEFAULT_DELIVERY_SETTINGS: DeliverySettings = {
 
 export interface Order {
   id: string
+  /** Legacy and primary company linkage (same value during migration). */
   customerId: string
+  companyId?: string
+  locationId?: string
+  locationName?: string
   productId: string
   tankId?: string
   quantity: number
@@ -145,6 +149,7 @@ export interface Order {
   signedByUid?: string
   signedByName?: string
   receivedByName?: string
+  contactOnSite?: string
   deliveryContactName?: string
   deliveryContactPhone?: string
   deliveryContactEmail?: string
@@ -152,6 +157,9 @@ export interface Order {
   billOfLadingUrl?: string
   invoicePdfUrl?: string
   deliveryNotes?: string
+  emptyCylindersPickedUp?: number
+  fullCylindersDelivered?: number
+  hazmatFee?: number
   deliveryConfirmationRecipients?: string[]
   runId?: string
   runStopId?: string

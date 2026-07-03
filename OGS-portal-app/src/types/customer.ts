@@ -9,10 +9,34 @@ export interface Address {
   zip: string
 }
 
+export type CompanyType = 'prospect' | 'customer' | 'inactive'
+
+export interface CompanyContact {
+  id: string
+  name: string
+  role: string
+  phone?: string
+  email?: string
+  isPrimary?: boolean
+  isDeliveryContact?: boolean
+}
+
+export interface CompanyLocation {
+  id: string
+  name: string
+  shipToAddress: Address
+  gateAccessNotes?: string
+  deliveryWindow?: string
+  storageLocation?: string
+  safetyNotes?: string
+  productsUsed?: string[]
+}
+
 export type CustomerStatus = 'active' | 'inactive' | 'hold' | 'archived' | 'deleted'
 
 export interface Customer {
   id: string
+  /** Company display name for CRM and billing. */
   name: string
   email: string
   phone: string
@@ -33,6 +57,21 @@ export interface Customer {
   geocodedAt?: string
   /** The lead this customer was converted from, if any. */
   leadId?: string
+  /** Explicit company profile fields for CRM hierarchy. */
+  companyName?: string
+  companyType?: CompanyType
+  mainPhone?: string
+  industry?: string
+  taxStatus?: 'taxable' | 'tax_exempt' | 'unknown'
+  paymentTerms?: string
+  agreementStatus?: 'none' | 'draft' | 'signed' | 'expired'
+  billingAddress?:
+    | Address
+    | { street?: string; city?: string; state?: string; zip?: string }
+    | null
+  contacts?: CompanyContact[]
+  locations?: CompanyLocation[]
+  defaultLocationId?: string
   status: CustomerStatus
   creditLimit: number
   notes?: string

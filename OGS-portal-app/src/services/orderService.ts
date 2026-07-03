@@ -24,6 +24,8 @@ export type { DeliveryTierConfig, DeliverySettings, RouteSchedule, AddOnItem }
 
 export interface OrderFilters {
   customerId?: string
+  companyId?: string
+  locationId?: string
   status?: OrderStatus
   deliveryTier?: DeliveryTier
   scheduledAfter?: Date
@@ -32,6 +34,10 @@ export interface OrderFilters {
 
 export interface CreateOrderInput {
   customerId: string
+  companyId?: string
+  locationId?: string
+  locationName?: string
+  contactOnSite?: string
   productId: string
   tankId?: string
   quantity: number
@@ -207,6 +213,8 @@ export async function getOrders(
   return serviceCall(async () => {
     const constraints: QueryConstraint[] = [orderBy('requestedAt', 'desc')]
     if (filters.customerId) constraints.push(where('customerId', '==', filters.customerId))
+    if (filters.companyId) constraints.push(where('companyId', '==', filters.companyId))
+    if (filters.locationId) constraints.push(where('locationId', '==', filters.locationId))
     if (filters.status)     constraints.push(where('status', '==', filters.status))
     if (filters.deliveryTier) constraints.push(where('deliveryTier', '==', filters.deliveryTier))
     if (filters.scheduledAfter)  constraints.push(where('scheduledAt', '>=', filters.scheduledAfter))
@@ -227,6 +235,8 @@ export function subscribeToOrders(
 ): Unsubscribe {
   const constraints: QueryConstraint[] = [orderBy('requestedAt', 'desc')]
   if (filters.customerId) constraints.push(where('customerId', '==', filters.customerId))
+  if (filters.companyId) constraints.push(where('companyId', '==', filters.companyId))
+  if (filters.locationId) constraints.push(where('locationId', '==', filters.locationId))
   if (filters.status)     constraints.push(where('status', '==', filters.status))
   return onSnapshot(query(ordersCol, ...constraints), (snap) => {
     callback(snap.docs.map((d) => ({ ...d.data(), id: d.id }) as Order))
@@ -247,6 +257,7 @@ export async function createOrder(
     )
     const ref = await addDoc(ordersCol, sanitizeForFirestore({
       ...payload,
+      companyId: data.companyId ?? data.customerId,
       ...pricing,
       status: 'pending' as OrderStatus,
       qbInvoiceNumber: null,
@@ -281,6 +292,7 @@ export async function createBatchOrders(
         )
         const ref = await addDoc(ordersCol, sanitizeForFirestore({
           ...payload,
+          companyId: item.companyId ?? item.customerId,
           ...pricing,
           ...(groupId ? { groupId } : {}),
           orderType,

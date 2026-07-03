@@ -37,6 +37,10 @@ export interface RunStop {
   order: number
   orderId: string
   customerId: string
+  companyId?: string
+  locationId?: string
+  locationName?: string
+  contactOnSite?: string
   tankId?: string
   status: RunStopStatus
   gallonsDelivered?: number

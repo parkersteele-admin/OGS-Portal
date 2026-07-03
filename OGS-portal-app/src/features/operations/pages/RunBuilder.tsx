@@ -27,7 +27,7 @@ import { Badge } from '../../../components/ui/Badge'
 import { Button } from '../../../components/ui/Button'
 import { Modal } from '../../../components/ui/Modal'
 import type { Order, DeliveryTier } from '../../../types/order'
-import type { Customer } from '../../../types/customer'
+import type { Customer, CompanyLocation } from '../../../types/customer'
 import type { Product } from '../../../types/product'
 import type { AppUser } from '../../../types/user'
 import './RunBuilder.css'
@@ -37,6 +37,9 @@ import './RunBuilder.css'
 interface StopItem {
   orderId: string
   customerId: string
+  companyId: string
+  locationId: string
+  locationName: string
   tankId?: string
   customerName: string
   address: string
@@ -52,6 +55,14 @@ interface Setup {
   date: string       // YYYY-MM-DD
   driverId: string
   truckId: string
+}
+
+interface LocationChoice {
+  locationId: string
+  locationName: string
+  address: string
+  city: string
+  zip: string
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -90,6 +101,31 @@ function isSameLocalDate(a: Date, b: Date): boolean {
     && a.getMonth() === b.getMonth()
     && a.getDate() === b.getDate()
   )
+}
+
+function customerLocations(customer?: Customer): CompanyLocation[] {
+  return customer?.locations ?? []
+}
+
+function deriveLocation(order: Order, customer?: Customer): LocationChoice | null {
+  const locations = customerLocations(customer)
+  if (locations.length === 0) return null
+
+  const byOrder = order.locationId
+    ? locations.find((loc) => loc.id === order.locationId)
+    : undefined
+  const byDefault = customer?.defaultLocationId
+    ? locations.find((loc) => loc.id === customer.defaultLocationId)
+    : undefined
+  const chosen = byOrder ?? byDefault ?? locations[0]
+
+  return {
+    locationId: chosen.id,
+    locationName: chosen.name,
+    address: chosen.shipToAddress.line1,
+    city: chosen.shipToAddress.city,
+    zip: chosen.shipToAddress.zip,
+  }
 }
 
 // ── StepIndicator ─────────────────────────────────────────────────────────────
@@ -422,6 +458,7 @@ interface Step3Props {
   productMap: Record<string, Product>
   onAddOrders: (orderIds: string[]) => void
   onRemoveOrder: (orderId: string) => void
+  onUpdateStopLocation: (orderId: string, locationId: string) => void
   onBack: () => void
   onNext: () => void
 }
@@ -434,6 +471,7 @@ const Step3Route: React.FC<Step3Props> = ({
   productMap,
   onAddOrders,
   onRemoveOrder,
+  onUpdateStopLocation,
   onBack,
   onNext,
 }) => {
@@ -609,6 +647,27 @@ const Step3Route: React.FC<Step3Props> = ({
                 <span className="rb-stop-item__addr">
                   {stop.address}{stop.city ? ` · ${stop.city}` : ''}{stop.zip ? ` ${stop.zip}` : ''}
                 </span>
+                <div className="rb-stop-item__location" onClick={(e) => e.stopPropagation()}>
+                  {(() => {
+                    const customer = customerMap[stop.customerId]
+                    const locations = customerLocations(customer)
+                    if (locations.length === 0) {
+                      return <span className="rb-stop-item__location-empty">No locations configured</span>
+                    }
+                    return (
+                      <select
+                        className="rb-input rb-select rb-input--sm"
+                        value={stop.locationId}
+                        onChange={(e) => onUpdateStopLocation(stop.orderId, e.target.value)}
+                      >
+                        <option value="">Select location</option>
+                        {locations.map((loc) => (
+                          <option key={loc.id} value={loc.id}>{loc.name}</option>
+                        ))}
+                      </select>
+                    )
+                  })()}
+                </div>
               </div>
               <div className="rb-stop-item__meta">
                 <span className="rb-stop-item__product">{stop.productName} × {stop.quantity}</span>
@@ -647,6 +706,7 @@ const Step3Route: React.FC<Step3Props> = ({
               filteredAvailableOrders.map((order) => {
                 const customer = customerMap[order.customerId]
                 const product = productMap[order.productId]
+                const loc = deriveLocation(order, customer)
                 const summary = order.quotedLineItems?.length
                   ? order.quotedLineItems.map((item) => `${item.description} x${item.quantity}`).join(' | ')
                   : `${product?.name ?? order.productId} x ${order.quantity}`
@@ -663,7 +723,9 @@ const Step3Route: React.FC<Step3Props> = ({
                         <span className="rb-add-order-row__order">#{order.id.slice(0, 8).toUpperCase()}</span>
                       </div>
                       <div className="rb-add-order-row__sub">
-                        {[customer?.address, customer?.city, customer?.state, customer?.zip].filter(Boolean).join(', ')}
+                        {loc
+                          ? `${loc.locationName} · ${[loc.address, loc.city, loc.zip].filter(Boolean).join(', ')}`
+                          : [customer?.address, customer?.city, customer?.state, customer?.zip].filter(Boolean).join(', ')}
                       </div>
                       <div className="rb-add-order-row__meta">{summary}</div>
                     </div>
@@ -863,14 +925,18 @@ export default function RunBuilder() {
       .map(o => {
         const cust = customerMap[o.customerId]
         const prod = productMap[o.productId]
+        const loc = deriveLocation(o, cust)
         return {
           orderId:      o.id,
           customerId:   o.customerId,
+          companyId:    o.companyId ?? o.customerId,
+          locationId:   loc?.locationId ?? '',
+          locationName: loc?.locationName ?? '',
           tankId:       o.tankId,
           customerName: cust?.name  ?? o.customerId,
-          address:      cust?.address ?? '',
-          city:         cust?.city    ?? '',
-          zip:          cust?.zip     ?? '',
+          address:      loc?.address ?? cust?.address ?? '',
+          city:         loc?.city    ?? cust?.city    ?? '',
+          zip:          loc?.zip     ?? cust?.zip     ?? '',
           productName:  prod?.name ?? o.productId,
           quantity:     o.quantity,
           tier:         o.deliveryTier,
@@ -894,20 +960,47 @@ export default function RunBuilder() {
       .map((order) => {
         const customer = customerMap[order.customerId]
         const product = productMap[order.productId]
+        const loc = deriveLocation(order, customer)
         return {
           orderId: order.id,
           customerId: order.customerId,
+          companyId: order.companyId ?? order.customerId,
+          locationId: loc?.locationId ?? '',
+          locationName: loc?.locationName ?? '',
           tankId: order.tankId,
           customerName: customer?.name ?? order.customerId,
-          address: customer?.address ?? '',
-          city: customer?.city ?? '',
-          zip: customer?.zip ?? '',
+          address: loc?.address ?? customer?.address ?? '',
+          city: loc?.city ?? customer?.city ?? '',
+          zip: loc?.zip ?? customer?.zip ?? '',
           productName: product?.name ?? order.productId,
           quantity: order.quantity,
           tier: order.deliveryTier,
         } satisfies StopItem
       })
     setStops([...stops, ...additions])
+  }
+
+  function updateStopLocation(orderId: string, locationId: string) {
+    setStops((prev) => prev.map((stop) => {
+      if (stop.orderId !== orderId) return stop
+      const customer = customerMap[stop.customerId]
+      const location = customerLocations(customer).find((loc) => loc.id === locationId)
+      if (!location) {
+        return {
+          ...stop,
+          locationId: '',
+          locationName: '',
+        }
+      }
+      return {
+        ...stop,
+        locationId: location.id,
+        locationName: location.name,
+        address: location.shipToAddress.line1,
+        city: location.shipToAddress.city,
+        zip: location.shipToAddress.zip,
+      }
+    }))
   }
 
   function removeOrderFromRun(orderId: string) {
@@ -926,6 +1019,11 @@ export default function RunBuilder() {
     setCreateError(null)
 
     try {
+      const invalidStops = stops.filter((stop) => !stop.locationId)
+      if (invalidStops.length > 0) {
+        throw new Error('Every stop must have a delivery location selected before creating the run.')
+      }
+
       // 1. Create run document
       const runId = await createRun({
         driverId:      setup.driverId,
@@ -945,6 +1043,9 @@ export default function RunBuilder() {
           order:      i + 1,
           orderId:    stop.orderId,
           customerId: stop.customerId,
+          companyId:  stop.companyId,
+          locationId: stop.locationId,
+          locationName: stop.locationName,
           ...(stop.tankId ? { tankId: stop.tankId } : {}),
           status:     'pending',
         } as never)
@@ -970,6 +1071,9 @@ export default function RunBuilder() {
             scheduledAt: serverTimestamp() as never,
             runId,
             runStopId: stopRefs[index].id,
+            companyId: stop.companyId,
+            locationId: stop.locationId,
+            locationName: stop.locationName,
           })
         )
       )
@@ -1035,6 +1139,7 @@ export default function RunBuilder() {
             onRemoveOrder={removeOrderFromRun}
             onBack={() => setStep(2)}
             onNext={goToStep4}
+            onUpdateStopLocation={updateStopLocation}
           />
         )}
         {step === 4 && (

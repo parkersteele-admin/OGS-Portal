@@ -317,13 +317,13 @@ const CustomerDetailPage: React.FC = () => {
               locations.map((loc) => (
                 <div key={loc.id} className="ob-step__location-card">
                   <strong>{loc.nickname}</strong>
-                  <span>{`${loc.address.street}, ${loc.address.city}, ${loc.address.state} ${loc.address.zip}`}</span>
+                  <span>{`Ship-to address: ${loc.address.street}, ${loc.address.city}, ${loc.address.state} ${loc.address.zip}`}</span>
                   <span>Contact: {loc.contactName} · {loc.contactPhone}</span>
                   {loc.preferredDays.length > 0 && (
-                    <span>Preferred: {loc.preferredDays.join(', ')}</span>
+                    <span>Delivery window/preferred days: {loc.preferredDays.join(', ')}</span>
                   )}
-                  {loc.accessNotes && <span>Notes: {loc.accessNotes}</span>}
-                  <span>Storage: {loc.cylinderStorage}</span>
+                  {loc.accessNotes && <span>Gate/access notes: {loc.accessNotes}</span>}
+                  <span>Storage/cage location: {loc.cylinderStorage}</span>
                   {loc.currentProvider && <span>Provider: {loc.currentProvider}</span>}
                 </div>
               ))

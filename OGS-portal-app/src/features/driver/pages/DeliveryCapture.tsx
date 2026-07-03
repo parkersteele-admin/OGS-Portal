@@ -27,6 +27,7 @@ import { useParams, useLocation, useNavigate } from 'react-router-dom'
 import { getDoc, doc } from 'firebase/firestore'
 import { db } from '../../../lib/firebase'
 import { updateRunStop, updateStopStatus } from '../../../services/runService'
+import { updateOrder } from '../../../services/orderService'
 import {
   uploadDeliveryPhoto,
 } from '../../../services/fileService'
@@ -219,6 +220,7 @@ export default function DeliveryCapture() {
   const [submitting,     setSubmitting]     = useState(false)
   const [submitError,    setSubmitError]    = useState<string | null>(null)
   const [deliveryNotes,  setDeliveryNotes]  = useState('')
+  const [selectedLocationId, setSelectedLocationId] = useState('')
 
   // Skip stop drawer
   const [showSkip,    setShowSkip]    = useState(false)
@@ -246,11 +248,18 @@ export default function DeliveryCapture() {
       setQtyDelivered(ord?.quantity ?? 0)
       setReceivedByName(ord?.deliveryContactName ?? '')
 
-      setCustomer(
-        customerSnap.exists()
-          ? ({ id: customerSnap.id, ...customerSnap.data() } as Customer)
-          : null,
-      )
+      const cust = customerSnap.exists()
+        ? ({ id: customerSnap.id, ...customerSnap.data() } as Customer)
+        : null
+      setCustomer(cust)
+
+      const fallbackLocationId =
+        ord?.locationId
+        || stop?.locationId
+        || cust?.defaultLocationId
+        || cust?.locations?.[0]?.id
+        || ''
+      setSelectedLocationId(fallbackLocationId)
 
       if (ord?.productId) {
         const pSnap = await getDoc(doc(db, 'products', ord.productId))
@@ -347,6 +356,24 @@ export default function DeliveryCapture() {
       if (!receivedByName.trim()) {
         throw new Error('Received by name is required before completing delivery.')
       }
+      if (!selectedLocationId) {
+        throw new Error('Delivery location must be selected before completing delivery.')
+      }
+
+      const selectedLocation = customer?.locations?.find((loc) => loc.id === selectedLocationId)
+
+      await Promise.all([
+        updateOrder(order.id, {
+          companyId: order.companyId ?? order.customerId,
+          locationId: selectedLocationId,
+          locationName: selectedLocation?.name ?? order.locationName,
+        }),
+        updateRunStop(runId, stop.id, {
+          companyId: stop.companyId ?? order.companyId ?? order.customerId,
+          locationId: selectedLocationId,
+          locationName: selectedLocation?.name ?? stop.locationName,
+        }),
+      ])
 
       const deliveredLineItems = order.productId
         ? [{ productId: order.productId, qty: qtyDelivered }]
@@ -443,6 +470,8 @@ export default function DeliveryCapture() {
 
   const unitLabel = product?.unit ?? 'unit'
   const orderedQty = order?.quantity ?? 0
+  const locationOptions = customer?.locations ?? []
+  const selectedLocationName = locationOptions.find((loc) => loc.id === selectedLocationId)?.name
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -473,6 +502,28 @@ export default function DeliveryCapture() {
             {customer.address}, {customer.city} {customer.state} {customer.zip}
           </div>
         )}
+        <div className="dc-field" style={{ marginTop: 10 }}>
+          <label className="dc-field__label" htmlFor="dc-location-select">
+            Delivery location <span className="dc-field__hint">(required)</span>
+          </label>
+          {locationOptions.length === 0 ? (
+            <p className="dc-body__sub" style={{ margin: 0 }}>
+              No company locations configured for this customer.
+            </p>
+          ) : (
+            <select
+              id="dc-location-select"
+              className="dc-select"
+              value={selectedLocationId}
+              onChange={(e) => setSelectedLocationId(e.target.value)}
+            >
+              <option value="">Select location…</option>
+              {locationOptions.map((loc) => (
+                <option key={loc.id} value={loc.id}>{loc.name}</option>
+              ))}
+            </select>
+          )}
+        </div>
         {product && order && (
           <div className="dc-stop-card__product">
             {product.name} · {order.quantity} {unitLabel}
@@ -705,6 +756,10 @@ export default function DeliveryCapture() {
               <span className="dc-summary__val">{product?.name ?? '—'}</span>
             </div>
             <div className="dc-summary__row">
+              <span className="dc-summary__lbl">Location</span>
+              <span className="dc-summary__val">{selectedLocationName ?? '—'}</span>
+            </div>
+            <div className="dc-summary__row">
               <span className="dc-summary__lbl">Qty delivered</span>
               <span className="dc-summary__val dc-summary__val--hero">
                 {qtyDelivered} {unitLabel}
@@ -770,7 +825,7 @@ export default function DeliveryCapture() {
           <button
             className="dc-cta dc-cta--deliver"
             onClick={() => setShowConfirm(true)}
-            disabled={submitting || !receivedByName.trim()}
+            disabled={submitting || !receivedByName.trim() || !selectedLocationId}
           >
             ✓ Mark as delivered
           </button>

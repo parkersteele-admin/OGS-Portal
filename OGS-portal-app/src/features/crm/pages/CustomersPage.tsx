@@ -179,6 +179,8 @@ const CustomersPage: React.FC = () => {
                 <thead className="page-table__head">
                   <tr>
                     <th className="page-table__th">Company</th>
+                    <th className="page-table__th">Contacts</th>
+                    <th className="page-table__th">Locations</th>
                     <th className="page-table__th">City</th>
                     <th className="page-table__th">Phone</th>
                     <th className="page-table__th">Email</th>
@@ -196,6 +198,8 @@ const CustomersPage: React.FC = () => {
                       onKeyDown={(e) => e.key === 'Enter' && navigate(`${crmBase}/customers/${c.id}`)}
                     >
                       <td className="page-table__td page-table__td--strong cp-cell--name">{c.name}</td>
+                      <td className="page-table__td">{c.contacts?.length ?? 0}</td>
+                      <td className="page-table__td">{c.locations?.length ?? 0}</td>
                       <td className="page-table__td">{c.city}{c.state ? `, ${c.state}` : ''}</td>
                       <td className="page-table__td">{c.phone || '-'}</td>
                       <td className="page-table__td cp-cell--email">{c.email || '-'}</td>
@@ -224,7 +228,7 @@ const CustomersPage: React.FC = () => {
                   onKeyDown={(e) => e.key === 'Enter' && navigate(`${crmBase}/customers/${c.id}`)}
                 >
                   <h3>{c.name}</h3>
-                  <div className="cp-mobile-card__meta">{c.phone || 'No phone'} · {getAccountType(c)}</div>
+                  <div className="cp-mobile-card__meta">{c.phone || 'No phone'} · {getAccountType(c)} · {c.contacts?.length ?? 0} contacts · {c.locations?.length ?? 0} locations</div>
                   <div className="cp-mobile-card__footer">
                     <span>Last order: {lastOrderMap[c.id] ?? '—'}</span>
                     <span className="cp-mobile-card__view">View →</span>

@@ -16,7 +16,13 @@ import {
 import { getLimitConstraint } from './queryOptimizer'
 import { db } from '../lib/firebase'
 import { customersCol } from '../lib/firestore'
-import type { Customer, CustomerStatus } from '../types/customer'
+import type {
+  Customer,
+  CustomerStatus,
+  CompanyContact,
+  CompanyLocation,
+  CompanyType,
+} from '../types/customer'
 import { formatAddress } from '../utils/addressUtils'
 import { serviceCall, fromSnap, paginate, type Page, type PageOptions, sanitizeForFirestore } from './base'
 
@@ -37,6 +43,16 @@ export interface CreateCustomerInput {
   creditLimit?: number
   notes?: string
   leadId?: string
+  companyName?: string
+  companyType?: CompanyType
+  mainPhone?: string
+  industry?: string
+  taxStatus?: 'taxable' | 'tax_exempt' | 'unknown'
+  paymentTerms?: string
+  agreementStatus?: 'none' | 'draft' | 'signed' | 'expired'
+  contacts?: CompanyContact[]
+  locations?: CompanyLocation[]
+  defaultLocationId?: string
 }
 
 // ── Read ──────────────────────────────────────────────────────────────────────
@@ -88,8 +104,15 @@ export async function createCustomer(data: CreateCustomerInput): Promise<string>
     const coords = await geocodeAddress(data).catch(() => null)
 
     const cleanData = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined))
+    const normalizedName = data.companyName?.trim() || data.name.trim()
     const ref = await addDoc(customersCol, sanitizeForFirestore({
       ...cleanData,
+      name: normalizedName,
+      companyName: normalizedName,
+      companyType: data.companyType ?? 'customer',
+      mainPhone: data.mainPhone ?? data.phone,
+      contacts: data.contacts ?? [],
+      locations: data.locations ?? [],
       status: 'active' as CustomerStatus,
       creditLimit: data.creditLimit ?? 5000,
       // geocodeCustomer Cloud Function handles geocoding server-side.

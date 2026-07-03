@@ -33,6 +33,7 @@ export interface CreateLeadInput {
   state?: string
   zip?: string
   source?: string
+  productInterest?: string
   assignedTo?: string
   estimatedValue?: number
   notes?: string
@@ -143,16 +144,33 @@ export async function convertLeadToCustomer(leadId: string): Promise<string> {
     }
 
     const { createCustomer } = await import('./customerService')
+    const nowId = `ct_${Date.now()}`
+    const companyName = lead.company?.trim() || lead.name.trim()
+    const contactName = lead.name.trim()
     const customerInput: CreateCustomerInput = {
-      name: lead.company ?? lead.name,
+      name: companyName,
+      companyName,
       email: lead.email,
       phone: lead.phone ?? '',
+      mainPhone: lead.phone ?? '',
       address: lead.address ?? '',
       city: lead.city ?? '',
       state: lead.state ?? '',
       zip: lead.zip ?? '',
       notes: lead.notes,
       leadId: leadId,
+      companyType: 'customer',
+      contacts: contactName
+        ? [{
+            id: nowId,
+            name: contactName,
+            role: 'Primary Contact',
+            phone: lead.phone,
+            email: lead.email,
+            isPrimary: true,
+            isDeliveryContact: true,
+          }]
+        : [],
     }
     const customerId = await createCustomer(customerInput)
 
