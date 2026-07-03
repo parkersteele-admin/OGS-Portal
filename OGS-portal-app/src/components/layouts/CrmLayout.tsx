@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { Outlet } from 'react-router-dom'
 import { Sidebar } from '../ui/Sidebar'
 import { TopBar } from '../ui/TopBar'
@@ -34,7 +34,6 @@ const MORE_ITEMS: MobileNavItem[] = [
 ]
 
 export const CrmLayout: React.FC = () => {
-  const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const { role, isAdmin } = useAuth()
 
   return (
@@ -43,12 +42,10 @@ export const CrmLayout: React.FC = () => {
         title={isAdmin ? 'Admin' : 'CRM'}
         items={isAdmin ? ADMIN_SIDEBAR_OVERVIEW_ITEMS : NAV_ITEMS}
         groups={isAdmin ? ADMIN_SIDEBAR_GROUPS : undefined}
-        mobileOpen={mobileNavOpen}
-        onMobileClose={() => setMobileNavOpen(false)}
       />
       <div className="layout__main">
         <ViewAsBanner />
-        <TopBar title="CRM" onMenuClick={() => setMobileNavOpen(true)} />
+        <TopBar title="CRM" />
         <main className="layout__content">
           <Outlet />
         </main>

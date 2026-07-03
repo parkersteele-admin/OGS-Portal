@@ -475,6 +475,29 @@ export default function AdminDashboard() {
   const admin = useAdminMetrics()
   const performance = usePerformanceMetrics()
 
+  const heroStats = [
+    {
+      label: 'Open Quotes',
+      value: crm.loading ? '—' : (crm.data ? fmtCurrency(crm.data.openQuoteValue) : '—'),
+      meta: crm.data ? `${crm.data.openQuoteCount} active` : 'Pipeline value',
+    },
+    {
+      label: 'Outstanding Invoices',
+      value: ops.loading ? '—' : (ops.data ? fmtCurrency(ops.data.outstandingInvoiceTotal) : '—'),
+      meta: ops.data ? `${ops.data.outstandingInvoiceCount} unpaid` : 'Collections queue',
+    },
+    {
+      label: 'Active Runs',
+      value: ops.loading ? '—' : (ops.data?.activeRuns ?? 0),
+      meta: 'Scheduled + in-progress',
+    },
+    {
+      label: 'Total Portal Users',
+      value: admin.loading ? '—' : (admin.data?.totalUsers ?? 0),
+      meta: admin.data ? `${admin.data.ogsStaff} staff` : 'User footprint',
+    },
+  ]
+
   return (
     <div className="adash">
       <header className="page-header">
@@ -487,6 +510,15 @@ export default function AdminDashboard() {
           <div className="page-header__actions">
             <span className="page-header__meta-tag">Admin</span>
           </div>
+        </div>
+        <div className="adash-hero-stats" aria-label="Executive summary">
+          {heroStats.map((item) => (
+            <article key={item.label} className="adash-hero-stat">
+              <p className="adash-hero-stat__label">{item.label}</p>
+              <p className="adash-hero-stat__value">{item.value}</p>
+              <p className="adash-hero-stat__meta">{item.meta}</p>
+            </article>
+          ))}
         </div>
       </header>
 

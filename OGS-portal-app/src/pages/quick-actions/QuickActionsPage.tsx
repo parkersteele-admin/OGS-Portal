@@ -8,7 +8,6 @@ import {
 	FileStack,
 	FileText,
 	Map,
-	Menu,
 	Send,
 	Tag,
 	Truck,
@@ -20,6 +19,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { db } from '../../lib/firebase'
 import type { OgsRole } from '../../types/user'
+import { MobileNav, type MobileNavItem } from '../../components/ui/MobileNav'
 import './QuickActionsPage.css'
 
 type StatTone = 'positive' | 'warning' | 'neutral'
@@ -39,12 +39,14 @@ interface QuickTile {
 	primary?: boolean
 }
 
-interface DrawerLink {
-	label: string
-	to: string
-}
-
 const ROLE_ORDER: OgsRole[] = ['admin', 'sales', 'dispatch', 'driver']
+
+const ROLE_HOME_PATH: Record<OgsRole, string> = {
+	admin: '/admin/dashboard',
+	sales: '/crm/dashboard',
+	dispatch: '/ops/dispatch',
+	driver: '/driver/schedule',
+}
 
 const ROLE_TILES: Record<OgsRole, QuickTile[]> = {
 	admin: [
@@ -74,31 +76,31 @@ const ROLE_TILES: Record<OgsRole, QuickTile[]> = {
 	],
 }
 
-const ROLE_DRAWER_LINKS: Record<OgsRole, DrawerLink[]> = {
+const ROLE_MORE_ITEMS: Record<OgsRole, MobileNavItem[]> = {
 	admin: [
-		{ label: 'Dashboard', to: '/admin/dashboard' },
-		{ label: 'Customers', to: '/admin/crm/customers' },
-		{ label: 'Quotes', to: '/admin/crm/quotes' },
-		{ label: 'Operations', to: '/admin/ops/dispatch' },
-		{ label: 'Users', to: '/admin/users' },
+		{ label: 'Dashboard', to: '/admin/dashboard', icon: '⌂' },
+		{ label: 'Customers', to: '/admin/crm/customers', icon: '◈' },
+		{ label: 'Quotes', to: '/admin/crm/quotes', icon: '◫' },
+		{ label: 'Operations', to: '/admin/ops/dispatch', icon: '△' },
+		{ label: 'Users', to: '/admin/users', icon: '◎' },
 	],
 	sales: [
-		{ label: 'Dashboard', to: '/crm/dashboard' },
-		{ label: 'Leads', to: '/crm/leads' },
-		{ label: 'Customers', to: '/crm/customers' },
-		{ label: 'Quotes', to: '/crm/quotes' },
-		{ label: 'Billing', to: '/crm/billing' },
+		{ label: 'Dashboard', to: '/crm/dashboard', icon: '⌂' },
+		{ label: 'Leads', to: '/crm/leads', icon: '◉' },
+		{ label: 'Customers', to: '/crm/customers', icon: '◈' },
+		{ label: 'Quotes', to: '/crm/quotes', icon: '◫' },
+		{ label: 'Billing', to: '/crm/billing', icon: '◌' },
 	],
 	dispatch: [
-		{ label: 'Dashboard', to: '/ops/dashboard' },
-		{ label: 'Dispatch', to: '/ops/dispatch' },
-		{ label: 'Orders', to: '/ops/orders' },
-		{ label: 'Runs', to: '/ops/runs' },
+		{ label: 'Dashboard', to: '/ops/dashboard', icon: '⌂' },
+		{ label: 'Dispatch', to: '/ops/dispatch', icon: '⌖' },
+		{ label: 'Orders', to: '/ops/orders', icon: '≡' },
+		{ label: 'Runs', to: '/ops/runs', icon: '△' },
 	],
 	driver: [
-		{ label: 'Schedule', to: '/driver/schedule' },
-		{ label: 'Dispatch Map', to: '/ops/dispatch' },
-		{ label: 'Truck', to: '/driver/truck' },
+		{ label: 'Schedule', to: '/driver/schedule', icon: '◷' },
+		{ label: 'Dispatch Map', to: '/ops/dispatch', icon: '⌖' },
+		{ label: 'Truck', to: '/driver/truck', icon: '◬' },
 	],
 }
 
@@ -339,7 +341,6 @@ function useQuickStats(role: OgsRole, userId: string | null): { stats: QuickStat
 export default function QuickActionsPage(): ReactElement {
 	const navigate = useNavigate()
 	const { role, user } = useAuth()
-	const [drawerOpen, setDrawerOpen] = useState(false)
 	const [activeRole, setActiveRole] = useState<OgsRole>('dispatch')
 	const [showStatsCue, setShowStatsCue] = useState(false)
 
@@ -375,38 +376,14 @@ export default function QuickActionsPage(): ReactElement {
 	}, [activeRole, stats, isLoading])
 
 	const tiles = useMemo(() => ROLE_TILES[activeRole], [activeRole])
-	const drawerLinks = useMemo(() => ROLE_DRAWER_LINKS[activeRole], [activeRole])
+	const roleHomePath = ROLE_HOME_PATH[activeRole]
+	const moreItems = useMemo(() => ROLE_MORE_ITEMS[activeRole], [activeRole])
 
 	return (
 		<div className="qa-page">
-			<button
-				type="button"
-				className={`qa-drawer-backdrop${drawerOpen ? ' qa-drawer-backdrop--open' : ''}`}
-				onClick={() => setDrawerOpen(false)}
-				aria-label="Close quick actions menu"
-			/>
-			<aside className={`qa-drawer${drawerOpen ? ' qa-drawer--open' : ''}`}>
-				<div className="qa-drawer__head">Quick links</div>
-				<div className="qa-drawer__links">
-					{drawerLinks.map((link) => (
-						<button
-							type="button"
-							key={link.to}
-							className="qa-drawer__link"
-							onClick={() => {
-								setDrawerOpen(false)
-								navigate(link.to)
-							}}
-						>
-							{link.label}
-						</button>
-					))}
-				</div>
-			</aside>
-
 			<header className="qa-topbar">
-				<button type="button" className="qa-menu" onClick={() => setDrawerOpen(true)} aria-label="Open quick links">
-					<Menu size={22} color="#ffffff" />
+				<button type="button" className="qa-back" onClick={() => navigate(roleHomePath)} aria-label="Back to dashboard">
+					Back
 				</button>
 				<div className="qa-wordmark">OGS Quick Actions</div>
 				<div className="qa-role-badge">{activeRole}</div>
@@ -495,6 +472,8 @@ export default function QuickActionsPage(): ReactElement {
 					</div>
 				))}
 			</section>
+
+			<MobileNav role={activeRole} moreItems={moreItems} />
 		</div>
 	)
 }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { Outlet } from 'react-router-dom'
 import { Sidebar } from '../ui/Sidebar'
 import { TopBar } from '../ui/TopBar'
@@ -27,20 +27,16 @@ const MORE_ITEMS: MobileNavItem[] = [
 ]
 
 export const AdminLayout: React.FC = () => {
-  const [mobileNavOpen, setMobileNavOpen] = useState(false)
-
   return (
     <div className="layout">
       <Sidebar
         title="Admin"
         items={ADMIN_SIDEBAR_OVERVIEW_ITEMS}
         groups={ADMIN_SIDEBAR_GROUPS}
-        mobileOpen={mobileNavOpen}
-        onMobileClose={() => setMobileNavOpen(false)}
       />
       <div className="layout__main">
         <ViewAsBanner />
-        <TopBar title="Admin" onMenuClick={() => setMobileNavOpen(true)} />
+        <TopBar title="Admin" />
         <main className="layout__content">
           <Outlet />
         </main>

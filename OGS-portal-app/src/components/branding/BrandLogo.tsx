@@ -16,7 +16,7 @@ export function BrandLogo({
   const classes = className ? `brand-logo ${className}` : 'brand-logo'
   const src = variant === 'white'
     ? `/logo-white.png?v=${LOGO_ASSET_VERSION}`
-    : `/logo.svg?v=${LOGO_ASSET_VERSION}`
+    : `/logo-dark.svg?v=${LOGO_ASSET_VERSION}`
 
   return <img className={classes} src={src} alt={alt} />
 }

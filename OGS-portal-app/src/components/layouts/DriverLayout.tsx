@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { Calendar, Crosshair, Truck } from 'lucide-react'
 import { Outlet } from 'react-router-dom'
 import { Sidebar } from '../ui/Sidebar'
@@ -25,15 +25,14 @@ const MORE_ITEMS: MobileNavItem[] = [
 ]
 
 export const DriverLayout: React.FC = () => {
-  const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const { role } = useAuth()
 
   return (
     <div className="layout">
-      <Sidebar title="Driver" items={NAV_ITEMS} mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />
+      <Sidebar title="Driver" items={NAV_ITEMS} />
       <div className="layout__main">
         <ViewAsBanner />
-        <TopBar title="Driver Portal" onMenuClick={() => setMobileNavOpen(true)} />
+        <TopBar title="Driver Portal" />
         <main className="layout__content">
           <Outlet />
         </main>
