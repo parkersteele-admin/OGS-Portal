@@ -387,6 +387,9 @@ interface DetailPanelProps {
 const DetailPanel: React.FC<DetailPanelProps> = ({
   lead, salesReps, onClose, onMoveTo, onConvert, onDelete, navigate, crmBase,
 }) => {
+  const [name,      setName]      = useState(lead.name)
+  const [email,     setEmail]     = useState(lead.email)
+  const [phone,     setPhone]     = useState(lead.phone ?? '')
   const [notes,     setNotes]     = useState(lead.notes ?? '')
   const [estValue,  setEstValue]  = useState(String(lead.estimatedValue ?? ''))
   const [assigned,  setAssigned]  = useState(lead.assignedTo ?? '')
@@ -400,6 +403,9 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
 
   // Sync when selected lead changes
   useEffect(() => {
+    setName(lead.name)
+    setEmail(lead.email)
+    setPhone(lead.phone ?? '')
     setNotes(lead.notes ?? '')
     setEstValue(String(lead.estimatedValue ?? ''))
     setAssigned(lead.assignedTo ?? '')
@@ -414,6 +420,9 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
     setSaving(true)
     try {
       await updateLead(lead.id, {
+        name:           name.trim(),
+        email:          email.trim(),
+        phone:          phone.trim() || undefined,
         notes:          notes.trim(),
         estimatedValue: estValue ? Number(estValue) : undefined,
         assignedTo:     assigned || undefined,
@@ -512,6 +521,23 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
         <section className="lp-panel__section">
           <h4 className="lp-panel__section-title">Details</h4>
           <div className="lp-panel__fields">
+            <Input
+              label="Lead name"
+              value={name}
+              onChange={e => setName(e.target.value)}
+            />
+            <Input
+              label="Email"
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+            />
+            <Input
+              label="Phone"
+              type="tel"
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
+            />
             <Input label="Address" value={address} onChange={e => setAddress(e.target.value)} />
             <div className="lp-form-row">
               <Input label="City"  value={city}     onChange={e => setCity(e.target.value)}     />
