@@ -442,6 +442,18 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
   const stageConfig = STAGE_MAP[lead.status] ?? { key: lead.status, label: lead.status, accent: false }
   const repName = salesReps.find(r => r.id === lead.assignedTo)?.name
   const stageBadgeVariant = stageConfig.accent ? 'brand' : 'neutral'
+  const hasUnsavedChanges =
+    name.trim() !== lead.name ||
+    email.trim() !== lead.email ||
+    (phone.trim() || '') !== (lead.phone ?? '') ||
+    notes.trim() !== (lead.notes ?? '') ||
+    estValue !== String(lead.estimatedValue ?? '') ||
+    (assigned || '') !== (lead.assignedTo ?? '') ||
+    (source || '') !== (lead.source ?? '') ||
+    (address.trim() || '') !== (lead.address ?? '') ||
+    (city.trim() || '') !== (lead.city ?? '') ||
+    (stateVal.trim() || '') !== (lead.state ?? '') ||
+    (zip.trim() || '') !== (lead.zip ?? '')
 
   return (
     <aside className="lp-panel" aria-label="Lead detail">
@@ -578,12 +590,6 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
                 placeholder="Products of interest, background info…"
               />
             </div>
-            <div className="lp-panel__save-row">
-              {saved && <span className="lp-saved">✓ Saved</span>}
-              <Button variant="secondary" size="sm" loading={saving} onClick={handleSave}>
-                Save changes
-              </Button>
-            </div>
           </div>
         </section>
 
@@ -596,6 +602,16 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
 
       {/* Footer actions */}
       <div className="lp-panel__footer">
+        {saved && <span className="lp-saved">✓ Saved</span>}
+        <Button
+          variant="primary"
+          size="sm"
+          loading={saving}
+          disabled={!hasUnsavedChanges || saving}
+          onClick={handleSave}
+        >
+          Save changes
+        </Button>
         {['qualified', 'proposal', 'won'].includes(lead.status) ? (
           <Button
             variant="ghost"
