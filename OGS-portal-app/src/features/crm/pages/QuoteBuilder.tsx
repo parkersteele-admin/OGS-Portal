@@ -507,14 +507,25 @@ export const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
     [includeRental, rentalRate, rentalMonths],
   )
   const effectiveDelivery = includeDelivery ? deliveryFee : 0
-  const preTaxTotal = parseFloat((subtotal + effectiveDelivery + rentalTotal).toFixed(2))
-  const parsedSalesTaxRatePercent = Number.parseFloat(salesTaxRatePercent)
-  const safeSalesTaxRatePercent = Number.isFinite(parsedSalesTaxRatePercent)
-    ? Math.max(parsedSalesTaxRatePercent, 0)
-    : 0
-  const salesTaxRate = applySalesTax ? (safeSalesTaxRatePercent / 100) : 0
-  const salesTaxAmount = parseFloat((preTaxTotal * salesTaxRate).toFixed(2))
-  const total = parseFloat((preTaxTotal + salesTaxAmount).toFixed(2))
+  const preTaxTotal = useMemo(
+    () => parseFloat((subtotal + effectiveDelivery + rentalTotal).toFixed(2)),
+    [subtotal, effectiveDelivery, rentalTotal],
+  )
+  const taxCalculations = useMemo(() => {
+    const parsedRate = Number.parseFloat(salesTaxRatePercent)
+    const safeRate = Number.isFinite(parsedRate) ? Math.max(parsedRate, 0) : 0
+    const decimalRate = applySalesTax ? (safeRate / 100) : 0
+    const taxAmount = parseFloat((preTaxTotal * decimalRate).toFixed(2))
+    const finalTotal = parseFloat((preTaxTotal + taxAmount).toFixed(2))
+    return {
+      safeSalesTaxRatePercent: safeRate,
+      salesTaxRate: decimalRate,
+      salesTaxAmount: taxAmount,
+      total: finalTotal,
+    }
+  }, [salesTaxRatePercent, applySalesTax, preTaxTotal])
+
+  const { safeSalesTaxRatePercent, salesTaxRate, salesTaxAmount, total } = taxCalculations
 
   const selectedSalesRep = useMemo(
     () => salesRepOptions.find((rep) => rep.id === salesRepId) ?? null,
