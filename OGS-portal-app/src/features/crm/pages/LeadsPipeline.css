@@ -389,13 +389,21 @@
 .lp-card__footer {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-2);
   padding-top: 0.75rem;
   border-top: 1px solid var(--color-divider);
 }
 
-.lp-card__stage-select {
-  flex: 1;
+.lp-card__footer .lp-card__stage-select {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+.lp-card__footer .lp-card__delete-btn,
+.lp-card__footer .lp-card__quote-btn {
+  flex: 1 1 calc(50% - (var(--space-2) / 2));
+  min-width: 0;
 }
 
 .lp-card__quote-btn {
