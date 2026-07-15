@@ -24,9 +24,10 @@
  *    certExpiryCheck     — Weekly Mon 07:00 ET: alert on upcoming inspections
  *
  *  Callables
- *    generateInvoicePdf — Build PDF invoice, upload to Storage, return signed URL
- *    generateQuotePdf   — Build PDF quote, upload to Storage, email to recipient, return signed URL
- *    optimizeRoute      — Reorder run stops via Google Maps Routes API
+ *    generateInvoicePdf   — Build PDF invoice, upload to Storage, return signed URL
+ *    generateQuotePdf     — Build PDF quote, upload to Storage, email to recipient, return signed URL
+ *    optimizeRoute        — Reorder run stops via Google Maps Routes API
+ *    submitWelcomeInquiry — Public: email + log a /welcome landing page inquiry
  *
  *  Utility
  *    healthCheck — Simple HTTP health probe
@@ -61,6 +62,7 @@ export { generateInvoicePdf, generateQuotePdf, optimizeRoute, respondToQuote, ba
 export { optimizeOrderRoute }                                     from './maps/optimizeRoute'
 export { generateRunManifest }                                    from './generateRunManifest'
 export { onCylinderFlagged }                                      from './onCylinderFlagged'
+export { submitWelcomeInquiry }                                   from './inquiries'
 
 // Onboarding callables
 export {

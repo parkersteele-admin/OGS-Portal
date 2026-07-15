@@ -72,6 +72,9 @@ import CustomerDetailPage from '../../pages/ops/CustomerDetail'
 import PublicQuotePage from '../../pages/public/PublicQuotePage'
 import QuickActionsPage from '../../pages/quick-actions/QuickActionsPage'
 
+// Public welcome / explainer landing page (no auth required)
+import WelcomePage from '../../pages/public/Welcome'
+
 
 
 const RootRedirect: React.FC = () => {
@@ -128,6 +131,9 @@ export const AppRouter: React.FC = () => (
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/signup" element={<SignUp />} />
       <Route path="/accept-invite" element={<AcceptInvitePage />} />
+
+      {/* Public explainer / landing page — shareable outside the login flow */}
+      <Route path="/welcome" element={<WelcomePage />} />
 
       {/* Public quote acceptance — no auth required, token in query string */}
       <Route path="/quote/:quoteId" element={<PublicQuotePage />} />
