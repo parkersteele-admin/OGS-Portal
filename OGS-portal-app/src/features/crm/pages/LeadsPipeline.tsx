@@ -166,6 +166,7 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ salesReps, onClose, onSave,
     e.preventDefault()
     await onSave({
       ...form,
+      company: form.company?.trim() ?? '',
       name: form.name.trim(),
       email: form.email.trim(),
       phone: form.phone?.trim() ?? '',
@@ -176,8 +177,8 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ salesReps, onClose, onSave,
     <Modal open onClose={onClose} title="Add new lead" size="md">
       <form className="lp-modal-form" onSubmit={handleSubmit}>
         <div className="lp-form-row">
+          <Input label="Company"      value={form.company} onChange={set('company')} required />
           <Input label="Contact name" value={form.name}    onChange={set('name')}    required />
-          <Input label="Company"      value={form.company} onChange={set('company')} />
         </div>
         <div className="lp-form-row">
           <Input label="Email" type="email" value={form.email} onChange={set('email')} />
@@ -396,6 +397,7 @@ interface DetailPanelProps {
 const DetailPanel: React.FC<DetailPanelProps> = ({
   lead, salesReps, onClose, onMoveTo, onConvert, onDelete, navigate, crmBase,
 }) => {
+  const [company,   setCompany]   = useState(lead.company ?? '')
   const [name,      setName]      = useState(lead.name)
   const [email,     setEmail]     = useState(lead.email)
   const [phone,     setPhone]     = useState(lead.phone ?? '')
@@ -413,6 +415,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
 
   // Sync when selected lead changes
   useEffect(() => {
+    setCompany(lead.company ?? '')
     setName(lead.name)
     setEmail(lead.email)
     setPhone(lead.phone ?? '')
@@ -431,6 +434,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
     setSaving(true)
     try {
       await updateLead(lead.id, {
+        company:        company.trim() || undefined,
         name:           name.trim(),
         email:          email.trim(),
         phone:          phone.trim() || undefined,
@@ -455,6 +459,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
   const repName = salesReps.find(r => r.id === lead.assignedTo)?.name
   const stageBadgeVariant = stageConfig.accent ? 'brand' : 'neutral'
   const hasUnsavedChanges =
+    (company.trim() || '') !== (lead.company ?? '') ||
     name.trim() !== lead.name ||
     email.trim() !== lead.email ||
     (phone.trim() || '') !== (lead.phone ?? '') ||
@@ -474,8 +479,8 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
       <div className="lp-panel__header">
         <div className="lp-panel__title-row">
           <div>
-            <h2 className="lp-panel__name">{lead.company ?? lead.name}</h2>
-            {lead.company && <p className="lp-panel__subname">{lead.name}</p>}
+            <h2 className="lp-panel__name">{lead.company?.trim() || 'Unnamed company'}</h2>
+            <p className="lp-panel__subname">{lead.name || 'No contact name'}</p>
           </div>
           <button className="lp-panel__close" onClick={onClose} aria-label="Close panel">✕</button>
         </div>
@@ -553,7 +558,12 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
           <h4 className="lp-panel__section-title">Details</h4>
           <div className="lp-panel__fields">
             <Input
-              label="Lead name"
+              label="Company"
+              value={company}
+              onChange={e => setCompany(e.target.value)}
+            />
+            <Input
+              label="Contact name"
               value={name}
               onChange={e => setName(e.target.value)}
             />
