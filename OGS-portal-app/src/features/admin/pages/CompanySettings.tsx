@@ -332,10 +332,10 @@ const CompanySettingsPage: React.FC = () => {
           <section className="cs-card">
             <h2 className="cs-card__title">Data Tools</h2>
             <p className="cs-card__sub">
-              One-time utility for importing the four historical C3 invoices/orders (1001-1004) via callable function.
+              One-time utility for syncing the five historical C3 QuickBooks invoices and linked orders (1001-1005).
             </p>
             <Button variant="secondary" size="md" onClick={() => setShowImportModal(true)}>
-              Import C3 Historical Orders
+              Sync C3 Historical Billing
             </Button>
           </section>
         )}
@@ -381,11 +381,11 @@ const CompanySettingsPage: React.FC = () => {
         </div>
       </Modal>
 
-      <Modal open={showImportModal} onClose={() => !importing && setShowImportModal(false)} title="Import C3 Historical Orders" size="md">
+      <Modal open={showImportModal} onClose={() => !importing && setShowImportModal(false)} title="Sync C3 Historical Billing" size="md">
         <div className="cs-danger-modal">
           <p className="cs-danger-modal__warning">
-            This runs the importC3Orders callable and creates four historical orders for C3 Solutions LLC.
-            Use only once unless duplicates are expected.
+            This runs the importC3Orders callable and syncs five historical QuickBooks invoices plus linked orders for C3 Solutions LLC.
+            Existing matching records are updated in place.
           </p>
           <Input
             label='Type "IMPORT C3" to confirm'
