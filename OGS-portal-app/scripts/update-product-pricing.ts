@@ -2,80 +2,281 @@
  * scripts/update-product-pricing.ts
  *
  * Updates product basePrice, pricePerUnit, and cost in Firestore
- * from the QuickBooks Products/Services export (2026-07-02).
+ * from a QuickBooks Products/Services CSV export.
  *
  * Matches on SKU field. Skips products not found in Firestore.
  * Also writes updated cost to the productPricing subcollection document.
  *
  * Run:
  *   GOOGLE_APPLICATION_CREDENTIALS=/path/to/serviceAccount.json \
- *   npx tsx scripts/update-product-pricing.ts
+ *   GOOGLE_CLOUD_PROJECT=ogs-portal \
+ *   npx tsx scripts/update-product-pricing.ts --csv /absolute/path/to/file.csv
+ *
+ * Dry run (no writes):
+ *   npx tsx scripts/update-product-pricing.ts --csv /absolute/path/to/file.csv --dry-run
  */
 
-import admin from 'firebase-admin'
+import { applicationDefault, getApps, initializeApp } from 'firebase-admin/app'
+import { FieldValue, getFirestore } from 'firebase-admin/firestore'
+import XLSX from 'xlsx'
 
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.applicationDefault(),
+const { readFile, utils } = XLSX
+
+interface PricingRow {
+  sku: string
+  basePrice: number
+  cost: number
+  productName: string
+}
+
+interface CatalogProduct {
+  id: string
+  sku: string
+  name: string
+  data: Record<string, unknown>
+}
+
+interface CliOptions {
+  csvPath: string
+  dryRun: boolean
+  parseOnly: boolean
+}
+
+const FALLBACK_CSV_PATH = '/Users/johnathancharles/Downloads/ProductsServicesList_Ohio_Gas_Supply_Co_7_2_2026.csv'
+
+const SKU_ALIASES: Record<string, string[]> = {
+  'PROP-100': ['PROPANE-100LB'],
+  'CO2-20': ['CO2-20LB'],
+  'PROP-20': ['PROPANE-20LB'],
+  'CO2-5': ['CO2-5LB'],
+  'CO2-50': ['CO2-50LB'],
+  'RENTAL': ['RENTAL-CYLINDER-MONTHLY'],
+  'DELIVERY': ['FEE-DELIVERY'],
+  'HAZMAT': ['FEE-HAZMAT'],
+}
+
+const NAME_ALIASES: Record<string, string[]> = {
+  '20 lb co2 exchange': ['carbon dioxide 20 lb'],
+  '20 lb propane exchange': ['propane 20 lb'],
+  '100 lb propane fill': ['propane 100 lb'],
+  '5 lb co2 exchange': ['carbon dioxide 5 lb'],
+  '50 lb co2 exchange': ['carbon dioxide 50 lb'],
+  '33 lb forklift propane exchange': ['33 lb forklift propane exchange'],
+  'cylinder rental monthly': ['cylinder rental monthly'],
+  'delivery fee': ['delivery fee'],
+  'hazmat fee': ['hazmat fee'],
+}
+
+function parseCliArgs(argv: string[]): CliOptions {
+  const args = [...argv]
+  let csvPath = process.env.QB_PRICING_CSV ?? FALLBACK_CSV_PATH
+  let dryRun = false
+  let parseOnly = false
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i]
+    if (arg === '--csv' && args[i + 1]) {
+      csvPath = args[i + 1]
+      i++
+      continue
+    }
+    if (arg === '--dry-run') {
+      dryRun = true
+    }
+    if (arg === '--parse-only') {
+      parseOnly = true
+    }
+  }
+
+  return { csvPath, dryRun, parseOnly }
+}
+
+function toNumber(value: unknown): number {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0
+  if (typeof value === 'string') {
+    const normalized = value.replace(/[$,\s]/g, '').trim()
+    if (!normalized) return 0
+    const parsed = Number(normalized)
+    return Number.isFinite(parsed) ? parsed : 0
+  }
+  return 0
+}
+
+function normalizeToken(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/co\u2082/g, 'co2')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+
+function pushUnique(list: CatalogProduct[], item: CatalogProduct) {
+  if (!list.some((v) => v.id === item.id)) {
+    list.push(item)
+  }
+}
+
+function resolveCatalogProduct(
+  row: PricingRow,
+  bySku: Map<string, CatalogProduct[]>,
+  byName: Map<string, CatalogProduct[]>,
+): CatalogProduct | null {
+  const candidates: CatalogProduct[] = []
+
+  const directSku = bySku.get(row.sku) ?? []
+  directSku.forEach((c) => pushUnique(candidates, c))
+
+  if (candidates.length === 0) {
+    const aliases = SKU_ALIASES[row.sku] ?? []
+    for (const alias of aliases) {
+      const skuMatches = bySku.get(alias.toUpperCase()) ?? []
+      skuMatches.forEach((c) => pushUnique(candidates, c))
+    }
+  }
+
+  if (candidates.length === 0) {
+    const normName = normalizeToken(row.productName)
+    const nameMatches = byName.get(normName) ?? []
+    nameMatches.forEach((c) => pushUnique(candidates, c))
+
+    const aliasNames = NAME_ALIASES[normName] ?? []
+    for (const alias of aliasNames) {
+      const aliasMatches = byName.get(normalizeToken(alias)) ?? []
+      aliasMatches.forEach((c) => pushUnique(candidates, c))
+    }
+  }
+
+  if (candidates.length === 1) return candidates[0]
+
+  if (candidates.length > 1) {
+    const matchedSkus = candidates.map((c) => c.sku).join(', ')
+    console.warn(`  ⚠  SKU ${row.sku} — matched multiple products (${matchedSkus}), skipping`)
+  }
+
+  return null
+}
+
+function parsePricingCsv(csvPath: string): PricingRow[] {
+  const workbook = readFile(csvPath, { raw: true })
+  const firstSheetName = workbook.SheetNames[0]
+  if (!firstSheetName) {
+    throw new Error(`CSV at ${csvPath} has no sheets`)
+  }
+
+  const rows = utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[firstSheetName], {
+    defval: '',
+  })
+
+  const bySku = new Map<string, PricingRow>()
+
+  for (const row of rows) {
+    const sku = String(row.SKU ?? '').trim().toUpperCase()
+    if (!sku) continue
+
+    const productName = String(row['Product/Service Name'] ?? row['Variant Name'] ?? sku).trim() || sku
+    const basePriceRaw = toNumber(row.Price)
+    if (!Number.isFinite(basePriceRaw) || basePriceRaw <= 0) continue
+    const basePrice = Number(basePriceRaw.toFixed(2))
+
+    const costRaw = toNumber(row.Cost)
+    const cost = Number(Math.max(costRaw, 0).toFixed(2))
+
+    const next: PricingRow = { sku, basePrice, cost, productName }
+    const existing = bySku.get(sku)
+
+    if (!existing) {
+      bySku.set(sku, next)
+      continue
+    }
+
+    if (next.basePrice > existing.basePrice) {
+      console.warn(
+        `  ⚠  Duplicate SKU ${sku} in CSV (${existing.productName} @ $${existing.basePrice} vs ${next.productName} @ $${next.basePrice}) — using higher price`,
+      )
+      bySku.set(sku, next)
+    } else {
+      console.warn(
+        `  ⚠  Duplicate SKU ${sku} in CSV (${existing.productName} @ $${existing.basePrice} vs ${next.productName} @ $${next.basePrice}) — keeping existing`,
+      )
+    }
+  }
+
+  return [...bySku.values()]
+}
+
+if (!getApps().length) {
+  initializeApp({
+    credential: applicationDefault(),
     projectId: process.env.GOOGLE_CLOUD_PROJECT,
   })
 }
 
-const db = admin.firestore()
-
-// ── QB pricing from CSV export (2026-07-02) ────────────────────────────────
-// { sku, basePrice, cost }  — cost is 0 when QB left it blank
-const QB_PRICING: Array<{ sku: string; basePrice: number; cost: number }> = [
-  { sku: 'PROP-100',  basePrice: 69.00,   cost: 32.56 },
-  { sku: 'CO2-20',    basePrice: 29.00,   cost:  9.01 },
-  { sku: 'PROP-20',   basePrice: 29.00,   cost:  8.24 },
-  { sku: 'PROP-A33',  basePrice: 45.00,   cost: 12.30 },
-  { sku: 'CO2-5',     basePrice: 18.00,   cost:  7.31 },
-  { sku: 'CO2-50',    basePrice: 45.00,   cost: 15.81 },
-  { sku: 'CO2-BULK',  basePrice: 95.00,   cost:  0    },
-  { sku: 'CYL-DEP',   basePrice: 150.00,  cost:  0    },
-  { sku: 'RENTAL',    basePrice:  5.40,   cost:  4.50 },  // monthly; daily handled separately if SKU differs
-  { sku: 'CYL-DMG',   basePrice: 125.00,  cost:  0    },
-  { sku: 'DELIVERY',  basePrice: 30.00,   cost:  0    },
-  { sku: 'EMERG',     basePrice: 75.00,   cost:  0    },
-  { sku: 'USURHE',    basePrice: 25.50,   cost:  7.70 },
-  { sku: 'HAZMAT',    basePrice:  4.50,   cost:  0    },
-  { sku: 'HE-BK',     basePrice: 733.00,  cost: 183.45 },
-  { sku: 'HE-BT',     basePrice: 947.00,  cost: 236.77 },
-  { sku: 'HE-T',      basePrice: 970.50,  cost: 242.51 },
-  { sku: 'CYL-LOSS',  basePrice: 250.00,  cost:  0    },
-  { sku: 'EX 1-K',    basePrice:  87.76,  cost: 21.94 },
-  { sku: 'EX 1-Q',    basePrice:  76.96,  cost: 19.24 },
-  { sku: 'NI-T',      basePrice:  42.76,  cost: 10.69 },
-]
-
+const db = getFirestore()
 async function run() {
-  console.log(`\nUpdating ${QB_PRICING.length} products from QB pricing export…\n`)
+  const { csvPath, dryRun, parseOnly } = parseCliArgs(process.argv.slice(2))
+  const pricingRows = parsePricingCsv(csvPath)
+
+  console.log(`\nLoaded ${pricingRows.length} SKU price rows from CSV: ${csvPath}`)
+  if (parseOnly) {
+    console.log('Parse-only mode complete. No Firestore reads or writes were made.')
+    return
+  }
+  if (dryRun) {
+    console.log('Running in dry-run mode: no Firestore writes will be made.')
+  }
+  console.log('')
 
   let updated = 0
   let skipped = 0
   let notFound = 0
 
-  for (const { sku, basePrice, cost } of QB_PRICING) {
-    const snap = await db
-      .collection('products')
-      .where('sku', '==', sku)
-      .limit(1)
-      .get()
+  const allProductsSnap = await db.collection('products').get()
+  const allProducts: CatalogProduct[] = allProductsSnap.docs.map((doc) => {
+    const data = doc.data() as Record<string, unknown>
+    return {
+      id: doc.id,
+      sku: String(data.sku ?? '').trim().toUpperCase(),
+      name: String(data.name ?? '').trim(),
+      data,
+    }
+  })
 
-    if (snap.empty) {
+  const bySku = new Map<string, CatalogProduct[]>()
+  const byName = new Map<string, CatalogProduct[]>()
+
+  for (const product of allProducts) {
+    if (product.sku) {
+      const skuList = bySku.get(product.sku) ?? []
+      skuList.push(product)
+      bySku.set(product.sku, skuList)
+    }
+
+    if (product.name) {
+      const key = normalizeToken(product.name)
+      const nameList = byName.get(key) ?? []
+      nameList.push(product)
+      byName.set(key, nameList)
+    }
+  }
+
+  for (const row of pricingRows) {
+    const { sku, basePrice, cost } = row
+    const matchedProduct = resolveCatalogProduct(row, bySku, byName)
+
+    if (!matchedProduct) {
       console.warn(`  ⚠  SKU ${sku} — not found in Firestore, skipping`)
       notFound++
       continue
     }
 
-    const productDoc = snap.docs[0]
-    const existing = productDoc.data() as Record<string, unknown>
+    const productRef = db.collection('products').doc(matchedProduct.id)
+    const existing = matchedProduct.data
 
     const existingPrice = Number(existing.basePrice ?? 0)
     const existingCost  = Number(existing.cost ?? 0)
+    const hasCost = cost > 0
 
-    if (existingPrice === basePrice && existingCost === cost) {
+    if (existingPrice === basePrice && (!hasCost || existingCost === cost)) {
       console.log(`  –  SKU ${sku} — unchanged ($${basePrice} / cost $${cost})`)
       skipped++
       continue
@@ -85,41 +286,47 @@ async function run() {
     const productUpdate: Record<string, unknown> = {
       basePrice,
       pricePerUnit: basePrice,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
     }
-    if (cost > 0) productUpdate.cost = cost
+    if (hasCost) productUpdate.cost = cost
 
-    await productDoc.ref.update(productUpdate)
+    if (!dryRun) {
+      await productRef.update(productUpdate)
+    }
 
     // Also update productPricing document (same ID as product)
-    if (cost > 0) {
-      const pricingRef = db.collection('productPricing').doc(productDoc.id)
+    if (hasCost) {
+      const pricingRef = db.collection('productPricing').doc(matchedProduct.id)
       const pricingSnap = await pricingRef.get()
       if (pricingSnap.exists) {
         const minMarginPercent: number =
           (pricingSnap.data() as Record<string, unknown>).minMarginPercent as number ?? 0.2
         const minPrice = parseFloat((cost / (1 - minMarginPercent)).toFixed(2))
-        await pricingRef.update({
-          cost,
-          minPrice,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        })
+        if (!dryRun) {
+          await pricingRef.update({
+            cost,
+            minPrice,
+            updatedAt: FieldValue.serverTimestamp(),
+          })
+        }
       } else {
         const minMarginPercent = 0.2
         const minPrice = parseFloat((cost / (1 - minMarginPercent)).toFixed(2))
-        await pricingRef.set({
-          productId: productDoc.id,
-          cost,
-          minMarginPercent,
-          minPrice,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        })
+        if (!dryRun) {
+          await pricingRef.set({
+            productId: matchedProduct.id,
+            cost,
+            minMarginPercent,
+            minPrice,
+            createdAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+          })
+        }
       }
     }
 
     console.log(
-      `  ✓  SKU ${sku} — price $${existingPrice} → $${basePrice}` +
+      `  ✓  SKU ${sku} (${matchedProduct.sku}) — price $${existingPrice} → $${basePrice}` +
       (cost > 0 ? `, cost $${existingCost} → $${cost}` : ' (no cost in QB)'),
     )
     updated++

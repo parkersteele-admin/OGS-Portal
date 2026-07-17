@@ -681,10 +681,22 @@ const QuoteEditorPage: React.FC = () => {
     mutationFn: async () => {
       setError(null)
       let id = savedId; if (!id) id = await saveMutation.mutateAsync()
+      const wasAlreadySent = status === 'sent'
       await sendQuote(id!)
-      // Generate PDF + email to customer. If this fails, surface it clearly so
-      // staff can retry instead of assuming the customer was notified.
-      await generateQuotePdf(id!)
+      // Generate PDF + email to customer. If this fails on first send,
+      // roll status back to draft so the quote is not left in a false sent state.
+      try {
+        await generateQuotePdf(id!)
+      } catch (err) {
+        if (!wasAlreadySent) {
+          try {
+            await updateQuote(id!, { status: 'draft' })
+          } catch (rollbackErr) {
+            console.warn('[QuoteEditorPage] failed to rollback quote status after send error', rollbackErr)
+          }
+        }
+        throw err
+      }
       setStatus('sent')
       queryClient.invalidateQueries({ queryKey: ['quotes'] })
     },

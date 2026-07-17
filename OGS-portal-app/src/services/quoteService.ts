@@ -318,8 +318,31 @@ export async function generateQuotePdf(quoteId: string): Promise<string> {
       functions,
       'generateQuotePdf',
     )
-    const result = await fn({ quoteId })
-    return result.data.url
+    try {
+      const result = await fn({ quoteId })
+      return result.data.url
+    } catch (err: unknown) {
+      const maybe = err as { code?: unknown; message?: unknown; details?: unknown }
+      const code = typeof maybe.code === 'string' ? maybe.code : ''
+      const details = typeof maybe.details === 'string'
+        ? maybe.details
+        : typeof maybe.message === 'string'
+          ? maybe.message
+          : ''
+
+      if (code.endsWith('/failed-precondition') || code === 'failed-precondition') {
+        throw new Error(details || 'Quote cannot be emailed yet. Please verify recipient email and email service configuration.')
+      }
+
+      if (code.endsWith('/internal') || code === 'internal') {
+        if (/recipient email/i.test(details)) {
+          throw new Error(details)
+        }
+        throw new Error('Quote PDF generated, but email delivery failed. Please retry in a moment. If this continues, contact support.')
+      }
+
+      throw err
+    }
   })
 }
 

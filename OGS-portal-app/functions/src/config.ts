@@ -20,6 +20,7 @@
 import { defineSecret } from 'firebase-functions/params'
 
 export const GOOGLE_MAPS_KEY       = defineSecret('GOOGLE_MAPS_SERVER_KEY')
+export const RESEND_API_KEY        = defineSecret('RESEND_API_KEY')
 
 /**
  * Asserts that a secret value is non-empty.

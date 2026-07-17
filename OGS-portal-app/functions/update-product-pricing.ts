@@ -12,16 +12,17 @@
  *   npx tsx scripts/update-product-pricing.ts
  */
 
-import admin from 'firebase-admin'
+import { applicationDefault, getApps, initializeApp } from 'firebase-admin/app'
+import { FieldValue, getFirestore } from 'firebase-admin/firestore'
 
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.applicationDefault(),
+if (!getApps().length) {
+  initializeApp({
+    credential: applicationDefault(),
     projectId: process.env.GOOGLE_CLOUD_PROJECT,
   })
 }
 
-const db = admin.firestore()
+const db = getFirestore()
 
 // ── QB pricing from CSV export (2026-07-02) ────────────────────────────────
 // { sku, basePrice, cost }  — cost is 0 when QB left it blank
@@ -85,7 +86,7 @@ async function run() {
     const productUpdate: Record<string, unknown> = {
       basePrice,
       pricePerUnit: basePrice,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
     }
     if (cost > 0) productUpdate.cost = cost
 
@@ -102,7 +103,7 @@ async function run() {
         await pricingRef.update({
           cost,
           minPrice,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
         })
       } else {
         const minMarginPercent = 0.2
@@ -112,8 +113,8 @@ async function run() {
           cost,
           minMarginPercent,
           minPrice,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
         })
       }
     }

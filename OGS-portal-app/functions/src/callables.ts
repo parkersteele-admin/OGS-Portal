@@ -7,7 +7,7 @@
 
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { db, FieldValue, adminAuth } from './admin';
-import { GOOGLE_MAPS_KEY, requireSecret } from './config';
+import { GOOGLE_MAPS_KEY, RESEND_API_KEY, requireSecret } from './config';
 import { performGeocode } from './triggers/geocodeCustomer';
 import { generateInvoicePdf as generatePdf } from './pdf/generateInvoicePdf';
 import { generateQuotePdf as generateQuotePdfCore } from './pdf/generateQuotePdf';
@@ -233,7 +233,7 @@ export const generateInvoicePdf = onCall(async (request) => {
  * Input:  { quoteId: string }
  * Output: { url: string }
  */
-export const generateQuotePdf = onCall(async (request) => {
+export const generateQuotePdf = onCall({ secrets: [RESEND_API_KEY] }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'You must be signed in.');
   }
@@ -264,8 +264,9 @@ export const generateQuotePdf = onCall(async (request) => {
     }
     url = await generateQuotePdfCore(data.quoteId);
   } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
     console.error(`generateQuotePdf callable [${data.quoteId}]:`, err);
-    throw new HttpsError('internal', 'PDF generation failed.');
+    throw new HttpsError('internal', `PDF generation failed: ${msg}`);
   }
 
   // ── Email the PDF when the quote has been sent ────────────────────────
@@ -283,6 +284,14 @@ export const generateQuotePdf = onCall(async (request) => {
     : '';
 
   if (isSent) {
+    // Validate email service configuration only when attempting delivery.
+    try {
+      requireSecret(RESEND_API_KEY.value(), 'RESEND_API_KEY');
+    } catch (cfgErr) {
+      const cfgMsg = cfgErr instanceof Error ? cfgErr.message : String(cfgErr);
+      throw new HttpsError('failed-precondition', `Quote email service is not configured: ${cfgMsg}`);
+    }
+
     // Fetch company settings, sales rep info, and email template wording
     const company = await getCompanySettings();
 
@@ -539,6 +548,9 @@ export const generateQuotePdf = onCall(async (request) => {
         // diagnose quickly from function errors.
         const msg = emailErr instanceof Error ? emailErr.message : String(emailErr);
         console.error(`[generateQuotePdf] email send failed for ${recipientEmail} — ${msg}`, emailErr);
+        if (/Resend API key not configured/i.test(msg)) {
+          throw new HttpsError('failed-precondition', 'Quote email service is not configured. Ask an admin to set RESEND_API_KEY for Cloud Functions.');
+        }
         throw new HttpsError('internal', `Quote email delivery failed: ${msg}`);
       }
     } else {

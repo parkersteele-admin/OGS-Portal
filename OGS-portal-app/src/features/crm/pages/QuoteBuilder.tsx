@@ -737,10 +737,24 @@ export const QuoteBuilderPanel: React.FC<QuoteBuilderPanelProps> = ({
       setError(null)
       let id = savedId
       if (!id) id = await saveMutation.mutateAsync()
+      const wasAlreadySent = status === 'sent'
       // Set status to 'sent' FIRST so the Cloud Function sees it when it checks
       // whether to email the PDF to the recipient.
       await sendQuote(id!)
-      await generateQuotePdf(id!) // generates PDF + emails because status is now 'sent'
+      try {
+        await generateQuotePdf(id!) // generates PDF + emails because status is now 'sent'
+      } catch (err) {
+        // On first-time send failures, roll back to draft so the UI reflects
+        // that the quote was not actually delivered.
+        if (!wasAlreadySent) {
+          try {
+            await updateQuote(id!, { status: 'draft' })
+          } catch (rollbackErr) {
+            console.warn('[QuoteBuilder] failed to rollback quote status after send error', rollbackErr)
+          }
+        }
+        throw err
+      }
       setStatus('sent')
       queryClient.invalidateQueries({ queryKey: ['quotes'] })
     },
