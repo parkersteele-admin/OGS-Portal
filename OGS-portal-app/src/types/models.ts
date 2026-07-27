@@ -10,6 +10,7 @@ export type { Product, ProductType, ProductCategory } from './product'
 export type { Tank, TankStatus, TankOwnership } from './tank'
 export type { Order, OrderStatus, DeliveryTier } from './order'
 export type { Run, RunStop, RunStatus, RunStopStatus } from './run'
+export type { RecurringRunTemplate, RecurringRunFrequency } from './recurringRun'
 export type {
   Invoice,
   InvoiceLineItem,

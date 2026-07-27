@@ -166,6 +166,9 @@ export default function RunsPage() {
             <p className="rp-subtitle">{runs.length} total run{runs.length !== 1 ? 's' : ''}</p>
           </div>
           <div className="rp-header__actions">
+            <Button variant="secondary" onClick={() => navigate(`${opsBase}/runs/recurring`)}>
+              Recurring Routes
+            </Button>
             <Button
               variant="secondary"
               size="sm"
@@ -197,6 +200,14 @@ export default function RunsPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => navigate(`${opsBase}/runs/recurring`)}
+          >
+            Recurring Routes
+          </Button>
 
           {isMobile ? (
             <div className="rp-status-chips" aria-label="Filter by status">

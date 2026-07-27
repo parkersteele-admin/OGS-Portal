@@ -15,6 +15,7 @@ import type {
   Quote,
   Product,
 } from '../types/models'
+import type { RecurringRunTemplate } from '../types/recurringRun'
 import type { Notification } from '../types/index'
 import type { Cylinder, ManifestItem, CylinderFlag } from '../types/cylinder'
 
@@ -49,6 +50,9 @@ export const ordersCol = col<Order>('orders')
 
 // ── Runs ──────────────────────────────────────────────────────────────────────
 export const runsCol = col<Run>('runs')
+
+/** Recurring run templates used by the Runs recurring planner UI. */
+export const recurringRunsCol = col<RecurringRunTemplate>('recurringRuns')
 
 /** /runs/{runId}/stops */
 export const runStopsCol = (runId: string) =>

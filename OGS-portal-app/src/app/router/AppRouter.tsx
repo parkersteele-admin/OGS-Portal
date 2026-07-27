@@ -24,6 +24,7 @@ import {
   OpsLayout,
   OpsOrdersPage,
   OpsTanksPage,
+  RecurringRunsPage,
   RunBuilder,
   RunSummaryPage,
   RunsPage,
@@ -213,6 +214,7 @@ export const AppRouter: React.FC = () => (
         <Route path="dashboard" element={<OpsDashboardPage />} />
         <Route path="orders" element={<OpsOrdersPage />} />
         <Route path="runs" element={<RunsPage />} />
+        <Route path="runs/recurring" element={<RecurringRunsPage />} />
         <Route path="runs/new" element={<RunBuilder />} />
         <Route path="runs/:runId/summary" element={<RunSummaryPage />} />
         <Route path="dispatch" element={<DispatchPage />} />
@@ -306,6 +308,7 @@ export const AppRouter: React.FC = () => (
         <Route path="ops/dashboard"                    element={<OpsDashboardPage />} />
         <Route path="ops/orders"                       element={<OpsOrdersPage />} />
         <Route path="ops/runs"                         element={<RunsPage />} />
+        <Route path="ops/runs/recurring"               element={<RecurringRunsPage />} />
         <Route path="ops/runs/new"                     element={<RunBuilder />} />
         <Route path="ops/runs/:runId/summary"          element={<RunSummaryPage />} />
         <Route path="ops/dispatch"                     element={<DispatchPage />} />
