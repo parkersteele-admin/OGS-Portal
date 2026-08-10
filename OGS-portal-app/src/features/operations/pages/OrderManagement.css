@@ -44,6 +44,122 @@
   gap: var(--space-2);
 }
 
+/* ── Order Requests Queue ─────────────────────────────────────────────────── */
+
+.om-requests {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  display: grid;
+  gap: var(--space-3);
+}
+
+.om-requests__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.om-requests__head h2 {
+  margin: 0;
+  font-size: var(--font-size-16);
+  color: var(--color-text);
+}
+
+.om-requests__head p {
+  margin: 4px 0 0;
+  color: var(--color-text-3);
+  font-size: var(--font-size-12);
+}
+
+.om-requests__embed-link {
+  color: var(--color-brand);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: var(--font-size-12);
+}
+
+.om-requests__embed-link:hover {
+  text-decoration: underline;
+}
+
+.om-requests__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--space-3);
+}
+
+.om-request-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  background: var(--color-bg-2);
+  display: grid;
+  gap: var(--space-2);
+}
+
+.om-request-card__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.om-request-card__row--meta {
+  align-items: flex-start;
+  flex-direction: column;
+  color: var(--color-text-3);
+  font-size: var(--font-size-12);
+}
+
+.om-request-card__status {
+  font-size: var(--font-size-11);
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.om-request-card__status--new {
+  color: #8a4b00;
+  background: #fff3d9;
+  border-color: #f8d28c;
+}
+
+.om-request-card__status--reviewed {
+  color: #075985;
+  background: #e0f2fe;
+  border-color: #a5d8ff;
+}
+
+.om-request-card__status--converted,
+.om-request-card__status--archived {
+  color: #4b5563;
+  background: #f3f4f6;
+}
+
+.om-request-card__line,
+.om-request-card__notes {
+  margin: 0;
+  font-size: var(--font-size-12);
+  color: var(--color-text-2);
+}
+
+.om-request-card__notes {
+  white-space: pre-wrap;
+}
+
+.om-request-card__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
 /* ── Filter bar ────────────────────────────────────────────────────────────── */
 
 .om-filters {

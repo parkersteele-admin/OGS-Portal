@@ -96,6 +96,65 @@
   padding: 12px;
 }
 
+.dcm-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dcm-remove-item {
+  border: 1px solid #5b2525;
+  background: #2b1515;
+  color: #ffb3b3;
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dcm-add-item-panel {
+  border: 1px dashed #3a3a3a;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.dcm-add-item-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 90px auto;
+  gap: 8px;
+}
+
+.dcm-add-item-grid select,
+.dcm-add-item-grid input {
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid #333333;
+  background: #141414;
+  color: #ffffff;
+  min-height: 38px;
+  padding: 0 10px;
+  font-family: Inter, sans-serif;
+}
+
+.dcm-add-item-btn {
+  border: none;
+  border-radius: 8px;
+  min-height: 38px;
+  padding: 0 12px;
+  background: #185f43;
+  color: #e8fff3;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.dcm-add-item-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
 .dcm-item-name {
   font-weight: 600;
 }
@@ -400,6 +459,10 @@
 
   .dcm-step-title {
     font-size: 24px;
+  }
+
+  .dcm-add-item-grid {
+    grid-template-columns: 1fr;
   }
 
   .dcm-signature-canvas {

@@ -332,6 +332,16 @@ service cloud.firestore {
     }
 
 
+    // ── Public order requests queue ──────────────────────────────────────────
+    // Public submissions are written by Cloud Functions only.
+    match /orderRequests/{requestId} {
+      allow read: if isDispatch() || isSales();
+      allow create: if false;
+      allow update: if isDispatch() || isSales();
+      allow delete: if isAdmin();
+    }
+
+
     // ── Quotes ────────────────────────────────────────────────────────────────
     match /quotes/{quoteId} {
       allow read: if isSales()

@@ -75,6 +75,7 @@ import QuickActionsPage from '../../pages/quick-actions/QuickActionsPage'
 
 // Public welcome / explainer landing page (no auth required)
 import WelcomePage from '../../pages/public/Welcome'
+import OrderRequestEmbedPage from '../../pages/public/OrderRequestEmbed'
 
 
 
@@ -138,6 +139,9 @@ export const AppRouter: React.FC = () => (
 
       {/* Public quote acceptance — no auth required, token in query string */}
       <Route path="/quote/:quoteId" element={<PublicQuotePage />} />
+
+      {/* Public embeddable order request form — no auth required */}
+      <Route path="/order-request" element={<OrderRequestEmbedPage />} />
 
       {/* Customer account setup via QR code — no auth required */}
       <Route path="/join/:token" element={<JoinSetupPage />} />

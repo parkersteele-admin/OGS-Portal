@@ -28,6 +28,7 @@ import { getDoc, doc } from 'firebase/firestore'
 import { db } from '../../../lib/firebase'
 import { updateRunStop, updateStopStatus } from '../../../services/runService'
 import { updateOrder } from '../../../services/orderService'
+import { getProductDropdown, type ProductDropdownItem } from '../../../services/productService'
 import {
   uploadDeliveryPhoto,
 } from '../../../services/fileService'
@@ -53,6 +54,12 @@ const SKIP_REASONS = [
 ] as const
 
 type SkipReason = (typeof SKIP_REASONS)[number]
+
+interface EditableDeliveryItem {
+  productId: string
+  orderedQty: number
+  qty: number
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -198,9 +205,11 @@ export default function DeliveryCapture() {
   const [step, setStep] = useState<Step>(1)
 
   // Step 2 — quantity
-  const [qtyDelivered, setQtyDelivered] = useState<number>(0)
-  // Add-on quantities: productId → qty
-  const [addOnQtys, setAddOnQtys] = useState<Record<string, number>>({})
+  const [items, setItems] = useState<EditableDeliveryItem[]>([])
+  const [productNames, setProductNames] = useState<Record<string, string>>({})
+  const [productOptions, setProductOptions] = useState<ProductDropdownItem[]>([])
+  const [newItemProductId, setNewItemProductId] = useState('')
+  const [newItemQty, setNewItemQty] = useState(1)
 
   // Step 3 — photo
   const photoInputRef  = useRef<HTMLInputElement>(null)
@@ -245,7 +254,7 @@ export default function DeliveryCapture() {
         ? ({ id: orderSnap.id, ...orderSnap.data() } as Order)
         : null
       setOrder(ord)
-      setQtyDelivered(ord?.quantity ?? 0)
+      setItems(buildInitialItems(ord))
       setReceivedByName(ord?.deliveryContactName ?? '')
 
       const cust = customerSnap.exists()
@@ -268,15 +277,6 @@ export default function DeliveryCapture() {
         )
       }
 
-      // Initialise add-on qty state from order.addOns
-      if (ord?.addOns?.length) {
-        const initial: Record<string, number> = {}
-        for (const ao of ord.addOns) {
-          initial[ao.productId] = ao.qty
-        }
-        setAddOnQtys(initial)
-      }
-
       setDataLoading(false)
     }
 
@@ -285,6 +285,61 @@ export default function DeliveryCapture() {
       setDataLoading(false)
     })
   }, [stop?.orderId, stop?.customerId])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadItemNames() {
+      const productIds = Array.from(new Set(items.map((item) => item.productId))).filter(Boolean)
+      if (productIds.length === 0) {
+        setProductNames({})
+        return
+      }
+
+      const resolved = await Promise.all(productIds.map(async (productId) => {
+        const snap = await getDoc(doc(db, 'products', productId))
+        if (!snap.exists()) return [productId, productId] as const
+        const name = snap.data().name
+        return [productId, (typeof name === 'string' && name.trim()) ? name : productId] as const
+      }))
+
+      if (!cancelled) {
+        setProductNames(Object.fromEntries(resolved))
+      }
+    }
+
+    loadItemNames().catch(() => {
+      if (!cancelled) setProductNames({})
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [items])
+
+  useEffect(() => {
+    let cancelled = false
+
+    getProductDropdown()
+      .then((options) => {
+        if (cancelled) return
+        setProductOptions(options)
+        setProductNames((prev) => {
+          const next = { ...prev }
+          for (const option of options) {
+            next[option.id] = option.name
+          }
+          return next
+        })
+      })
+      .catch(() => {
+        if (!cancelled) setProductOptions([])
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // ── Step 1: Arrive ─────────────────────────────────────────────────────────
 
@@ -375,13 +430,14 @@ export default function DeliveryCapture() {
         }),
       ])
 
-      const deliveredLineItems = order.productId
-        ? [{ productId: order.productId, qty: qtyDelivered }]
-        : []
-      const deliveredAddOns = order.addOns?.map((ao) => ({
-        productId: ao.productId,
-        qty: addOnQtys[ao.productId] ?? ao.qty,
-      })) ?? []
+      const deliveredLineItems = items
+        .filter((item) => item.productId && item.qty > 0)
+        .map((item) => ({ productId: item.productId, qty: item.qty }))
+      const qtyDelivered = Number(deliveredLineItems.reduce((sum, item) => sum + item.qty, 0).toFixed(2))
+
+      if (deliveredLineItems.length === 0 || qtyDelivered <= 0) {
+        throw new Error('At least one delivered item quantity is required before completing delivery.')
+      }
 
       await finalizeSignedDelivery({
         runId,
@@ -392,7 +448,6 @@ export default function DeliveryCapture() {
         deliveryNotes: deliveryNotes.trim() || undefined,
         photoUrls: photoUrl ? [photoUrl] : undefined,
         deliveredLineItems,
-        deliveredAddOns: deliveredAddOns.length ? deliveredAddOns : undefined,
       })
 
       // Navigate back to schedule after successful delivery
@@ -403,6 +458,36 @@ export default function DeliveryCapture() {
       setSubmitting(false)
       setShowConfirm(false)
     }
+  }
+
+  function handleAddItem() {
+    const productId = newItemProductId.trim()
+    const qty = Number(newItemQty)
+    if (!productId || !Number.isFinite(qty) || qty <= 0) return
+
+    setItems((prev) => {
+      const existingIdx = prev.findIndex((item) => item.productId === productId)
+      if (existingIdx >= 0) {
+        return prev.map((item, idx) => (
+          idx === existingIdx ? { ...item, qty: Number((item.qty + qty).toFixed(2)) } : item
+        ))
+      }
+      return [
+        ...prev,
+        {
+          productId,
+          orderedQty: 0,
+          qty: Number(qty.toFixed(2)),
+        },
+      ]
+    })
+
+    setNewItemProductId('')
+    setNewItemQty(1)
+  }
+
+  function handleRemoveAddedItem(productId: string) {
+    setItems((prev) => prev.filter((item) => !(item.productId === productId && item.orderedQty === 0)))
   }
 
   // ── Skip stop ──────────────────────────────────────────────────────────────
@@ -469,7 +554,7 @@ export default function DeliveryCapture() {
   }
 
   const unitLabel = product?.unit ?? 'unit'
-  const orderedQty = order?.quantity ?? 0
+  const totalDeliveredQty = Number(items.reduce((sum, item) => sum + item.qty, 0).toFixed(2))
   const locationOptions = customer?.locations ?? []
   const selectedLocationName = locationOptions.find((loc) => loc.id === selectedLocationId)?.name
 
@@ -552,88 +637,95 @@ export default function DeliveryCapture() {
           ════════════════════════════════════════════════════════ */}
       {step === 2 && (
         <div className="dc-body">
-          <h2 className="dc-body__heading">Quantity delivered</h2>
+          <h2 className="dc-body__heading">Delivered quantities</h2>
 
-          {/* ── Standing order qty ── */}
           <div className="dc-qty-section">
-            <p className="dc-qty-section__label">Standing order</p>
-            <p className="dc-body__sub">Ordered: <strong>{orderedQty} {unitLabel}</strong></p>
-
-            <div className="dc-stepper">
-              <button
-                className="dc-stepper__btn"
-                onClick={() => setQtyDelivered((q) => Math.max(0, +(q - 1).toFixed(2)))}
-                aria-label="Decrease quantity"
-              >
-                −
-              </button>
-              <input
-                className="dc-stepper__input"
-                type="number"
-                min="0"
-                step="0.5"
-                value={qtyDelivered}
-                onChange={(e) => setQtyDelivered(Number(e.target.value))}
-              />
-              <button
-                className="dc-stepper__btn"
-                onClick={() => setQtyDelivered((q) => +(q + 1).toFixed(2))}
-                aria-label="Increase quantity"
-              >
-                +
-              </button>
-            </div>
-            <span className="dc-stepper__unit">{unitLabel}</span>
-
-            {qtyDelivered !== orderedQty && (
-              <div className="dc-qty-note">
-                ⚠ Different from ordered quantity ({orderedQty} {unitLabel})
+            <p className="dc-qty-section__label">Line items</p>
+            {items.map((item, idx) => (
+              <div key={`${item.productId}-${idx}`} className="dc-addon-row">
+                <span className="dc-addon-row__name">{productNames[item.productId] ?? item.productId}</span>
+                <div className="dc-stepper dc-stepper--compact">
+                  <button
+                    className="dc-stepper__btn"
+                    onClick={() => setItems((prev) => prev.map((row, rowIdx) => (
+                      rowIdx === idx ? { ...row, qty: Math.max(0, +(row.qty - 1).toFixed(2)) } : row
+                    )))}
+                    aria-label="Decrease"
+                  >−</button>
+                  <input
+                    className="dc-stepper__input"
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={item.qty}
+                    onChange={(e) => {
+                      const next = Number(e.target.value)
+                      setItems((prev) => prev.map((row, rowIdx) => (
+                        rowIdx === idx ? { ...row, qty: Number.isFinite(next) ? Math.max(0, next) : 0 } : row
+                      )))
+                    }}
+                  />
+                  <button
+                    className="dc-stepper__btn"
+                    onClick={() => setItems((prev) => prev.map((row, rowIdx) => (
+                      rowIdx === idx ? { ...row, qty: +(row.qty + 1).toFixed(2) } : row
+                    )))}
+                    aria-label="Increase"
+                  >+</button>
+                </div>
+                <span className="dc-addon-row__unit">
+                  {item.orderedQty > 0 ? `Ordered: ${item.orderedQty}` : 'Added onsite'}
+                </span>
+                {item.orderedQty === 0 && (
+                  <button
+                    type="button"
+                    className="dc-addon-row__remove"
+                    onClick={() => handleRemoveAddedItem(item.productId)}
+                  >
+                    Remove
+                  </button>
+                )}
               </div>
-            )}
-          </div>
+            ))}
 
-          {/* ── Add-ons qty (only shown when add-ons exist) ── */}
-          {order?.addOns && order.addOns.length > 0 && (
-            <div className="dc-qty-section dc-qty-section--addons">
-              <p className="dc-qty-section__label">ADD-ONS</p>
-              {order.addOns.map((ao) => {
-                const qty = addOnQtys[ao.productId] ?? ao.qty
-                return (
-                  <div key={ao.productId} className="dc-addon-row">
-                    <span className="dc-addon-row__name">{ao.productName}</span>
-                    <div className="dc-stepper dc-stepper--compact">
-                      <button
-                        className="dc-stepper__btn"
-                        onClick={() => setAddOnQtys((prev) => ({ ...prev, [ao.productId]: Math.max(0, (prev[ao.productId] ?? ao.qty) - 1) }))}
-                        aria-label="Decrease"
-                      >−</button>
-                      <input
-                        className="dc-stepper__input"
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={qty}
-                        onChange={(e) => setAddOnQtys((prev) => ({ ...prev, [ao.productId]: Number(e.target.value) }))}
-                      />
-                      <button
-                        className="dc-stepper__btn"
-                        onClick={() => setAddOnQtys((prev) => ({ ...prev, [ao.productId]: (prev[ao.productId] ?? ao.qty) + 1 }))}
-                        aria-label="Increase"
-                      >+</button>
-                    </div>
-                    <span className="dc-addon-row__unit">{unitLabel}</span>
-                  </div>
-                )
-              })}
-              <p className="dc-qty-section__sub">
-                {Object.values(addOnQtys).reduce((s, v) => s + v, 0)} add-on {unitLabel}s
-              </p>
+            <div className="dc-add-item-panel">
+              <p className="dc-qty-section__label">Add onsite item</p>
+              <div className="dc-add-item-grid">
+                <select
+                  className="dc-select"
+                  value={newItemProductId}
+                  onChange={(e) => setNewItemProductId(e.target.value)}
+                >
+                  <option value="">Select product to add...</option>
+                  {productOptions.map((option) => (
+                    <option key={option.id} value={option.id}>{option.name}</option>
+                  ))}
+                </select>
+                <input
+                  className="dc-input dc-input--qty"
+                  type="number"
+                  min="0.5"
+                  step="0.5"
+                  value={newItemQty}
+                  onChange={(e) => setNewItemQty(Number(e.target.value))}
+                />
+                <button
+                  type="button"
+                  className="dc-add-item-btn"
+                  onClick={handleAddItem}
+                  disabled={!newItemProductId || !Number.isFinite(newItemQty) || newItemQty <= 0}
+                >
+                  Add Item
+                </button>
+              </div>
             </div>
-          )}
+
+            <p className="dc-qty-section__sub">Total delivered: {totalDeliveredQty}</p>
+          </div>
 
           <button
             className="dc-cta dc-cta--next"
-            disabled={qtyDelivered <= 0}
+            disabled={totalDeliveredQty <= 0}
             onClick={() => setStep(3)}
           >
             Next → Photo
@@ -753,7 +845,7 @@ export default function DeliveryCapture() {
             </div>
             <div className="dc-summary__row">
               <span className="dc-summary__lbl">Product</span>
-              <span className="dc-summary__val">{product?.name ?? '—'}</span>
+              <span className="dc-summary__val">{items.length} item{items.length !== 1 ? 's' : ''}</span>
             </div>
             <div className="dc-summary__row">
               <span className="dc-summary__lbl">Location</span>
@@ -762,19 +854,16 @@ export default function DeliveryCapture() {
             <div className="dc-summary__row">
               <span className="dc-summary__lbl">Qty delivered</span>
               <span className="dc-summary__val dc-summary__val--hero">
-                {qtyDelivered} {unitLabel}
-                {qtyDelivered !== orderedQty && (
-                  <span className="dc-summary__diff"> (ordered: {orderedQty})</span>
-                )}
+                {totalDeliveredQty}
               </span>
             </div>
-            {order?.addOns && order.addOns.length > 0 && (
+            {items.length > 0 && (
               <div className="dc-summary__row dc-summary__row--addons">
-                <span className="dc-summary__lbl">Add-ons delivered</span>
+                <span className="dc-summary__lbl">Delivered items</span>
                 <span className="dc-summary__val">
-                  {order.addOns.map((ao) => (
-                    <span key={ao.productId} className="dc-summary__addon-item">
-                      {addOnQtys[ao.productId] ?? ao.qty}× {ao.productName}
+                  {items.filter((item) => item.qty > 0).map((item) => (
+                    <span key={item.productId} className="dc-summary__addon-item">
+                      {item.qty}× {productNames[item.productId] ?? item.productId}
                     </span>
                   ))}
                 </span>
@@ -838,7 +927,7 @@ export default function DeliveryCapture() {
           <div className="dc-dialog">
             <h3 className="dc-dialog__title">Confirm delivery</h3>
             <p className="dc-dialog__body">
-              Mark <strong>{qtyDelivered} {unitLabel}</strong> as delivered
+              Mark <strong>{totalDeliveredQty}</strong> as delivered
               to <strong>{customer?.name}</strong>?<br />
               This will store the signature, attach the delivery documents, and finalize the stop.
             </p>
@@ -932,4 +1021,44 @@ export default function DeliveryCapture() {
 
     </div>
   )
+}
+
+function buildInitialItems(order: Order | null): EditableDeliveryItem[] {
+  if (!order) return []
+
+  const fromQuoted = Array.isArray(order.quotedLineItems)
+    ? order.quotedLineItems
+      .map((item) => ({
+        productId: String(item.productId ?? '').trim(),
+        qty: Number(item.quantity ?? 0),
+      }))
+      .filter((item) => item.productId && item.qty > 0)
+    : []
+
+  const source = fromQuoted.length > 0
+    ? fromQuoted
+    : [
+        order.productId
+          ? {
+              productId: order.productId,
+              qty: Number(order.quantity ?? 0),
+            }
+          : null,
+        ...(order.addOns ?? []).map((item) => ({
+          productId: item.productId,
+          qty: Number(item.qty ?? 0),
+        })),
+      ].filter((item): item is { productId: string; qty: number } => !!item && !!item.productId)
+
+  const merged = new Map<string, number>()
+  for (const item of source) {
+    const prior = merged.get(item.productId) ?? 0
+    merged.set(item.productId, Number((prior + Math.max(0, Number(item.qty) || 0)).toFixed(2)))
+  }
+
+  return [...merged.entries()].map(([productId, qty]) => ({
+    productId,
+    orderedQty: qty,
+    qty,
+  }))
 }

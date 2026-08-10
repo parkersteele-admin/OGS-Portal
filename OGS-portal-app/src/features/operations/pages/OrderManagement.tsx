@@ -18,14 +18,17 @@ import {
   onSnapshot,
   query,
   orderBy,
+  limit,
   getDocs,
   getDoc,
   doc,
+  updateDoc,
+  serverTimestamp,
   where,
   collectionGroup,
 } from 'firebase/firestore'
 import { db } from '../../../lib/firebase'
-import { ordersCol, invoicesCol } from '../../../lib/firestore'
+import { ordersCol, invoicesCol, orderRequestsCol } from '../../../lib/firestore'
 import {
   createOrder,
   updateOrder,
@@ -61,6 +64,7 @@ import type { Customer } from '../../../types/customer'
 import type { Product } from '../../../types/product'
 import type { Invoice } from '../../../types/billing'
 import type { QuoteItem } from '../../../types/crm'
+import type { OrderRequest } from '../../../types/orderRequest'
 import './OrderManagement.css'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -181,6 +185,13 @@ const TIER_LABELS: Record<DeliveryTier, string> = {
 }
 
 const RUSH_TIERS: DeliveryTier[] = ['next-day', 'same-day']
+
+const ORDER_REQUEST_STATUS_LABELS: Record<string, string> = {
+  new: 'New',
+  reviewed: 'Reviewed',
+  converted: 'Converted',
+  archived: 'Archived',
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -353,7 +364,7 @@ function OrderDetailSheet({
 }: OrderDetailSheetProps) {
   const { isAdmin, user, realUser } = useAuth()
   const canCancel = canTransition(order.status, 'cancelled')
-  const canEdit = order.status === 'pending' || order.status === 'scheduled'
+  const canEdit = isAdmin || order.status === 'pending' || order.status === 'scheduled'
   const [billingBusy, setBillingBusy] = useState(false)
   const [statusBusy, setStatusBusy] = useState(false)
   const [sendingEstimate, setSendingEstimate] = useState(false)
@@ -759,8 +770,7 @@ function OrderDetailPanel({
   }
 
   const canCancel = canTransition(order.status, 'cancelled')
-  const canEdit =
-    order.status === 'pending' || order.status === 'scheduled'
+  const canEdit = isAdmin || order.status === 'pending' || order.status === 'scheduled'
   const normalizedStatus = normalizeLifecycleStatus(order.status)
   const canSendEstimate =
     order.status === 'pending' || order.status === 'scheduled' || order.status === 'assigned' || order.status === 'in-transit'
@@ -1017,6 +1027,12 @@ function OrderDetailPanel({
                 {fmtCurrency(order.total)}
               </span>
             </div>
+            {order.qbInvoiceNumber && (
+              <div className="om-panel__row">
+                <span className="om-panel__label">QB Invoice #</span>
+                <span className="om-panel__val">{order.qbInvoiceNumber}</span>
+              </div>
+            )}
           </section>
 
           {/* Run assignment */}
@@ -1567,6 +1583,8 @@ function CreateOrderModal({ initialCustomerId, initialLineItems, convertingQuote
   })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [applySalesTax, setApplySalesTax] = useState(false)
+  const [salesTaxRatePercent, setSalesTaxRatePercent] = useState('0.00')
   const customerInputRef = useRef<HTMLInputElement>(null)
 
   // Load products on mount
@@ -1635,16 +1653,17 @@ function CreateOrderModal({ initialCustomerId, initialLineItems, convertingQuote
   const deliveryFee = tierPricing.deliveryFee
   const upchargeAmount = parseFloat((revenueProducts * upchargePercent).toFixed(2))
 
+  const safeTaxRate = applySalesTax ? Math.max(0, parseFloat(salesTaxRatePercent) || 0) : 0
   const rollups = useMemo(
     () => calculateLineItemRollups({
       revenueProducts,
       totalCost,
       lineProfit,
       extraRevenue: upchargeAmount + deliveryFee,
-      applySalesTax: false,
-      salesTaxRate: 0,
+      applySalesTax,
+      salesTaxRate: safeTaxRate / 100,
     }),
-    [revenueProducts, totalCost, lineProfit, upchargeAmount, deliveryFee],
+    [revenueProducts, totalCost, lineProfit, upchargeAmount, deliveryFee, applySalesTax, safeTaxRate],
   )
 
   const quoteLineItems = useMemo<QuoteItem[]>(
@@ -1714,11 +1733,11 @@ function CreateOrderModal({ initialCustomerId, initialLineItems, convertingQuote
         upchargePercent,
         subtotal: parseFloat((revenueProducts + upchargeAmount).toFixed(2)),
         deliveryFee,
-        total: rollups.preTaxTotal,
-        applySalesTax: false,
-        salesTaxRate: 0,
-        salesTaxAmount: 0,
-        taxRate: 0,
+        total: rollups.totalRevenue,
+        applySalesTax,
+        salesTaxRate: applySalesTax ? safeTaxRate / 100 : 0,
+        salesTaxAmount: applySalesTax ? rollups.salesTaxAmount : 0,
+        taxRate: applySalesTax ? safeTaxRate / 100 : 0,
         quotedLineItems: eligibleItems,
         addOns: rest.map((item) => ({
           productId: item.productId,
@@ -1883,6 +1902,42 @@ function CreateOrderModal({ initialCustomerId, initialLineItems, convertingQuote
             />
           </div>
 
+          {/* Sales Tax */}
+          <div className="om-field">
+            <label className="om-field__label">Sales Tax</label>
+            <div style={{ display: 'flex', gap: '16px', alignItems: 'center', marginBottom: '6px' }}>
+              <label style={{ display: 'flex', gap: '6px', alignItems: 'center', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="create-sales-tax"
+                  checked={!applySalesTax}
+                  onChange={() => setApplySalesTax(false)}
+                />
+                No tax
+              </label>
+              <label style={{ display: 'flex', gap: '6px', alignItems: 'center', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="create-sales-tax"
+                  checked={applySalesTax}
+                  onChange={() => setApplySalesTax(true)}
+                />
+                Apply sales tax
+              </label>
+            </div>
+            {applySalesTax && (
+              <Input
+                label="Sales Tax Rate (%)"
+                id="create-tax-rate"
+                type="number"
+                min="0"
+                step="0.01"
+                value={salesTaxRatePercent}
+                onChange={(e) => setSalesTaxRatePercent(e.target.value)}
+              />
+            )}
+          </div>
+
           <div className="om-field">
             <label className="om-field__label">Line Items</label>
             <LineItemsEditor
@@ -1925,8 +1980,8 @@ function CreateOrderModal({ initialCustomerId, initialLineItems, convertingQuote
                 <span>{fmtCurrency(rollups.preTaxTotal)}</span>
               </div>
               <div className="om-pricing-preview__row">
-                <span>Sales tax</span>
-                <span>{fmtCurrency(0)}</span>
+                <span>Sales tax{applySalesTax && safeTaxRate > 0 ? ` (${safeTaxRate}%)` : ''}</span>
+                <span>{fmtCurrency(rollups.salesTaxAmount)}</span>
               </div>
               <div className="om-pricing-preview__row om-pricing-preview__row--total">
                 <span>Total revenue</span>
@@ -2062,6 +2117,9 @@ export default function OrderManagement() {
   const [customerMap, setCustomerMap] = useState<Record<string, Customer>>({})
   const [productMap, setProductMap] = useState<Record<string, Product>>({})
   const [ordersLoading, setOrdersLoading] = useState(true)
+  const [orderRequests, setOrderRequests] = useState<OrderRequest[]>([])
+  const [orderRequestsLoading, setOrderRequestsLoading] = useState(true)
+  const [reviewingRequestIds, setReviewingRequestIds] = useState<Set<string>>(new Set())
 
   // ── Filters ───────────────────────────────────────────────────────────────────
   const [search, setSearch] = useState('')
@@ -2174,6 +2232,20 @@ export default function OrderManagement() {
         setOrdersLoading(false)
       },
     )
+    return unsub
+  }, [])
+
+  useEffect(() => {
+    const unsub = onSnapshot(
+      query(orderRequestsCol, orderBy('createdAt', 'desc'), limit(20)),
+      (snap) => {
+        setOrderRequests(
+          snap.docs.map((snapshot) => ({ ...snapshot.data(), id: snapshot.id })),
+        )
+        setOrderRequestsLoading(false)
+      },
+    )
+
     return unsub
   }, [])
 
@@ -2385,7 +2457,29 @@ export default function OrderManagement() {
     }
   }
 
+  async function handleMarkRequestReviewed(requestId: string) {
+    if (!requestId) return
+    setReviewingRequestIds((prev) => new Set(prev).add(requestId))
+    try {
+      await updateDoc(doc(db, 'orderRequests', requestId), {
+        status: 'reviewed',
+        reviewedAt: serverTimestamp(),
+        reviewedBy: realUser?.id ?? user?.id ?? null,
+        updatedAt: serverTimestamp(),
+      })
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to update order request.')
+    } finally {
+      setReviewingRequestIds((prev) => {
+        const next = new Set(prev)
+        next.delete(requestId)
+        return next
+      })
+    }
+  }
+
   const selectedCount = selected.size
+  const newOrderRequestCount = orderRequests.filter((request) => request.status === 'new').length
 
   return (
     <div className="om-page">
@@ -2545,6 +2639,82 @@ export default function OrderManagement() {
         </div>
       </div>
 
+      <section className="om-requests" aria-label="Order requests">
+        <div className="om-requests__head">
+          <div>
+            <h2>Order Requests</h2>
+            <p>
+              Captured from the public request form at /order-request. New: {newOrderRequestCount}
+            </p>
+          </div>
+          <a
+            className="om-requests__embed-link"
+            href="/order-request?embed=1"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Open embed form
+          </a>
+        </div>
+
+        {orderRequestsLoading ? (
+          <div className="om-empty">Loading order requests…</div>
+        ) : orderRequests.length === 0 ? (
+          <div className="om-empty">No requests yet.</div>
+        ) : (
+          <div className="om-requests__list">
+            {orderRequests.map((request) => {
+              const statusLabel = ORDER_REQUEST_STATUS_LABELS[request.status] ?? request.status
+              const reviewing = reviewingRequestIds.has(request.id)
+              return (
+                <article key={request.id} className="om-request-card">
+                  <div className="om-request-card__row">
+                    <strong>{request.name}</strong>
+                    <span className={`om-request-card__status om-request-card__status--${request.status}`}>
+                      {statusLabel}
+                    </span>
+                  </div>
+                  <div className="om-request-card__row om-request-card__row--meta">
+                    <span>{request.phone}</span>
+                    <span>{request.email}</span>
+                    <span>{fmtDateTime(request.createdAt)}</span>
+                  </div>
+                  {request.company && <p className="om-request-card__line">Company: {request.company}</p>}
+                  {request.deliveryAddress && <p className="om-request-card__line">Address: {request.deliveryAddress}</p>}
+                  {request.preferredDeliveryDate && <p className="om-request-card__line">Preferred date: {request.preferredDeliveryDate}</p>}
+                  {(request.requestedItems ?? []).length > 0 && (
+                    <p className="om-request-card__line">Items: {(request.requestedItems ?? []).join(', ')}</p>
+                  )}
+                  {request.requestDetails && <p className="om-request-card__notes">{request.requestDetails}</p>}
+
+                  <div className="om-request-card__actions">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setShowCreate(true)}
+                    >
+                      + Create Order
+                    </Button>
+                    {request.status === 'new' && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        disabled={reviewing}
+                        onClick={() => {
+                          void handleMarkRequestReviewed(request.id)
+                        }}
+                      >
+                        {reviewing ? 'Saving…' : 'Mark Reviewed'}
+                      </Button>
+                    )}
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        )}
+      </section>
+
       {/* ── Table ── */}
       <div className="om-table-wrap">
         {ordersLoading ? (
@@ -2651,7 +2821,10 @@ export default function OrderManagement() {
                       </td>
 
                       <td className="om-table__td om-table__td--right om-total">
-                        {fmtCurrency(order.total)}
+                        <div>{fmtCurrency(order.total)}</div>
+                        {order.qbInvoiceNumber && (
+                          <div style={{ fontSize: '11px', color: '#888', marginTop: '2px' }}>QB #{order.qbInvoiceNumber}</div>
+                        )}
                       </td>
 
                       <td
@@ -2761,7 +2934,7 @@ export default function OrderManagement() {
                 const isActiveDelivery = normalizedStatus === 'scheduled' || normalizedStatus === 'assigned' || normalizedStatus === 'in_transit'
                 const isBillingStage = normalizedStatus === 'invoice_sent_pending' || normalizedStatus === 'invoice_sent'
                 const isClosed = order.status === 'paid' || order.status === 'archived'
-                const canEditOrder = order.status === 'pending' || order.status === 'scheduled'
+                const canEditOrder = isAdmin || order.status === 'pending' || order.status === 'scheduled'
                 const canCancelOrder = canTransition(order.status, 'cancelled')
                 const canComplete = canCompleteDelivery(order)
 

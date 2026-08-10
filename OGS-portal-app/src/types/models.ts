@@ -20,4 +20,5 @@ export type {
   PaymentMethod,
 } from './billing'
 export type { Lead, LeadStatus, Quote, QuoteItem, QuoteStatus, ContactLog } from './crm'
+export type { OrderRequest, OrderRequestStatus } from './orderRequest'
 export type { AppFile } from './file'

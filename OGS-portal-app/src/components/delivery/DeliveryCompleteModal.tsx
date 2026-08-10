@@ -10,6 +10,7 @@ import { CheckCircle2, Loader2 } from 'lucide-react'
 import { getDoc, doc } from 'firebase/firestore'
 import { db } from '../../lib/firebase'
 import { adminFinalizeDelivery } from '../../services/deliveryService'
+import { getProductDropdown, type ProductDropdownItem } from '../../services/productService'
 import type { Order } from '../../types/order'
 import './DeliveryCompleteModal.css'
 
@@ -19,6 +20,12 @@ interface DeliveryCompleteModalProps {
   stopId: string
   onSuccess: () => void
   onClose: () => void
+}
+
+interface EditableDeliveryItem {
+  productId: string
+  orderedQty: number
+  qty: number
 }
 
 type Step = 1 | 2 | 3 | 4
@@ -151,9 +158,11 @@ export function DeliveryCompleteModal({
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const [primaryProductName, setPrimaryProductName] = useState(order.productId)
-  const [primaryQty, setPrimaryQty] = useState<number>(order.quantity ?? 0)
-  const [addOnQtys, setAddOnQtys] = useState<Record<string, number>>({})
+  const [items, setItems] = useState<EditableDeliveryItem[]>([])
+  const [productNames, setProductNames] = useState<Record<string, string>>({})
+  const [productOptions, setProductOptions] = useState<ProductDropdownItem[]>([])
+  const [newItemProductId, setNewItemProductId] = useState('')
+  const [newItemQty, setNewItemQty] = useState(1)
 
   const [receivedByName, setReceivedByName] = useState('')
   const [deliveryNotes, setDeliveryNotes] = useState('')
@@ -165,53 +174,109 @@ export function DeliveryCompleteModal({
   useEffect(() => {
     let cancelled = false
 
-    async function loadProductName() {
+    async function loadProductNames() {
       try {
-        if (!order.productId) return
-        const snap = await getDoc(doc(db, 'products', order.productId))
-        if (cancelled || !snap.exists()) return
-        const name = snap.data().name
-        if (typeof name === 'string' && name.trim()) {
-          setPrimaryProductName(name)
+        const ids = Array.from(new Set(buildInitialItems(order).map((item) => item.productId))).filter(Boolean)
+        if (ids.length === 0) return
+
+        const resolved = await Promise.all(ids.map(async (productId) => {
+          const snap = await getDoc(doc(db, 'products', productId))
+          if (!snap.exists()) return [productId, productId] as const
+          const name = snap.data().name
+          return [productId, (typeof name === 'string' && name.trim()) ? name : productId] as const
+        }))
+
+        if (!cancelled) {
+          setProductNames(Object.fromEntries(resolved))
         }
       } catch {
         // non-blocking
       }
     }
 
-    loadProductName()
+    loadProductNames()
     return () => {
       cancelled = true
     }
-  }, [order.productId])
+  }, [order])
 
   useEffect(() => {
-    const initial: Record<string, number> = {}
-    for (const addOn of order.addOns ?? []) {
-      initial[addOn.productId] = addOn.qty
-    }
-    setAddOnQtys(initial)
-    setReceivedByName(order.deliveryContactName ?? '')
-  }, [order.addOns, order.deliveryContactName])
+    let cancelled = false
 
-  const addOns = order.addOns ?? []
+    getProductDropdown()
+      .then((options) => {
+        if (cancelled) return
+        setProductOptions(options)
+        setProductNames((prev) => {
+          const next = { ...prev }
+          for (const option of options) {
+            next[option.id] = option.name
+          }
+          return next
+        })
+      })
+      .catch(() => {
+        if (!cancelled) setProductOptions([])
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function hydrateUnknownNames() {
+      const unknownIds = items
+        .map((item) => item.productId)
+        .filter((id) => id && !productNames[id])
+
+      if (unknownIds.length === 0) return
+
+      const resolved = await Promise.all(unknownIds.map(async (productId) => {
+        const snap = await getDoc(doc(db, 'products', productId))
+        if (!snap.exists()) return [productId, productId] as const
+        const name = snap.data().name
+        return [productId, (typeof name === 'string' && name.trim()) ? name : productId] as const
+      }))
+
+      if (!cancelled) {
+        setProductNames((prev) => ({
+          ...prev,
+          ...Object.fromEntries(resolved),
+        }))
+      }
+    }
+
+    hydrateUnknownNames().catch(() => {
+      // non-blocking
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [items, productNames])
+
+  useEffect(() => {
+    setItems(buildInitialItems(order))
+    setReceivedByName(order.deliveryContactName ?? '')
+  }, [order])
+
   const allQtyValid = useMemo(() => {
-    if (primaryQty < 0) return false
-    return Object.values(addOnQtys).every((qty) => qty >= 0)
-  }, [primaryQty, addOnQtys])
+    if (items.length === 0) return false
+    return items.every((item) => item.qty >= 0) && items.some((item) => item.qty > 0)
+  }, [items])
 
   const deliveredLineItems = useMemo(() => {
-    if (!order.productId) return []
-    return [{ productId: order.productId, qty: primaryQty }]
-  }, [order.productId, primaryQty])
+    return items
+      .filter((item) => item.productId && item.qty > 0)
+      .map((item) => ({ productId: item.productId, qty: item.qty }))
+  }, [items])
 
-  const deliveredAddOns = useMemo(
-    () =>
-      addOns.map((addOn) => ({
-        productId: addOn.productId,
-        qty: addOnQtys[addOn.productId] ?? addOn.qty,
-      })),
-    [addOns, addOnQtys],
+  const totalDeliveredQty = useMemo(
+    () => Number(deliveredLineItems.reduce((sum, item) => sum + item.qty, 0).toFixed(2)),
+    [deliveredLineItems],
   )
 
   const canNext =
@@ -222,6 +287,39 @@ export function DeliveryCompleteModal({
 
   function updateQty(current: number, delta: number) {
     return Math.max(0, current + delta)
+  }
+
+  function handleAddItem() {
+    const productId = newItemProductId.trim()
+    const qty = Number(newItemQty)
+    if (!productId || !Number.isFinite(qty) || qty <= 0) return
+
+    setItems((prev) => {
+      const existingIdx = prev.findIndex((item) => item.productId === productId)
+      if (existingIdx >= 0) {
+        return prev.map((item, idx) => (
+          idx === existingIdx
+            ? { ...item, qty: Number((item.qty + qty).toFixed(2)) }
+            : item
+        ))
+      }
+
+      return [
+        ...prev,
+        {
+          productId,
+          orderedQty: 0,
+          qty: Number(qty.toFixed(2)),
+        },
+      ]
+    })
+
+    setNewItemProductId('')
+    setNewItemQty(1)
+  }
+
+  function handleRemoveAddedItem(productId: string) {
+    setItems((prev) => prev.filter((item) => !(item.productId === productId && item.orderedQty === 0)))
   }
 
   function getSignatureDataUrl() {
@@ -258,11 +356,10 @@ export function DeliveryCompleteModal({
       await adminFinalizeDelivery({
         runId,
         stopId,
-        qtyDelivered: primaryQty,
+        qtyDelivered: totalDeliveredQty,
         deliveredLineItems,
         receivedByName: receivedByName.trim(),
         signatureDataUrl,
-        deliveredAddOns,
         deliveryNotes: deliveryNotes.trim() || undefined,
       })
 
@@ -300,56 +397,75 @@ export function DeliveryCompleteModal({
           {step === 1 && (
             <section>
               <h3 className="dcm-step-title">Confirm Items</h3>
-              <div className="dcm-item-row">
-                <div>
-                  <div className="dcm-item-name">{primaryProductName}</div>
-                  <div className="dcm-item-meta">Ordered: {order.quantity}</div>
+              {items.map((item, idx) => (
+                <div key={`${item.productId}-${idx}`} className="dcm-item-row">
+                  <div>
+                    <div className="dcm-item-name">{productNames[item.productId] || item.productId}</div>
+                    <div className="dcm-item-meta">
+                      {item.orderedQty > 0 ? `Ordered: ${item.orderedQty}` : 'Added onsite'}
+                    </div>
+                  </div>
+                  <div className="dcm-item-actions">
+                    <div className="dcm-stepper">
+                      <button
+                        type="button"
+                        onClick={() => setItems((prev) => prev.map((row, rowIdx) => (
+                          rowIdx === idx ? { ...row, qty: updateQty(row.qty, -1) } : row
+                        )))}
+                      >
+                        −
+                      </button>
+                      <span>{item.qty}</span>
+                      <button
+                        type="button"
+                        onClick={() => setItems((prev) => prev.map((row, rowIdx) => (
+                          rowIdx === idx ? { ...row, qty: updateQty(row.qty, 1) } : row
+                        )))}
+                      >
+                        +
+                      </button>
+                    </div>
+                    {item.orderedQty === 0 && (
+                      <button
+                        type="button"
+                        className="dcm-remove-item"
+                        onClick={() => handleRemoveAddedItem(item.productId)}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="dcm-stepper">
-                  <button type="button" onClick={() => setPrimaryQty((qty) => updateQty(qty, -1))}>−</button>
-                  <span>{primaryQty}</span>
-                  <button type="button" onClick={() => setPrimaryQty((qty) => updateQty(qty, 1))}>+</button>
+              ))}
+
+              <div className="dcm-add-item-panel">
+                <div className="dcm-add-item-grid">
+                  <select
+                    value={newItemProductId}
+                    onChange={(event) => setNewItemProductId(event.target.value)}
+                  >
+                    <option value="">Select product to add...</option>
+                    {productOptions.map((option) => (
+                      <option key={option.id} value={option.id}>{option.name}</option>
+                    ))}
+                  </select>
+                  <input
+                    type="number"
+                    min="0.5"
+                    step="0.5"
+                    value={newItemQty}
+                    onChange={(event) => setNewItemQty(Number(event.target.value))}
+                  />
+                  <button
+                    type="button"
+                    className="dcm-add-item-btn"
+                    onClick={handleAddItem}
+                    disabled={!newItemProductId || !Number.isFinite(newItemQty) || newItemQty <= 0}
+                  >
+                    Add Item
+                  </button>
                 </div>
               </div>
-
-              {addOns.length > 0 && (
-                <>
-                  <h4 className="dcm-subtitle">Add-Ons</h4>
-                  {addOns.map((addOn) => (
-                    <div key={addOn.productId} className="dcm-item-row">
-                      <div>
-                        <div className="dcm-item-name">{addOn.productName || addOn.productId}</div>
-                        <div className="dcm-item-meta">Ordered: {addOn.qty}</div>
-                      </div>
-                      <div className="dcm-stepper">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setAddOnQtys((prev) => ({
-                              ...prev,
-                              [addOn.productId]: updateQty(prev[addOn.productId] ?? addOn.qty, -1),
-                            }))
-                          }
-                        >
-                          −
-                        </button>
-                        <span>{addOnQtys[addOn.productId] ?? addOn.qty}</span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setAddOnQtys((prev) => ({
-                              ...prev,
-                              [addOn.productId]: updateQty(prev[addOn.productId] ?? addOn.qty, 1),
-                            }))
-                          }
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </>
-              )}
             </section>
           )}
 
@@ -401,13 +517,13 @@ export function DeliveryCompleteModal({
 
               <div className="dcm-summary">
                 <p><strong>Receiver:</strong> {receivedByName}</p>
-                <p><strong>Primary Item:</strong> {primaryProductName} · {primaryQty}</p>
-                {deliveredAddOns.length > 0 && (
+                <p><strong>Total Delivered Quantity:</strong> {totalDeliveredQty}</p>
+                {deliveredLineItems.length > 0 && (
                   <div>
-                    <strong>Add-Ons:</strong>
+                    <strong>Delivered Items:</strong>
                     <ul>
-                      {deliveredAddOns.map((item) => (
-                        <li key={item.productId}>{item.productId}: {item.qty}</li>
+                      {deliveredLineItems.map((item) => (
+                        <li key={item.productId}>{productNames[item.productId] || item.productId}: {item.qty}</li>
                       ))}
                     </ul>
                   </div>
@@ -472,4 +588,53 @@ export function DeliveryCompleteModal({
       </div>
     </div>
   )
+}
+
+function buildInitialItems(order: Order): EditableDeliveryItem[] {
+  const fromQuoted = Array.isArray(order.quotedLineItems)
+    ? order.quotedLineItems
+      .map((item) => ({
+        productId: String(item.productId ?? '').trim(),
+        qty: Number(item.quantity ?? 0),
+      }))
+      .filter((item) => item.productId && item.qty > 0)
+    : []
+
+  if (fromQuoted.length > 0) {
+    const merged = mergeByProductId(fromQuoted)
+    return merged.map((item) => ({
+      productId: item.productId,
+      orderedQty: item.qty,
+      qty: item.qty,
+    }))
+  }
+
+  const fallback = [
+    order.productId
+      ? {
+          productId: order.productId,
+          qty: Number(order.quantity ?? 0),
+        }
+      : null,
+    ...(order.addOns ?? []).map((item) => ({
+      productId: item.productId,
+      qty: Number(item.qty ?? 0),
+    })),
+  ].filter((item): item is { productId: string; qty: number } => !!item && !!item.productId)
+
+  const merged = mergeByProductId(fallback)
+  return merged.map((item) => ({
+    productId: item.productId,
+    orderedQty: item.qty,
+    qty: item.qty,
+  }))
+}
+
+function mergeByProductId(items: Array<{ productId: string; qty: number }>): Array<{ productId: string; qty: number }> {
+  const map = new Map<string, number>()
+  for (const item of items) {
+    const current = map.get(item.productId) ?? 0
+    map.set(item.productId, Number((current + Math.max(0, Number(item.qty) || 0)).toFixed(2)))
+  }
+  return [...map.entries()].map(([productId, qty]) => ({ productId, qty }))
 }

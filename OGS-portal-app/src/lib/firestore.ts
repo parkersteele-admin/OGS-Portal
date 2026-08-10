@@ -131,6 +131,7 @@ import type {
   TeamInvite,
   JoinRequest,
 } from '../types/company'
+import type { OrderRequest } from '../types/orderRequest'
 
 /** /customers/{companyId}/locations */
 export const companyLocationsCol = (companyId: string) =>
@@ -141,6 +142,7 @@ export const creditApplicationsCol = col<CreditApplication>('creditApplications'
 
 /** /quoteRequests/{quoteId} */
 export const quoteRequestsCol = col<QuoteRequest>('quoteRequests')
+export const orderRequestsCol = col<OrderRequest>('orderRequests')
 
 /** /invites/{inviteId} */
 export const invitesCol = col<TeamInvite>('invites')

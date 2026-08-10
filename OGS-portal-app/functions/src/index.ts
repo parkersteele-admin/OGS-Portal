@@ -64,6 +64,7 @@ export { optimizeOrderRoute }                                     from './maps/o
 export { generateRunManifest }                                    from './generateRunManifest'
 export { onCylinderFlagged }                                      from './onCylinderFlagged'
 export { submitWelcomeInquiry }                                   from './inquiries'
+export { submitOrderRequest }                                     from './orderRequests'
 
 // Onboarding callables
 export {

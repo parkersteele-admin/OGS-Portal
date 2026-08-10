@@ -21,6 +21,16 @@ interface ProductSnapshot {
   id: string
   name: string
   unit: string
+  basePrice?: number
+  pricePerUnit?: number
+}
+
+interface ResolvedDeliveryLineItem {
+  productId: string
+  qty: number
+  unitPrice: number
+  amount: number
+  description: string
 }
 
 export const adminFinalizeDelivery = onCall(
@@ -90,10 +100,23 @@ export const adminFinalizeDelivery = onCall(
           id: productId,
           name: (docData?.name as string | undefined) || productId,
           unit: (docData?.unit as string | undefined) || 'unit',
+          basePrice: docData?.basePrice as number | undefined,
+          pricePerUnit: docData?.pricePerUnit as number | undefined,
         } satisfies ProductSnapshot,
       ] as const
     }))
     const productMap = new Map(productDocs)
+
+    const normalizedDeliveredLineItems = normalizeDeliveredItems(data.deliveredLineItems)
+    const normalizedDeliveredAddOns = normalizeDeliveredItems(data.deliveredAddOns ?? [])
+    const resolvedLineItems = resolveDeliveryLineItems({
+      order,
+      primaryItems: normalizedDeliveredLineItems,
+      addOnItems: normalizedDeliveredAddOns,
+      productMap,
+    })
+    const primaryResolved = resolvedLineItems.slice(0, normalizedDeliveredLineItems.length)
+    const addOnResolved = resolvedLineItems.slice(normalizedDeliveredLineItems.length)
 
     const signature = parseDataUrl(data.signatureDataUrl)
     if (!signature) {
@@ -129,18 +152,18 @@ export const adminFinalizeDelivery = onCall(
     })
 
     const bolItems = [
-      ...data.deliveredLineItems.map((item) => {
+      ...primaryResolved.map((item) => {
         const product = productMap.get(item.productId)
         return {
-          description: product?.name || item.productId,
+          description: product?.name || item.description,
           quantity: item.qty,
           unit: product?.unit || 'unit',
         }
       }),
-      ...(data.deliveredAddOns ?? []).map((item) => {
+      ...addOnResolved.map((item) => {
         const product = productMap.get(item.productId)
         return {
-          description: product?.name || item.productId,
+          description: product?.name || item.description,
           quantity: item.qty,
           unit: product?.unit || 'unit',
         }
@@ -209,9 +232,26 @@ export const adminFinalizeDelivery = onCall(
       createdAt: FieldValue.serverTimestamp(),
     })
 
+    const subtotal = Number(resolvedLineItems.reduce((sum, item) => sum + item.amount, 0).toFixed(2))
+    const deliveryFee = toNumber(order.deliveryFee, 0)
+    const applySalesTax = typeof order.applySalesTax === 'boolean'
+      ? order.applySalesTax
+      : toNumber(order.salesTaxRate, order.taxRate, 0) > 0
+    const salesTaxRate = applySalesTax ? toNumber(order.salesTaxRate, order.taxRate, 0) : 0
+    const salesTaxAmount = applySalesTax ? Number((subtotal * salesTaxRate).toFixed(2)) : 0
+    const total = Number((subtotal + deliveryFee + salesTaxAmount).toFixed(2))
+    const totalQtyDelivered = Number(
+      (primaryResolved.reduce((sum, item) => sum + item.qty, 0) + addOnResolved.reduce((sum, item) => sum + item.qty, 0)).toFixed(2),
+    )
+    const shouldAutoReadyForInvoice =
+      Boolean(order.fromRecurringRunTemplate)
+      || order.orderType === 'route'
+      || order.orderType === 'offRoute'
+    const nextStatus = shouldAutoReadyForInvoice ? 'ready_to_invoice' : 'delivered'
+
     await stopRef.update({
       status: 'completed',
-      gallonsDelivered: data.qtyDelivered,
+      gallonsDelivered: totalQtyDelivered || data.qtyDelivered,
       completedAt: signedAt,
       signedAt,
       signedByName: receivedByName,
@@ -221,7 +261,7 @@ export const adminFinalizeDelivery = onCall(
     })
 
     await orderSnap.ref.update({
-      status: 'delivered',
+      status: nextStatus,
       deliveryStatus: 'signed',
       deliveredAt: signedAt,
       signedAt,
@@ -230,8 +270,24 @@ export const adminFinalizeDelivery = onCall(
       receivedByName,
       signatureUrl: signatureUpload.url,
       billOfLadingUrl: billOfLading.url,
-      deliveredLineItems: data.deliveredLineItems,
-      deliveredAddOns: data.deliveredAddOns ?? [],
+      productId: primaryResolved[0]?.productId ?? (order.productId as string | undefined),
+      quantity: primaryResolved[0]?.qty ?? toNumber(order.quantity),
+      unitPrice: primaryResolved[0]?.unitPrice ?? toNumber(order.unitPrice),
+      subtotal,
+      salesTaxRate,
+      salesTaxAmount,
+      taxRate: salesTaxRate,
+      taxAmount: salesTaxAmount,
+      total,
+      deliveredLineItems: primaryResolved.map((item) => ({ productId: item.productId, qty: item.qty })),
+      deliveredAddOns: addOnResolved.map((item) => ({ productId: item.productId, qty: item.qty })),
+      quotedLineItems: resolvedLineItems.map((item) => ({
+        productId: item.productId,
+        description: item.description,
+        quantity: item.qty,
+        unitPrice: item.unitPrice,
+        amount: item.amount,
+      })),
       ...(deliveryNotes ? { deliveryNotes } : {}),
       updatedAt: FieldValue.serverTimestamp(),
     })
@@ -239,10 +295,12 @@ export const adminFinalizeDelivery = onCall(
     await appendStatusHistory(
       db,
       orderId,
-      'delivered',
+      nextStatus,
       request.auth.uid,
       actorName,
-      'Delivery marked delivered by admin/dispatch.',
+      shouldAutoReadyForInvoice
+        ? 'Delivery finalized by admin/dispatch and moved to ready_to_invoice.'
+        : 'Delivery marked delivered by admin/dispatch.',
     )
 
     await maybeCompleteRun(data.runId)
@@ -379,6 +437,9 @@ async function resolveDeliveryRecipients(
 ): Promise<string[]> {
   const recipients = new Set<string>()
 
+  const customerEmail = customer.email as string | undefined
+  if (customerEmail) recipients.add(customerEmail)
+
   const adminUsers = await db.collection('users').where('role', '==', 'admin').where('active', '==', true).get()
   adminUsers.docs.forEach((doc) => {
     const email = doc.data().email as string | undefined
@@ -427,4 +488,80 @@ async function downloadBuffer(url: string): Promise<Buffer> {
   }
   const arrayBuffer = await response.arrayBuffer()
   return Buffer.from(arrayBuffer)
+}
+
+function toNumber(...values: unknown[]): number {
+  for (const value of values) {
+    if (typeof value === 'number' && Number.isFinite(value)) return value
+    if (typeof value === 'string' && value.trim() !== '') {
+      const parsed = Number(value)
+      if (Number.isFinite(parsed)) return parsed
+    }
+  }
+  return 0
+}
+
+function normalizeDeliveredItems(
+  items: Array<{ productId: string; qty: number }> | undefined,
+): Array<{ productId: string; qty: number }> {
+  if (!Array.isArray(items)) return []
+
+  const quantities = new Map<string, number>()
+  for (const item of items) {
+    const productId = String(item.productId ?? '').trim()
+    if (!productId) continue
+    const qty = Math.max(0, toNumber(item.qty))
+    if (qty <= 0) continue
+    quantities.set(productId, Number(((quantities.get(productId) ?? 0) + qty).toFixed(2)))
+  }
+
+  return [...quantities.entries()].map(([productId, qty]) => ({ productId, qty }))
+}
+
+function resolveDeliveryLineItems(args: {
+  order: Record<string, unknown>
+  primaryItems: Array<{ productId: string; qty: number }>
+  addOnItems: Array<{ productId: string; qty: number }>
+  productMap: Map<string, ProductSnapshot>
+}): ResolvedDeliveryLineItem[] {
+  const quotedUnitPrice = new Map<string, number>()
+
+  const quoted = Array.isArray(args.order.quotedLineItems)
+    ? (args.order.quotedLineItems as Array<Record<string, unknown>>)
+    : []
+  for (const item of quoted) {
+    const productId = String(item.productId ?? '').trim()
+    const unitPrice = toNumber(item.unitPrice)
+    if (productId && unitPrice > 0) quotedUnitPrice.set(productId, unitPrice)
+  }
+
+  const addOns = Array.isArray(args.order.addOns)
+    ? (args.order.addOns as Array<Record<string, unknown>>)
+    : []
+  for (const item of addOns) {
+    const productId = String(item.productId ?? '').trim()
+    const unitPrice = toNumber(item.unitPrice)
+    if (productId && unitPrice > 0) quotedUnitPrice.set(productId, unitPrice)
+  }
+
+  const fallbackUnitPrice = toNumber(args.order.unitPrice, 0)
+  const all = [...args.primaryItems, ...args.addOnItems]
+  return all.map((item) => {
+    const product = args.productMap.get(item.productId)
+    const unitPrice = toNumber(
+      quotedUnitPrice.get(item.productId),
+      product?.pricePerUnit,
+      product?.basePrice,
+      fallbackUnitPrice,
+      0,
+    )
+    const amount = Number((item.qty * unitPrice).toFixed(2))
+    return {
+      productId: item.productId,
+      qty: item.qty,
+      unitPrice,
+      amount,
+      description: product?.name ?? item.productId,
+    }
+  })
 }
