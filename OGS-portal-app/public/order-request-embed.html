@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Order Request</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --surface: #ffffff;
+      --text: #0f172a;
+      --muted: #4b5563;
+      --line: #d5dbe5;
+      --brand: #0b5f87;
+      --brand-2: #084665;
+      --pill: #e9f4fa;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+      background:
+        radial-gradient(900px 320px at 0% 0%, #d8ebf8 0%, transparent 65%),
+        radial-gradient(700px 300px at 100% 100%, #fbead8 0%, transparent 70%),
+        var(--bg);
+      color: var(--text);
+      padding: 12px;
+    }
+
+    .card {
+      max-width: 760px;
+      margin: 0 auto;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      overflow: hidden;
+      background: var(--surface);
+      box-shadow: 0 12px 40px rgba(15, 23, 42, 0.12);
+    }
+
+    .head {
+      padding: 18px 18px 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .eyebrow {
+      margin: 0 0 6px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--brand);
+      font-weight: 700;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(22px, 2vw, 28px);
+    }
+
+    .sub {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    form {
+      display: grid;
+      gap: 14px;
+      padding: 16px 18px 18px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #111827;
+    }
+
+    input,
+    textarea {
+      width: 100%;
+      margin-top: 6px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 11px;
+      font-size: 14px;
+      background: #fff;
+      color: #0f172a;
+    }
+
+    input:focus,
+    textarea:focus {
+      outline: 2px solid rgba(11, 95, 135, 0.2);
+      border-color: var(--brand);
+    }
+
+    .wide { grid-column: 1 / -1; }
+
+    fieldset {
+      margin: 0;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+    }
+
+    legend {
+      padding: 0 6px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    .chip {
+      border: 1px solid transparent;
+      border-radius: 999px;
+      background: var(--pill);
+      color: #0b5f87;
+      padding: 7px 12px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .chip.active {
+      background: var(--brand);
+      color: #fff;
+    }
+
+    .error {
+      margin: 0;
+      color: #b91c1c;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .ok {
+      margin: 0;
+      color: #0f766e;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .submit {
+      border: none;
+      border-radius: 10px;
+      background: var(--brand);
+      color: #fff;
+      padding: 11px 14px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .submit:hover { background: var(--brand-2); }
+    .submit:disabled { opacity: 0.7; cursor: wait; }
+
+    .hp {
+      position: absolute;
+      left: -10000px;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    @media (max-width: 760px) {
+      body { padding: 8px; }
+      .grid { grid-template-columns: 1fr; }
+      .head, form { padding-left: 12px; padding-right: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <header class="head">
+      <p class="eyebrow">Ohio Gas Supply</p>
+      <h1>Order Request</h1>
+      <p class="sub">This form only submits a request. It does not expose your app or admin screens.</p>
+    </header>
+
+    <form id="requestForm" novalidate>
+      <input class="hp" name="website" id="website" tabindex="-1" autocomplete="off" aria-hidden="true" />
+
+      <div class="grid">
+        <label>
+          Name
+          <input id="name" name="name" required />
+        </label>
+        <label>
+          Phone
+          <input id="phone" name="phone" required />
+        </label>
+        <label>
+          Email
+          <input id="email" name="email" type="email" required />
+        </label>
+        <label>
+          Company (optional)
+          <input id="company" name="company" />
+        </label>
+        <label class="wide">
+          Delivery address (optional)
+          <input id="deliveryAddress" name="deliveryAddress" />
+        </label>
+      </div>
+
+      <fieldset>
+        <legend>What do you need?</legend>
+        <div id="chips" class="chips"></div>
+      </fieldset>
+
+      <label>
+        Additional details (optional)
+        <textarea id="requestDetails" name="requestDetails" rows="4" placeholder="Tell us what product(s), quantity, and timing you need."></textarea>
+      </label>
+
+      <p id="message" aria-live="polite"></p>
+
+      <button id="submitBtn" class="submit" type="submit">Submit Request</button>
+    </form>
+  </main>
+
+  <script>
+    const OPTIONS = [
+      'Propane refill',
+      'New cylinder delivery',
+      'Exchange empty cylinders',
+      'Tank inspection/service',
+      'Recurring delivery setup',
+      'Emergency / rush request',
+    ]
+
+    const chipsWrap = document.getElementById('chips')
+    const messageEl = document.getElementById('message')
+    const submitBtn = document.getElementById('submitBtn')
+    const form = document.getElementById('requestForm')
+    const selected = new Set()
+
+    function renderChips() {
+      chipsWrap.innerHTML = ''
+      OPTIONS.forEach((item) => {
+        const btn = document.createElement('button')
+        btn.type = 'button'
+        btn.className = 'chip' + (selected.has(item) ? ' active' : '')
+        btn.textContent = item
+        btn.addEventListener('click', () => {
+          if (selected.has(item)) selected.delete(item)
+          else selected.add(item)
+          renderChips()
+        })
+        chipsWrap.appendChild(btn)
+      })
+    }
+
+    function setMessage(text, kind) {
+      messageEl.textContent = text || ''
+      messageEl.className = kind === 'error' ? 'error' : kind === 'ok' ? 'ok' : ''
+    }
+
+    renderChips()
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault()
+      setMessage('')
+
+      const payload = {
+        name: document.getElementById('name').value.trim(),
+        phone: document.getElementById('phone').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        company: document.getElementById('company').value.trim(),
+        deliveryAddress: document.getElementById('deliveryAddress').value.trim(),
+        requestDetails: document.getElementById('requestDetails').value.trim(),
+        requestedItems: Array.from(selected),
+        website: document.getElementById('website').value,
+        sourceUrl: window.location.href,
+      }
+
+      if (!payload.name || !payload.phone || !payload.email) {
+        setMessage('Name, phone, and email are required.', 'error')
+        return
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) {
+        setMessage('Enter a valid email address.', 'error')
+        return
+      }
+      if (payload.requestedItems.length === 0 && !payload.requestDetails) {
+        setMessage('Select at least one request option or add details.', 'error')
+        return
+      }
+
+      submitBtn.disabled = true
+      submitBtn.textContent = 'Submitting...'
+
+      try {
+        const res = await fetch('/api/submit-order-request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+
+        const json = await res.json().catch(() => ({}))
+        if (!res.ok || json?.success !== true) {
+          throw new Error(json?.error || 'Request failed')
+        }
+
+        form.reset()
+        selected.clear()
+        renderChips()
+        setMessage('Request submitted. Our team will review and approve it shortly.', 'ok')
+      } catch (err) {
+        setMessage('Could not submit your request right now. Please try again.', 'error')
+      } finally {
+        submitBtn.disabled = false
+        submitBtn.textContent = 'Submit Request'
+      }
+    })
+  </script>
+</body>
+</html>

@@ -2649,7 +2649,7 @@ export default function OrderManagement() {
           </div>
           <a
             className="om-requests__embed-link"
-            href="/order-request?embed=1"
+            href="/order-request-embed.html"
             target="_blank"
             rel="noopener noreferrer"
           >

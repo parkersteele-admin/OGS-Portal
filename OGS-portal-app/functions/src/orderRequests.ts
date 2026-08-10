@@ -7,6 +7,7 @@
  */
 
 import { onCall, HttpsError } from 'firebase-functions/v2/https'
+import { onRequest } from 'firebase-functions/v2/https'
 import { db, FieldValue } from './admin'
 import { sendEmail } from './email/sendEmail'
 
@@ -57,9 +58,15 @@ function isLikelyPhone(value: string): boolean {
 export const submitOrderRequest = onCall(async (request) => {
   const data = request.data as Partial<SubmitOrderRequestInput>
 
+  const result = await processOrderRequest(data)
+  return { success: true, requestId: result.requestId, orderId: result.orderId }
+})
+
+async function processOrderRequest(data: Partial<SubmitOrderRequestInput>) {
+
   // Honeypot tripped — pretend success to avoid helping bots tune payloads.
   if (data.website) {
-    return { success: true }
+    return { requestId: 'honeypot', orderId: 'honeypot' }
   }
 
   const name = (data.name ?? '').trim().slice(0, 100)
@@ -85,7 +92,65 @@ export const submitOrderRequest = onCall(async (request) => {
     throw new HttpsError('invalid-argument', 'Select at least one requested item or provide details.')
   }
 
+  const customerRef = db.collection('customers').doc()
+  const fallbackAddress = deliveryAddress || 'Address pending confirmation'
+
+  await customerRef.set({
+    name: company || name,
+    companyName: company || null,
+    email,
+    phone,
+    address: fallbackAddress,
+    city: 'Unknown',
+    state: 'OH',
+    zip: '00000',
+    status: 'active',
+    creditLimit: 0,
+    companyType: 'prospect',
+    notes: `Created from embedded order request form for ${name}.`,
+    deliveryContactName: name,
+    deliveryContactPhone: phone,
+    deliveryContactEmail: email,
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  })
+
+  const orderNotes = [
+    'External web request (pending review).',
+    `Requester: ${name}`,
+    `Phone: ${phone}`,
+    `Email: ${email}`,
+    deliveryAddress ? `Requested address: ${deliveryAddress}` : '',
+    preferredDeliveryDate ? `Preferred date: ${preferredDeliveryDate}` : '',
+    requestedItems.length ? `Requested items: ${requestedItems.join(', ')}` : '',
+    requestDetails ? `Details: ${requestDetails}` : '',
+  ].filter(Boolean).join('\n')
+
+  const orderRef = await db.collection('orders').add({
+    customerId: customerRef.id,
+    companyId: customerRef.id,
+    productId: 'external-request',
+    quantity: 1,
+    deliveryTier: 'standard',
+    upchargePercent: 0,
+    unitPrice: 0,
+    subtotal: 0,
+    deliveryFee: 0,
+    total: 0,
+    status: 'pending',
+    notes: orderNotes,
+    deliveryContactName: name,
+    deliveryContactPhone: phone,
+    deliveryContactEmail: email,
+    requestedItems,
+    externalRequest: true,
+    requestedAt: FieldValue.serverTimestamp(),
+    createdAt: FieldValue.serverTimestamp(),
+  })
+
   const requestRef = await db.collection('orderRequests').add({
+    orderId: orderRef.id,
+    customerId: customerRef.id,
     name,
     phone,
     email,
@@ -135,5 +200,30 @@ export const submitOrderRequest = onCall(async (request) => {
     console.error('[submitOrderRequest] email send failed —', err)
   }
 
-  return { success: true, requestId: requestRef.id }
+  return { requestId: requestRef.id, orderId: orderRef.id }
+}
+
+export const submitOrderRequestPublic = onRequest(async (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*')
+  res.set('Access-Control-Allow-Headers', 'Content-Type')
+  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS')
+
+  if (req.method === 'OPTIONS') {
+    res.status(204).send('')
+    return
+  }
+
+  if (req.method !== 'POST') {
+    res.status(405).json({ success: false, error: 'Method not allowed' })
+    return
+  }
+
+  try {
+    const payload = (req.body ?? {}) as Partial<SubmitOrderRequestInput>
+    const result = await processOrderRequest(payload)
+    res.status(200).json({ success: true, requestId: result.requestId, orderId: result.orderId })
+  } catch (err) {
+    const message = err instanceof HttpsError ? err.message : 'Failed to submit order request'
+    res.status(400).json({ success: false, error: message })
+  }
 })

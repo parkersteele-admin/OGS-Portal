@@ -8,6 +8,10 @@
     ],
     "rewrites": [
       {
+        "source": "/api/submit-order-request",
+        "function": "submitOrderRequestPublic"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

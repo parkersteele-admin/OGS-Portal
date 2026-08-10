@@ -65,6 +65,7 @@ export { generateRunManifest }                                    from './genera
 export { onCylinderFlagged }                                      from './onCylinderFlagged'
 export { submitWelcomeInquiry }                                   from './inquiries'
 export { submitOrderRequest }                                     from './orderRequests'
+export { submitOrderRequestPublic }                               from './orderRequests'
 
 // Onboarding callables
 export {
