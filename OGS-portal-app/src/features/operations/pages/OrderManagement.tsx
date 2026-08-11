@@ -1650,7 +1650,6 @@ function CreateOrderModal({ initialCustomerId, initialLineItems, convertingQuote
 
   const tierPricing = useMemo(() => calculateOrderPricing(1, 1, tier), [tier])
   const upchargePercent = tierPricing.upchargePercent
-  const deliveryFee = tierPricing.deliveryFee
   const upchargeAmount = parseFloat((revenueProducts * upchargePercent).toFixed(2))
 
   const safeTaxRate = applySalesTax ? Math.max(0, parseFloat(salesTaxRatePercent) || 0) : 0
@@ -1659,11 +1658,12 @@ function CreateOrderModal({ initialCustomerId, initialLineItems, convertingQuote
       revenueProducts,
       totalCost,
       lineProfit,
-      extraRevenue: upchargeAmount + deliveryFee,
+      // delivery fee is already in line items; only add tier upcharge for premium tiers
+      extraRevenue: upchargeAmount,
       applySalesTax,
       salesTaxRate: safeTaxRate / 100,
     }),
-    [revenueProducts, totalCost, lineProfit, upchargeAmount, deliveryFee, applySalesTax, safeTaxRate],
+    [revenueProducts, totalCost, lineProfit, upchargeAmount, applySalesTax, safeTaxRate],
   )
 
   const quoteLineItems = useMemo<QuoteItem[]>(
@@ -1732,7 +1732,7 @@ function CreateOrderModal({ initialCustomerId, initialLineItems, convertingQuote
         unitPrice: primary.unitPrice,
         upchargePercent,
         subtotal: parseFloat((revenueProducts + upchargeAmount).toFixed(2)),
-        deliveryFee,
+        deliveryFee: 0,
         total: rollups.totalRevenue,
         applySalesTax,
         salesTaxRate: applySalesTax ? safeTaxRate / 100 : 0,
