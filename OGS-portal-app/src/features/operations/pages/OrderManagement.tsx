@@ -2852,7 +2852,7 @@ export default function OrderManagement() {
                           </svg>
                         </button>
 
-                        {(order.status === 'pending' ||
+                        {(isAdmin || order.status === 'pending' ||
                           order.status === 'scheduled') && (
                           <button
                             className="om-action-btn"
@@ -2968,7 +2968,7 @@ export default function OrderManagement() {
                         onClick: () => setDetailOrder(order),
                       }
 
-                const secondaryActions = isClosed
+                const secondaryActions = (isClosed && !isAdmin)
                   ? []
                   : [
                       ...(canEditOrder
