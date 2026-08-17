@@ -234,12 +234,13 @@ export const adminFinalizeDelivery = onCall(
 
     const subtotal = Number(resolvedLineItems.reduce((sum, item) => sum + item.amount, 0).toFixed(2))
     const deliveryFee = toNumber(order.deliveryFee, 0)
+    const hazmatFee = toNumber(order.hazmatFee, 0)
     const applySalesTax = typeof order.applySalesTax === 'boolean'
       ? order.applySalesTax
       : toNumber(order.salesTaxRate, order.taxRate, 0) > 0
     const salesTaxRate = applySalesTax ? toNumber(order.salesTaxRate, order.taxRate, 0) : 0
     const salesTaxAmount = applySalesTax ? Number((subtotal * salesTaxRate).toFixed(2)) : 0
-    const total = Number((subtotal + deliveryFee + salesTaxAmount).toFixed(2))
+    const total = Number((subtotal + deliveryFee + hazmatFee + salesTaxAmount).toFixed(2))
     const totalQtyDelivered = Number(
       (primaryResolved.reduce((sum, item) => sum + item.qty, 0) + addOnResolved.reduce((sum, item) => sum + item.qty, 0)).toFixed(2),
     )

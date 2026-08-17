@@ -93,8 +93,21 @@ export const onQuoteSent = onDocumentWritten(
 
     const groupId = buildOrderGroupId()
     const subtotal = (eligible.length > 0 ? eligible : [primary]).reduce((sum, item) => sum + (Number.isFinite(item.amount) ? item.amount : item.quantity * item.unitPrice), 0)
-    const deliveryFee = 35
-    const total = subtotal + deliveryFee
+    
+    // Extract fees from line items
+    const deliveryFeeItem = quoteItems.find(
+      (item) => item.description?.toLowerCase().includes('delivery fee') ||
+               (item.description?.toLowerCase().includes('delivery') && item.description?.toLowerCase().includes('fee'))
+    )
+    const deliveryFee = deliveryFeeItem?.amount ?? 35
+    
+    const hazmatFeeItem = quoteItems.find(
+      (item) => item.description?.toLowerCase().includes('hazmat') ||
+               item.description?.toLowerCase().includes('hazardous material')
+    )
+    const hazmatFee = hazmatFeeItem?.amount ?? 0
+    
+    const total = subtotal + deliveryFee + hazmatFee
     const addOnAddedAt = new Date().toISOString()
     const repFields = Object.fromEntries(
       Object.entries({
@@ -115,6 +128,7 @@ export const onQuoteSent = onDocumentWritten(
       upchargePercent: 0,
       subtotal,
       deliveryFee,
+      hazmatFee,
       total,
       status: 'pending',
       groupId,

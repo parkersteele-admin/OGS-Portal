@@ -180,10 +180,23 @@ async function createOperationalOrder(args: {
   }
 
   const groupId = buildOrderGroupId()
-  const deliveryFee = 35
+  
+  // Extract fees from line items
+  const deliveryFeeItem = quoteItems.find(
+    (item) => item.description?.toLowerCase().includes('delivery fee') ||
+             (item.description?.toLowerCase().includes('delivery') && item.description?.toLowerCase().includes('fee'))
+  )
+  const deliveryFee = deliveryFeeItem?.amount ?? 35
+  
+  const hazmatFeeItem = quoteItems.find(
+    (item) => item.description?.toLowerCase().includes('hazmat') ||
+             item.description?.toLowerCase().includes('hazardous material')
+  )
+  const hazmatFee = hazmatFeeItem?.amount ?? 0
+  
   const pricedItems = eligible.length > 0 ? eligible : [primary]
   const subtotal = pricedItems.reduce((sum, item) => sum + safeNumber(item.amount), 0)
-  const total = subtotal + deliveryFee
+  const total = subtotal + deliveryFee + hazmatFee
   const orderRef = db.collection('orders').doc()
   const addOnAddedAt = new Date().toISOString()
   const repFields = Object.fromEntries(
@@ -204,6 +217,7 @@ async function createOperationalOrder(args: {
     upchargePercent: 0,
     subtotal,
     deliveryFee,
+    hazmatFee,
     total,
     status: 'pending',
     groupId,
