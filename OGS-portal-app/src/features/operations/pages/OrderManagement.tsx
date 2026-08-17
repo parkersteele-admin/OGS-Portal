@@ -1017,10 +1017,18 @@ function OrderDetailPanel({
               <span className="om-panel__label">Subtotal</span>
               <span className="om-panel__val">{fmtCurrency(order.subtotal)}</span>
             </div>
-            <div className="om-panel__row">
-              <span className="om-panel__label">Delivery fee</span>
-              <span className="om-panel__val">{fmtCurrency(order.deliveryFee)}</span>
-            </div>
+            {order.deliveryFee > 0 && (
+              <div className="om-panel__row">
+                <span className="om-panel__label">Delivery fee</span>
+                <span className="om-panel__val">{fmtCurrency(order.deliveryFee)}</span>
+              </div>
+            )}
+            {order.hazmatFee && order.hazmatFee > 0 && (
+              <div className="om-panel__row">
+                <span className="om-panel__label">Hazmat fee</span>
+                <span className="om-panel__val">{fmtCurrency(order.hazmatFee)}</span>
+              </div>
+            )}
             <div className="om-panel__row om-panel__row--total">
               <span className="om-panel__label">Total</span>
               <span className="om-panel__val om-panel__val--total">
@@ -1692,6 +1700,19 @@ function CreateOrderModal({ initialCustomerId, initialLineItems, convertingQuote
     const [primary, ...rest] = eligibleItems
     if (!primary) return setError('Add at least one valid line item.')
 
+    // Extract fees from line items
+    const deliveryFeeItem = quoteLineItems.find((item) =>
+      item.description?.toLowerCase().includes('delivery fee') ||
+      item.description?.toLowerCase().includes('delivery') && item.description?.toLowerCase().includes('fee')
+    )
+    const deliveryFeeAmount = deliveryFeeItem?.amount ?? 0
+
+    const hazmatFeeItem = quoteLineItems.find((item) =>
+      item.description?.toLowerCase().includes('hazmat') ||
+      item.description?.toLowerCase().includes('hazardous material')
+    )
+    const hazmatFeeAmount = hazmatFeeItem?.amount ?? 0
+
     setSubmitting(true)
     setError('')
     try {
@@ -1726,14 +1747,17 @@ function CreateOrderModal({ initialCustomerId, initialLineItems, convertingQuote
       )
 
       const addOnAddedAt = new Date().toISOString()
+      const totalWithFees = parseFloat((rollups.totalRevenue + deliveryFeeAmount + hazmatFeeAmount).toFixed(2))
+      
       await updateOrder(orderId, {
         productId: primary.productId,
         quantity: primary.quantity,
         unitPrice: primary.unitPrice,
         upchargePercent,
         subtotal: parseFloat((revenueProducts + upchargeAmount).toFixed(2)),
-        deliveryFee: 0,
-        total: rollups.totalRevenue,
+        deliveryFee: deliveryFeeAmount,
+        hazmatFee: hazmatFeeAmount,
+        total: totalWithFees,
         applySalesTax,
         salesTaxRate: applySalesTax ? safeTaxRate / 100 : 0,
         salesTaxAmount: applySalesTax ? rollups.salesTaxAmount : 0,
@@ -2831,61 +2855,31 @@ export default function OrderManagement() {
                         className="om-table__td om-table__td--actions"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <button
-                          className="om-action-btn"
-                          title="View detail"
-                          onClick={() => setDetailOrder(order)}
-                          aria-label="View order detail"
-                        >
-                          <svg
-                            width="15"
-                            height="15"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                          >
-                            <path
-                              d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                            />
-                            <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
-                          </svg>
-                        </button>
-
-                        {(isAdmin || order.status === 'pending' ||
-                          order.status === 'scheduled') && (
+                        <div className="om-action-group">
                           <button
-                            className="om-action-btn"
-                            title="Reschedule"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setRescheduleOrder(order)
-                            }}
-                            aria-label="Reschedule order"
+                            className="om-action-btn om-action-btn--text"
+                            title="Open order"
+                            onClick={() => setDetailOrder(order)}
+                            aria-label="Open order"
                           >
-                            <svg
-                              width="15"
-                              height="15"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                            >
-                              <path
-                                d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                              <path
-                                d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                            </svg>
+                            Open
                           </button>
-                        )}
+
+                          {(isAdmin || order.status === 'pending' ||
+                            order.status === 'scheduled') && (
+                            <button
+                              className="om-action-btn om-action-btn--text"
+                              title="Edit order"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setRescheduleOrder(order)
+                              }}
+                              aria-label="Edit order"
+                            >
+                              Edit
+                            </button>
+                          )}
+                        </div>
 
                         {order.status === 'pending' && (
                           <button
