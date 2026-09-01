@@ -21,8 +21,19 @@ export const FOOTER_Y = 748
 
 type PdfDoc = InstanceType<typeof PDFDocument>
 
+const LOGO_X = MARGIN_L
+const LOGO_Y = 28
+const LOGO_WIDTH = 170
+const LOGO_HEIGHT = 44
+
 function displayUrl(url: string): string {
   return url.replace(/^https?:\/\//i, '').replace(/\/$/, '')
+}
+
+function getTitleFontSize(title: string): number {
+  if (title === 'TERMS & CONDITIONS') return 24
+  if (title === 'BILL OF LADING' || title === 'TERMS ACCEPTED') return 26
+  return 30
 }
 
 export function drawBrandedHeader(
@@ -35,10 +46,6 @@ export function drawBrandedHeader(
   doc.rect(0, 0, 8, PAGE_H).fill(OGS_BRAND_BLUE)
 
   const hasLogo = Boolean(logoAsset)
-  const LOGO_X = MARGIN_L - 25
-  const LOGO_Y = 26
-  const LOGO_WIDTH = 400
-  const LOGO_HEIGHT = 96
 
   if (logoAsset) {
     try {
@@ -85,17 +92,19 @@ export function drawBrandedHeader(
     headerY += 11
   }
 
+  const titleSize = getTitleFontSize(title)
+  const titleY = 40
   doc
-    .fontSize(30)
+    .fontSize(titleSize)
     .font('Helvetica-Bold')
     .fillColor(OGS_BRAND_BLUE)
-    .text(title, 0, 40, { align: 'right', width: RIGHT_EDGE })
+    .text(title, 0, titleY, { align: 'right', width: RIGHT_EDGE })
 
   doc
     .fontSize(9)
     .font('Helvetica')
     .fillColor('#555555')
-    .text(referenceText, 0, 78, { align: 'right', width: RIGHT_EDGE })
+    .text(referenceText, 0, titleY + titleSize + 8, { align: 'right', width: RIGHT_EDGE })
 
   const dividerY = Math.max(headerY + 12, 108)
   doc
