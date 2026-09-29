@@ -115,6 +115,7 @@ export const LineItemsEditor: React.FC<LineItemsEditorProps> = ({
                   label=""
                   placeholder="Select product..."
                   products={products}
+                  selectedLabel={{ name: row.productName || row.description, sku: row.skuLabel }}
                   disabled={disabled}
                 />
                 <input
@@ -150,7 +151,7 @@ export const LineItemsEditor: React.FC<LineItemsEditorProps> = ({
                     step={0.1}
                     value={parseFloat((row.marginPercent * 100).toFixed(2)) || ''}
                     onChange={(event) => handleFieldChange(row._id, 'marginPercent', Number(event.target.value) || 0)}
-                    disabled={disabled || !row.productId}
+                    disabled={disabled || !row.productId || row.cost === 0}
                   />
                 </label>
 

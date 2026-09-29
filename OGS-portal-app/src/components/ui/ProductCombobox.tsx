@@ -13,7 +13,6 @@ import React, {
   useState,
   useEffect,
   useRef,
-  useCallback,
   type KeyboardEvent,
 } from 'react'
 import { getProductDropdown } from '../../services/productService'
@@ -31,6 +30,7 @@ export interface ProductComboboxProps {
   placeholder?: string
   /** Optional filtered product list (if provided, overrides the default fetch) */
   products?: ProductDropdownItem[]
+  selectedLabel?: { name: string; sku: string }
   disabled?: boolean
   required?: boolean
 }
@@ -41,11 +41,12 @@ export const ProductCombobox: React.FC<ProductComboboxProps> = ({
   label = 'Product',
   placeholder = 'Search or select a product…',
   products,
+  selectedLabel,
   disabled = false,
   required = false,
 }) => {
-  const [options,      setOptions]      = useState<ProductDropdownItem[]>(products ?? [])
-  const [loading,      setLoading]      = useState(!products)
+  const [loadedOptions, setOptions]      = useState<ProductDropdownItem[]>(products ?? [])
+  const [fetchLoading, setLoading]      = useState(!products)
   const [open,         setOpen]         = useState(false)
   const [query,        setQuery]        = useState('')
   const [activeIdx,    setActiveIdx]    = useState(-1)
@@ -53,13 +54,12 @@ export const ProductCombobox: React.FC<ProductComboboxProps> = ({
   const inputRef    = useRef<HTMLInputElement>(null)
   const listRef     = useRef<HTMLUListElement>(null)
 
+  const options = products ?? loadedOptions
+  const loading = products ? false : fetchLoading
+
   // Load product list once (only if not provided as prop)
   useEffect(() => {
-    if (products) {
-      setOptions(products)
-      setLoading(false)
-      return
-    }
+    if (products) return
     getProductDropdown()
       .then(setOptions)
       .finally(() => setLoading(false))
@@ -78,7 +78,7 @@ export const ProductCombobox: React.FC<ProductComboboxProps> = ({
   }, [open])
 
   // Selected product display name
-  const selected = options.find((o) => o.id === value)
+  const selected = options.find((o) => o.id === value) ?? (value ? selectedLabel : undefined)
 
   // Filtered options
   const filtered = query.trim()
@@ -115,7 +115,7 @@ export const ProductCombobox: React.FC<ProductComboboxProps> = ({
     onSelect(null)
   }
 
-  const handleKeyDown = useCallback((e: KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (!open) { if (e.key === 'Enter' || e.key === ' ') openMenu(); return }
     switch (e.key) {
       case 'ArrowDown':
@@ -134,7 +134,7 @@ export const ProductCombobox: React.FC<ProductComboboxProps> = ({
         setOpen(false)
         break
     }
-  }, [open, activeIdx, flatList]) // eslint-disable-line react-hooks/exhaustive-deps
+  }
 
   // Scroll active item into view
   useEffect(() => {

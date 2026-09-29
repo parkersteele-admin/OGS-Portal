@@ -269,7 +269,7 @@ const QuoteEditorPage: React.FC = () => {
   const [fallbackRep, setFallbackRep] = useState({ name: '', email: '', phone: '' })
   const [deliveryFee,    setDeliveryFee]    = useState(0)
   const [includeDelivery,setIncludeDelivery]= useState(false)
-  const [rentalMonths,   setRentalMonths]   = useState(0)
+  const [rentalMonths,   setRentalMonths]   = useState(1)
   const [rentalRate,     setRentalRate]     = useState(0)
   const [includeRental,  setIncludeRental]  = useState(false)
   const [applySalesTax, setApplySalesTax] = useState(false)
@@ -344,7 +344,11 @@ const QuoteEditorPage: React.FC = () => {
       // Try to match recipient from loaded list; fallback to raw id
       const rid = q.customerId ?? q.leadId ?? ''
       setRecipientId(rid)
-      setRows(q.lineItems.map(item => ({
+      const rental = q.lineItems.find((item) => item.productId === 'rental')
+      setIncludeRental(Boolean(rental))
+      setRentalRate(rental?.unitPrice ?? 0)
+      setRentalMonths(rental?.quantity ?? 1)
+      setRows(q.lineItems.filter((item) => item.productId !== 'rental').map(item => ({
         _id:         crypto.randomUUID(),
         productId:   item.productId,
         productName: '',
@@ -518,10 +522,7 @@ const QuoteEditorPage: React.FC = () => {
   useEffect(() => {
     if (deliveryRows.length === 0) return
 
-    const latestDeliveryRow = deliveryRows[deliveryRows.length - 1]
-    const inferredDeliveryFee = latestDeliveryRow.amount > 0
-      ? latestDeliveryRow.amount
-      : latestDeliveryRow.unitPrice
+    const inferredDeliveryFee = deliveryRows.reduce((sum, row) => sum + row.amount, 0)
     const nextDeliveryFee = Number.isFinite(inferredDeliveryFee)
       ? Math.max(inferredDeliveryFee, 0)
       : 0
@@ -575,7 +576,7 @@ const QuoteEditorPage: React.FC = () => {
   )
 
   useEffect(() => {
-    if (Object.keys(productMap).length === 0) return
+    if (loadingQuote || Object.keys(productMap).length === 0) return
     setRows((prev) => prev.map((row) => {
       if (!row.productId) return row
       const product = productMap[row.productId]
@@ -584,6 +585,7 @@ const QuoteEditorPage: React.FC = () => {
       return recalculateLineItem({
         ...row,
         productName: product.name,
+        skuLabel: product.sku,
         basePrice: product.basePrice,
         cost: product.cost,
         minMarginPercent: product.minMarginPercent,
@@ -591,7 +593,7 @@ const QuoteEditorPage: React.FC = () => {
         marginPercent,
       }, 'unitPrice', pricingPermissions.enforceMarginFloor)
     }))
-  }, [productMap, pricingPermissions.enforceMarginFloor])
+  }, [productMap, loadingQuote, pricingPermissions.enforceMarginFloor])
 
   // Compute filtered products based on selected category
   const filteredProducts = useMemo(() => {
@@ -620,6 +622,7 @@ const QuoteEditorPage: React.FC = () => {
     if (marginViolations.length > 0) {
       return `Margin is below minimum on ${marginViolations.length} line item${marginViolations.length === 1 ? '' : 's'}.`
     }
+    if (includeRental && (rentalMonths < 1 || rentalRate < 0)) return 'Enter a valid rental rate and at least one month.'
     if (!validUntil) return 'Please set a valid-until date.'
     return null
   }
@@ -1153,16 +1156,16 @@ const QuoteEditorPage: React.FC = () => {
             <div className="qep-summary">
               <h3 className="qep-summary__title">Summary</h3>
               <div className="qep-summary__rows">
-                <div className="qep-summary__row"><span>Revenue (products)</span><span>{formatCurrency(subtotal)}</span></div>
+                <div className="qep-summary__row"><span>Line items (products & fees)</span><span>{formatCurrency(subtotal)}</span></div>
                 <div className="qep-summary__row"><span>Total cost</span><span>{formatCurrency(totalCost)}</span></div>
                 <div className="qep-summary__row"><span>Line profit</span><span>{formatCurrency(totalLineProfit)}</span></div>
-                {includeDelivery && effectiveDelivery > 0 && (
+                {includeDelivery && (
                   <div className="qep-summary__row">
                     <span>Delivery fee</span>
                     <span>{formatCurrency(effectiveDelivery)}</span>
                   </div>
                 )}
-                {includeRental && rentalTotal > 0 && (
+                {includeRental && (
                   <div className="qep-summary__row">
                     <span>Tank rental</span>
                     <span>{formatCurrency(rentalTotal)}</span>

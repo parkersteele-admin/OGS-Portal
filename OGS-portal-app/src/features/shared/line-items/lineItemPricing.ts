@@ -55,7 +55,7 @@ export function recalculateLineItem(
   let marginPercent = normalizeMarginInput(row.marginPercent)
   let unitPrice = Number.isFinite(row.unitPrice) ? parseFloat(Math.max(row.unitPrice, 0).toFixed(2)) : 0
 
-  if (source === 'margin') {
+  if (source === 'margin' && cost > 0) {
     if (enforceMarginFloor) {
       marginPercent = Math.max(marginPercent, minMarginPercent)
     }
@@ -65,7 +65,7 @@ export function recalculateLineItem(
     if (enforceMarginFloor) {
       unitPrice = Math.max(unitPrice, minPrice)
     }
-    marginPercent = normalizeMarginInput(calculateMarginPercent(unitPrice, cost))
+    marginPercent = calculateMarginPercent(unitPrice, cost)
   }
 
   if (enforceMarginFloor && unitPrice < minPrice) {
