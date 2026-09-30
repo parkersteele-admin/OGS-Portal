@@ -154,7 +154,7 @@ function fetchImageBuffer(url: string): Promise<Buffer | null> {
 
 // ── PDF builder ───────────────────────────────────────────────────────────────
 
-function buildQuotePdf(
+export function buildQuotePdf(
   quoteId:   string,
   quote:     Record<string, unknown>,
   recipient: Record<string, unknown>,
@@ -196,7 +196,7 @@ function buildQuotePdf(
 
     const quoteNum = (quote.quoteNumber as string) || quoteId.slice(-8).toUpperCase()
     const referenceText = `#${quoteNum}`
-    const DIVIDER_Y = drawBrandedHeader(doc, company, logoAsset, 'QUOTE', referenceText)
+    const DIVIDER_Y = drawBrandedHeader(doc, company, logoAsset, 'QUOTE', referenceText, 0.5)
 
     // ── Section labels ─────────────────────────────────────────────────────
     const META_X = 380
@@ -318,7 +318,7 @@ function buildQuotePdf(
       const rowHeight = Math.max(18, descriptionHeight + 4)
 
       if (rowY + rowHeight > FOOTER_Y - 170) {
-        const nextDividerY = newBrandedPage(doc, company, logoAsset, 'QUOTE', referenceText)
+        const nextDividerY = newBrandedPage(doc, company, logoAsset, 'QUOTE', referenceText, 0.5)
         doc
           .fontSize(7)
           .font('Helvetica-Bold')
@@ -412,7 +412,7 @@ function buildQuotePdf(
     if (notesText) {
       const notesHeight = doc.heightOfString(notesText, { width: CONTENT_W })
       if (rowY + 30 + notesHeight > FOOTER_Y - 140) {
-        const nextDividerY = newBrandedPage(doc, company, logoAsset, 'QUOTE', referenceText)
+        const nextDividerY = newBrandedPage(doc, company, logoAsset, 'QUOTE', referenceText, 0.5)
         rowY = nextDividerY + 18
       }
       doc
@@ -444,7 +444,7 @@ function buildQuotePdf(
     const BOX_H = hasRep ? 148 : 66
 
     if (rowY + BOX_H + 24 > FOOTER_Y - 10) {
-      const nextDividerY = newBrandedPage(doc, company, logoAsset, 'QUOTE', referenceText)
+      const nextDividerY = newBrandedPage(doc, company, logoAsset, 'QUOTE', referenceText, 0.5)
       rowY = nextDividerY + 18
     }
 
@@ -543,7 +543,7 @@ function buildQuotePdf(
 
     // ── Page 2: Terms & Conditions ──────────────────────────────────────────
     if (company.termsAndConditions) {
-      const pageTwoDividerY = newBrandedPage(doc, company, logoAsset, 'TERMS & CONDITIONS', referenceText)
+      const pageTwoDividerY = newBrandedPage(doc, company, logoAsset, 'TERMS & CONDITIONS', referenceText, 0.5)
 
       // T&C body text
       doc

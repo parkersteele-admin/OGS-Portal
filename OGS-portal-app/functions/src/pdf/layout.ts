@@ -42,6 +42,7 @@ export function drawBrandedHeader(
   logoAsset: Buffer | string | null,
   title: string,
   referenceText: string,
+  logoScale = 1,
 ): number {
   doc.rect(0, 0, 8, PAGE_H).fill(OGS_BRAND_BLUE)
 
@@ -51,12 +52,12 @@ export function drawBrandedHeader(
     try {
       if (typeof logoAsset === 'string') {
         SVGtoPDF(doc, logoAsset, LOGO_X, LOGO_Y, {
-          width: LOGO_WIDTH,
-          height: LOGO_HEIGHT,
+          width: LOGO_WIDTH * logoScale,
+          height: LOGO_HEIGHT * logoScale,
           preserveAspectRatio: 'xMinYMin meet',
         })
       } else {
-        doc.image(logoAsset, LOGO_X, LOGO_Y, { fit: [LOGO_WIDTH, LOGO_HEIGHT] })
+        doc.image(logoAsset, LOGO_X, LOGO_Y, { fit: [LOGO_WIDTH * logoScale, LOGO_HEIGHT * logoScale] })
       }
     } catch {
       // Ignore malformed assets and continue with the text header.
@@ -74,7 +75,7 @@ export function drawBrandedHeader(
     headerY = nameY + 23
   } else {
     // Start company detail lines just below the resized logo.
-    headerY = LOGO_Y + LOGO_HEIGHT + 2
+    headerY = LOGO_Y + LOGO_HEIGHT * logoScale + 2
   }
   if (company.tagline) {
     doc.fontSize(8.5).font('Helvetica').fillColor('#666666').text(company.tagline, MARGIN_L, headerY)
@@ -159,7 +160,8 @@ export function newBrandedPage(
   logoAsset: Buffer | string | null,
   title: string,
   referenceText: string,
+  logoScale = 1,
 ): number {
   doc.addPage({ margin: 0, size: 'LETTER' })
-  return drawBrandedHeader(doc, company, logoAsset, title, referenceText)
+  return drawBrandedHeader(doc, company, logoAsset, title, referenceText, logoScale)
 }
