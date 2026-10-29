@@ -448,6 +448,22 @@
         { "fieldPath": "status",                 "order": "ASCENDING" },
         { "fieldPath": "pendingReturnDriverId",  "order": "ASCENDING" }
       ]
+    },
+
+    // ── contactLogs ───────────────────────────────────────────────────────────
+
+    // CustomerRecord / LeadsPipeline ActivitySection:
+    // where(entityType) + where(entityId) + orderBy(contactedAt DESC)
+    // Missing index caused these history queries to silently fail (empty
+    // results), which looked like logged activities were never saved.
+    {
+      "collectionGroup": "contactLogs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "entityType",  "order": "ASCENDING" },
+        { "fieldPath": "entityId",    "order": "ASCENDING" },
+        { "fieldPath": "contactedAt", "order": "DESCENDING" }
+      ]
     }
 
   ],

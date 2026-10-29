@@ -288,8 +288,9 @@ const ActivitySection: React.FC<{ leadId: string }> = ({ leadId }) => {
   const [method, setMethod]     = useState<ContactMethod>('call')
   const [summary, setSummary]   = useState('')
   const [saving,  setSaving]    = useState(false)
+  const [error,   setError]     = useState<string | null>(null)
 
-  const { data: logs = [], isLoading } = useQuery({
+  const { data: logs = [], isLoading, isError, error: queryError } = useQuery({
     queryKey: ['contactLogs', 'lead', leadId],
     queryFn: async () => {
       const snap = await getDocs(
@@ -310,6 +311,7 @@ const ActivitySection: React.FC<{ leadId: string }> = ({ leadId }) => {
     e.preventDefault()
     if (!summary.trim()) return
     setSaving(true)
+    setError(null)
     try {
       await addDoc(collection(db, 'contactLogs'), {
         entityType:  'lead',
@@ -320,9 +322,11 @@ const ActivitySection: React.FC<{ leadId: string }> = ({ leadId }) => {
         contactedAt: serverTimestamp(),
         createdAt:   serverTimestamp(),
       })
-      queryClient.invalidateQueries({ queryKey: ['contactLogs', 'lead', leadId] })
+      await queryClient.invalidateQueries({ queryKey: ['contactLogs', 'lead', leadId] })
       setSummary('')
       setShowForm(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to log activity.')
     } finally {
       setSaving(false)
     }
@@ -358,8 +362,14 @@ const ActivitySection: React.FC<{ leadId: string }> = ({ leadId }) => {
         </form>
       )}
 
+      {error && <p className="lp-error">{error}</p>}
+
       {isLoading ? (
         <div className="lp-activity__loading">Loading…</div>
+      ) : isError ? (
+        <p className="lp-error">
+          {queryError instanceof Error ? queryError.message : 'Failed to load activity history.'}
+        </p>
       ) : logs.length === 0 ? (
         <p className="lp-empty">No activity logged yet.</p>
       ) : (

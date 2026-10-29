@@ -918,9 +918,10 @@ interface LogInteractionModalProps {
   onClose:  () => void
   onSubmit: (form: LogInteractionForm) => Promise<void>
   saving:   boolean
+  error:    string | null
 }
 
-const LogInteractionModal: React.FC<LogInteractionModalProps> = ({ onClose, onSubmit, saving }) => {
+const LogInteractionModal: React.FC<LogInteractionModalProps> = ({ onClose, onSubmit, saving, error }) => {
   const todayIso = new Date().toISOString().slice(0, 16)
   const [form, setForm] = useState<LogInteractionForm>({
     method:      'call',
@@ -935,7 +936,11 @@ const LogInteractionModal: React.FC<LogInteractionModalProps> = ({ onClose, onSu
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    await onSubmit(form)
+    try {
+      await onSubmit(form)
+    } catch {
+      // error surfaced via the `error` prop from the parent mutation
+    }
   }
 
   return (
@@ -973,6 +978,7 @@ const LogInteractionModal: React.FC<LogInteractionModalProps> = ({ onClose, onSu
           value={form.followUpAt}
           onChange={set('followUpAt')}
         />
+        {error && <p className="cr-form-error">{error}</p>}
         <div className="cr-modal-actions">
           <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>
             Cancel
@@ -1366,7 +1372,7 @@ const CustomerRecord: React.FC = () => {
   const outstandingBalance = outstandingInvoices?.reduce((s, inv) => s + inv.total, 0) ?? 0
 
   // Contact logs (fetched when history tab active)
-  const { data: contactLogs = [], isLoading: logsLoading } = useQuery({
+  const { data: contactLogs = [], isLoading: logsLoading, isError: logsError, error: logsErrorObj } = useQuery({
     queryKey: ['contactLogs', customerId],
     queryFn: async () => {
       const snap = await getDocs(
@@ -1552,6 +1558,8 @@ const CustomerRecord: React.FC = () => {
     },
   })
 
+  const [logError, setLogError] = useState<string | null>(null)
+
   const logMutation = useMutation({
     mutationFn: async (form: LogInteractionForm) => {
       await addDoc(collection(db, 'contactLogs'), {
@@ -1570,6 +1578,10 @@ const CustomerRecord: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contactLogs', customerId] })
       setShowLogModal(false)
+      setLogError(null)
+    },
+    onError: (err) => {
+      setLogError(err instanceof Error ? err.message : 'Failed to log interaction.')
     },
   })
 
@@ -1587,6 +1599,9 @@ const CustomerRecord: React.FC = () => {
     },
     onError: () => setUploadProgress(null),
   })
+  const uploadError = uploadMutation.error
+    ? (uploadMutation.error instanceof Error ? uploadMutation.error.message : 'Upload failed.')
+    : null
 
   const deleteMutation = useMutation({
     mutationFn: deleteFile,
@@ -2825,6 +2840,14 @@ const CustomerRecord: React.FC = () => {
 
           {logsLoading ? (
             <div className="cr-skeleton cr-skeleton--list" />
+          ) : logsError ? (
+            <Card>
+              <CardBody>
+                <p className="cr-form-error">
+                  {logsErrorObj instanceof Error ? logsErrorObj.message : 'Failed to load contact history.'}
+                </p>
+              </CardBody>
+            </Card>
           ) : contactLogs.length === 0 ? (
             <Card>
               <CardBody>
@@ -3136,6 +3159,7 @@ const CustomerRecord: React.FC = () => {
               </Button>
             </div>
           </div>
+          {uploadError && <p className="cr-form-error" role="alert">{uploadError}</p>}
 
           {filesLoading ? (
             <div className="cr-skeleton cr-skeleton--list" />
@@ -3571,6 +3595,7 @@ const CustomerRecord: React.FC = () => {
           onClose={() => setShowLogModal(false)}
           onSubmit={async (form) => { await logMutation.mutateAsync(form) }}
           saving={logMutation.isPending}
+          error={logError}
         />
       )}
 

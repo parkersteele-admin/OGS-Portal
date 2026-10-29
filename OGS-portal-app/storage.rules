@@ -43,6 +43,7 @@ service firebase.storage {
     function isAdmin()    { return hasRole('admin');    }
     function isDispatch() { return hasAnyRole(['admin', 'dispatch']); }
     function isDriver()   { return hasAnyRole(['admin', 'dispatch', 'driver']); }
+    function isStaff()    { return hasAnyRole(['admin', 'dispatch', 'sales']); }
 
     // Customer portal users have their customerId stored as a custom claim.
     function isOwnCustomer(customerId) {
@@ -65,6 +66,15 @@ service firebase.storage {
 
     function isImageOrDocument() {
       return isImageType() || isDocumentType();
+    }
+
+    // PDF, Word, and scanned images — matches the CRM upload picker.
+    function isOfficeDocument() {
+      return isImageOrDocument()
+        || request.resource.contentType in [
+             'application/msword',
+             'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+           ];
     }
 
     // ── Size helpers ──────────────────────────────────────────────────────────
@@ -92,6 +102,25 @@ service firebase.storage {
       allow write:  if (isDispatch() || isOwnCustomer(customerId))
                     && isDocumentType()
                     && isUnder25MB();
+    }
+
+    // ── customer documents ────────────────────────────────────────────────────
+    // General customer documents (signed credit apps, agreements, etc.) uploaded
+    // from the CRM Documents tab via fileService.uploadFile.
+    match /ogs-portal/customers/{customerId}/{fileId} {
+      allow read:   if isStaff() || isOwnCustomer(customerId);
+      allow create: if isStaff() && isOfficeDocument() && isUnder25MB();
+      allow update: if false;
+      allow delete: if isStaff();
+    }
+
+    // ── tank documents ────────────────────────────────────────────────────────
+    // Inspection reports uploaded from Operations → Tank Inventory.
+    match /ogs-portal/tanks/{tankId}/{fileId} {
+      allow read:   if isStaff();
+      allow create: if isStaff() && isOfficeDocument() && isUnder25MB();
+      allow update: if false;
+      allow delete: if isStaff();
     }
 
     // ── invoices ──────────────────────────────────────────────────────────────

@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { useBackdropClose } from '../../hooks/useBackdropClose';
 import './Modal.css';
 
 interface ModalProps {
@@ -18,6 +19,7 @@ export const Modal: React.FC<ModalProps> = ({ open, onClose, title, size = 'md',
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
   }, [open, onClose]);
+  const backdrop = useBackdropClose(onClose);
 
   if (!open) return null;
 
@@ -27,7 +29,7 @@ export const Modal: React.FC<ModalProps> = ({ open, onClose, title, size = 'md',
       role="dialog"
       aria-modal="true"
       aria-label={title}
-      onClick={onClose}
+      {...backdrop}
     >
       <div className={`ui-modal ui-modal--${size}`} onClick={(e) => e.stopPropagation()}>
         {title && (
