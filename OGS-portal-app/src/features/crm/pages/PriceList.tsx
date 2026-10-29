@@ -18,7 +18,6 @@ import { useAuth } from '../../../hooks/useAuth'
 import { Button } from '../../../components/ui/Button'
 import { Input } from '../../../components/ui/Input'
 import type { Product, ProductCategory } from '../../../types/product'
-import { isDailyChargeCategory } from '../../shared/line-items/lineItemPricing'
 import './PriceList.css'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -222,7 +221,7 @@ const SlideOver: React.FC<SlideOverProps> = ({ initial, onClose, onSaved }) => {
       cost: parsedCost,
       minMarginPercent,
       rentalPrice: rentalPrice ? parseFloat(rentalPrice) : null,
-      chargedDaily: isDailyChargeCategory(category) && chargedDaily,
+      chargedDaily,
       isVisible,
       isFeatured,
       sortOrder: parseInt(sortOrder) || 0,
@@ -304,12 +303,10 @@ const SlideOver: React.FC<SlideOverProps> = ({ initial, onClose, onSaved }) => {
           )}
 
           <div className="pl-so-toggles">
-            {isDailyChargeCategory(category) && (
-              <label className="pl-so-toggle-row">
-                <Toggle checked={chargedDaily} onChange={() => setChargedDaily((v) => !v)} label="Charged per day" />
-                <span>Charged per day — base price is a daily rate; quotes ask for number of days</span>
-              </label>
-            )}
+            <label className="pl-so-toggle-row">
+              <Toggle checked={chargedDaily} onChange={() => setChargedDaily((v) => !v)} label="Charged per day" />
+              <span>Charged per day — base price is a daily rate; quotes ask for number of days</span>
+            </label>
             <label className="pl-so-toggle-row">
               <Toggle checked={isVisible} onChange={() => setIsVisible((v) => !v)} label="Visible to customers" />
               <span>Visible to customers</span>

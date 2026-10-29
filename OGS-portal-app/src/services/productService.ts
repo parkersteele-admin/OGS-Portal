@@ -42,7 +42,7 @@ export interface ProductDropdownItem {
   cost: number
   minMarginPercent: number
   minPrice: number
-  /** Fees only: basePrice is a daily rate. */
+  /** basePrice is a daily rate. */
   chargedDaily?: boolean
 }
 
