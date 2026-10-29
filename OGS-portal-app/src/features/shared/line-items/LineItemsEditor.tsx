@@ -4,6 +4,7 @@ import type { ProductDropdownItem } from '../../../services/productService'
 import { formatCurrency } from '../../../utils/format'
 import {
   EMPTY_LINE_ITEM,
+  isDailyChargeCategory,
   lineItemFromProduct,
   normalizeMarginInput,
   recalculateLineItem,
@@ -105,8 +106,10 @@ export const LineItemsEditor: React.FC<LineItemsEditorProps> = ({
           const hasMarginViolation = Boolean(row.productId) && row.marginPercent + 0.0001 < row.minMarginPercent
           const detailsOpen = detailsOpenById[row._id] ?? false
           const isDaily = row.rentalDays != null
-          // Daily charging only applies to Fees products (or lines already saved as daily).
-          const canChargeDaily = isDaily || productById.get(row.productId)?.category === 'Fees'
+          // Daily charging applies to Fees/Rentals products, products flagged as daily,
+          // and lines already saved as daily.
+          const rowProduct = productById.get(row.productId)
+          const canChargeDaily = isDaily || rowProduct?.chargedDaily === true || isDailyChargeCategory(rowProduct?.category)
 
           return (
             <article key={row._id} className={`lie-item${hasMarginViolation ? ' lie-item--warn' : ''}`}>

@@ -26,6 +26,13 @@ export const EMPTY_LINE_ITEM = (): EditableLineItem => ({
   amount: 0,
 })
 
+const DAILY_CATEGORIES = new Set(['fees', 'rentals'])
+
+/** Whether a product category can be charged per day (Fees and Rentals). */
+export function isDailyChargeCategory(category: string | undefined): boolean {
+  return DAILY_CATEGORIES.has((category ?? '').trim().toLowerCase())
+}
+
 /** Units actually billed: quantity, multiplied by days for daily-charged lines. */
 export function billableQuantity(row: Pick<EditableLineItem, 'quantity' | 'rentalDays'>): number {
   return row.rentalDays != null ? row.quantity * row.rentalDays : row.quantity

@@ -18,6 +18,7 @@ import { useAuth } from '../../../hooks/useAuth'
 import { Button } from '../../../components/ui/Button'
 import { Input } from '../../../components/ui/Input'
 import type { Product, ProductCategory } from '../../../types/product'
+import { isDailyChargeCategory } from '../../shared/line-items/lineItemPricing'
 import './PriceList.css'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -221,7 +222,7 @@ const SlideOver: React.FC<SlideOverProps> = ({ initial, onClose, onSaved }) => {
       cost: parsedCost,
       minMarginPercent,
       rentalPrice: rentalPrice ? parseFloat(rentalPrice) : null,
-      chargedDaily: category === 'Fees' && chargedDaily,
+      chargedDaily: isDailyChargeCategory(category) && chargedDaily,
       isVisible,
       isFeatured,
       sortOrder: parseInt(sortOrder) || 0,
@@ -303,7 +304,7 @@ const SlideOver: React.FC<SlideOverProps> = ({ initial, onClose, onSaved }) => {
           )}
 
           <div className="pl-so-toggles">
-            {category === 'Fees' && (
+            {isDailyChargeCategory(category) && (
               <label className="pl-so-toggle-row">
                 <Toggle checked={chargedDaily} onChange={() => setChargedDaily((v) => !v)} label="Charged per day" />
                 <span>Charged per day — base price is a daily rate; quotes ask for number of days</span>
