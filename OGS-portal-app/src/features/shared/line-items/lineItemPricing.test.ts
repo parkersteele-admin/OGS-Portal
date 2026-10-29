@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { EMPTY_LINE_ITEM, recalculateLineItem, calculateLineItemRollups } from './lineItemPricing'
+import { EMPTY_LINE_ITEM, recalculateLineItem, calculateLineItemRollups, toQuoteItem, fromQuoteItem } from './lineItemPricing'
 
 describe('quote line pricing', () => {
   it('keeps a zero-cost fee price when margin is edited and reports its full margin', () => {
@@ -30,5 +30,42 @@ describe('quote line pricing', () => {
     expect(totals.salesTaxAmount).toBe(7.13)
     expect(totals.totalRevenue).toBe(102.13)
     expect(totals.totalProfit).toBe(59)
+  })
+
+  it('multiplies daily-charged lines by days and folds them into a billable quote line', () => {
+    const cage = recalculateLineItem({
+      ...EMPTY_LINE_ITEM(),
+      productId: 'cage',
+      description: 'Propane Cage Rental (cylinder)',
+      quantity: 2,
+      rentalDays: 14,
+      unitPrice: 5,
+      cost: 1.5,
+    })
+    expect(cage.amount).toBe(140)
+    expect(cage.profit).toBe(98)
+
+    const saved = toQuoteItem(cage)
+    expect(saved).toEqual({
+      productId: 'cage',
+      description: 'Propane Cage Rental (cylinder) — 2 × 14 days',
+      quantity: 28,
+      unitPrice: 5,
+      amount: 140,
+      rentalUnits: 2,
+      rentalDays: 14,
+    })
+    expect(saved.quantity * saved.unitPrice).toBe(saved.amount)
+
+    expect(fromQuoteItem(saved)).toEqual({
+      description: 'Propane Cage Rental (cylinder)',
+      quantity: 2,
+      rentalDays: 14,
+    })
+  })
+
+  it('leaves regular lines unfolded with no rental fields', () => {
+    const row = recalculateLineItem({ ...EMPTY_LINE_ITEM(), productId: 'co2', description: 'CO2', quantity: 3, unitPrice: 20 })
+    expect(toQuoteItem(row)).toEqual({ productId: 'co2', description: 'CO2', quantity: 3, unitPrice: 20, amount: 60 })
   })
 })

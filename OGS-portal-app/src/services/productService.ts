@@ -42,6 +42,8 @@ export interface ProductDropdownItem {
   cost: number
   minMarginPercent: number
   minPrice: number
+  /** Fees only: basePrice is a daily rate. */
+  chargedDaily?: boolean
 }
 
 export interface InternalProductPricingGuard {
@@ -401,6 +403,7 @@ export async function getProductDropdown(): Promise<ProductDropdownItem[]> {
             cost: p.cost ?? normalizeCost(undefined, p.basePrice),
             minMarginPercent: p.minMarginPercent ?? DEFAULT_MARGIN_DECIMAL,
             minPrice: p.minPrice ?? computeMinPrice(p.cost ?? 0, p.minMarginPercent ?? DEFAULT_MARGIN_DECIMAL),
+            chargedDaily: p.chargedDaily === true,
           }
         })
 

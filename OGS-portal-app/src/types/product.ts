@@ -34,6 +34,8 @@ export interface Product {
   /** Derived internal floor price based on cost and min margin. */
   minPrice?: number
   rentalPrice?: number | null
+  /** Fees only: basePrice is a daily rate; quotes multiply it by a day count. */
+  chargedDaily?: boolean
 
   // ── Units ─────────────────────────────────────────────────────
   unit: string  // 'cylinder' | 'lb' | 'cf' | 'liter' | 'fee' | etc.

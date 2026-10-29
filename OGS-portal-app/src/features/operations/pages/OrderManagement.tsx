@@ -48,6 +48,7 @@ import { useAuth } from '../../../hooks/useAuth'
 import { Button } from '../../../components/ui/Button'
 import { Input } from '../../../components/ui/Input'
 import { Modal } from '../../../components/ui/Modal'
+import { useBackdropClose } from '../../../hooks/useBackdropClose'
 import { InvoiceDetailDrawer } from '../components/InvoiceDetailDrawer'
 import { DeliveryCompleteModal } from '../../../components/delivery/DeliveryCompleteModal'
 import MobileOrderCard from '../../../components/orders/MobileOrderCard'
@@ -56,6 +57,9 @@ import {
   EMPTY_LINE_ITEM,
   calculateLineItemRollups,
   recalculateLineItem,
+  billableQuantity,
+  toQuoteItem,
+  fromQuoteItem,
 } from '../../shared/line-items/lineItemPricing'
 import { getLineItemPricingPermissions } from '../../shared/line-items/lineItemPermissions'
 import type { EditableLineItem } from '../../shared/line-items/types'
@@ -1594,6 +1598,7 @@ function CreateOrderModal({ initialCustomerId, initialLineItems, convertingQuote
   const [applySalesTax, setApplySalesTax] = useState(false)
   const [salesTaxRatePercent, setSalesTaxRatePercent] = useState('0.00')
   const customerInputRef = useRef<HTMLInputElement>(null)
+  const backdrop = useBackdropClose(onClose)
 
   // Load products on mount
   useEffect(() => {
@@ -1647,7 +1652,7 @@ function CreateOrderModal({ initialCustomerId, initialLineItems, convertingQuote
   )
 
   const totalCost = useMemo(
-    () => parseFloat(pricedLineItems.reduce((sum, item) => sum + (item.cost * item.quantity), 0).toFixed(2)),
+    () => parseFloat(pricedLineItems.reduce((sum, item) => sum + (item.cost * billableQuantity(item)), 0).toFixed(2)),
     [pricedLineItems],
   )
 
@@ -1675,13 +1680,7 @@ function CreateOrderModal({ initialCustomerId, initialLineItems, convertingQuote
   )
 
   const quoteLineItems = useMemo<QuoteItem[]>(
-    () => pricedLineItems.map((item) => ({
-      productId: item.productId,
-      description: item.description,
-      quantity: item.quantity,
-      unitPrice: item.unitPrice,
-      amount: item.amount,
-    })),
+    () => pricedLineItems.map(toQuoteItem),
     [pricedLineItems],
   )
 
@@ -1796,7 +1795,7 @@ function CreateOrderModal({ initialCustomerId, initialLineItems, convertingQuote
   }
 
   return (
-    <div className="om-overlay" onClick={onClose}>
+    <div className="om-overlay" {...backdrop}>
       <div
         className="om-modal om-modal--lg"
         onClick={(e) => e.stopPropagation()}
@@ -2057,6 +2056,7 @@ function RescheduleModal({ order, onClose, onSaved }: RescheduleModalProps) {
   const [notes, setNotes] = useState(order.notes ?? '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const backdrop = useBackdropClose(onClose)
 
   async function handleSave() {
     setBusy(true)
@@ -2077,7 +2077,7 @@ function RescheduleModal({ order, onClose, onSaved }: RescheduleModalProps) {
   }
 
   return (
-    <div className="om-overlay" onClick={onClose}>
+    <div className="om-overlay" {...backdrop}>
       <div
         className="om-modal om-modal--sm"
         onClick={(e) => e.stopPropagation()}
@@ -2192,7 +2192,10 @@ export default function OrderManagement() {
     const customerId = params.get('customerId')
     const convertQuoteId = params.get('convertQuoteId')
     
-    if (newParam === '1') {
+    if ((location.state as { openNew?: boolean } | null)?.openNew) {
+      setShowCreate(true)
+      navigate(location.pathname, { replace: true, state: null })
+    } else if (newParam === '1') {
       setShowCreate(true)
       if (customerId) {
         setInitialCreateCustomerId(customerId)
@@ -2217,8 +2220,7 @@ export default function OrderManagement() {
                 productId: item.productId,
                 productName: item.description,
                 skuLabel: '',
-                description: item.description,
-                quantity: item.quantity,
+                ...fromQuoteItem(item),
                 basePrice: item.unitPrice,
                 cost: 0, // Cost not available from quote
                 minMarginPercent: 0.2,

@@ -13,6 +13,8 @@ export interface EditableLineItem {
   profit: number
   unitPrice: number
   amount: number
+  /** Set when the line is charged per day; amount = quantity × rentalDays × unitPrice. */
+  rentalDays?: number
 }
 
 export type RecalcSource = 'margin' | 'unitPrice' | 'other'

@@ -179,6 +179,7 @@ const SlideOver: React.FC<SlideOverProps> = ({ initial, onClose, onSaved }) => {
   const [cost,         setCost]         = useState(String(initial?.cost ?? ''))
   const [minMargin,    setMinMargin]    = useState(String(((initial?.minMarginPercent ?? 0.2) * 100).toFixed(1)))
   const [rentalPrice,  setRentalPrice]  = useState(String(initial?.rentalPrice ?? ''))
+  const [chargedDaily, setChargedDaily] = useState(initial?.chargedDaily ?? false)
   const [isVisible,    setIsVisible]    = useState(initial?.isVisible ?? false)
   const [isFeatured,   setIsFeatured]   = useState(initial?.isFeatured ?? false)
   const [sortOrder,    setSortOrder]    = useState(String(initial?.sortOrder ?? 0))
@@ -220,6 +221,7 @@ const SlideOver: React.FC<SlideOverProps> = ({ initial, onClose, onSaved }) => {
       cost: parsedCost,
       minMarginPercent,
       rentalPrice: rentalPrice ? parseFloat(rentalPrice) : null,
+      chargedDaily: category === 'Fees' && chargedDaily,
       isVisible,
       isFeatured,
       sortOrder: parseInt(sortOrder) || 0,
@@ -301,6 +303,12 @@ const SlideOver: React.FC<SlideOverProps> = ({ initial, onClose, onSaved }) => {
           )}
 
           <div className="pl-so-toggles">
+            {category === 'Fees' && (
+              <label className="pl-so-toggle-row">
+                <Toggle checked={chargedDaily} onChange={() => setChargedDaily((v) => !v)} label="Charged per day" />
+                <span>Charged per day — base price is a daily rate; quotes ask for number of days</span>
+              </label>
+            )}
             <label className="pl-so-toggle-row">
               <Toggle checked={isVisible} onChange={() => setIsVisible((v) => !v)} label="Visible to customers" />
               <span>Visible to customers</span>

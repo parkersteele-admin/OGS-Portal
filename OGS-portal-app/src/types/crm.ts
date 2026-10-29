@@ -38,9 +38,14 @@ export type QuoteStatus = 'draft' | 'sent' | 'accepted' | 'declined' | 'expired'
 export interface QuoteItem {
   productId: string
   description: string
+  /** Billable quantity. For daily-charged lines this is rentalUnits × rentalDays. */
   quantity: number
   unitPrice: number
   amount: number
+  /** Daily-charged lines only: units rented (e.g. number of cages). */
+  rentalUnits?: number
+  /** Daily-charged lines only: number of days billed. */
+  rentalDays?: number
 }
 
 export type QuotePrimaryCommunicationMethod = 'email' | 'phone' | 'text'

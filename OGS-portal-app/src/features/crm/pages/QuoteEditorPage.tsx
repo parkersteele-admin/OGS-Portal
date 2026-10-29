@@ -58,6 +58,9 @@ import {
   calculateLineItemRollups,
   calculateMarginPercent,
   recalculateLineItem,
+  billableQuantity,
+  toQuoteItem,
+  fromQuoteItem,
 } from '../../shared/line-items/lineItemPricing'
 import { getLineItemPricingPermissions } from '../../shared/line-items/lineItemPermissions'
 import type { EditableLineItem } from '../../shared/line-items/types'
@@ -145,10 +148,6 @@ const FlatIcon: React.FC<{ name: FlatIconName }> = ({ name }) => {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const DELIVERY_PRODUCT_ID = 'delivery'
-
-function toQuoteItem(r: DraftLineItem): QuoteItem {
-  return { productId: r.productId, description: r.description, quantity: r.quantity, unitPrice: r.unitPrice, amount: r.amount }
-}
 
 // ── PDF preview modal ─────────────────────────────────────────────────────────
 
@@ -353,8 +352,7 @@ const QuoteEditorPage: React.FC = () => {
         productId:   item.productId,
         productName: '',
         skuLabel:    '',
-        description: item.description,
-        quantity:    item.quantity,
+        ...fromQuoteItem(item),
         basePrice:   item.unitPrice,
         cost:        0,
         minMarginPercent: 0.2,
@@ -537,7 +535,7 @@ const QuoteEditorPage: React.FC = () => {
     [productRows],
   )
   const totalCost = useMemo(
-    () => parseFloat(productRows.reduce((s, r) => s + (r.cost * r.quantity), 0).toFixed(2)),
+    () => parseFloat(productRows.reduce((s, r) => s + (r.cost * billableQuantity(r)), 0).toFixed(2)),
     [productRows],
   )
   const totalLineProfit = useMemo(
@@ -622,6 +620,7 @@ const QuoteEditorPage: React.FC = () => {
     if (marginViolations.length > 0) {
       return `Margin is below minimum on ${marginViolations.length} line item${marginViolations.length === 1 ? '' : 's'}.`
     }
+    if (productRows.some(r => r.rentalDays != null && r.rentalDays < 1)) return 'Daily-charged lines need at least one day.'
     if (includeRental && (rentalMonths < 1 || rentalRate < 0)) return 'Enter a valid rental rate and at least one month.'
     if (!validUntil) return 'Please set a valid-until date.'
     return null

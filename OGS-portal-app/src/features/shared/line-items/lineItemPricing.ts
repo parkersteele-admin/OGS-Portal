@@ -1,4 +1,5 @@
 import type { ProductDropdownItem } from '../../../services/productService'
+import type { QuoteItem } from '../../../types/crm'
 import type {
   EditableLineItem,
   LineItemRollupInput,
@@ -25,6 +26,11 @@ export const EMPTY_LINE_ITEM = (): EditableLineItem => ({
   amount: 0,
 })
 
+/** Units actually billed: quantity, multiplied by days for daily-charged lines. */
+export function billableQuantity(row: Pick<EditableLineItem, 'quantity' | 'rentalDays'>): number {
+  return row.rentalDays != null ? row.quantity * row.rentalDays : row.quantity
+}
+
 export function normalizeMarginInput(value: number): number {
   if (!Number.isFinite(value)) return 0
   const normalized = value > 1 ? value / 100 : value
@@ -48,6 +54,10 @@ export function recalculateLineItem(
   enforceMarginFloor = false,
 ): EditableLineItem {
   const quantity = Number.isFinite(row.quantity) ? Math.max(row.quantity, 0) : 0
+  const rentalDays = row.rentalDays == null
+    ? undefined
+    : (Number.isFinite(row.rentalDays) ? Math.max(Math.round(row.rentalDays), 0) : 0)
+  const billable = billableQuantity({ quantity, rentalDays })
   const cost = Number.isFinite(row.cost) ? Math.max(row.cost, 0) : 0
   const minMarginPercent = normalizeMarginInput(row.minMarginPercent)
   const minPrice = calculateMinPrice(cost, minMarginPercent)
@@ -73,12 +83,13 @@ export function recalculateLineItem(
     marginPercent = minMarginPercent
   }
 
-  const amount = parseFloat((quantity * unitPrice).toFixed(2))
-  const profit = parseFloat(((unitPrice - cost) * quantity).toFixed(2))
+  const amount = parseFloat((billable * unitPrice).toFixed(2))
+  const profit = parseFloat(((unitPrice - cost) * billable).toFixed(2))
 
   return {
     ...row,
     quantity,
+    rentalDays,
     cost,
     minMarginPercent,
     minPrice,
@@ -110,6 +121,7 @@ export function lineItemFromProduct(
       minPrice: product.minPrice,
       marginPercent,
       unitPrice: product.basePrice,
+      rentalDays: product.chargedDaily ? (current.rentalDays ?? 1) : undefined,
     },
     'unitPrice',
     enforceMarginFloor,
@@ -137,5 +149,39 @@ export function calculateLineItemRollups(input: LineItemRollupInput): LineItemRo
     totalRevenue,
     totalProfit,
     overallMarginPercent,
+  }
+}
+
+const DAILY_SUFFIX = / — [\d.]+ × \d+ days?$/
+
+/**
+ * Converts an editor row to a saved quote line. Daily-charged lines are folded
+ * so quantity = units × days and the description spells it out; everything
+ * downstream (PDF, orders, invoices) can keep computing quantity × unitPrice.
+ */
+export function toQuoteItem(row: EditableLineItem): QuoteItem {
+  const base = { productId: row.productId, unitPrice: row.unitPrice, amount: row.amount }
+  if (row.rentalDays == null) {
+    return { ...base, description: row.description, quantity: row.quantity }
+  }
+  const days = row.rentalDays
+  return {
+    ...base,
+    description: `${row.description} — ${row.quantity} × ${days} day${days === 1 ? '' : 's'}`,
+    quantity: billableQuantity(row),
+    rentalUnits: row.quantity,
+    rentalDays: days,
+  }
+}
+
+/** Reverses toQuoteItem's folding so a saved daily line can be edited again. */
+export function fromQuoteItem(item: QuoteItem): Pick<EditableLineItem, 'description' | 'quantity' | 'rentalDays'> {
+  if (item.rentalDays == null) {
+    return { description: item.description, quantity: item.quantity, rentalDays: undefined }
+  }
+  return {
+    description: item.description.replace(DAILY_SUFFIX, ''),
+    quantity: item.rentalUnits ?? item.quantity / Math.max(item.rentalDays, 1),
+    rentalDays: item.rentalDays,
   }
 }

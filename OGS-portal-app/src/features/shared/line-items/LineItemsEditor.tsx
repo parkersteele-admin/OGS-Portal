@@ -33,6 +33,7 @@ export const LineItemsEditor: React.FC<LineItemsEditorProps> = ({
   const [detailsOpenById, setDetailsOpenById] = useState<Record<string, boolean>>({})
 
   const safeItems = useMemo(() => (items.length > 0 ? items : [EMPTY_LINE_ITEM()]), [items])
+  const productById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products])
 
   const updateRow = (id: string, next: (row: EditableLineItem) => EditableLineItem) => {
     onChange(safeItems.map((row) => (row._id === id ? next(row) : row)))
@@ -50,6 +51,9 @@ export const LineItemsEditor: React.FC<LineItemsEditorProps> = ({
       if (field === 'minMarginPercent') {
         const normalized = normalizeMarginInput(Number(value))
         return recalculateLineItem({ ...row, minMarginPercent: normalized }, 'other', enforceMarginFloor)
+      }
+      if (field === 'rentalDays') {
+        return recalculateLineItem({ ...row, rentalDays: Number(value) || 0 }, 'other', enforceMarginFloor)
       }
       if (field === 'cost') {
         return recalculateLineItem({ ...row, cost: Number(value) || 0 }, 'other', enforceMarginFloor)
@@ -79,6 +83,14 @@ export const LineItemsEditor: React.FC<LineItemsEditorProps> = ({
     })
   }
 
+  const handleChargeDailyToggle = (id: string, chargeDaily: boolean) => {
+    updateRow(id, (row) => recalculateLineItem(
+      { ...row, rentalDays: chargeDaily ? (row.rentalDays ?? 1) : undefined },
+      'other',
+      enforceMarginFloor,
+    ))
+  }
+
   const handleAddRow = () => onChange([...safeItems, EMPTY_LINE_ITEM()])
 
   const handleRemoveRow = (id: string) => {
@@ -92,6 +104,9 @@ export const LineItemsEditor: React.FC<LineItemsEditorProps> = ({
         {safeItems.map((row, index) => {
           const hasMarginViolation = Boolean(row.productId) && row.marginPercent + 0.0001 < row.minMarginPercent
           const detailsOpen = detailsOpenById[row._id] ?? false
+          const isDaily = row.rentalDays != null
+          // Daily charging only applies to Fees products (or lines already saved as daily).
+          const canChargeDaily = isDaily || productById.get(row.productId)?.category === 'Fees'
 
           return (
             <article key={row._id} className={`lie-item${hasMarginViolation ? ' lie-item--warn' : ''}`}>
@@ -125,6 +140,17 @@ export const LineItemsEditor: React.FC<LineItemsEditorProps> = ({
                   onChange={(event) => handleFieldChange(row._id, 'description', event.target.value)}
                   disabled={disabled}
                 />
+                {canChargeDaily && (
+                  <label className="lie-item__daily">
+                    <input
+                      type="checkbox"
+                      checked={isDaily}
+                      onChange={(event) => handleChargeDailyToggle(row._id, event.target.checked)}
+                      disabled={disabled}
+                    />
+                    <span>Charge daily</span>
+                  </label>
+                )}
               </div>
 
               <div className="lie-item__controls">
@@ -141,6 +167,21 @@ export const LineItemsEditor: React.FC<LineItemsEditorProps> = ({
                   />
                 </label>
 
+                {isDaily && (
+                  <label>
+                    <span className="lie-item__label">Days</span>
+                    <input
+                      className="ui-input"
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={row.rentalDays || ''}
+                      onChange={(event) => handleFieldChange(row._id, 'rentalDays', Number(event.target.value) || 0)}
+                      disabled={disabled}
+                    />
+                  </label>
+                )}
+
                 <label>
                   <span className="lie-item__label">Margin %</span>
                   <input
@@ -156,7 +197,7 @@ export const LineItemsEditor: React.FC<LineItemsEditorProps> = ({
                 </label>
 
                 <label>
-                  <span className="lie-item__label">Final price</span>
+                  <span className="lie-item__label">{isDaily ? 'Daily rate' : 'Final price'}</span>
                   <input
                     className="ui-input"
                     type="number"
