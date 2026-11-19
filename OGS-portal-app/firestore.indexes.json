@@ -1,6 +1,18 @@
 {
   "indexes": [
 
+    // ── notifications ─────────────────────────────────────────────────────────
+
+    // useNotifications: where(userId) + orderBy(createdAt desc)
+    {
+      "collectionGroup": "notifications",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId",    "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+
     // ── customers ─────────────────────────────────────────────────────────────
 
     // getCustomers / subscribeToCustomers: where(status) + orderBy(name)
