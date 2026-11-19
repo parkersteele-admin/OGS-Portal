@@ -572,7 +572,7 @@ export const countersignOnboardingPacket = onCall({ secrets: SECRETS, memory: '5
 
 // ── Bank details: reveal + mark entered ───────────────────────────────────────
 
-export const revealOnboardingBankDetails = onCall({ secrets: [ONBOARDING_ENCRYPTION_KEY] }, async (req) => {
+export const revealOnboardingBankDetails = onCall({ secrets: [ONBOARDING_ENCRYPTION_KEY, RESEND_API_KEY] }, async (req) => {
   assertAdmin(req)
   const { ref, packet } = await loadPacket(str((req.data as Record<string, unknown>)?.packetId, 128))
   const secure = await ref.collection('secure').doc('bank').get()

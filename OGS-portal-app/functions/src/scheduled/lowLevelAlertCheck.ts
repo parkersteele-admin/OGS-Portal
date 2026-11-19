@@ -25,7 +25,6 @@ export const lowLevelAlertCheck = onSchedule(
   {
     schedule:       '0 8 * * *',
     timeZone:       'America/New_York',
-    secrets:        [],
     memory:         '256MiB',
     timeoutSeconds: 540,
   },

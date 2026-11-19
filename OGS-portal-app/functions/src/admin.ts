@@ -12,6 +12,15 @@ import { getApps, initializeApp } from 'firebase-admin/app'
 import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore'
 import { getStorage } from 'firebase-admin/storage'
 import { getAuth } from 'firebase-admin/auth'
+import { setGlobalOptions } from 'firebase-functions/v2'
+import { RESEND_API_KEY } from './config'
+
+// Every function gets the Resend key from Secret Manager. ~26 modules send
+// email through sendEmail(), which reads process.env.RESEND_API_KEY; binding
+// it globally means no function depends on a post-deploy env-var patch.
+// Functions that declare their own `secrets` must include RESEND_API_KEY too
+// if they send email (function-level secrets replace this list).
+setGlobalOptions({ secrets: [RESEND_API_KEY] })
 
 if (!getApps().length) {
   initializeApp()

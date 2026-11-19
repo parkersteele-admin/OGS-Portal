@@ -35,7 +35,7 @@
 
 import { onCall, HttpsError } from 'firebase-functions/v2/https'
 import { db } from '../admin'
-import { GOOGLE_MAPS_KEY, requireSecret } from '../config'
+import { GOOGLE_MAPS_KEY, requireSecret, RESEND_API_KEY } from '../config'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -136,7 +136,7 @@ function validateInput(data: Record<string, unknown>): OptimizeRouteInput {
 // ── Callable ───────────────────────────────────────────────────────────────────
 
 export const optimizeOrderRoute = onCall(
-  { secrets: [GOOGLE_MAPS_KEY] },
+  { secrets: [GOOGLE_MAPS_KEY, RESEND_API_KEY] },
   async (request): Promise<OptimizeRouteOutput> => {
 
     // ── Auth + role check ────────────────────────────────────────────────────

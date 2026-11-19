@@ -35,7 +35,6 @@ export const overdueInvoiceCheck = onSchedule(
   {
     schedule:       '0 9 * * *',
     timeZone:       'America/New_York',
-    secrets:        [],
     memory:         '256MiB',
     timeoutSeconds: 540,
   },

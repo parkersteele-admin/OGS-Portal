@@ -577,7 +577,7 @@ export const generateQuotePdf = onCall({ secrets: [RESEND_API_KEY] }, async (req
  * Input:  { runId: string }
  * Output: { optimizedOrder: number[] }   — original stop indices in new order
  */
-export const optimizeRoute = onCall({ secrets: [GOOGLE_MAPS_KEY] }, async (request) => {
+export const optimizeRoute = onCall({ secrets: [GOOGLE_MAPS_KEY, RESEND_API_KEY] }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'You must be signed in.');
   }
@@ -673,7 +673,7 @@ export const optimizeRoute = onCall({ secrets: [GOOGLE_MAPS_KEY] }, async (reque
  * Access: admin only
  * Output: { processed: number, skipped: number, failed: number }
  */
-export const backfillGeocodeCustomers = onCall({ secrets: [GOOGLE_MAPS_KEY] }, async (request) => {
+export const backfillGeocodeCustomers = onCall({ secrets: [GOOGLE_MAPS_KEY, RESEND_API_KEY] }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in required.');
   if (request.auth.token.role !== 'admin') throw new HttpsError('permission-denied', 'Admin only.');
 

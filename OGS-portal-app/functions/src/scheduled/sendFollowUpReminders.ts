@@ -13,7 +13,6 @@ export const sendFollowUpReminders = onSchedule(
   {
     schedule:       '0 7 * * *',
     timeZone:       'America/New_York',
-    secrets:        [],
     memory:         '256MiB',
     timeoutSeconds: 300,
   },

@@ -17,7 +17,6 @@ export const alertUnassignedLead = onSchedule(
   {
     schedule:       '0 * * * *',   // every hour
     timeZone:       'America/New_York',
-    secrets:        [],
     memory:         '256MiB',
     timeoutSeconds: 120,
   },

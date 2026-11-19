@@ -27,7 +27,6 @@ export const certExpiryCheck = onSchedule(
   {
     schedule:       '0 7 * * 1', // every Monday at 07:00
     timeZone:       'America/New_York',
-    secrets:        [],
     memory:         '256MiB',
     timeoutSeconds: 540,
   },

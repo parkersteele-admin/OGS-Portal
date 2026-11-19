@@ -19,7 +19,7 @@
 
 import { onDocumentCreated, onDocumentUpdated } from 'firebase-functions/v2/firestore'
 import { db, FieldValue } from '../admin'
-import { GOOGLE_MAPS_KEY, requireSecret } from '../config'
+import { GOOGLE_MAPS_KEY, requireSecret, RESEND_API_KEY } from '../config'
 
 const ADDRESS_FIELDS = ['address', 'city', 'state', 'zip'] as const
 type AddressField = typeof ADDRESS_FIELDS[number]
@@ -132,7 +132,7 @@ export async function performGeocode(
 export const geocodeCustomerOnCreate = onDocumentCreated(
   {
     document: 'customers/{customerId}',
-    secrets:  [GOOGLE_MAPS_KEY],
+    secrets:  [GOOGLE_MAPS_KEY, RESEND_API_KEY],
   },
   async (event) => {
     const snap = event.data
@@ -148,7 +148,7 @@ export const geocodeCustomerOnCreate = onDocumentCreated(
 export const geocodeCustomerOnUpdate = onDocumentUpdated(
   {
     document: 'customers/{customerId}',
-    secrets:  [GOOGLE_MAPS_KEY],
+    secrets:  [GOOGLE_MAPS_KEY, RESEND_API_KEY],
   },
   async (event) => {
     const snap = event.data
