@@ -343,6 +343,21 @@ service cloud.firestore {
 
 
     // ── Quotes ────────────────────────────────────────────────────────────────
+    // ── Digital onboarding packets ────────────────────────────────────────────
+    // Written only by Cloud Functions. Encrypted bank details (secure/*) and
+    // the access log are never readable by any client.
+    match /onboardingPackets/{packetId} {
+      allow read: if isSales();
+      allow write: if false;
+      match /secure/{docId} {
+        allow read, write: if false;
+      }
+      match /accessLog/{logId} {
+        allow read: if isAdmin();
+        allow write: if false;
+      }
+    }
+
     match /quotes/{quoteId} {
       allow read: if isSales()
         || (isPortalUser() && resource.data.customerId == linkedCompanyId())

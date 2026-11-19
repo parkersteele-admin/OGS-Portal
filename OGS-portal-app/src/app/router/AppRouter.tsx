@@ -62,6 +62,7 @@ import SignUp from '../../pages/public/SignUp'
 import OnboardingPage from '../../pages/portal/Onboarding'
 import AcceptInvitePage from '../../pages/portal/AcceptInvite'
 import JoinSetupPage from '../../pages/portal/JoinSetup'
+import PublicOnboardingPage from '../../features/onboarding/PublicOnboardingPage'
 import TeamSettingsPage from '../../pages/portal/TeamSettings'
 import { OnboardingLayout } from '../../components/layouts/OnboardingLayout'
 
@@ -145,6 +146,9 @@ export const AppRouter: React.FC = () => (
 
       {/* Customer account setup via QR code — no auth required */}
       <Route path="/join/:token" element={<JoinSetupPage />} />
+
+      {/* Digital onboarding packet (agreement + payment authorization e-sign) — no auth required */}
+      <Route path="/onboard/:token" element={<PublicOnboardingPage />} />
 
       {/* Onboarding wizard — minimal layout, no sidebar */}
       <Route

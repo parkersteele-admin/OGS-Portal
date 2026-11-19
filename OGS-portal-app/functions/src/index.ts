@@ -107,3 +107,18 @@ export { alertUnassignedLead }          from './scheduled/alertUnassignedLead'
 export const healthCheck = onRequest((_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
+
+// ── Digital onboarding packets (PSA + payment authorization e-sign) ──────────
+export {
+  createOnboardingPacket,
+  resendOnboardingPacket,
+  getOnboardingPacketLink,
+  voidOnboardingPacket,
+  getOnboardingPacketPublic,
+  getOnboardingW9,
+  submitOnboardingPacket,
+  countersignOnboardingPacket,
+  revealOnboardingBankDetails,
+  markOnboardingBankEntered,
+  sendOnboardingReminders,
+} from './onboardingPackets'

@@ -86,6 +86,7 @@ import type { AppFile } from '../../../types/file'
 import type { AppUser } from '../../../types/user'
 import type { UserRole } from '../../../types/user'
 import type { Invoice } from '../../../types/billing'
+import { OnboardingPacketsPanel } from '../../onboarding/OnboardingPacketsPanel'
 import './CustomerRecord.css'
 
 // ── Extended types for CRM-specific Firestore fields ─────────────────────────
@@ -109,7 +110,7 @@ interface ContactLogWithFollowUp extends ContactLog {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-type TabKey = 'overview' | 'company' | 'orderHistory' | 'history' | 'notes' | 'documents' | 'access' | 'productPricing' | 'standingOrder'
+type TabKey = 'overview' | 'company' | 'orderHistory' | 'history' | 'notes' | 'documents' | 'access' | 'productPricing' | 'standingOrder' | 'onboarding'
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'overview',       label: 'Overview' },
@@ -117,6 +118,7 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'orderHistory',   label: 'Order History' },
   { key: 'history',        label: 'Contact History' },
   { key: 'notes',          label: 'Account Notes' },
+  { key: 'onboarding',     label: 'Onboarding' },
   { key: 'documents',      label: 'Documents' },
   { key: 'access',         label: 'User Access' },
   { key: 'productPricing', label: 'Product Pricing' },
@@ -3125,6 +3127,11 @@ const CustomerRecord: React.FC = () => {
             </Button>
           </div>
         </div>
+      )}
+
+      {/* ── Tab: Onboarding ────────────────────────────────────────────────── */}
+      {activeTab === 'onboarding' && customer && (
+        <OnboardingPacketsPanel customer={customer} currentUser={user} />
       )}
 
       {/* ── Tab: Documents ─────────────────────────────────────────────────── */}
