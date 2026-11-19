@@ -265,6 +265,15 @@ jobs:
 
             # Stale gen2 function services can reference GC'd images.
             # Skip those services instead of failing the entire deploy.
+            # Functions that bind RESEND_API_KEY as a Secret Manager secret
+            # (e.g. generateQuotePdf, onboarding packets) already have it and
+            # reject a plain-text override. Leave those alone.
+            if echo "$output" | grep -qiE "different type|secretKeyRef|already been set"; then
+              SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
+              echo "Skipping $service because RESEND_API_KEY is bound as a secret." >&2
+              continue
+            fi
+
             if echo "$output" | grep -qiE "Image .+ not found"; then
               SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
               echo "Skipping $service because its backing image is missing." >&2
