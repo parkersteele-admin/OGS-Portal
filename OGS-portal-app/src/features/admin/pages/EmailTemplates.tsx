@@ -7,12 +7,14 @@
  * Currently manages:
  *  - Quote email intro paragraph
  *  - "Want to discuss?" copy (shown instead of a Decline button)
+ *  - Onboarding packet defaults (separate doc: /settings/onboardingDefaults)
  */
 
 import React, { useState, useEffect } from 'react'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { db } from '../../../lib/firebase'
 import { Button } from '../../../components/ui/Button'
+import { OnboardingDefaultsEditor } from '../../onboarding/OnboardingDefaultsEditor'
 import './EmailTemplates.css'
 
 interface EmailTemplateSettings {
@@ -153,6 +155,8 @@ const EmailTemplatesPage: React.FC = () => {
           {saved ? '✓ Saved' : 'Save Templates'}
         </Button>
       </div>
+
+      <OnboardingDefaultsEditor />
     </div>
   )
 }

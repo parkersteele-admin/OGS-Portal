@@ -6,7 +6,7 @@
  */
 
 import { httpsCallable } from 'firebase/functions'
-import { collection, onSnapshot, query, where, type Timestamp } from 'firebase/firestore'
+import { collection, doc, getDoc, onSnapshot, query, setDoc, where, type Timestamp } from 'firebase/firestore'
 import { db, functions } from '../../lib/firebase'
 
 export interface RateLine { label: string; charge: string; basis: string }
@@ -172,14 +172,74 @@ export const DEFAULT_RATE_SCHEDULE: RateLine[] = [
   { label: '12 cylinder cage purchase', charge: '$2,031.00', basis: 'One-time purchase' },
 ]
 
+export const DEFAULT_MESSAGE_TEMPLATE = [
+  'Hi {firstName},',
+  "Excellent! We're looking forward to working with you. Let me know a convenient time — we'd prefer to check out where you'd like the cage set and see the site prior to any deliveries.",
+  "Use the button below to review and sign your Product Supply Agreement and set up your payment authorization. Product deliveries are billed upon delivery; monthly rentals are billed on the 1st of each month in arrears. You'll also be able to let us know whether you'd prefer to purchase or rent the 12-cylinder storage cage.",
+  'Let me know if you have any questions or need anything else.',
+  '{repName}',
+].join('\n\n')
+
+/** Fill {firstName} / {repName} placeholders in a message template. */
+export function renderMessageTemplate(template: string, firstName: string, repName: string): string {
+  return template
+    .replace(/\{firstName\}/g, firstName || 'there')
+    .replace(/\{repName\}/g, repName || 'Ohio Gas Supply')
+}
+
 export function defaultPersonalMessage(firstName: string, repName: string): string {
-  return [
-    `Hi ${firstName || 'there'},`,
-    `Excellent! We're looking forward to working with you. Let me know a convenient time — we'd prefer to check out where you'd like the cage set and see the site prior to any deliveries.`,
-    `Use the button below to review and sign your Product Supply Agreement and set up your payment authorization. Product deliveries are billed upon delivery; monthly rentals are billed on the 1st of each month in arrears. You'll also be able to let us know whether you'd prefer to purchase or rent the 12-cylinder storage cage.`,
-    `Let me know if you have any questions or need anything else.`,
-    repName || 'Ohio Gas Supply',
-  ].join('\n\n')
+  return renderMessageTemplate(DEFAULT_MESSAGE_TEMPLATE, firstName, repName)
+}
+
+// ── Editable defaults (settings/onboardingDefaults) ──────────────────────────
+
+export interface OnboardingDefaults {
+  messageTemplate: string
+  rateSchedule: RateLine[]
+  feeWaived: boolean
+  feeAmount: number
+  serviceMethod: string
+  paymentTerms: string
+  askCageChoice: boolean
+}
+
+export const BUILT_IN_ONBOARDING_DEFAULTS: OnboardingDefaults = {
+  messageTemplate: DEFAULT_MESSAGE_TEMPLATE,
+  rateSchedule: DEFAULT_RATE_SCHEDULE,
+  feeWaived: true,
+  feeAmount: 0,
+  serviceMethod: 'Cylinder exchange',
+  paymentTerms: 'Payment on delivery',
+  askCageChoice: true,
+}
+
+const onboardingDefaultsRef = () => doc(db, 'settings', 'onboardingDefaults')
+
+/** Saved defaults merged over the built-in ones. Falls back to built-ins on any error. */
+export async function getOnboardingDefaults(): Promise<OnboardingDefaults> {
+  try {
+    const snap = await getDoc(onboardingDefaultsRef())
+    if (!snap.exists()) return { ...BUILT_IN_ONBOARDING_DEFAULTS }
+    const d = snap.data() as Partial<OnboardingDefaults>
+    return {
+      ...BUILT_IN_ONBOARDING_DEFAULTS,
+      ...d,
+      messageTemplate: d.messageTemplate?.trim() ? d.messageTemplate : DEFAULT_MESSAGE_TEMPLATE,
+      rateSchedule: Array.isArray(d.rateSchedule) && d.rateSchedule.length ? d.rateSchedule : DEFAULT_RATE_SCHEDULE,
+    }
+  } catch {
+    return { ...BUILT_IN_ONBOARDING_DEFAULTS }
+  }
+}
+
+/** Admin only (enforced by Firestore rules on /settings). */
+export async function saveOnboardingDefaults(d: OnboardingDefaults): Promise<void> {
+  await setDoc(onboardingDefaultsRef(), {
+    ...d,
+    rateSchedule: d.rateSchedule
+      .map((r) => ({ label: r.label.trim(), charge: r.charge.trim(), basis: r.basis.trim() }))
+      .filter((r) => r.label),
+  })
 }
 
 export interface SignatureValue {

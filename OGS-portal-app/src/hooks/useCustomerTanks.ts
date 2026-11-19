@@ -24,10 +24,13 @@ interface UseCustomerTanksResult {
 export function useCustomerTanks(
   customerId: string | null | undefined,
 ): UseCustomerTanksResult {
-  const { data: tanks, loading, error } = useFirestoreSubscription<Tank>(
-    query(customerTanksCol(customerId!), orderBy('serialNumber')),
-    !!customerId,
+  // Memoize so the subscription isn't torn down and re-opened on every render
+  // (a fresh query object each render caused an infinite snapshot → render loop).
+  const tanksQuery = useMemo(
+    () => (customerId ? query(customerTanksCol(customerId), orderBy('serialNumber')) : null),
+    [customerId],
   )
+  const { data: tanks, loading, error } = useFirestoreSubscription<Tank>(tanksQuery, !!customerId)
 
   const hasLowLevel = useMemo(
     () =>

@@ -16,7 +16,7 @@
 
 import { useState, useEffect } from 'react'
 import type { Query, DocumentData } from 'firebase/firestore'
-import { onSnapshot } from 'firebase/firestore'
+import { onSnapshot, queryEqual } from 'firebase/firestore'
 
 interface UseFirestoreSubscriptionResult<T> {
   data: T[]
@@ -43,16 +43,24 @@ interface UseFirestoreSubscriptionResult<T> {
  *   - Single re-render per snapshot update (via setState)
  */
 export function useFirestoreSubscription<T extends { id: string }>(
-  q: Query<DocumentData>,
+  q: Query<DocumentData> | null | undefined,
   enabled: boolean = true,
 ): UseFirestoreSubscriptionResult<T> {
+  // Keep a stable query reference: callers often build `query(...)` inline,
+  // which yields a new object every render. Only swap when the query really
+  // changes, otherwise each snapshot would re-subscribe and loop forever.
+  const [activeQuery, setActiveQuery] = useState(q)
+  if (q !== activeQuery && !(q && activeQuery && queryEqual(q, activeQuery))) {
+    setActiveQuery(q)
+  }
+
   const [data, setData] = useState<T[]>([])
   const [loading, setLoading] = useState(enabled)
   const [error, setError] = useState<Error | null>(null)
 
   useEffect(() => {
     // Guard: disabled or invalid query
-    if (!enabled || !q) {
+    if (!enabled || !activeQuery) {
       setData([])
       setLoading(false)
       return
@@ -60,7 +68,7 @@ export function useFirestoreSubscription<T extends { id: string }>(
 
     // Setup subscription
     const unsubscribe = onSnapshot(
-      q,
+      activeQuery,
       (snap) => {
         const docs = snap.docs.map((doc) => ({
           id: doc.id,
@@ -80,7 +88,7 @@ export function useFirestoreSubscription<T extends { id: string }>(
 
     // Cleanup: unsubscribe on unmount or dependency change
     return unsubscribe
-  }, [q, enabled])
+  }, [activeQuery, enabled])
 
   return { data, loading, error }
 }

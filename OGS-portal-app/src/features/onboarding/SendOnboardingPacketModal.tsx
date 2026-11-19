@@ -4,7 +4,7 @@
  * Staff modal: configure and email a digital onboarding packet.
  */
 
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Modal } from '../../components/ui/Modal'
 import { Button } from '../../components/ui/Button'
 import type { Customer } from '../../types/customer'
@@ -12,7 +12,8 @@ import type { AppUser } from '../../types/user'
 import { formatAddress } from '../../utils/addressUtils'
 import {
   createOnboardingPacket, callableErrorMessage, defaultPersonalMessage, DEFAULT_RATE_SCHEDULE,
-  type PacketCustomerInfo, type RateLine,
+  getOnboardingDefaults, saveOnboardingDefaults, renderMessageTemplate,
+  type OnboardingDefaults, type PacketCustomerInfo, type RateLine,
 } from './onboardingService'
 
 interface Props {
@@ -67,6 +68,56 @@ export const SendOnboardingPacketModal: React.FC<Props> = ({ open, onClose, cust
   const [repEmail, setRepEmail] = useState(currentUser?.email || '')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
+  const [defaultsReady, setDefaultsReady] = useState(false)
+  const [savingDefault, setSavingDefault] = useState(false)
+  const [defaultNotice, setDefaultNotice] = useState('')
+  const isAdmin = currentUser?.role === 'admin'
+  const firstName = prefill.contactName.split(' ')[0]
+  const customerTerms = customer.paymentTerms && !/due on receipt|cod/i.test(customer.paymentTerms) ? customer.paymentTerms : ''
+
+  // Load the saved defaults (Admin › Email Templates › Onboarding packet).
+  useEffect(() => {
+    let cancelled = false
+    void getOnboardingDefaults().then((d) => {
+      if (cancelled) return
+      setMessage(renderMessageTemplate(d.messageTemplate, firstName, currentUser?.name || ''))
+      setRates(d.rateSchedule.map((r) => ({ ...r })))
+      setFeeWaived(d.feeWaived)
+      setFeeAmount(String(d.feeAmount ?? 0))
+      setServiceMethod(d.serviceMethod)
+      setPaymentTerms(customerTerms || d.paymentTerms)
+      setAskCage(d.askCageChoice)
+      setDefaultsReady(true)
+    })
+    return () => { cancelled = true }
+  }, [firstName, currentUser?.name, customerTerms])
+
+  const saveAsDefault = async () => {
+    if (!window.confirm('Use this message, rate schedule and terms as the default for all future onboarding packets?')) return
+    setSavingDefault(true); setDefaultNotice(''); setError('')
+    // Turn this customer's names back into placeholders so the template stays generic.
+    let template = message
+    const repNameValue = currentUser?.name || ''
+    if (repNameValue.trim().length > 1) template = template.split(repNameValue).join('{repName}')
+    if (firstName.trim().length > 1) template = template.split(firstName).join('{firstName}')
+    const defaults: OnboardingDefaults = {
+      messageTemplate: template,
+      rateSchedule: rates,
+      feeWaived,
+      feeAmount: Number(feeAmount) || 0,
+      serviceMethod,
+      paymentTerms,
+      askCageChoice: askCage,
+    }
+    try {
+      await saveOnboardingDefaults(defaults)
+      setDefaultNotice('Saved as the default for future packets.')
+    } catch (e) {
+      setError(callableErrorMessage(e, 'Could not save defaults. Only admins can change them.'))
+    } finally {
+      setSavingDefault(false)
+    }
+  }
 
   const updateRate = (i: number, k: keyof RateLine, v: string) => setRates((r) => r.map((row, idx) => (idx === i ? { ...row, [k]: v } : row)))
 
@@ -102,6 +153,7 @@ export const SendOnboardingPacketModal: React.FC<Props> = ({ open, onClose, cust
 
   return (
     <Modal open={open} onClose={onClose} title="Send onboarding packet" size="lg">
+      {!defaultsReady ? <p className="obs-muted">Loading…</p> : (
       <div className="obs-modal">
         <p className="obs-muted">
           Emails a secure link to review and sign the Product Supply Agreement and Payment Authorization. The W-9 is attached. Company details below are pre-filled for the customer to confirm.
@@ -168,12 +220,19 @@ export const SendOnboardingPacketModal: React.FC<Props> = ({ open, onClose, cust
         </div>
 
         {error && <div className="obs-error" role="alert">{error}</div>}
+        {defaultNotice && <div className="obs-notice">{defaultNotice}</div>}
 
         <div className="obs-actions">
+          {isAdmin && (
+            <button type="button" className="obs-link obs-actions__left" onClick={() => void saveAsDefault()} disabled={savingDefault || sending}>
+              {savingDefault ? 'Saving…' : 'Save as default for future packets'}
+            </button>
+          )}
           <Button variant="secondary" onClick={onClose} disabled={sending}>Cancel</Button>
           <Button onClick={send} disabled={sending}>{sending ? 'Sending…' : 'Send packet'}</Button>
         </div>
       </div>
+      )}
     </Modal>
   )
 }

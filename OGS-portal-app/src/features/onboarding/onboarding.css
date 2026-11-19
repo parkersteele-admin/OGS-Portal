@@ -211,7 +211,8 @@
 .obs-rates td:nth-child(1) { width: 45%; }
 .obs-icon-btn { background: none; border: 0; font-size: 18px; line-height: 1; color: var(--color-text-3, #6b7280); cursor: pointer; padding: 4px 6px; }
 .obs-icon-btn:hover { color: var(--color-danger, #d64545); }
-.obs-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+.obs-actions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.obs-actions__left { margin-right: auto; }
 .obs-steps-list { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.55; color: var(--color-text-2, #374151); }
 
 @media (max-width: 640px) {
