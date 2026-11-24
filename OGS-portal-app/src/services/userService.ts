@@ -173,7 +173,11 @@ export async function sendPasswordReset(email: string): Promise<void> {
       functions,
       'sendUserPasswordResetEmail',
     )
-    await fn({ email: email.trim().toLowerCase() })
+    const { data } = await fn({ email: email.trim().toLowerCase() })
+    // Admin-only helper: surface delivery failures instead of reporting success.
+    if (!data.emailSent) {
+      throw new Error('Reset email could not be sent. Check the email service configuration.')
+    }
   })
 }
 

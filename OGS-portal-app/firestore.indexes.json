@@ -476,6 +476,28 @@
         { "fieldPath": "entityId",    "order": "ASCENDING" },
         { "fieldPath": "contactedAt", "order": "DESCENDING" }
       ]
+    },
+
+    // alertUnassignedLead: source == + assignedTo == null + stage not-in + createdAt <=
+    {
+      "collectionGroup": "leads",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "assignedTo", "order": "ASCENDING" },
+        { "fieldPath": "source",     "order": "ASCENDING" },
+        { "fieldPath": "createdAt",  "order": "ASCENDING" },
+        { "fieldPath": "stage",      "order": "ASCENDING" }
+      ]
+    },
+
+    // lowLevelAlertCheck: status == deployed + currentLevelPct <=
+    {
+      "collectionGroup": "tanks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status",          "order": "ASCENDING" },
+        { "fieldPath": "currentLevelPct", "order": "ASCENDING" }
+      ]
     }
 
   ],

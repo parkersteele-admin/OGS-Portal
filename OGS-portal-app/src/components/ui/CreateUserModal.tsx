@@ -158,7 +158,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
   const [role,     setRole]     = useState<UserRole>(roles[0] ?? 'driver')
   const [customer, setCustomer] = useState<Customer | null>(preselectedCustomer ?? null)
   const [error,    setError]    = useState('')
-  const [success,  setSuccess]  = useState<'created' | 'linked' | null>(null)
+  const [success,  setSuccess]  = useState<'created' | 'linked' | 'email-failed' | null>(null)
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -175,8 +175,16 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
       return createAppUser(payload)  // returns { uid, linked }
     },
     onSuccess: (result) => {
-      const linked = (result as unknown as { linked?: boolean })?.linked
-      setSuccess(linked ? 'linked' : 'created')
+      if (result.linked) {
+        setSuccess('linked')
+      } else if (!result.emailSent) {
+        // Account exists but the setup email failed — keep the modal open so
+        // the admin sees it and can resend from the user's row.
+        setSuccess('email-failed')
+        return
+      } else {
+        setSuccess('created')
+      }
       setTimeout(() => { onCreated() }, 1500)
     },
     onError: (err: Error) => {
@@ -198,7 +206,16 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
 
   return (
     <Modal open onClose={onClose} title="Create User" size="md">
-      {success ? (
+      {success === 'email-failed' ? (
+        <div className="cum-success">
+          <p className="cum-success__icon">⚠</p>
+          <p className="cum-success__msg">
+            User created, but the password-setup email could not be sent.
+            Use "Send reset email" on their row to try again once email is working.
+          </p>
+          <Button variant="secondary" size="sm" onClick={onCreated}>Close</Button>
+        </div>
+      ) : success ? (
         <div className="cum-success">
           <p className="cum-success__icon">✓</p>
           {success === 'linked' ? (
